@@ -117,10 +117,12 @@ only do it once.
 **If uploading files isn't working for some reason**: open `AGENTS.md` in any plain text
 program (Notes, Notepad, TextEdit — whatever came with your computer), select all the text,
 copy it, and paste it directly as your first message instead. This always works, on
-anything that can have a conversation with you. One difference with this path: since there's
-no file for it to check on its own, it'll show you a short block of text before you finish
-each session and ask you to save it (a Notes app is fine) — just paste that back first
-next time, so it still knows exactly where you left off.
+anything that can have a conversation with you. (On Windows, double-clicking a file like
+this one sometimes doesn't open anything obvious — if that happens, right-click it instead
+and choose **Open with → Notepad**.) One difference with this path: since there's no file
+for it to check on its own, it'll show you a short block of text before you finish each
+session and ask you to save it (a Notes app is fine) — just paste that back first next
+time, so it still knows exactly where you left off.
 
 ---
 

@@ -68,7 +68,9 @@ model, and this is that. It only needs doing once.
 6. **Error notifications**: create a third workflow from n8n's built-in error-trigger
    template that emails you "a workflow failed, here's why" and set it as the error
    workflow on both of the above. This is what makes a stale credential fail loudly
-   instead of silently.
+   instead of silently. **You'll know this one worked when**: it shows up as a third
+   workflow in your list, and both WF-01 and WF-02 show it selected under their own
+   Settings → Error Workflow.
 
 **You'll know steps 1-2 worked when**: both workflows appear in your n8n workflow list
 with no warning triangles on any node. A warning triangle means that node still needs a

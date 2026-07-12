@@ -15,8 +15,9 @@ that's worth checking before you start (whoever set up your HubSpot account will
    `crm.schemas.companies.write`, `crm.objects.deals.write`, `crm.objects.contacts.write`,
    `crm.objects.companies.write`.
 4. Click **Create app**, confirm, then copy the access token shown — HubSpot only shows it
-   once. Paste it somewhere temporary; you'll use it in one command below, then can forget
-   it.
+   once. Paste it somewhere temporary — a Notes app is fine. **You won't need it again
+   until the connectors step, later on** (see `connectors/connector-checklist.md`), so
+   don't worry if nothing seems to want it right now — that's expected, just hold onto it.
 
 **If your screen doesn't match this exactly**: HubSpot's exact menu wording shifts between
 account types and over time. Search Settings for "private app," or ask your AI assistant
@@ -71,7 +72,11 @@ HubSpot's settings — it takes about 10 minutes:
    create **Orion Pipeline** with stages: Prospect, Lead, MQL, SQL, Deal, Closed Won,
    Closed Lost. **If HubSpot won't let you add a new pipeline** (this is normal on
    free/starter plans — HubSpot allows only one per account), just rename your existing
-   default pipeline's stages to match instead.
+   default pipeline's stages to match instead. **If you already have real deals sitting
+   in that pipeline**: jot down which stage each one is currently in before you rename
+   anything — renaming a stage doesn't delete the deals in it, but the label under them
+   changes, so take a moment afterward to move each one to whichever new stage name is
+   the closest match.
 4. That's it — skip to "After applying" below. You've just done, by hand, exactly what the
    script would have done automatically.
 

@@ -24,6 +24,16 @@ like `status/status.json` is something you can just open. Instead:
 - If nothing else works, plain copy-paste of a file's text into the chat always works,
   regardless of what AI product you are.
 
+**If the client has no file upload at all — a bare chat with nothing but copy-paste —
+resumability needs one extra step, because there's no file for you to read back later.**
+At the end of any session where you're in this situation (and any time real progress has
+been made), print the current, complete contents of `status/status.json` in the chat as
+plain text, and say something like: "Save this somewhere — a Notes app is fine — so next
+time, just paste it back to me first and I'll know exactly where we left off." Do this
+before the client closes the conversation, not only if they ask. Without this, "you can
+stop anytime and come back" silently stops being true the moment file upload isn't
+available, and that promise is made to every reader in `README.md` — keep it.
+
 ## Before you say anything to the client
 
 1. **Read `status/status.json`.** If it does not exist, this is session 1 — copy

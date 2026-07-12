@@ -20,6 +20,22 @@ No self-serve install has happened yet through this repository. This volume open
 moment the first one does — mirroring exactly how the coach-led kit's own Vol. 1 was
 mined from its first two real installs, not written speculatively in advance.
 
+## Anticipated risk, flagged before any install (not yet confirmed against a real one)
+
+**n8n is the least "non-technical" part of this journey, even after the onboarding
+rewrite.** Every client, regardless of which chat surface they use for the daily
+conversation, still has to personally use n8n's own workflow editor: import two JSON
+files, open individual nodes, and pick or create credentials per node. This is a genuine
+property of the tool chosen (n8n), not something the wording in `connectors/` or `n8n/`
+can fully soften away — it's been made as clear and well-scaffolded as documentation can
+make it (a plain-language framing of what's happening, concrete "you'll know it worked
+when" signals, no fabricated non-technical alternative), but it remains the one stretch of
+the install where a client with zero tolerance for anything resembling "software settings"
+is most likely to want to hand the keyboard to someone else, or lean hard on a
+code-capable AI adapter to do it for them. Worth watching for in the first few real
+installs — if this is where people actually get stuck, the fix is probably architectural
+(a different automation layer, or a much thinner n8n-config generator), not more wording.
+
 ## Explicitly out of scope for this channel
 
 - The IG/LinkedIn content-template layer and the Skool support system aren't built yet

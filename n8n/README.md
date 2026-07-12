@@ -21,13 +21,38 @@ time:
    path later, that's a deliberate future decision to make with a clear head — not
    something to loosen by editing a node without thinking it through.
 
+## Before you import: these workflows need their own small separate account
+
+This is worth knowing upfront, because it's easy to miss: **the chat conversation you have
+with your agent, and these automated workflows, are two different things technically**,
+even though they feel like one agent to you. Your everyday chat runs on whatever Claude/
+ChatGPT/Copilot subscription you already have — nothing extra needed there. But these two
+automated workflows (the ones that run when you submit a form, without you actively
+chatting) need their own way to reach Claude, which means a separate account at
+**console.anthropic.com** (Anthropic's developer site, different from claude.ai):
+
+1. Go to console.anthropic.com and sign up (email, Google, or single sign-on all work).
+2. You'll need to add a card under **Settings → Billing** — this account is billed
+   separately, based on how much these two workflows are actually used (typically small
+   for this — a few prospects and calls a day), not a flat subscription fee. Skipping this
+   step is the single most common reason a brand-new key doesn't work, so don't skip it.
+3. Click **API Keys** in the sidebar, then **Create Key**. Copy the key shown — like other
+   keys in this repo, it's shown exactly once. If you ever lose it, you just make a new one
+   — nothing is harmed by that.
+
+**If this feels like a lot**: it's the one part of this whole install that genuinely can't
+be avoided or done by hand instead — automated workflows need their own way to reach an AI
+model, and this is that. It only needs doing once.
+
 ## Import & set up
 
-1. **Import** both JSON files into your own n8n workspace (Workflows → ⋯ → Import from
-   file).
-2. **Attach your credentials** from the connector checklist: the Anthropic/model API key
-   your agent uses, Gmail OAuth2, and your CRM credential. The credential names in the
-   JSON are placeholders — rebind each node to your own.
+1. **Import** both JSON files into your own n8n account (three dots in the top-right,
+   then **Import from File** — pick each JSON file from your unzipped folder).
+2. **Attach your credentials**: open each node in the imported workflow that needs one
+   (n8n will show a warning on any node that isn't connected to a credential yet) and pick
+   or create the matching one — the Anthropic key from just above, your Gmail connection,
+   and your CRM connection, both already set up in the
+   [connector checklist](../connectors/connector-checklist.md).
 3. **Set a workflow variable** — n8n's term for a simple setting these workflows read
    (n8n → Variables):
    - `AGENT_SYSTEM_PROMPT` — the assembled system prompt from
@@ -44,6 +69,10 @@ time:
    template that emails you "a workflow failed, here's why" and set it as the error
    workflow on both of the above. This is what makes a stale credential fail loudly
    instead of silently.
+
+**You'll know steps 1-2 worked when**: both workflows appear in your n8n workflow list
+with no warning triangles on any node. A warning triangle means that node still needs a
+credential picked — click it and fix that one before moving on.
 
 ## Wiring your commitments — the point of all this
 

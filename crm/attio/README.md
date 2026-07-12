@@ -5,16 +5,21 @@ Shapes a fresh (or messy) Attio workspace into the Orion pipeline in minutes: st
 daily-driving views. Stage definitions should match knowledge base §4 — same names, same
 entry criteria.
 
-## First time generating an Attio API key? Do this first
+## First time generating an Attio access token (Attio's name for what's commonly called an API key)? Do this first
 
-1. Log into Attio, then go to **Settings** (bottom-left, usually a gear icon) →
-   **Developers** → **API keys**.
-2. Click **Create API key**. Give it a name like "Orion install" so it's easy to find
-   later.
-3. Grant it **full data access** and **full configuration access** when asked — this is
-   what lets the setup script create lists and fields.
-4. Copy the key somewhere temporary (a notes app is fine) — Attio only shows it once.
+1. Log into Attio. Click the dropdown next to your workspace name (top-left), then click
+   **Workspace settings**.
+2. Click the **Developers** tab, then click **+ New access token**.
+3. Give it a name like "Orion install" so it's easy to find later, and set its scopes as
+   broad as the screen allows (look for wording like full access to records and
+   configuration) — this is what lets the setup script create lists and fields.
+4. Copy the token somewhere temporary (a notes app is fine) — Attio only shows it once.
    You'll paste it into one command below, then you can forget it.
+
+**If your screen doesn't match this exactly**: Attio, like any product, changes its menus
+over time. Search your account's settings for "developer" or "access token," or just ask
+your AI assistant to help you find it — the end result (a long random string of letters
+and numbers you copy once) is what matters, not the exact click path.
 
 ## What gets created
 

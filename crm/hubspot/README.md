@@ -5,6 +5,9 @@ Orion pipeline. Stage definitions should match knowledge base §4.
 
 ## First time generating a HubSpot private app token? Do this first
 
+You'll need to be an admin on your HubSpot account for this step — if you're not sure,
+that's worth checking before you start (whoever set up your HubSpot account will know).
+
 1. In HubSpot, go to **Settings** (gear icon, top-right) → **Integrations** →
    **Private Apps**.
 2. Click **Create a private app**. Name it something like "Orion install."
@@ -14,6 +17,11 @@ Orion pipeline. Stage definitions should match knowledge base §4.
 4. Click **Create app**, confirm, then copy the access token shown — HubSpot only shows it
    once. Paste it somewhere temporary; you'll use it in one command below, then can forget
    it.
+
+**If your screen doesn't match this exactly**: HubSpot's exact menu wording shifts between
+account types and over time. Search Settings for "private app," or ask your AI assistant
+to help you find it — the end result (a token you copy once) is what matters, not the
+exact click path.
 
 ## How this differs from the Attio template
 

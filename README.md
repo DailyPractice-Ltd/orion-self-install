@@ -34,8 +34,8 @@ own copy of that folder on your own computer.
      caption: "On the repository page, click the green 'Code' button, then 'Download ZIP'." -->
 ![The green Code button on GitHub, showing the Download ZIP option](docs/img/01-github-code-button.png)
 
-1. On the page you're reading this from, look for a green button that says **Code**, near
-   the top. Click it, then click **Download ZIP**.
+1. On the page you're reading this from, look for a green button that says **Code**, in
+   the top-right of the file list. Click it, then click **Download ZIP**.
 2. Your browser downloads a file — usually straight into a folder called "Downloads."
 3. **Unzip it**: this turns the single downloaded file back into a proper folder you can
    open.
@@ -92,10 +92,12 @@ only do it once.
      caption: "In claude.ai, click your name/menu, then 'Projects', then 'Create project'. Name it anything — e.g. 'My Orion'." -->
 ![Creating a new Project in claude.ai](docs/img/03-claude-project-create.png)
 
-1. **Claude**: go to claude.ai, create a **Project** (this just means a dedicated space
-   with its own memory), and give it any name — "My Orion" is fine.
-   **ChatGPT**: go to chatgpt.com, and create a **Custom GPT** (ChatGPT's equivalent —
-   look for "Explore GPTs" then "Create").
+1. **Claude**: go to claude.ai, click **Projects** on the left, then **New Project** (this
+   just means a dedicated space with its own memory), and give it any name — "My Orion" is
+   fine.
+   **ChatGPT**: go to chatgpt.com, click **Explore GPTs** in the sidebar, then **Create**.
+   (This needs a paid ChatGPT plan — if you're on the free plan, use the "if uploading
+   files isn't working" option below instead, it works just as well.)
    **Copilot**: in Microsoft 365 Copilot, look for **Create agent**.
 
 <!-- SCREENSHOT: docs/img/04-claude-project-upload-files.png
@@ -115,7 +117,10 @@ only do it once.
 **If uploading files isn't working for some reason**: open `AGENTS.md` in any plain text
 program (Notes, Notepad, TextEdit — whatever came with your computer), select all the text,
 copy it, and paste it directly as your first message instead. This always works, on
-anything that can have a conversation with you.
+anything that can have a conversation with you. One difference with this path: since there's
+no file for it to check on its own, it'll show you a short block of text before you finish
+each session and ask you to save it (a Notes app is fine) — just paste that back first
+next time, so it still knows exactly where you left off.
 
 ---
 

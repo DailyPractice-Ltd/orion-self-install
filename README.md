@@ -171,6 +171,11 @@ alone — that's what it's built for. If it genuinely can't help, reach out to
 
 ---
 
+*Testing this repository rather than installing it for yourself? See
+`NON-TECHNICAL-DRY-RUN.md` before you start — it's a protocol, not a suggestion.*
+
+---
+
 *For Daily Practice maintainers evolving this repository itself — not installing it for a
 client — the technical specification lives in `specs/001-self-install/` and
 `.specify/memory/constitution.md`.*

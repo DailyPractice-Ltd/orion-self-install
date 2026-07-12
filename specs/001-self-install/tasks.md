@@ -159,7 +159,9 @@ explicitly out of scope (see `docs/self-serve-learnings.md`).
 - T033 Full non-technical dry run: someone who is not the founder, with no prior Orion
   exposure, clones the repo cold and reaches `validated` using only what's in the
   repository. Anywhere they get stuck is a defect in the repository, not in them — this is
-  the real acceptance gate, not T032.
+  the real acceptance gate, not T032. Run it using the protocol in
+  `NON-TECHNICAL-DRY-RUN.md` — this is not optional colour, it's what turns a subjective
+  "seemed fine" into a real, loggable pass/fail with a friction record.
 
 ---
 

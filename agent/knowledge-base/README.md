@@ -9,6 +9,11 @@ You're writing while they talk (or type) — don't paraphrase into generic sales
 If a section reads like a marketing template instead of the client's actual voice,
 ask again until it doesn't.
 
+One term below you may need to explain rather than just use: **ICP**, short for "ideal
+customer profile" — just means the type of customer they're actually trying to reach. If
+the client isn't from a sales background (a lot of founders aren't), say the full phrase
+once rather than assuming the abbreviation is familiar.
+
 | File | Section | Captures |
 |---|---|---|
 | `01-business-context.md` | Business context | What the business is, stage, model, channels |

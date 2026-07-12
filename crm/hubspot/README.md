@@ -39,11 +39,40 @@ that tier:
   Pipelines. This is a Settings-level action, not reachable via the API — expect the same
   boundary on most CRMs, including Attio (its views have the identical limitation).
 
-## Apply it
+## Apply it — two ways, pick whichever fits
 
-If your AI assistant can run scripts (see `agent/adapters/claude-code.md`), it can do this
-step directly once you've pasted in the token. Otherwise, run this yourself in a terminal —
-your assistant can tell you exactly how to open one for your operating system:
+**If your AI assistant can run scripts for you** (Claude Code, Cursor, or similar — see
+`agent/adapters/claude-code.md`): it can create all of this automatically once you've
+pasted in the token you just generated. No further reading needed — it'll handle the
+command below itself.
+
+**If not — no terminal, no code, entirely by hand in HubSpot's normal screens:**
+
+You don't need to run anything. Just recreate the same shape yourself, directly in
+HubSpot's settings — it takes about 10 minutes:
+
+1. Go to **Settings → Properties**, find the **Lifecycle Stage** property on Contacts, and
+   edit it to make sure these options all exist (add any that are missing, leave any
+   existing ones alone): 1. Prospect, 2. Lead, 3. MQL, 4. SQL, 5. Deals (Opportunity),
+   6. Customer, 7. Evangelist, 8. Closed/Lost, 9. Subscriber.
+2. Still in **Settings → Properties**, create a new group called **Orion Harness
+   Install**, and add these fields to it: Industry / vertical, Product / service, ICP
+   description, Sales motion, AI tools in use, CRM in use, Team size, AI-sales maturity
+   (1–5), Agent name, Template version, Installed on.
+3. Go to **Settings → Objects → Deals → Pipelines**. If you're allowed to add a new one,
+   create **Orion Pipeline** with stages: Prospect, Lead, MQL, SQL, Deal, Closed Won,
+   Closed Lost. **If HubSpot won't let you add a new pipeline** (this is normal on
+   free/starter plans — HubSpot allows only one per account), just rename your existing
+   default pipeline's stages to match instead.
+4. That's it — skip to "After applying" below. You've just done, by hand, exactly what the
+   script would have done automatically.
+
+**If your assistant offered to run the script and you're not sure whether it worked**: ask
+it to show you the Lifecycle Stage options on a Contact — if the nine options above are
+there, it worked.
+
+<details>
+<summary>For the technically inclined: the command the script runs</summary>
 
 ```bash
 # From this directory (crm/hubspot/):
@@ -52,9 +81,10 @@ HUBSPOT_API_KEY=<the token you just generated> node apply-hubspot-template.mjs
 # Re-runnable: existing properties/options are skipped, so it's safe to run again if
 # something failed partway.
 ```
+</details>
 
-Once validated, deactivate the private app — ongoing workflows use their own separate
-credential (see `connectors/connector-checklist.md`).
+Once validated (either way), deactivate the private app — ongoing workflows use their own
+separate credential (see `connectors/connector-checklist.md`).
 
 ## After applying
 

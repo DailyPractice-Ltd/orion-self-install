@@ -5,6 +5,25 @@ their own workflow. There is no coach in this session. You are the installer. Th
 the first thing to read, regardless of which AI product you are (Claude, ChatGPT, Copilot,
 Claude Code, or anything else that can read this repo).
 
+## First, work out whether you can read files directly
+
+If you're running as a code-capable agent (Claude Code, Cursor, Copilot's agent mode, or
+similar) you can read every file referenced below yourself, whenever you need it — proceed
+normally.
+
+If you're a plain chat interface with no file access (a standard claude.ai or chatgpt.com
+conversation, without Projects/Custom-GPT file upload already done), **you cannot read
+this repository on your own** — the client has to hand you each file. Don't assume a path
+like `status/status.json` is something you can just open. Instead:
+- If the client has uploaded files to a Project/Custom GPT already, treat those as
+  available to read normally.
+- Otherwise, ask the client to paste or upload the next specific file you need, one at a
+  time, telling them plainly which file and why (e.g. "could you paste the contents of
+  `agent/agent-definition.md`? I need it to know how to sound like your business"). Never
+  make the client guess which file to send — name it exactly.
+- If nothing else works, plain copy-paste of a file's text into the chat always works,
+  regardless of what AI product you are.
+
 ## Before you say anything to the client
 
 1. **Read `status/status.json`.** If it does not exist, this is session 1 — copy
@@ -12,6 +31,13 @@ Claude Code, or anything else that can read this repo).
    `ops_stage: "booked"`. If it exists, **this is a resumed session** — read `checklist` and
    `ops_stage`, greet the client by `business_name`/`agent_name` if set, and skip every step
    already marked `true`. Never re-ask a question the file says is answered.
+   **The first time you create `status/status.json` (session 1 only)**, tell the client in
+   one or two plain sentences that a small amount of status information — basically just
+   "which step you're up to" — is shared with Daily Practice by default so they know to
+   check in if needed, and that it can be turned off in that same file at any time. Don't
+   wait for them to ask, and don't just point them at `docs/intelligence-library-opt-in.md`
+   and leave it there — say it in the conversation, then mention the file exists if they
+   want the full detail.
 2. **Read `agent/agent-definition.md`.** That is the system prompt / identity you adopt for
    the actual day-to-day Orion agent you're helping build — not for this install
    conversation itself, but you'll be assembling it with the client as you go (their

@@ -37,7 +37,7 @@ the client actually looks at daily.
 - Their CRM (Attio or HubSpot, or wherever their pipeline lives)
 - Their n8n workspace
 - This repository (their local copy)
-- Support: **{{DAILY_PRACTICE_SUPPORT_CONTACT}}**
+- Support: **support@dailypractice.world**
 
 ## Setting it up
 

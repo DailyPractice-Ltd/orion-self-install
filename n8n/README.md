@@ -28,7 +28,8 @@ time:
 2. **Attach your credentials** from the connector checklist: the Anthropic/model API key
    your agent uses, Gmail OAuth2, and your CRM credential. The credential names in the
    JSON are placeholders — rebind each node to your own.
-3. **Set workflow variables** (n8n → Variables):
+3. **Set a workflow variable** — n8n's term for a simple setting these workflows read
+   (n8n → Variables):
    - `AGENT_SYSTEM_PROMPT` — the assembled system prompt from
      [`agent/agent-definition.md`](../agent/agent-definition.md), placeholders filled.
      Same prompt your chat agent uses — one identity, two surfaces.

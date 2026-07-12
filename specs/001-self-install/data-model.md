@@ -103,12 +103,12 @@ tool, not part of the install's internal state machine.
 
 ## Placeholder inventory (constitution Article VI gate)
 
-| Placeholder | Filled by | When |
-|---|---|---|
-| `{{DAILY_PRACTICE_SUPPORT_CONTACT}}` (`README.md`, `notion/project-tracker-template.md`, `docs/intelligence-library-opt-in.md`) | Daily Practice (maintainer) | Once, before the template is distributed |
-| `{{CLIENT_NAME}}`, `{{CLIENT_BUSINESS}}`, `{{AGENT_NAME}}`, `{{CLIENT_VOCABULARY}}`, `{{CLIENT_ICP}}`, `{{CLIENT_COMMITMENTS}}`, `{{CLIENT_CRM}}`, `{{CLIENT_AI_TOOL}}` (`agent/`, `crm/`) | The installing agent | During the install conversation, before the client sees the rendered file |
-| `{{CLIENT_EMAIL}}` (`n8n/wf-01-*.json`, `n8n/wf-02-*.json`) | The installing agent | When setting up the approval-email recipient during n8n import (US3) |
-| `{{DATE}}` (`agent/knowledge-base/07-commitments.md`) | The installing agent | The day the commitments are agreed with the client |
+| Placeholder | Filled by | When | Status |
+|---|---|---|---|
+| ~~`{{DAILY_PRACTICE_SUPPORT_CONTACT}}`~~ (was in `README.md`, `notion/project-tracker-template.md`, `docs/intelligence-library-opt-in.md`) | Daily Practice (maintainer) | Once, before the template is distributed | **Resolved 2026-07-12** — filled with `support@dailypractice.world` in all three files. If that address ever changes, update it in those three places (this table is the checklist). |
+| `{{CLIENT_NAME}}`, `{{CLIENT_BUSINESS}}`, `{{AGENT_NAME}}`, `{{CLIENT_VOCABULARY}}`, `{{CLIENT_ICP}}`, `{{CLIENT_COMMITMENTS}}`, `{{CLIENT_CRM}}`, `{{CLIENT_AI_TOOL}}` (`agent/`, `crm/`) | The installing agent | During the install conversation, before the client sees the rendered file | Open by design — filled per client, differently every time |
+| `{{CLIENT_EMAIL}}` (`n8n/wf-01-*.json`, `n8n/wf-02-*.json`) | The installing agent | When setting up the approval-email recipient during n8n import (US3) | Open by design — filled per client |
+| `{{DATE}}` (`agent/knowledge-base/07-commitments.md`) | The installing agent | The day the commitments are agreed with the client | Open by design — filled per client |
 
 No other placeholders exist in this repository. Any new one introduced by future work must
 be added to this table (Article VI gate) before it ships.

@@ -36,5 +36,5 @@ entire mechanism — there's no separate form, account, or agreement.
 
 Set it back to `false`. Takes effect immediately; nothing further is collected. Data
 already shared before you opted out isn't retroactively deleted by this switch — contact
-**{{DAILY_PRACTICE_SUPPORT_CONTACT}}** if you want to request removal of anything already
+**support@dailypractice.world** if you want to request removal of anything already
 shared.

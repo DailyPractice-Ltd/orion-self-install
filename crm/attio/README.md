@@ -27,11 +27,39 @@ entry criteria.
    same information is visible inside the client's own CRM, not just a local file.
 3. **Three views** (manual — see below): Daily Drive, Pipeline, Waiting on approval.
 
-## Apply it
+## Apply it — two ways, pick whichever fits
 
-If your AI assistant can run scripts (see `agent/adapters/claude-code.md`), it can do this
-step directly once you've pasted in the API key. Otherwise, run this yourself in a
-terminal — your assistant can tell you exactly how to open one for your operating system:
+**If your AI assistant can run scripts for you** (Claude Code, Cursor, or similar — see
+`agent/adapters/claude-code.md`): it can create all of this automatically once you've
+pasted in the API key you just generated. No further reading needed — it'll handle the
+command below itself.
+
+**If not — no terminal, no code, entirely by hand in Attio's normal screens:**
+
+You don't need to run anything. Just recreate the same shape yourself, directly in Attio's
+web interface — it takes about 10 minutes:
+
+1. Create a new list. Name it **Sales Pipeline**.
+2. Add a status field called **Stage** with these six options, in this order: Prospect,
+   Lead, MQL, SQL, Deal, Customer.
+3. Add these other fields to the list: **Next action** (text), **Next action due**
+   (date), **Source channel** (dropdown: Instagram, LinkedIn, Referral, Community, Email,
+   Event, Other), **Last touch** (date), **Commitment served** (dropdown — use your own
+   monthly commitments from knowledge base §7 as the options), **Objection open** (text),
+   **Staged draft waiting** (checkbox).
+4. Create a second new list. Name it **Harness Install** — this will hold exactly one
+   entry, ever. Add these fields: Industry / vertical, Product / service, ICP description,
+   Sales motion, AI tools in use, CRM in use, Team size, AI-sales maturity (1–5), Agent
+   name, Template version, Installed on.
+5. That's it — skip to "Views" below. You've just done, by hand, exactly what the script
+   would have done automatically.
+
+**If your assistant offered to run the script and you're not sure whether it worked**: ask
+it to show you the Sales Pipeline list in your Attio account — if the six stages and
+fields above are there, it worked.
+
+<details>
+<summary>For the technically inclined: the command the script runs</summary>
 
 ```bash
 # From this directory (crm/attio/):
@@ -40,9 +68,11 @@ ATTIO_API_KEY=<the key you just generated> node apply-attio-template.mjs
 # Re-runnable: existing lists/attributes are skipped, so it's safe to run again if
 # something failed partway (including "I closed my laptop").
 ```
+</details>
 
-Once it's validated and working, delete the API key from wherever you pasted it — the
-ongoing workflows use their own separate credential (see `connectors/connector-checklist.md`).
+Once it's validated and working (either way), delete the API key from wherever you pasted
+it — the ongoing workflows use their own separate credential (see
+`connectors/connector-checklist.md`).
 
 **Person vs company pipeline**: the template defaults to `"parent_object": "people"` —
 right for a founder or individual seller selling to individuals. For a B2B motion, change

@@ -1,8 +1,15 @@
 # CRM — which one, and how it gets wired in
 
+CRM stands for "customer relationship management" — it just means whatever tool or
+spreadsheet the client uses to track who they're talking to and where each deal stands.
+
 **If you're the installing agent**: ask the client directly which CRM they use (or if they
-don't have one yet), then follow the matching path below. Don't move on to connectors until
-`status/status.json`'s `crm_choice_made` and `crm_template_applied` are both `true`.
+don't have one yet), then follow the matching path below. Explain to the client, in one
+sentence, that they'll generate something called an API key at this step — it's just a
+special password that lets two apps (their CRM and their new workflows) talk to each other
+automatically; each CRM path below shows exactly where to get it. Don't move on to
+connectors until `status/status.json`'s `crm_choice_made` and `crm_template_applied` are
+both `true`.
 
 ## Decide which path
 

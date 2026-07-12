@@ -1,0 +1,159 @@
+{
+  "name": "WF-01 · Prospect research → staged outreach draft [orion-self-install v0.1.0]",
+  "nodes": [
+    {
+      "id": "trigger-form",
+      "name": "New prospect (form)",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [0, 0],
+      "parameters": {
+        "formTitle": "Research a prospect",
+        "formDescription": "{{AGENT_NAME}} researches this prospect and stages an outreach draft for your approval. Nothing is sent.",
+        "formFields": {
+          "values": [
+            { "fieldLabel": "Prospect name", "requiredField": true },
+            { "fieldLabel": "Profile / company URL", "requiredField": false },
+            { "fieldLabel": "Where you found them (channel)", "requiredField": true },
+            { "fieldLabel": "Anything you already know", "fieldType": "textarea", "requiredField": false }
+          ]
+        }
+      }
+    },
+    {
+      "id": "llm-research",
+      "name": "Research + draft (agent)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "credentials": { "anthropicApi": { "name": "Anthropic API — {{CLIENT_BUSINESS}}" } },
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-sonnet-5',\n  max_tokens: 1500,\n  system: $vars.AGENT_SYSTEM_PROMPT,\n  messages: [{ role: 'user', content: `Task: prospect research\\n\\nInputs:\\nprospect_name: ${$json['Prospect name']}\\nprofile_url: ${$json['Profile / company URL'] || 'none provided'}\\nchannel: ${$json['Where you found them (channel)']}\\nknown_context: ${$json['Anything you already know'] || 'none'}\\n\\nProduce exactly two sections with these headings:\\nProspect Summary\\n---\\nOutreach Draft` }]\n}) }}"
+      }
+    },
+    {
+      "id": "split-sections",
+      "name": "Split sections",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0],
+      "parameters": {
+        "jsCode": "const text = $input.first().json.content?.[0]?.text ?? '';\nconst [summaryPart, draftPart] = text.split(/---|\\n(?=Outreach Draft)/i);\nconst clean = (s, heading) => (s ?? '').replace(new RegExp('^\\\\s*' + heading + '\\\\s*:?\\\\s*', 'i'), '').trim();\nreturn [{ json: {\n  prospect_name: $('New prospect (form)').first().json['Prospect name'],\n  channel: $('New prospect (form)').first().json['Where you found them (channel)'],\n  prospect_summary: clean(summaryPart, 'Prospect Summary'),\n  outreach_draft: clean(draftPart, 'Outreach Draft'),\n} }];"
+      }
+    },
+    {
+      "id": "gmail-draft",
+      "name": "Create Gmail DRAFT (staged, not sent)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [660, 0],
+      "credentials": { "gmailOAuth2": { "name": "Gmail — {{CLIENT_BUSINESS}}" } },
+      "parameters": {
+        "resource": "draft",
+        "operation": "create",
+        "subject": "={{ 'Draft for ' + $json.prospect_name + ' — staged by {{AGENT_NAME}}' }}",
+        "message": "={{ $json.outreach_draft + '\\n\\n—\\nStaged for your approval — nothing has been sent. [orion-self-install v0.1.0]' }}"
+      }
+    },
+    {
+      "id": "approval",
+      "name": "Ask: log to CRM?",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [880, 0],
+      "credentials": { "gmailOAuth2": { "name": "Gmail — {{CLIENT_BUSINESS}}" } },
+      "parameters": {
+        "resource": "message",
+        "operation": "sendAndWait",
+        "sendTo": "{{CLIENT_EMAIL}}",
+        "subject": "={{ 'Approve: add ' + $json.prospect_name + ' to your pipeline?' }}",
+        "message": "={{ '<p><b>Prospect Summary</b></p><p>' + $json.prospect_summary + '</p><p>An outreach draft is waiting in your Gmail Drafts. Approve to log this prospect + research note to your CRM (stage: Prospect, staged-draft flag on). Decline and nothing is written anywhere.</p>' }}",
+        "responseType": "approval",
+        "approvalOptions": { "values": { "approvalType": "double" } }
+      }
+    },
+    {
+      "id": "if-approved",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1100, 0],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data?.approved }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "crm-entry",
+      "name": "CRM: add to pipeline (Prospect)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, -100],
+      "credentials": { "httpHeaderAuth": { "name": "CRM — {{CLIENT_BUSINESS}}" } },
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.attio.com/v2/lists/sales_pipeline/entries",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { parent_record: { name: $('Split sections').first().json.prospect_name }, entry_values: { stage: 'Prospect', source_channel: $('Split sections').first().json.channel, next_action: 'Send staged outreach draft (in Gmail Drafts)', staged_draft_waiting: true, last_touch: $now.format('yyyy-MM-dd') } } }) }}",
+        "notesInFlow": "This node targets the Attio template's shape by default — swap the URL/body for your HubSpot properties or other-CRM setup if you used a different path (see crm/README.md). Finish this mapping against your real CRM."
+      }
+    },
+    {
+      "id": "signal",
+      "name": "Status signal (opt-in)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, -100],
+      "disabled": true,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.STATUS_SIGNAL_ENDPOINT }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ client_id: $vars.CLIENT_ID, business_name: $vars.CLIENT_BUSINESS_NAME, harness_status: 'connected', ops_stage: 'day2_wire_and_run', template_version: '0.1.0', timestamp: $now.toISO() }) }}",
+        "notesInFlow": "Disabled by default — enable only if status/status.json's sharing.status_signal_enabled is true, and only once a real endpoint exists (see docs/self-serve-learnings.md)."
+      }
+    },
+    {
+      "id": "noop-declined",
+      "name": "Declined → nothing written",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1320, 120],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "New prospect (form)": { "main": [[{ "node": "Research + draft (agent)", "type": "main", "index": 0 }]] },
+    "Research + draft (agent)": { "main": [[{ "node": "Split sections", "type": "main", "index": 0 }]] },
+    "Split sections": { "main": [[{ "node": "Create Gmail DRAFT (staged, not sent)", "type": "main", "index": 0 }]] },
+    "Create Gmail DRAFT (staged, not sent)": { "main": [[{ "node": "Ask: log to CRM?", "type": "main", "index": 0 }]] },
+    "Ask: log to CRM?": { "main": [[{ "node": "Approved?", "type": "main", "index": 0 }]] },
+    "Approved?": {
+      "main": [
+        [{ "node": "CRM: add to pipeline (Prospect)", "type": "main", "index": 0 }],
+        [{ "node": "Declined → nothing written", "type": "main", "index": 0 }]
+      ]
+    },
+    "CRM: add to pipeline (Prospect)": { "main": [[{ "node": "Status signal (opt-in)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "errorWorkflow": "" },
+  "meta": { "template_version": "0.1.0" }
+}

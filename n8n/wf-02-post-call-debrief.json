@@ -1,0 +1,161 @@
+{
+  "name": "WF-02 · Post-call → summary + staged CRM update + staged follow-up [orion-self-install v0.1.0]",
+  "nodes": [
+    {
+      "id": "trigger-form",
+      "name": "Call ended (form)",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [0, 0],
+      "parameters": {
+        "formTitle": "Debrief a call",
+        "formDescription": "Paste the transcript or your notes. {{AGENT_NAME}} returns a summary, a staged CRM update, and a staged follow-up draft. Nothing executes without your approval.",
+        "formFields": {
+          "values": [
+            { "fieldLabel": "Who was the call with", "requiredField": true },
+            { "fieldLabel": "Transcript or notes", "fieldType": "textarea", "requiredField": true },
+            { "fieldLabel": "Current pipeline stage", "fieldType": "dropdown", "fieldOptions": { "values": [
+              { "option": "Prospect" }, { "option": "Lead" }, { "option": "MQL" },
+              { "option": "SQL" }, { "option": "Deal" }, { "option": "Customer" }
+            ] }, "requiredField": true }
+          ]
+        }
+      }
+    },
+    {
+      "id": "llm-debrief",
+      "name": "Debrief (agent)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "credentials": { "anthropicApi": { "name": "Anthropic API — {{CLIENT_BUSINESS}}" } },
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-sonnet-5',\n  max_tokens: 2000,\n  system: $vars.AGENT_SYSTEM_PROMPT,\n  messages: [{ role: 'user', content: `Task: post call debrief\\n\\nInputs:\\ncontact: ${$json['Who was the call with']}\\ncurrent_stage: ${$json['Current pipeline stage']}\\ntranscript: ${$json['Transcript or notes']}\\n\\nProduce exactly three sections with these headings, separated by --- lines:\\nCall Summary\\n---\\nCRM Update\\n(include: proposed stage [one of Prospect/Lead/MQL/SQL/Deal/Customer], next action, next action due date, and the note to log)\\n---\\nFollow-up Draft` }]\n}) }}"
+      }
+    },
+    {
+      "id": "split-sections",
+      "name": "Split sections",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0],
+      "parameters": {
+        "jsCode": "const text = $input.first().json.content?.[0]?.text ?? '';\nconst parts = text.split(/\\n-{3,}\\n/);\nconst clean = (s, heading) => (s ?? '').replace(new RegExp('^\\\\s*' + heading + '\\\\s*:?\\\\s*', 'i'), '').trim();\nconst crm = clean(parts[1], 'CRM Update');\nconst stageMatch = crm.match(/stage\\s*[:\\-]?\\s*(Prospect|Lead|MQL|SQL|Deal|Customer)/i);\nreturn [{ json: {\n  contact: $('Call ended (form)').first().json['Who was the call with'],\n  call_summary: clean(parts[0], 'Call Summary'),\n  crm_update: crm,\n  proposed_stage: stageMatch ? stageMatch[1] : $('Call ended (form)').first().json['Current pipeline stage'],\n  follow_up_draft: clean(parts[2], 'Follow-up Draft'),\n} }];"
+      }
+    },
+    {
+      "id": "gmail-draft",
+      "name": "Create follow-up DRAFT (staged, not sent)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [660, 0],
+      "credentials": { "gmailOAuth2": { "name": "Gmail — {{CLIENT_BUSINESS}}" } },
+      "parameters": {
+        "resource": "draft",
+        "operation": "create",
+        "subject": "={{ 'Follow-up for ' + $json.contact + ' — staged by {{AGENT_NAME}}' }}",
+        "message": "={{ $json.follow_up_draft + '\\n\\n—\\nStaged for your approval — nothing has been sent. [orion-self-install v0.1.0]' }}"
+      }
+    },
+    {
+      "id": "approval",
+      "name": "Ask: apply CRM update?",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [880, 0],
+      "credentials": { "gmailOAuth2": { "name": "Gmail — {{CLIENT_BUSINESS}}" } },
+      "parameters": {
+        "resource": "message",
+        "operation": "sendAndWait",
+        "sendTo": "{{CLIENT_EMAIL}}",
+        "subject": "={{ 'Approve: CRM update for ' + $json.contact + '?' }}",
+        "message": "={{ '<p><b>Call Summary</b></p><p>' + $json.call_summary + '</p><p><b>Proposed CRM update</b> (stage → ' + $json.proposed_stage + ')</p><p>' + $json.crm_update + '</p><p>A follow-up draft is waiting in your Gmail Drafts. Approve to write this update to your CRM. Decline and the CRM is untouched.</p>' }}",
+        "responseType": "approval",
+        "approvalOptions": { "values": { "approvalType": "double" } }
+      }
+    },
+    {
+      "id": "if-approved",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1100, 0],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data?.approved }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "crm-update",
+      "name": "CRM: update entry + log note",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, -100],
+      "credentials": { "httpHeaderAuth": { "name": "CRM — {{CLIENT_BUSINESS}}" } },
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.attio.com/v2/notes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { title: 'Call debrief — ' + $now.format('yyyy-MM-dd'), format: 'plaintext', content: $('Split sections').first().json.call_summary + '\\n\\nCRM update applied:\\n' + $('Split sections').first().json.crm_update } }) }}",
+        "notesInFlow": "This node targets the Attio template's shape by default — swap the URL/body for your HubSpot properties or other-CRM setup if you used a different path (see crm/README.md). Finish attaching the note to the contact's record + updating the pipeline entry (stage, next_action, next_action_due, last_touch, staged_draft_waiting=true) against your real CRM."
+      }
+    },
+    {
+      "id": "signal",
+      "name": "Status signal (opt-in)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, -100],
+      "disabled": true,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.STATUS_SIGNAL_ENDPOINT }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ client_id: $vars.CLIENT_ID, business_name: $vars.CLIENT_BUSINESS_NAME, harness_status: 'validated', ops_stage: 'validated', template_version: '0.1.0', timestamp: $now.toISO() }) }}",
+        "notesInFlow": "Disabled by default — enable only if status/status.json's sharing.status_signal_enabled is true, and only once a real endpoint exists."
+      }
+    },
+    {
+      "id": "noop-declined",
+      "name": "Declined → CRM untouched",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1320, 120],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Call ended (form)": { "main": [[{ "node": "Debrief (agent)", "type": "main", "index": 0 }]] },
+    "Debrief (agent)": { "main": [[{ "node": "Split sections", "type": "main", "index": 0 }]] },
+    "Split sections": { "main": [[{ "node": "Create follow-up DRAFT (staged, not sent)", "type": "main", "index": 0 }]] },
+    "Create follow-up DRAFT (staged, not sent)": { "main": [[{ "node": "Ask: apply CRM update?", "type": "main", "index": 0 }]] },
+    "Ask: apply CRM update?": { "main": [[{ "node": "Approved?", "type": "main", "index": 0 }]] },
+    "Approved?": {
+      "main": [
+        [{ "node": "CRM: update entry + log note", "type": "main", "index": 0 }],
+        [{ "node": "Declined → CRM untouched", "type": "main", "index": 0 }]
+      ]
+    },
+    "CRM: update entry + log note": { "main": [[{ "node": "Status signal (opt-in)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "errorWorkflow": "" },
+  "meta": { "template_version": "0.1.0" }
+}

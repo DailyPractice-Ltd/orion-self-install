@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://orion-self-install/contracts/status-signal.schema.json",
+  "title": "Orion self-install status signal",
+  "description": "The minimal, always-disclosed payload optionally emitted on install stage change (constitution Article V, channel 1). Never contains knowledge-base content, prospect data, or message content.",
+  "type": "object",
+  "required": ["client_id", "business_name", "harness_status", "ops_stage", "template_version", "timestamp"],
+  "additionalProperties": false,
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "Slugified business name — stable identifier for this install, not a secret."
+    },
+    "business_name": {
+      "type": "string",
+      "description": "Human-readable business name, as captured in the knowledge base."
+    },
+    "harness_status": {
+      "type": "string",
+      "enum": ["draft", "configured", "connected", "validated", "installed/running"],
+      "description": "Reused verbatim from dailypractice-mono's HarnessStatus type (specs/001-sales-harness/contracts/harness.ts) — forward-only."
+    },
+    "ops_stage": {
+      "type": "string",
+      "enum": ["booked", "day1_encode", "day2_wire_and_run", "validated", "seven_day_checkin", "formalised"],
+      "description": "Superset mirroring the Daily Practice internal tracking board's list names exactly."
+    },
+    "template_version": {
+      "type": "string",
+      "description": "This repository's own CHANGELOG.md version the client started from."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the stage change that triggered this emission."
+    }
+  }
+}

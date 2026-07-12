@@ -1,0 +1,71 @@
+{
+  "kit_version": "0.1.0",
+  "description": "Attio workspace template for an Orion self-install. Applied by apply-attio-template.mjs. Stages mirror the funnel in agent/knowledge-base/04-methodology-and-motion.md.",
+  "parent_object": "people",
+  "parent_object_note": "Use 'people' for a founder or individual seller selling to individuals. Switch to 'companies' for a B2B motion.",
+
+  "pipeline_list": {
+    "name": "Sales Pipeline",
+    "api_slug": "sales_pipeline",
+    "stage_attribute": {
+      "title": "Stage",
+      "api_slug": "stage",
+      "statuses": [
+        { "title": "Prospect", "celebration": false },
+        { "title": "Lead", "celebration": false },
+        { "title": "MQL", "celebration": false },
+        { "title": "SQL", "celebration": false },
+        { "title": "Deal", "celebration": false },
+        { "title": "Customer", "celebration": true }
+      ]
+    },
+    "entry_attributes": [
+      { "title": "Next action", "api_slug": "next_action", "type": "text" },
+      { "title": "Next action due", "api_slug": "next_action_due", "type": "date" },
+      { "title": "Source channel", "api_slug": "source_channel", "type": "select",
+        "options": ["Instagram", "LinkedIn", "Referral", "Community", "Email", "Event", "Other"] },
+      { "title": "Last touch", "api_slug": "last_touch", "type": "date" },
+      { "title": "Commitment served", "api_slug": "commitment_served", "type": "select",
+        "options_note": "Replace with the client's own commitment activities from knowledge base §7 during setup",
+        "options": ["Commitment 1", "Commitment 2", "Commitment 3"] },
+      { "title": "Objection open", "api_slug": "objection_open", "type": "text" },
+      { "title": "Staged draft waiting", "api_slug": "staged_draft_waiting", "type": "checkbox" }
+    ]
+  },
+
+  "harness_install_list": {
+    "name": "Harness Install",
+    "api_slug": "harness_install",
+    "note": "Holds exactly one entry: this client's assessment profile + install metadata, mirroring status/status.json so it's also visible inside their own CRM.",
+    "entry_attributes": [
+      { "title": "Industry / vertical", "api_slug": "industry", "type": "text" },
+      { "title": "Product / service", "api_slug": "product", "type": "text" },
+      { "title": "ICP description", "api_slug": "icp_description", "type": "text" },
+      { "title": "Sales motion", "api_slug": "sales_motion", "type": "text" },
+      { "title": "AI tools in use", "api_slug": "ai_tools_in_use", "type": "select", "is_multiselect": true,
+        "options": ["Claude", "ChatGPT", "Copilot", "Gemini", "Other", "None"] },
+      { "title": "CRM in use", "api_slug": "crm_in_use", "type": "select",
+        "options": ["Attio", "HubSpot", "Other", "None"] },
+      { "title": "Team size", "api_slug": "team_size", "type": "number" },
+      { "title": "AI-sales maturity (1-5)", "api_slug": "ai_sales_maturity", "type": "rating" },
+      { "title": "Agent name", "api_slug": "agent_name", "type": "text" },
+      { "title": "Template version", "api_slug": "template_version", "type": "text" },
+      { "title": "Installed on", "api_slug": "installed_on", "type": "date" }
+    ]
+  },
+
+  "views_manual_setup": {
+    "note": "Attio views are not currently creatable via the public API — set these up in the UI (~2 minutes). Recipes in README.md.",
+    "views": [
+      { "name": "Daily Drive", "type": "table",
+        "filter": "Next action due is on or before today, Stage is not Customer",
+        "sort": "Next action due ascending" },
+      { "name": "Pipeline", "type": "kanban", "group_by": "Stage",
+        "note": "The at-a-glance board. Card fields: Next action, Next action due." },
+      { "name": "Waiting on approval", "type": "table",
+        "filter": "Staged draft waiting is checked",
+        "sort": "Last touch ascending",
+        "note": "Everything the agent has staged that needs the client's yes." }
+    ]
+  }
+}

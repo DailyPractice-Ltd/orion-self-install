@@ -1,0 +1,64 @@
+{
+  "kit_version": "0.1.0",
+  "description": "HubSpot portal template for an Orion self-install. Applied by apply-hubspot-template.mjs. Stages mirror the funnel in agent/knowledge-base/04-methodology-and-motion.md.",
+  "object_type": "contacts",
+  "object_type_note": "Use 'contacts' for a founder or individual seller selling to individuals. Add 'companies' too for a B2B motion — run the script twice, once per object type, for the assessment-profile properties (lifecyclestage is shared).",
+
+  "lifecyclestage": {
+    "note": "Standard HubSpot property, already present on every portal — this template ensures the option set matches the funnel, it does not create the property itself.",
+    "internal_name": "lifecyclestage",
+    "options": [
+      { "label": "1. Prospect", "value": "1_prospect" },
+      { "label": "2. Lead", "value": "2_lead" },
+      { "label": "3. MQL", "value": "3_mql" },
+      { "label": "4. SQL", "value": "4_sql" },
+      { "label": "5. Deals (Opportunity)", "value": "5_deals_opportunity" },
+      { "label": "6. Customer", "value": "6_customer" },
+      { "label": "7. Evangelist", "value": "7_evangelist" },
+      { "label": "8. Closed/Lost", "value": "8_closed_lost" },
+      { "label": "9. Subscriber", "value": "9_subscriber" }
+    ]
+  },
+
+  "assessment_profile_properties": {
+    "group_name": "orion_harness_install",
+    "group_label": "Orion Harness Install",
+    "note": "Custom properties holding the assessment profile + install metadata — mirrors status/status.json so it's also visible inside the client's own CRM.",
+    "properties": [
+      { "name": "harness_industry", "label": "Industry / vertical", "type": "string", "fieldType": "text" },
+      { "name": "harness_product", "label": "Product / service", "type": "string", "fieldType": "text" },
+      { "name": "harness_icp_description", "label": "ICP description", "type": "string", "fieldType": "textarea" },
+      { "name": "harness_sales_motion", "label": "Sales motion", "type": "string", "fieldType": "text" },
+      { "name": "harness_ai_tools_in_use", "label": "AI tools in use", "type": "enumeration", "fieldType": "checkbox",
+        "options": ["Claude", "ChatGPT", "Copilot", "Gemini", "Other", "None"] },
+      { "name": "harness_crm_in_use", "label": "CRM in use", "type": "enumeration", "fieldType": "select",
+        "options": ["HubSpot", "Attio", "Other", "None"] },
+      { "name": "harness_team_size", "label": "Team size", "type": "number", "fieldType": "number" },
+      { "name": "harness_ai_sales_maturity", "label": "AI-sales maturity (1-5)", "type": "number", "fieldType": "number" },
+      { "name": "harness_agent_name", "label": "Agent name", "type": "string", "fieldType": "text" },
+      { "name": "harness_template_version", "label": "Template version", "type": "string", "fieldType": "text" },
+      { "name": "harness_installed_on", "label": "Installed on", "type": "date", "fieldType": "date" }
+    ]
+  },
+
+  "deal_pipeline": {
+    "name": "Orion Pipeline",
+    "note_plan_tier": "HubSpot's free/starter tiers support only ONE deal pipeline per portal. If the client is on that tier, RENAME their existing default pipeline instead of creating a new one (Settings → Objects → Deals → Pipelines — a manual UI action, not scriptable). If the client is on Pro+ (multiple pipelines allowed), the apply script can create a dedicated one via the Pipelines API.",
+    "stages": [
+      { "label": "Prospect", "order": 0 },
+      { "label": "Lead", "order": 1 },
+      { "label": "MQL", "order": 2 },
+      { "label": "SQL", "order": 3 },
+      { "label": "Deal", "order": 4 },
+      { "label": "Closed Won", "order": 5, "closed_won": true },
+      { "label": "Closed Lost", "order": 6, "closed_lost": true }
+    ],
+    "stages_note": "A default starting shape matching the funnel in knowledge base §4 — rename stages to the client's own vocabulary once applied; the lifecyclestage mapping above is the part that must match exactly, Deal-pipeline stage names can vary."
+  },
+
+  "decision_maker_property": {
+    "note": "No new property needed — HubSpot's existing hs_buying_role Contact property (value DECISION_MAKER) is the standard field. Associate the Contact to its Company for a B2B motion.",
+    "internal_name": "hs_buying_role",
+    "existing_property": true
+  }
+}

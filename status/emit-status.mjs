@@ -59,8 +59,36 @@ if (ops_stage_changed) {
 writeFileSync(STATUS_PATH, JSON.stringify(status, null, 2) + '\n');
 console.log(`status/status.json updated — harness_status: ${status.harness_status}, ops_stage: ${status.ops_stage}`);
 
-// Emit the minimal status signal only when explicitly enabled AND an endpoint is set.
-if (status.sharing.status_signal_enabled && status.sharing.status_signal_endpoint) {
+// Emit the minimal status signal only when explicitly enabled AND a destination is
+// configured. Two transports, bridge preferred (specs/002-production-line/contracts/
+// bridge-radio.md): the welcome-pack bridge (authenticated /signals door) when its three
+// sharing fields are set, else the legacy direct webhook from feature 001.
+const sharing = status.sharing;
+const bridgeConfigured = Boolean(sharing.bridge_url && sharing.harness_id && sharing.install_token);
+if (sharing.status_signal_enabled && bridgeConfigured) {
+  try {
+    const res = await fetch(String(sharing.bridge_url).replace(/\/+$/, '') + '/signals', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sharing.install_token}`,
+      },
+      body: JSON.stringify({
+        harness_id: sharing.harness_id,
+        signal_type: 'install_checkpoint',
+        sent_at: now,
+        payload: {
+          ops_stage: status.ops_stage,
+          harness_status: status.harness_status,
+          template_version: status.template_version,
+        },
+      }),
+    });
+    console.log(res.ok ? 'Status signal sent (via the radio).' : `Radio answered ${res.status} — not retried.`);
+  } catch (err) {
+    console.log(`Radio address unreachable (${err?.cause?.code || err.message}) — not retried. Local status was still saved.`);
+  }
+} else if (sharing.status_signal_enabled && sharing.status_signal_endpoint) {
   const payload = {
     client_id: status.client_id,
     business_name: status.business_name,
@@ -70,7 +98,7 @@ if (status.sharing.status_signal_enabled && status.sharing.status_signal_endpoin
     timestamp: now,
   };
   try {
-    const res = await fetch(status.sharing.status_signal_endpoint, {
+    const res = await fetch(sharing.status_signal_endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

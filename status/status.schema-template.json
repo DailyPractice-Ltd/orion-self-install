@@ -1,6 +1,6 @@
 {
-  "schema_version": "1.0.0",
-  "template_version": "0.1.0",
+  "schema_version": "1.1.0",
+  "template_version": "0.2.0",
   "client_id": null,
   "business_name": null,
   "agent_name": null,
@@ -8,6 +8,7 @@
   "ops_stage": "booked",
   "started_at": null,
   "updated_at": null,
+  "machine_profile": null,
   "checklist": {
     "agent_identity_set": false,
     "kb_business_context": false,
@@ -34,10 +35,15 @@
     "vt07_resume_after_interruption": false,
     "vt08_status_signal_emission": false
   },
+  "packages": {},
   "stage_history": [],
   "sharing": {
     "status_signal_enabled": true,
     "status_signal_endpoint": null,
+    "radio_choice": null,
+    "bridge_url": null,
+    "harness_id": null,
+    "install_token": null,
     "intelligence_library_opt_in": false
   },
   "notes": ""

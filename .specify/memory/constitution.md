@@ -1,8 +1,22 @@
 # Orion Self-Install Constitution
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-12 | **Last Amended**: 2026-07-12
+**Version**: 1.1.0 | **Ratified**: 2026-07-12 | **Last Amended**: 2026-07-25
 
-**Sync Impact Report** (this ratification):
+**Sync Impact Report** (amendment 1.1.0, 2026-07-25):
+- Version change: 1.0.0 → 1.1.0 (MINOR — Article V channel 1 materially expanded).
+- Article V channel 1 redefined as **the radio**: same single toggle, still on by
+  default with a plain-words, one-click decline, but its contents are now enumerated in
+  full — (a) install-stage signals, (b) work heartbeats (signal type + timestamp only),
+  (c) package-install reports (package name, kind, version), and (d) a two-way mailbox
+  whose replies send only on the client's explicit yes. The never-list (no message
+  content, no KB content, no prospect data) is unchanged. Channel 2 untouched.
+- Rationale and alternatives: `specs/002-production-line/research.md` (R4); requirement
+  source: `specs/002-production-line/spec.md` FR-007..FR-009. Old channel-1 emitters
+  remain conformant (the new definition is a superset).
+- Proposed in writing per the Amendment Process below; approval is Daily Practice (the
+  founder) merging branch `002-production-line`.
+
+**Sync Impact Report** (1.0.0 ratification):
 - Version change: none → 1.0.0 (initial ratification for this repository)
 - Derivation: translated from `dailypractice-mono`'s constitution v2.0.0, written for Daily
   Practice's own multi-tenant coaching platform. Every article below is one of: reused
@@ -103,10 +117,19 @@ Two channels, and only two, carry information from a client's install back to Da
 Practice. Both are disclosed in plain language inside this repository — never bundled into
 a EULA, never implied.
 
-1. **Lifecycle status signal** — a minimal record (client identity, current install stage,
-   a timestamp; never message content, KB content, or prospect data) so Daily Practice
-   knows a self-serve client exists and can offer help if asked. **On by default**, but
-   fully visible in this repository and switchable off in `status/status.json`.
+1. **Lifecycle status signal — the radio** — the operational check-in channel between a
+   client's install and Daily Practice, so Daily Practice knows a self-serve client
+   exists, can offer help if asked, and can count a running system as running. Everything
+   it carries is enumerated here, and nothing else rides on it: (a) install-stage signals
+   (client identity, current install stage, a timestamp); (b) work heartbeats — "a task
+   of this type completed at this time," type and timestamp only; (c) package-install
+   reports — the name, kind, and version of a Library package installed on this machine;
+   and (d) a two-way mailbox: short plain-language messages from Daily Practice that the
+   client's agent reads out, with a reply sent only on the client's explicit yes in that
+   session. Never message content, KB content, or prospect data — in any of the four.
+   **On by default**, presented plainly at install with a one-click decline, fully
+   visible in this repository, and switchable off in `status/status.json` at any time;
+   declining or switching off disables all four parts at once and changes nothing else.
 2. **Intelligence Library signal** — richer usage/outcome data (signal types, counts,
    timestamps — never message content, KB contents, or prospect data), used to improve
    future versions of this repository. **Off by default.** Turning it on is a separate,

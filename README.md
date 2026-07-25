@@ -1,15 +1,15 @@
 # Orion — turn your own AI assistant into your sales agent
 
 Orion is a personal sales agent that learns your business, your customers, and how you
-actually sell — then takes on the parts of selling that aren't talking to people. For
-example: you tell it about a prospect, and it researches them and drafts a message for you
-to look over. After a call, you tell it how it went, and it writes up the summary, updates
-your pipeline, and drafts your follow-up — all as drafts waiting for you, never sent on
-their own.
+actually sell — then takes on the parts of selling that aren't talking to people. You
+tell it about a prospect; it researches them and drafts a message for you to look over.
+After a call, you tell it how it went; it writes the summary, updates your pipeline, and
+drafts your follow-up — all as drafts waiting for you, never sent on their own.
 
-There's no coach or consultant involved in setting this up. Your own AI assistant — Claude,
-ChatGPT, or Copilot, whichever you already use — walks you through it directly, using the
-files in this download. This page will get you to the point where it takes over.
+There's no coach or consultant involved. Your own AI assistant — Claude, ChatGPT, or
+Copilot, whichever you already use — installs it with you, using the files in this
+folder. This page is the control panel: **Press Start** below gets you going; **the
+Library** underneath it is where you add capabilities, today or months from now.
 
 **Three things worth knowing before you start:**
 
@@ -20,6 +20,76 @@ files in this download. This page will get you to the point where it takes over.
   below — and nothing is lost.
 - **Nothing happens without you saying yes.** Not one email, not one change to your
   contacts list, ever, without you approving it first. More on this below.
+
+---
+
+## ▶ Press Start
+
+First time here? Get the folder onto your computer first —
+[two minutes, Step 1 below](#step-1--get-the-files-onto-your-computer) — then come
+back to this button.
+
+**Press Start means: run one line.** Open a terminal in your Orion folder — on a
+**Mac**: open the folder in Finder, then right-click inside it and look for
+**New Terminal at Folder** (or open the Terminal app, type `cd `, drag the folder onto
+the window, press Enter). On **Windows**: open the folder and right-click any empty
+space, then choose **Open in Terminal**. A terminal is just a window that takes typed
+commands — you'll type exactly one:
+
+```bash
+node start.mjs
+```
+
+A setup wizard wakes up and does the looking-around for you: what computer this is,
+which AI tools already live on it, what's missing. It asks at most a question or two
+(only the ones a machine genuinely can't answer), never asks you to put a password in
+the chat, and ends by handing you the exact prompt that starts your AI on the install.
+
+**You'll know it worked when**: your terminal shows "Orion — Press Start" and starts
+talking to you in plain words. The whole thing takes a few minutes.
+
+**If that didn't work** — say the window says something like `command not found: node`
+— your computer doesn't have Node.js, a free tool the wizard runs on. **You don't need
+it.** The wizard is a fast lane, not the only door: the
+[full walkthrough below](#step-1--get-the-files-onto-your-computer) reaches every same
+outcome by plain conversation with your AI, and it always works.
+
+---
+
+## 📚 The Library — add capabilities anytime
+
+Honest mechanics: on this website a "button" is a link. Each one opens a package page
+whose **first block is the exact text to paste into your AI** — your AI installs it
+from there, fits it to your business, and proves it works on your real data.
+
+**Agents** — a colleague with a job:
+
+- **[Prospecting](library/agents/prospecting/PACKAGE.md)** — ~20 researched
+  candidates that match your ideal customer, each with a one-line "why them."
+- **[Call-Planner Control Tower](library/agents/call-planner/PACKAGE.md)** — who to
+  call today, in what order, with context and the angle.
+- **[Friday Report](library/agents/friday-report/PACKAGE.md)** — the week's honest
+  scoreboard, drafted for your approval.
+
+**Skills** — one teachable capability:
+
+- **[Meeting Sizing](library/skills/meeting-sizing/PACKAGE.md)** — every meeting gets
+  an outcome, a decision-maker, and the shortest useful length.
+
+**Workflows** — automated chains, gated on your yes:
+
+- **[Prospect Research → Outreach](library/workflows/prospect-research-outreach/PACKAGE.md)**
+  — form in, researched draft out, waiting in your Drafts.
+- **[Post-Call Debrief](library/workflows/post-call-debrief/PACKAGE.md)** — call notes
+  in; summary, CRM update and follow-up draft out.
+
+**Programs** — operating routines your agent runs with you:
+
+- **[Revenue Operating Cadence](library/programs/revenue-operating-cadence/PACKAGE.md)**
+  — the daily/weekly/monthly beat that moves revenue from attention to collected cash.
+
+More about how packages work (and what "installed" honestly means):
+[the Library's own page](library/README.md).
 
 ---
 
@@ -53,8 +123,8 @@ own copy of that folder on your own computer.
 ![The unzipped folder open in Finder, showing its contents](docs/img/02-unzipped-folder-contents.png)
 
 **You'll know this step worked when**: you can open that folder and see a list of files
-and other folders inside it — things named `AGENTS.md`, `agent`, `crm`, `connectors`, and
-so on. You don't need to open or understand any of them yourself.
+and other folders inside it — things named `AGENTS.md`, `start.mjs`, `agent`, `crm`,
+`library`, and so on. You don't need to open or understand any of them yourself.
 
 **If you get a "damaged file" or "can't be opened" message**: the download probably didn't
 finish. Delete the ZIP file and downloaded folder, and try the download again.
@@ -62,13 +132,16 @@ finish. Delete the ZIP file and downloaded folder, and try the download again.
 **Already comfortable with git?** You can `git clone` this repository's URL instead of
 downloading a ZIP — same end result, skip the rest of this step if so.
 
+Now you can go back up and [**Press Start**](#-press-start) — or carry on below for the
+no-wizard lane, which works even without Node.js and is every bit as first-class.
+
 ---
 
 ## Step 2 — Open the folder with your AI assistant
 
-How you do this depends on which kind of AI tool you use. Pick whichever description below
-sounds like you — there's no wrong answer, and if you're not sure, start with "Just a
-website" below; it always works.
+This is the conversational lane: everything the wizard does — including the choices it
+would ask you — your AI covers by just talking with you. How you start depends on which
+kind of AI tool you use. Not sure? Start with "Just a website" below; it always works.
 
 ### If you use Claude Code, Cursor, or a similar app that opens folders on your computer
 
@@ -145,7 +218,8 @@ close your laptop, go to a meeting, or come back next week — go ahead. Nothing
 When you're ready to continue, just open the same folder with your AI assistant again (it
 doesn't even have to be the same one you started with) and say something like **"let's
 continue."** It will already know exactly what you've done so far and pick up from there —
-you'll never have to answer the same question twice.
+you'll never have to answer the same question twice. (The wizard works the same way:
+running `node start.mjs` again greets you with exactly where things stand.)
 
 ---
 
@@ -157,11 +231,12 @@ you'll never have to answer the same question twice.
 - **It won't write anything that could embarrass you or your business.** If you ask for
   something that crosses a line, it'll tell you plainly and suggest a better way — not
   just refuse and leave you stuck.
-- **It won't send information about your business anywhere without telling you.** A small
-  amount of status information (basically just "which step you're up to") may be shared
-  with Daily Practice by default, so they know to check in if you need help — your AI
-  assistant will explain exactly what that means and how to turn it off if you'd rather it
-  didn't, the first time it comes up.
+- **It won't send information about your business anywhere without telling you.** Your
+  harness can keep a small check-in "radio" open with Daily Practice — which install
+  step you're on, that a task ran, which packages you have; never the content of
+  anything. It's presented to you plainly as a pre-ticked choice you can decline with
+  one keystroke, during setup, and you can switch it off anytime after.
+  [The radio, in plain words](docs/radio.md) is the whole story — no fine print.
 
 ---
 
@@ -179,5 +254,5 @@ alone — that's what it's built for. If it genuinely can't help, reach out to
 ---
 
 *For Daily Practice maintainers evolving this repository itself — not installing it for a
-client — the technical specification lives in `specs/001-self-install/` and
-`.specify/memory/constitution.md`.*
+client — the technical specifications live in `specs/001-self-install/`,
+`specs/002-production-line/`, and `.specify/memory/constitution.md`.*

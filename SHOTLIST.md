@@ -89,6 +89,12 @@ the references once you've decided which of these are worth capturing.
 - **Gmail Drafts folder**, showing one staged draft — this is the single best "trust me,
   it really does just wait for you" image in the whole repository, worth prioritising if
   you only add one more.
+- **`docs/img/05-terminal-press-start.png`** — a terminal in the unzipped folder right
+  after running `node start.mjs`, showing the "Orion — Press Start" banner and the
+  plain-words machine report. Capture on your own Mac (no account needed, no client
+  data on screen — check the folder name in the prompt line before saving). This would
+  slot straight into the README's "Press Start" section; the README doesn't reference
+  it yet, so add the reference when the image lands.
 
 ---
 

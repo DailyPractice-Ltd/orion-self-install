@@ -1,0 +1,22 @@
+{
+  "generated_at": null,
+  "today": [],
+  "history": [],
+  "enrichment": [],
+  "lists": {
+    "priorities": ["P0", "P1", "P2"],
+    "owners": ["{{TEAM_MEMBERS}}"],
+    "stages": ["{{PIPELINE_STAGES}}"],
+    "outcomes": [
+      "No answer",
+      "Voicemail",
+      "Gatekeeper",
+      "Connected – follow-up",
+      "Callback booked",
+      "Meeting booked",
+      "Wrong number",
+      "Disqualified",
+      "No call needed"
+    ]
+  }
+}

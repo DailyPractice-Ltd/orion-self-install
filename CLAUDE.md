@@ -7,5 +7,5 @@ maintainer work), not for running a client's install.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/001-self-install/plan.md`
+`specs/002-production-line/plan.md`
 <!-- SPECKIT END -->

@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://orion-self-install/contracts/status-additions.schema.json",
+  "title": "status.json additions — schema 1.1.0 (feature 002-production-line)",
+  "description": "The three regions feature 002 adds to status/status.json: machine_profile (written by start.mjs), the sharing radio fields, and the packages map. Feature 001's contracts remain authoritative for everything else. Every reader MUST tolerate any of these regions being absent (files written under schema 1.0.0).",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.1.0",
+      "description": "Moves from 1.0.0 to 1.1.0 on the first write that adds any region below."
+    },
+    "machine_profile": {
+      "type": "object",
+      "description": "What the Press Start wizard learned about this computer (FR-001). Never contains anything the client typed — detection only, plus the one chosen-surface answer.",
+      "required": ["os", "node_version", "git_present", "surfaces_found", "chosen_surface", "detected_at"],
+      "additionalProperties": false,
+      "properties": {
+        "os": {
+          "type": "string",
+          "description": "'macos' | 'windows' | 'linux' | raw process.platform value for anything else."
+        },
+        "os_version": { "type": "string", "description": "os.release(); informational." },
+        "node_version": { "type": "string", "description": "process.version at detection time." },
+        "git_present": { "type": "boolean" },
+        "surfaces_found": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["claude-desktop", "claude-code", "cursor", "chatgpt-app", "copilot-vscode"]
+          },
+          "description": "Best-effort filesystem/PATH detection (research.md R1). Absence from this list never means 'not installed'."
+        },
+        "chosen_surface": {
+          "type": ["string", "null"],
+          "enum": ["claude-desktop", "claude-code", "cursor", "chatgpt-app", "copilot-vscode", "website-chat", null],
+          "description": "Auto-set when exactly one surface is found; set by the single human question when two or more are; 'website-chat' when none are (the always-available lane)."
+        },
+        "detected_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "sharing": {
+      "type": "object",
+      "description": "1.0.0 fields (status_signal_enabled, status_signal_endpoint, intelligence_library_opt_in) keep their exact meaning. These are the radio additions (FR-008). Radio-on means: status_signal_enabled AND bridge_url AND harness_id AND install_token all set.",
+      "properties": {
+        "radio_choice": {
+          "type": ["string", "null"],
+          "enum": ["accepted", "declined", null],
+          "description": "null = the check-in choice has never been presented; set once, never re-asked. 'declined' is always accompanied by status_signal_enabled=false."
+        },
+        "bridge_url": {
+          "type": ["string", "null"],
+          "description": "The radio address from the welcome pack. null is the shipped default AND the stub posture while the sister bridge feature is unbuilt — with it null, no code path performs any outbound call."
+        },
+        "harness_id": { "type": ["string", "null"], "description": "From the welcome pack." },
+        "install_token": {
+          "type": ["string", "null"],
+          "description": "From the welcome pack. Entered via masked prompt, never echoed, never logged, shown back as last-4 only. Lives here because status.json is the radio's config home (FR-002/FR-008); revocable server-side at any time."
+        }
+      }
+    },
+    "packages": {
+      "type": "object",
+      "description": "Installed-package record, keyed by slug (FR-005/FR-007; Article II). Written the moment a smoke test passes, read for shelf reports and resume.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["kind", "version", "installed_at", "smoke_test_passed"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "type": "string", "enum": ["agent", "skill", "workflow", "program"] },
+          "version": { "type": "string" },
+          "installed_at": { "type": "string", "format": "date-time" },
+          "smoke_test_passed": {
+            "type": "boolean",
+            "description": "true only after the package's live check on the client's own data (Article VIII) — never optimistically."
+          }
+        }
+      }
+    }
+  }
+}

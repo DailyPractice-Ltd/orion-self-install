@@ -41,18 +41,37 @@ available, and that promise is made to every reader in `README.md` — keep it.
    `ops_stage: "booked"`. If it exists, **this is a resumed session** — read `checklist` and
    `ops_stage`, greet the client by `business_name`/`agent_name` if set, and skip every step
    already marked `true`. Never re-ask a question the file says is answered.
-   **The first time you create `status/status.json` (session 1 only)**, tell the client in
-   one or two plain sentences that a small amount of status information — basically just
-   "which step you're up to" — is shared with Daily Practice by default so they know to
-   check in if needed, and that it can be turned off in that same file at any time. Don't
-   wait for them to ask, and don't just point them at `docs/intelligence-library-opt-in.md`
-   and leave it there — say it in the conversation, then mention the file exists if they
-   want the full detail.
-2. **Read `agent/agent-definition.md`.** That is the system prompt / identity you adopt for
+   Two regions of that file deserve special respect:
+   - **`machine_profile`** — if it's filled, the Press Start wizard (`start.mjs`) already
+     looked at this computer: OS, Node, git, which AI tools live here, and which one the
+     client chose. Never re-ask any of it. If it's `null`, the wizard never ran — fill the
+     same facts by asking, briefly and only as needed.
+   - **`sharing.radio_choice`** — if it's `null`, the check-in choice has never been
+     presented. Present it once, in these words (the same words the wizard uses): *"Your
+     harness checks in with Daily Practice so we can support you and count your system as
+     running — it shares which step you're on, that a task ran, and which packages you've
+     installed, never the content of your messages, your knowledge base, or your
+     prospects. You can switch this off. Keep check-ins on?"* Default is yes; declining is
+     one word, sets `sharing.status_signal_enabled` to `false` and `radio_choice` to
+     `"declined"`, and changes nothing else. Accepting sets `radio_choice` to
+     `"accepted"`; if the client has a welcome pack (radio address, harness id, key), its
+     values go into `sharing` — the key is typed by the client, never read back aloud.
+     If `radio_choice` is already set, respect it silently — this choice is never
+     re-litigated. Full plain-words detail: `docs/radio.md`.
+2. **Check the mailbox — every session start, when the radio is on.** "On" means
+   `sharing.status_signal_enabled` is `true` AND `bridge_url`, `harness_id`,
+   `install_token` are all set. If you can run scripts, run
+   `node status/radio.mjs check`. An empty mailbox needs no mention at all. If a message
+   is waiting, read it to the client in plain words before other work, and send a reply
+   **only on their explicit yes, in their words**
+   (`node status/radio.mjs reply --nudge <id> --message "…"`). On a surface that can't
+   run commands, skip this quietly — Daily Practice reaches those clients by email
+   instead; never pretend to have checked.
+3. **Read `agent/agent-definition.md`.** That is the system prompt / identity you adopt for
    the actual day-to-day Orion agent you're helping build — not for this install
    conversation itself, but you'll be assembling it with the client as you go (their
    knowledge base, their tone, their agent name).
-3. **Read `agent/adapters/`** and open the one file matching the surface you're running on
+4. **Read `agent/adapters/`** and open the one file matching the surface you're running on
    right now (`claude.md`, `chatgpt.md`, `copilot.md`, or `claude-code.md` if you can read
    and write files / run scripts in this repo directly). It tells you which parts of the
    install you can do for the client mechanically versus which parts need a manual,
@@ -99,11 +118,38 @@ know why, just that the names are load-bearing; don't rename them.
    in the relevant file — don't guess silently. Every fork like this is already anticipated
    somewhere in this repo; look before improvising.
 
+## The Library — adding capabilities after (or during) the install
+
+`library/` holds installable packages — **Agents** (a colleague with a job), **Skills**
+(one teachable capability), **Workflows** (an automated hand-off chain), **Programs** (an
+operating routine). The client usually arrives with a pasted install prompt from a
+package page; you can also offer one when it genuinely fits. The rules when installing
+one:
+
+1. The package's `PACKAGE.md` is the whole recipe: read it (or have it pasted), fill
+   every `{{PLACEHOLDER}}` **in conversation** before the client sees rendered output,
+   one question at a time.
+2. **Run the smoke test on the client's own live data** — a package isn't installed
+   because its files are in place; it's installed when its "you'll know it worked when…"
+   line is true.
+3. Only then record it in `status/status.json` under `packages.<slug>` (`kind`,
+   `version`, `installed_at`, `smoke_test_passed: true`).
+4. If the radio is on and you can run scripts, report it to the shelf:
+   `node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>` —
+   that's how Daily Practice knows what this machine runs when improvements ship. Radio
+   off → skip, say nothing, all is well.
+5. Every agent package's safety rails are non-negotiable rules 3 and 4 above, restated —
+   drafts only, refusal line intact, no exceptions because a package "needs" one.
+
 ## Where the fuller detail lives
 
 - `.specify/memory/constitution.md` — the principles behind these rules, if you want the
   reasoning, not just the rule.
-- `specs/001-self-install/spec.md` — the full user-journey spec this repo implements.
+- `specs/001-self-install/spec.md` — the foundation user-journey spec this repo
+  implements; `specs/002-production-line/spec.md` — the wizard, Library, and radio layer
+  on top of it.
+- `docs/radio.md` — the check-in system in plain words, including what to do on a
+  surface that can't run commands.
 - Anything you're unsure about is more likely answered in a file here than not. This repo
   is written to brief you, specifically — read before asking the client something the repo
   already tells you.

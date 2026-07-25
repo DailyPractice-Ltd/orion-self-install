@@ -110,5 +110,10 @@ tool, not part of the install's internal state machine.
 | `{{CLIENT_EMAIL}}` (`n8n/wf-01-*.json`, `n8n/wf-02-*.json`) | The installing agent | When setting up the approval-email recipient during n8n import (US3) | Open by design — filled per client |
 | `{{DATE}}` (`agent/knowledge-base/07-commitments.md`) | The installing agent | The day the commitments are agreed with the client | Open by design — filled per client |
 
-No other placeholders exist in this repository. Any new one introduced by future work must
-be added to this table (Article VI gate) before it ships.
+No other placeholders exist in this repository *as of feature 001*. Any new one
+introduced by future work must be inventoried before it ships (Article VI gate) —
+feature 002's additions (`{{TEAM_MEMBERS}}`, `{{PIPELINE_STAGES}}`, `{{CRM_NAME}}`,
+`{{ACCOUNTING_TOOL}}`, `{{TIMEZONE}}`, `{{REPORT_DAY}}`, and the 001 vocabulary reused
+in `library/` packages) are inventoried in
+[`../002-production-line/data-model.md`](../002-production-line/data-model.md), all
+agent-filled during the install conversation.

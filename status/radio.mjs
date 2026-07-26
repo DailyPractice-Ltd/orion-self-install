@@ -112,8 +112,10 @@ if (command === 'check') {
   const res = await call('GET', '/nudges');
   if (res.status === 401) reportAuthProblem();
   if (!res.ok) { console.log(`Mailbox check answered ${res.status} — skipped, will try next session.`); process.exit(0); }
-  const nudges = await res.json().catch(() => []);
-  if (!Array.isArray(nudges) || nudges.length === 0) {
+  // The server wraps the list: { "nudges": [...] } (bridge contract, BridgeNudgesResponse).
+  const data = await res.json().catch(() => null);
+  const nudges = Array.isArray(data?.nudges) ? data.nudges : [];
+  if (nudges.length === 0) {
     console.log('Mailbox empty — no messages from Daily Practice.');
     process.exit(0);
   }
@@ -134,9 +136,10 @@ if (command === 'reply') {
     console.log('reply needs --nudge <id> and --message "text".');
     process.exit(1);
   }
+  // Server field is `body` (bridge contract, BridgeNudgeReplyRequest); the CLI flag
+  // stays --message because that's what it is to the client.
   const res = await call('POST', `/nudges/${encodeURIComponent(flags.nudge)}/reply`, {
-    harness_id: sharing.harness_id,
-    message: flags.message,
+    body: flags.message,
   });
   if (res.status === 401) reportAuthProblem();
   console.log(res.ok ? 'Reply sent — it\'s with Daily Practice.' : `Reply answered ${res.status} — not retried; try again next session.`);
@@ -151,7 +154,8 @@ if (command === 'signal') {
   const res = await call('POST', '/signals', {
     harness_id: sharing.harness_id,
     signal_type: flags.type,
-    sent_at: new Date().toISOString(),
+    // Server name for the client-clock timestamp; it anchors replay idempotence.
+    occurred_at: new Date().toISOString(),
     payload: {
       ops_stage: status.ops_stage,
       harness_status: status.harness_status,

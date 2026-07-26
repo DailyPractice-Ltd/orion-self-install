@@ -443,7 +443,7 @@ async function welcomePackStep(status) {
       body: JSON.stringify({
         harness_id: status.sharing.harness_id,
         signal_type: 'install_checkpoint',
-        sent_at: new Date().toISOString(),
+        occurred_at: new Date().toISOString(),
         payload: {
           ops_stage: status.ops_stage,
           harness_status: status.harness_status,

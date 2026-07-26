@@ -45,10 +45,12 @@ The 1.0.0 fields keep their exact meaning. New fields:
 
 **Radio-on definition** (used by every outbound path):
 `status_signal_enabled === true` **and** `bridge_url` **and** `install_token` **and**
-`harness_id` are all set. Anything less → silent local-only no-op. The legacy
-`status_signal_endpoint` keeps working for the plain lifecycle signal when the bridge is
-not configured; when both are set, the bridge wins (path-drift fix mirrored from the
-sister spec's FR-B03).
+`harness_id` are all set. Anything less → silent local-only no-op.
+
+*(Amended 2026-07-26, 002a reconciliation: this section originally kept the legacy
+unauthenticated `status_signal_endpoint` webhook working as a fallback when the bridge
+was not configured. That fallback — and the field — were removed in schema 1.2.0; the
+authenticated radio is the only outbound path.)*
 
 ### `packages` — what's installed here (FR-005/FR-007, Article II)
 

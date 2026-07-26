@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * Update status/status.json locally, and — only if sharing.status_signal_enabled is
- * true and sharing.status_signal_endpoint is set — emit the minimal status signal
- * (specs/001-self-install/contracts/status-signal.schema.json) to that endpoint.
+ * Update status/status.json locally, and — only when the radio is on (the welcome-pack
+ * fields are set and sharing.status_signal_enabled is true) — emit an install_checkpoint
+ * signal through the authenticated bridge (specs/002-production-line/contracts/
+ * bridge-radio.md). The radio is the only outbound path; the unauthenticated 001-era
+ * webhook was removed in the 002a reconciliation.
  *
  *   node status/emit-status.mjs --ops_stage day1_encode --harness_status configured
  *   node status/emit-status.mjs --checklist kb_business_context=true
@@ -59,10 +61,9 @@ if (ops_stage_changed) {
 writeFileSync(STATUS_PATH, JSON.stringify(status, null, 2) + '\n');
 console.log(`status/status.json updated — harness_status: ${status.harness_status}, ops_stage: ${status.ops_stage}`);
 
-// Emit the minimal status signal only when explicitly enabled AND a destination is
-// configured. Two transports, bridge preferred (specs/002-production-line/contracts/
-// bridge-radio.md): the welcome-pack bridge (authenticated /signals door) when its three
-// sharing fields are set, else the legacy direct webhook from feature 001.
+// Emit an install_checkpoint through the radio — the one outbound path — only when
+// explicitly enabled AND the welcome-pack fields are set (specs/002-production-line/
+// contracts/bridge-radio.md). Anything less is a silent local save.
 const sharing = status.sharing;
 const bridgeConfigured = Boolean(sharing.bridge_url && sharing.harness_id && sharing.install_token);
 if (sharing.status_signal_enabled && bridgeConfigured) {
@@ -76,7 +77,7 @@ if (sharing.status_signal_enabled && bridgeConfigured) {
       body: JSON.stringify({
         harness_id: sharing.harness_id,
         signal_type: 'install_checkpoint',
-        sent_at: now,
+        occurred_at: now,
         payload: {
           ops_stage: status.ops_stage,
           harness_status: status.harness_status,
@@ -88,25 +89,6 @@ if (sharing.status_signal_enabled && bridgeConfigured) {
   } catch (err) {
     console.log(`Radio address unreachable (${err?.cause?.code || err.message}) — not retried. Local status was still saved.`);
   }
-} else if (sharing.status_signal_enabled && sharing.status_signal_endpoint) {
-  const payload = {
-    client_id: status.client_id,
-    business_name: status.business_name,
-    harness_status: status.harness_status,
-    ops_stage: status.ops_stage,
-    template_version: status.template_version,
-    timestamp: now,
-  };
-  try {
-    const res = await fetch(sharing.status_signal_endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    console.log(res.ok ? 'Status signal sent.' : `Status signal endpoint responded ${res.status} — not retried.`);
-  } catch (err) {
-    console.log(`Status signal endpoint unreachable (${err.message}) — not retried. Local status was still saved.`);
-  }
 } else {
-  console.log('Status signal disabled or no endpoint configured — nothing sent outward.');
+  console.log('Radio off or not configured — nothing sent outward. Local status was saved.');
 }

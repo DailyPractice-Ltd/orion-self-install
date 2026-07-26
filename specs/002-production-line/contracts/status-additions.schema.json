@@ -41,7 +41,7 @@
     },
     "sharing": {
       "type": "object",
-      "description": "1.0.0 fields (status_signal_enabled, status_signal_endpoint, intelligence_library_opt_in) keep their exact meaning. These are the radio additions (FR-008). Radio-on means: status_signal_enabled AND bridge_url AND harness_id AND install_token all set.",
+      "description": "1.0.0 fields status_signal_enabled and intelligence_library_opt_in keep their exact meaning; status_signal_endpoint was removed in 1.2.0 (002a reconciliation — the unauthenticated legacy webhook is gone). These are the radio additions (FR-008). Radio-on means: status_signal_enabled AND bridge_url AND harness_id AND install_token all set.",
       "properties": {
         "radio_choice": {
           "type": ["string", "null"],

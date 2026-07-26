@@ -1,14 +1,14 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://orion-self-install/contracts/status-additions.schema.json",
-  "title": "status.json additions — schema 1.1.0 (feature 002-production-line)",
-  "description": "The three regions feature 002 adds to status/status.json: machine_profile (written by start.mjs), the sharing radio fields, and the packages map. Feature 001's contracts remain authoritative for everything else. Every reader MUST tolerate any of these regions being absent (files written under schema 1.0.0).",
+  "title": "status.json additions — schema 1.2.0 (feature 002-production-line + 002a reconciliation)",
+  "description": "The three regions feature 002 adds to status/status.json: machine_profile (written by start.mjs), the sharing radio fields, and the packages map. Feature 001's contracts remain authoritative for everything else. Every reader MUST tolerate any of these regions being absent (files written under earlier schemas).",
   "type": "object",
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "1.1.0",
-      "description": "Moves from 1.0.0 to 1.1.0 on the first write that adds any region below."
+      "const": "1.2.0",
+      "description": "1.1.0 added the three regions below; 1.2.0 (002a reconciliation) removed sharing.status_signal_endpoint. Writers migrate older files in place: add missing regions, delete the removed field, stamp this version."
     },
     "machine_profile": {
       "type": "object",
@@ -27,13 +27,13 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["claude-desktop", "claude-code", "cursor", "chatgpt-app", "copilot-vscode"]
+            "enum": ["claude-desktop", "claude-code", "codex", "cursor", "chatgpt-app", "copilot-vscode"]
           },
-          "description": "Best-effort filesystem/PATH detection (research.md R1). Absence from this list never means 'not installed'."
+          "description": "Best-effort filesystem/PATH detection (research.md R1; codex added 2026-07-26 after the founder walkthrough). Absence from this list never means 'not installed'."
         },
         "chosen_surface": {
           "type": ["string", "null"],
-          "enum": ["claude-desktop", "claude-code", "cursor", "chatgpt-app", "copilot-vscode", "website-chat", null],
+          "enum": ["claude-desktop", "claude-code", "codex", "cursor", "chatgpt-app", "copilot-vscode", "website-chat", null],
           "description": "Auto-set when exactly one surface is found; set by the single human question when two or more are; 'website-chat' when none are (the always-available lane)."
         },
         "detected_at": { "type": "string", "format": "date-time" }

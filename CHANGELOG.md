@@ -12,20 +12,50 @@ that applies to both gets made in both places, cited both ways.
 
 ## Unreleased — candidates
 
-- No self-serve client has been through this repo yet. Everything here is a first-principles
-  adaptation of the coach-led kit (v1.1.0) plus original design for resumability and
-  non-technical delivery — it has not been field-tested. The first real self-serve install
-  is this repo's own "Vol. 1," the same way Sugar Free Sundays and Solo Community were for
-  the coach-led kit.
+- No self-serve *client* has been through this repo yet (the founder's own 26 Jul
+  walkthrough is logged as Vol. 0, not Vol. 1). The first real self-serve install is
+  this repo's "Vol. 1," the same way Sugar Free Sundays and Solo Community were for the
+  coach-led kit — and SC-006 stands: a real non-technical person, not the founder,
+  through `NON-TECHNICAL-DRY-RUN.md`, now covering Press Start + one Library install.
 - Daily Practice's own preferred Spec Kit starter template has not yet been supplied; this
   repo currently vendors `dailypractice-mono`'s own `.specify/` setup as the seed (see
   `specs/001-self-install/plan.md` §1). Swap-in, not a blocker.
-- Repo visibility/license (public+MIT vs. private+invite) is a recommended default, not yet
-  confirmed by the founder — see the plan.
-- The radio's live round trip (first signal, nudge, reply, shelf report against the real
-  bridge) is deferred until `dailypractice-mono` feature `002-intelligence-bridge` is
-  deployed — client side ships stubbed-off (`sharing.bridge_url: null`) and verified
-  against a local mock only. See `specs/002-production-line/quickstart.md` §7.
+- ~~Repo visibility/license~~ — resolved 2026-07-26: **public + MIT**, live at
+  https://github.com/DailyPractice-Ltd/orion-self-install (Template Repository).
+
+## 0.3.0 — 2026-07-26
+
+Two same-day passes: the radio reconciled against the deployed bridge (002a), and the
+onboarding journey reworked from the founder's own live walkthrough
+(`docs/self-serve-learnings.md` Vol. 0).
+
+### Changed
+
+- **Radio speaks the deployed bridge's actual protocol** (002a reconciliation, verified
+  live): `occurred_at` replaces `sent_at` in every signal; the mailbox parses the
+  `{ nudges: [...] }` envelope; replies send `{ body }`; the unauthenticated 001-era
+  `status_signal_endpoint` webhook is removed outright (status schema 1.2.0 — the
+  authenticated radio is the only outbound path); both n8n workflows' legacy webhook
+  nodes replaced with bridge-shaped Radio signal nodes (disabled by default);
+  `contracts/bridge-radio.md` rewritten to deployed truth, live round trip recorded.
+- **README restructured around the walkthrough's four findings**: new Step 2 "Move it
+  to its home" (`Github → Projects` convention); Step 3's terminal method is now
+  open-from-search + `cd ` + drag-the-folder + Enter; Step 4 is agent-agnostic ("open
+  the folder with your AI, or hand it AGENTS.md" — vendor specifics demoted to
+  examples); new "Once installed, use Orion from any project" section. Press Start
+  stays the first actionable element, reframed as three moves.
+- Wizard handoffs aligned: Claude desktop app now routes via its **Code** tab
+  (Project-upload kept as fallback); folder wording matches the new home convention.
+- `SHOTLIST.md` rebuilt around the new journey; screenshots 01–05 + 07 landed in
+  `docs/img/` (03/04/05/07 redaction-processed — no non-Orion business data survives);
+  06a/06b (website lane) still pending.
+
+### Added
+
+- **Codex as a first-class surface**: contract vocabulary (`codex` slug), wizard
+  detection (`codex` on PATH / `~/.codex`), plain-words description, and its own
+  handoff. Answers the walkthrough's "what if I'm working on Codex?" directly.
+- `docs/self-serve-learnings.md` Vol. 0 — the founder-walkthrough findings, logged.
 
 ## 0.2.0 — 2026-07-25
 

@@ -29,8 +29,9 @@ must tolerate that (the conversational path fills it by asking, FR-010).
 | `machine_profile.detected_at` | ISO 8601 | Refreshed on every wizard run |
 
 **Surface slug vocabulary** (fixed — detection method per slug in
-[research.md](research.md) R1): `claude-desktop`, `claude-code`, `cursor`,
+[research.md](research.md) R1): `claude-desktop`, `claude-code`, `codex`, `cursor`,
 `chatgpt-app`, `copilot-vscode`, plus the always-available fallback `website-chat`.
+(`codex` added 2026-07-26 — the founder walkthrough's "what if I'm on Codex?" gap.)
 
 ### `sharing` — extended for the radio (FR-008)
 

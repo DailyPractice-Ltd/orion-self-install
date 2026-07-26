@@ -16,6 +16,8 @@ decision / rationale / alternatives considered, per the plan workflow.
   `%APPDATA%\Claude`) accepted as secondary evidence.
 - **Claude Code** — `claude` resolvable on PATH (`spawnSync`, never a shell string), or
   `~/.claude` directory present.
+- **Codex** — `codex` resolvable on PATH, or `~/.codex` directory present. (Added
+  2026-07-26 after the founder walkthrough asked "what if I'm working on Codex?")
 - **ChatGPT app** — macOS: `/Applications/ChatGPT.app`; Windows:
   `%LOCALAPPDATA%\Programs\ChatGPT`.
 - **GitHub Copilot** — a VS Code install plus a `~/.vscode/extensions/github.copilot*`

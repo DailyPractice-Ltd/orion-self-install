@@ -128,7 +128,11 @@ function loadStatus() {
   return { status: JSON.parse(readFileSync(STATUS_PATH, 'utf8')), firstRun: false };
 }
 
-/** Files written under schema 1.0.0 simply lack the 1.1.0 regions — add, never error. */
+/**
+ * Files written under older schemas simply lack the newer regions — add, never error.
+ * 1.2.0 (002a reconciliation) also removed the legacy unauthenticated webhook field;
+ * delete it if an old bookmark still carries it.
+ */
 function migrate(status) {
   if (!('machine_profile' in status)) status.machine_profile = null;
   if (!status.packages || typeof status.packages !== 'object') status.packages = {};
@@ -136,7 +140,8 @@ function migrate(status) {
   for (const key of ['radio_choice', 'bridge_url', 'harness_id', 'install_token']) {
     if (!(key in status.sharing)) status.sharing[key] = null;
   }
-  status.schema_version = '1.1.0';
+  delete status.sharing.status_signal_endpoint;
+  status.schema_version = '1.2.0';
   return status;
 }
 
@@ -189,6 +194,7 @@ function detectSurfaces() {
     found.push('claude-desktop');
   }
   if (onPath('claude') || exists(join(home, '.claude'))) found.push('claude-code');
+  if (onPath('codex') || exists(join(home, '.codex'))) found.push('codex');
   if ((mac && exists('/Applications/Cursor.app')) || exists(join(home, '.cursor'))) found.push('cursor');
   if ((mac && exists('/Applications/ChatGPT.app')) ||
       (win && exists(join(local, 'Programs', 'ChatGPT')))) {
@@ -197,14 +203,15 @@ function detectSurfaces() {
   if (hasCopilotExtension(home)) found.push('copilot-vscode');
 
   // Code-capable surfaces first — the fastest lane leads, without hiding the others.
-  const order = ['claude-code', 'cursor', 'claude-desktop', 'chatgpt-app', 'copilot-vscode'];
+  const order = ['claude-code', 'codex', 'cursor', 'claude-desktop', 'chatgpt-app', 'copilot-vscode'];
   return order.filter((s) => found.includes(s));
 }
 
 const SURFACE_WORDS = {
   'claude-code': 'Claude Code (runs in a terminal and can read and write the files here itself — the fastest lane)',
+  'codex': "Codex (OpenAI's coding agent — runs in a terminal and can work on these files directly)",
   'cursor': 'Cursor (a code editor with an AI built in — can also work on these files directly)',
-  'claude-desktop': 'Claude (the desktop app)',
+  'claude-desktop': 'Claude (the desktop app — its Code tab can open this folder directly)',
   'chatgpt-app': 'ChatGPT (the desktop app)',
   'copilot-vscode': 'GitHub Copilot (inside VS Code)',
   'website-chat': 'an AI chat website (claude.ai, chatgpt.com, or Copilot in the browser)',
@@ -286,7 +293,7 @@ async function main() {
   } else {
     say("  • I didn't find an AI app installed here — no problem at all. The chat");
     say('    websites (claude.ai, chatgpt.com, Copilot) work for everyone, and the');
-    say('    README\'s Step 2 shows that lane.');
+    say('    README\'s Step 4 shows that lane.');
   }
 
   status.machine_profile = {
@@ -480,6 +487,11 @@ function printHandoff(surface) {
       say('Code by typing  claude  and pressing Enter, then paste this prompt:');
       box(prompt);
       break;
+    case 'codex':
+      say('Open a terminal in this folder (tip: you\'re in one right now), start Codex');
+      say('by typing  codex  and pressing Enter, then paste this prompt:');
+      box(prompt);
+      break;
     case 'cursor':
       say('Open Cursor, use File → Open Folder… to open THIS folder, open its AI chat');
       say('panel, and paste this prompt:');
@@ -491,11 +503,14 @@ function printHandoff(surface) {
       box(prompt);
       break;
     case 'claude-desktop':
-      say('Open the Claude app and create a Project (call it "My Orion" — a Project is');
-      say('just a chat space with its own memory). Add the file AGENTS.md from this');
-      say('folder to the Project (the same everyday action as attaching a file to an');
-      say('email), then paste this prompt:');
-      box(promptChat);
+      say('Open the Claude app and click Code (near the top of the sidebar), then open');
+      say('THIS folder with its folder picker — the one you gave Orion as its home in');
+      say('README Step 2. Then paste this prompt:');
+      box(prompt);
+      say('');
+      say('(No Code tab in your Claude app? Create a Project instead — a chat space');
+      say('with its own memory — add the file AGENTS.md from this folder to it, and');
+      say('paste the same prompt. Both roads lead to the same place.)');
       break;
     case 'chatgpt-app':
       say('Open ChatGPT and attach the file AGENTS.md from this folder to a new chat');
@@ -505,7 +520,7 @@ function printHandoff(surface) {
       break;
     default:
       say('Go to your AI\'s website (claude.ai, chatgpt.com, or Copilot), follow');
-      say('README.md Step 2 to hand it the file AGENTS.md, then paste this prompt:');
+      say('README.md Step 4 to hand it the file AGENTS.md, then paste this prompt:');
       box(promptChat);
   }
   say('');

@@ -1,104 +1,114 @@
 # Screenshot shot list
 
-**The repository is live** (https://github.com/DailyPractice-Ltd/orion-self-install,
-public, since 2026-07-26), so every shot below is now capturable. **Why these are
-captured by a human at their own keyboard rather than generated**: most of them require
-being logged into a real account — either a brand-new one (off-limits for an AI to
-create on someone's behalf) or one of Daily Practice's own real, live business accounts,
-which would risk capturing real client/business data in a screenshot destined for this
-public template repo, even by accident, in the background of a browser tab or a sidebar
-list. So: here's exactly what to capture.
+**Status 2026-07-26**: the founder walked the real client journey, captured the shots,
+and six of the seven now live in `docs/img/` (the three flow shots were
+redaction-processed first — every filename, session title, and business name that
+wasn't Orion's own was cropped or painted out before entering this public repo). Only
+the website-lane pair (06a/06b) is still pending. **Why humans capture these rather
+than an AI generating them**: most need a real logged-in account, and real accounts
+carry real business data — the rule is crop or blur anything that isn't Orion's own,
+every time, before a shot lands here.
 
-Save each file at the exact path listed — the README already references these paths, so
-they'll appear automatically the moment the files exist. No other change needed.
+Save each file at the exact path listed — the README references these paths, so they
+appear the moment the files exist. No other change needed.
 
 ---
 
 ## Priority 1 — referenced directly in README.md
 
-### `docs/img/01-github-code-button.png`
+### `docs/img/01-github-code-button.png` — ✅ landed 2026-07-26
 
-- **Capture once**: this repository is live on GitHub.
-- **Screen**: the repository's main GitHub page, logged in or logged out (doesn't matter).
-- **Action to show**: click the green **Code** button near the top-right of the file list
-  — capture the dropdown it opens, with **Download ZIP** visible.
-- **Highlight**: a red or yellow box/arrow around the "Code" button and around "Download
-  ZIP" in the dropdown — both need to be findable at a glance, since this is the very
-  first action a brand-new reader takes.
-- **Caption** (already in README, for reference): "On the repository page, click the green
-  'Code' button, then 'Download ZIP'."
-- **Alt text** (already in README): "The green Code button on the GitHub repository page,
-  with the Download ZIP option visible in the dropdown."
+- **Screen**: the repository's GitHub page
+  (https://github.com/DailyPractice-Ltd/orion-self-install).
+- **Shows**: the green **Code** button circled, arrows to **Download ZIP** in the open
+  dropdown.
+- **Re-capture note (optional polish)**: current shot shows the logged-in maintainer
+  view (Settings tab, "Use this template"); a logged-out/private-window capture would
+  match a client's view exactly.
 
-### `docs/img/02-unzipped-folder-contents.png`
+### `docs/img/02-unzipped-folder-contents.png` — ✅ landed 2026-07-26
 
-- **Screen**: Finder (Mac) or File Explorer (Windows) — pick one, Mac is fine as the
-  primary since Oliver's on a Mac; a Windows equivalent is a nice-to-have, not required.
-- **Action to show**: the unzipped folder open, showing its contents — `README.md`,
-  `AGENTS.md`, and the `agent`, `crm`, `connectors` folders should all be visible in the
-  file list without scrolling.
-- **Highlight**: none needed — the point is just "does my screen look like this."
-- **Caption**: "You should see a folder full of files and folders like this — you're in
-  the right place."
-- **Alt text**: "A Mac Finder window showing the unzipped orion-self-install folder open,
-  with files like README.md, AGENTS.md, and folders like agent, crm, connectors visible."
+- **Screen**: the unzipped folder open in Finder — `README.md`, `AGENTS.md`,
+  `start.mjs`, and the `agent`, `crm`, `library` folders visible.
+- **Re-capture note (optional polish)**: current shot is a French-localised Finder
+  ("Nom", "Dossier"); an English-UI capture would suit the global audience better. Not
+  blocking — the shape of the window is the point.
 
-### `docs/img/03-claude-project-create.png`
+### `docs/img/03-move-to-its-home.png` — ✅ landed 2026-07-26 (redacted)
 
-- **Screen**: claude.ai, logged in, the Projects area.
-- **Action to show**: the "Create project" button, and/or the naming screen right after
-  clicking it.
+- **Screen**: two file windows — Downloads on one side, the home folder with
+  **Github → Projects** on the other — mid-drag of `orion-self-install-main`, arrow
+  from source to destination.
+- **Redaction applied**: every row that wasn't Github / Projects / the Orion folder
+  painted out, both panes.
+
+### `docs/img/04-terminal-press-start.png` — ✅ landed 2026-07-26 (cropped)
+
+- **Screen**: Terminal showing `cd ` with the dragged-in folder path, annotated
+  *Type CD → hit Spacebar → drag the folder → hit Enter*.
+- **Crop applied**: the Finder overlay (real project names) cropped out; the arrows
+  pointing off-frame toward "your file window" are intentional.
+
+### `docs/img/05-desktop-agent-open-folder.png` — ✅ landed 2026-07-26 (redacted)
+
+- **Screen**: a desktop AI agent (the Claude app's **Code** tab) with its folder picker
+  open at **Github → Projects → orion-self-install-main**, arrows to the Code tab, the
+  folder path, and the Open button.
+- **Redaction applied**: sidebar sessions, session cards, and every non-Orion folder
+  name painted out.
+
+### `docs/img/06a-claude-project-create.png` — ⬜ pending
+
+- **Screen**: claude.ai, logged in, the Projects area — the "Create project" button
+  and/or the naming screen right after.
 - **Highlight**: a box around "Create project."
-- **Caption**: "In claude.ai, click your name/menu, then 'Projects', then 'Create
-  project'. Name it anything — e.g. 'My Orion'."
-- **Alt text**: "The claude.ai interface showing the 'Create project' button and a newly
-  named project."
+- **Caption** (already in README): "Example, in claude.ai: Projects → Create project →
+  name it 'My Orion'. Every AI website has an equivalent."
+- **Watch for**: recent chats/projects in the sidebar — collapse it or crop to the
+  Projects area before saving.
 
-### `docs/img/04-claude-project-upload-files.png`
+### `docs/img/06b-claude-project-upload-files.png` — ⬜ pending
 
-- **Screen**: inside a claude.ai Project, the settings/knowledge area.
-- **Action to show**: the button for adding files (Claude currently calls this "Add
-  content" or similar — capture whatever it's actually labelled at the time), ideally
-  mid-file-picker with `AGENTS.md` visible/selected.
+- **Screen**: inside a claude.ai Project, the add-files/knowledge area, ideally
+  mid-file-picker with `AGENTS.md` selected.
 - **Highlight**: a box around the add-files button.
-- **Caption**: "Inside your new Project, find the button to add or upload files (often
-  called 'Add content' or 'Knowledge'), then select AGENTS.md from your unzipped folder."
-- **Alt text**: "The Project settings screen in claude.ai with the 'Add content' or file
-  upload button highlighted, and a file picker open showing AGENTS.md selected."
+- **Caption** (already in README): "Then add one file from your Orion folder:
+  AGENTS.md."
+- **Watch for**: same sidebar rule as 06a.
+
+### `docs/img/07-use-orion-from-any-project.png` — ✅ landed 2026-07-26 (redacted)
+
+- **Screen**: the desktop agent's folder picker at the **Github** folder level —
+  arrows showing you can hop into Projects (or make a new folder), i.e. Orion is one
+  open away from anywhere.
+- **Redaction applied**: same as 05.
 
 ---
 
-## Priority 2 — nice to have, not yet referenced in README.md (add later if you want deeper visual coverage)
+## Priority 2 — nice to have, not yet referenced in README.md
 
 These would help inside `crm/attio/README.md`, `crm/hubspot/README.md`, and
-`connectors/connector-checklist.md` — none are blocking the README's own goal, so I didn't
-wire placeholder references for these into any file. Say the word if you want me to add
-the references once you've decided which of these are worth capturing.
+`connectors/connector-checklist.md` — none are blocking. Say the word to wire
+placeholder references once captured.
 
 - **Attio → Settings → Developers → API keys**, mid-creation of a new key, with the
-  "full data access" / "full configuration access" toggles visible.
+  access toggles visible.
 - **HubSpot → Settings → Integrations → Private Apps**, the Scopes tab, with the five
-  required scopes checked (`crm.schemas.contacts.write`, etc.).
+  required scopes checked.
 - **n8n**, the blank canvas right after first login, and separately, the "Import from
   file" menu item.
-- **Gmail Drafts folder**, showing one staged draft — this is the single best "trust me,
-  it really does just wait for you" image in the whole repository, worth prioritising if
+- **Gmail Drafts folder**, showing one staged draft — the single best "trust me, it
+  really does just wait for you" image in the whole repository, worth prioritising if
   you only add one more.
-- **`docs/img/05-terminal-press-start.png`** — a terminal in the unzipped folder right
-  after running `node start.mjs`, showing the "Orion — Press Start" banner and the
-  plain-words machine report. Capture on your own Mac (no account needed, no client
-  data on screen — check the folder name in the prompt line before saving). This would
-  slot straight into the README's "Press Start" section; the README doesn't reference
-  it yet, so add the reference when the image lands.
 
 ---
 
 ## Format notes for whoever captures these
 
-- PNG, reasonable width (a browser window at ~1280px wide is plenty — no need for full
-  4K screenshots).
+- PNG, reasonable width (a browser window at ~1280px wide is plenty).
 - Crop tightly to the relevant area; a full-screen grab with a tiny relevant button
-  somewhere in it isn't useful at the sizes these will render inline.
-- If a real account's screen has other real business data visible (existing contacts,
-  deals, emails) that shouldn't go in a public repo, crop or blur it out before saving —
-  this applies especially to the Gmail Drafts and CRM screenshots.
+  isn't useful at inline sizes.
+- **If a real account's screen shows real business data (contacts, deals, emails,
+  session titles, other project names), crop or blur it out before saving** — this is
+  the standing rule that was applied to shots 03/04/05/07, and it applies especially
+  to the Gmail and CRM shots above.

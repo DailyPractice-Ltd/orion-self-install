@@ -14,11 +14,42 @@ bump, the same relationship the coach-led kit has with its own learnings volumes
 
 ---
 
+## Vol. 0 — the founder's own walkthrough, 2026-07-26 (pre-client)
+
+Not a client install (Vol. 1 still opens with the first real one), but the first time a
+human walked the published journey end to end — the founder, deliberately playing a
+never-met-us reader on the live GitHub page. Four defects found, all fixed the same day
+(CHANGELOG 0.3.0):
+
+1. **"Create a Claude Project" stopped the walkthrough cold.** The reader's actual
+   reaction: *"What is a Claude project? Why Claude? What if I'm working on Codex?"* —
+   the README's Step 2 led with one vendor's mechanism instead of the move itself.
+   Fix: the step is now agent-agnostic — "open the folder with your AI if it can open
+   folders; hand it AGENTS.md if it can't" — with per-tool details demoted to examples.
+   The lesson generalises: **name the move, not the vendor** (constitution Article IX
+   applies to prose, not just adapter files).
+2. **The journey had no "give it a home" step.** The unzipped folder stayed in
+   Downloads — the one place things get buried and deleted — and nothing said
+   otherwise. Fix: new Step 2 (move to `Github → Projects`, or wherever the client
+   keeps their work), which also gives every later instruction a stable path to point
+   at.
+3. **"Open a terminal in this folder" assumed the right-click trick.** The founder's
+   own method is more universal and easier to say: open Terminal from search, type
+   `cd `, **drag the folder onto the window**, Enter. Fix: that's now the documented
+   method everywhere (README Step 3, wizard handoffs).
+4. **Codex wasn't a first-class citizen.** The wizard didn't detect it and the README
+   never named it. Fix: `codex` added to the surface vocabulary (contract first), the
+   wizard's detection and handoff, and the README's tool lists.
+
+Also captured: the real screenshots for the whole journey (docs/img/01–07, redacted
+per the SHOTLIST rule before entering the public repo).
+
 ## Vol. 1 — (pending)
 
-No self-serve install has happened yet through this repository. This volume opens the
-moment the first one does — mirroring exactly how the coach-led kit's own Vol. 1 was
-mined from its first two real installs, not written speculatively in advance.
+No self-serve *client* install has happened yet through this repository. This volume
+opens the moment the first one does — mirroring exactly how the coach-led kit's own
+Vol. 1 was mined from its first two real installs, not written speculatively in
+advance.
 
 ## Anticipated risk, flagged before any install (not yet confirmed against a real one)
 

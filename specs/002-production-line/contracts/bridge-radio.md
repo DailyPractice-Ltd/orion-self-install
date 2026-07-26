@@ -121,3 +121,12 @@ the authenticated radio is the only outbound path (schema 1.2.0).
 
 When this repo's changes and the server's 002a branch are both deployed: run
 [quickstart.md](../quickstart.md) §"Radio round trip" and close SC-005.
+
+---
+
+**Verification record (2026-07-26)**: run with this repo's real code against a
+synthetic harness. Against **production**: mailbox check surfaced a nudge (envelope
+parse fix proven), reply landed as `{ body }`, signal with `occurred_at` accepted,
+radio-off sent nothing, revoked token → 401. Against the server's 002a branch (local,
+live DB): `install_checkpoint` and `kind: program` accepted. SC-005 closes after 002a
+deploys and the last two checks re-run against production.

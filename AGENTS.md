@@ -117,6 +117,16 @@ know why, just that the names are load-bearing; don't rename them.
    or HubSpot, they have no CRM at all), say so plainly and route to the fallback documented
    in the relevant file — don't guess silently. Every fork like this is already anticipated
    somewhere in this repo; look before improvising.
+7. **Signals fire only at enumerated completion moments — never from conversation.** The
+   radio's outbound signals have exactly six named moments (the trigger table in
+   `docs/radio.md`; canonical form in `specs/002-production-line/contracts/bridge-radio.md`).
+   Each real-work moment sits *downstream of the client's explicit yes* on the work
+   itself. A greeting, a question, a draft, a plan — none of these is a moment; send
+   nothing. One signal per moment, most specific type wins, label and timestamp only.
+   When a moment does occur and the radio is on and you can run scripts:
+   `node status/radio.mjs signal --type <type>`. Radio off, or no script surface →
+   skip silently. Never signal to "seem alive" — the count is only honest if it only
+   counts real, approved work.
 
 ## The Library — adding capabilities after (or during) the install
 

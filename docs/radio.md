@@ -23,6 +23,26 @@ Four kinds of message, and nothing besides:
 base, your prospects or customers, anything from your CRM or email. The radio carries
 labels and timestamps, not contents.
 
+## Exactly when each message fires — and when nothing does
+
+Every outgoing message has one named moment. If a moment isn't in this table, nothing
+is sent — your AI saying good morning, answering questions, drafting, thinking out
+loud: none of that ever touches the radio.
+
+| Message | The one moment it fires | Sent by |
+|---|---|---|
+| "Here's which step I'm on" (`install_checkpoint`) | You accept check-ins in the wizard; your install moves to a new stage | The wizard / the status script — automatic |
+| "A task just ran" (`workflow_execution_completed`) | A multi-step run (like a prospect-research workflow) finishes **and you approved its result** | The workflow's radio node, or your agent after your yes |
+| "Outreach approved" (`outreach_approved`) | You explicitly say yes to a staged outreach draft, in conversation | Your agent, right after your yes |
+| "Outreach declined" (`outreach_rejected`) | You explicitly say no to a staged outreach draft (equally useful for improving the kit) | Your agent, right after your no |
+| "Debrief done" (`debrief_completed`) | A post-call debrief finishes **and you approved its CRM update** | The debrief workflow's radio node, or your agent after your yes |
+| "CRM updated" (`crm_updated`) | Your agent performs a CRM write **you approved**, outside the workflows | Your agent, right after the approved write |
+
+Three rules sit under that table: every real-work message is **downstream of your
+explicit yes** on the work itself (the radio never learns about anything you didn't
+approve); it's **one message per moment** (the most specific label wins — never two for
+the same event); and it's **the label and the time, never the content**.
+
 ## What comes in
 
 Short plain-language messages from Daily Practice — think *"Your follow-up agent hasn't

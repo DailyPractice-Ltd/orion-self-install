@@ -138,7 +138,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ harness_id: $vars.HARNESS_ID, signal_type: 'workflow_execution_completed', occurred_at: $now.toISO(), payload: { workflow: 'wf-02', task_type: 'post_call_debrief', template_version: '0.1.0' } }) }}",
+        "jsonBody": "={{ JSON.stringify({ harness_id: $vars.HARNESS_ID, signal_type: 'debrief_completed', occurred_at: $now.toISO(), payload: { workflow: 'wf-02', task_type: 'post_call_debrief', template_version: '0.1.0' } }) }}",
         "notesInFlow": "Disabled by default — enable only when the radio is on (status/status.json → sharing.status_signal_enabled true) and the three Variables BRIDGE_URL / HARNESS_ID / INSTALL_TOKEN are set from the same welcome-pack values. Sits on the approved branch only: it reports that a run completed, never content."
       }
     },

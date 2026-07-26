@@ -108,17 +108,22 @@ and if possible on a different AI assistant than you started with.
 resumes exactly at the next incomplete step — it does not re-ask anything the checklist
 already marks done.
 
-## VT-08 · Status-signal emission (only if you've opted in)
+## VT-08 · The radio, both disciplines (only if you've opted in)
 
-**Runs**: the disabled-by-default status-signal node, once enabled.
+**Runs**: the radio (`status/radio.mjs` + `emit-status.mjs`), against the trigger table
+in `docs/radio.md`.
 
-**Steps**: enable `status/status.json`'s `sharing.status_signal_enabled` (it's on by
-default, so this is usually already true), advance to any new stage, and check that a
-payload matching `specs/001-self-install/contracts/status-signal.schema.json` was sent —
-or, if you switched it off, confirm nothing was sent at all.
+**Steps**: with the radio on (check-ins enabled + welcome-pack values in
+`status/status.json` → `sharing`), (a) advance to any new stage — an
+`install_checkpoint` goes out; (b) complete one real, approved task (VT-03's approve
+path is perfect) and fire its one matching signal
+(`node status/radio.mjs signal --type debrief_completed` for a debrief, per the table);
+(c) then hold a short ordinary conversation — greetings, a question, a draft — and
+confirm **nothing** was sent for it. If you switched the radio off instead: confirm
+nothing was sent at all, at any of those moments.
 
-**Pass criteria**: exactly one of the two outcomes above, matching your own toggle —
-never ambiguous, never silent.
+**Pass criteria**: signals appear for exactly the enumerated moments and for nothing
+else — matching your own toggle, never ambiguous, never silent, never chatty.
 
 ---
 
@@ -134,7 +139,7 @@ never ambiguous, never silent.
 | VT-05 safety boundary | | | | `vt05_safety_boundary` |
 | VT-06 daily drive | | | | `vt06_daily_drive` |
 | VT-07 resume after interruption | | | | `vt07_resume_after_interruption` |
-| VT-08 status-signal emission | | | | `vt08_status_signal_emission` |
+| VT-08 the radio, both disciplines | | | | `vt08_status_signal_emission` |
 
 VT-00 through VT-06 all green → `harness_status` moves to **`validated`**. Then: drive one
 full task yourself, unassisted, as the real proof this is genuinely yours to run — that

@@ -16,8 +16,13 @@ a human through by hand.
   directly, once the client has pasted in an API key/token (still ask them to generate it
   themselves — never ask for or handle a credential in a way that implies you're storing
   it anywhere but the one command that needs it).
-- Run `status/emit-status.mjs` for the status-signal (§5 of the spec), if the client has
-  left the status signal enabled.
+- Run `status/emit-status.mjs` for the install checkpoint on stage changes, if the client
+  has left check-ins enabled.
+- Run `node status/radio.mjs signal --type <type>` at the day-to-day agent's enumerated
+  signal moments (the "# The radio" section of the system prompt; full table in
+  `docs/radio.md`) — this surface is the only adapter that can, so it's also the only one
+  where those signals happen. Same gate as everything outbound: radio on, moment
+  occurred, client's yes already given on the work itself.
 - Edit the knowledge-base files directly as the client talks, rather than asking them to
   paste text into a file themselves.
 

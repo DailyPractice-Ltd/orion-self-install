@@ -53,8 +53,26 @@ checklist is resolved at the bottom.
 - Senders today: the wizard (first `install_checkpoint` on accepting check-ins),
   `status/emit-status.mjs` (`install_checkpoint` on ops-stage change),
   `status/radio.mjs signal --type <t>`, and the (disabled-by-default) "Radio signal"
-  node in each n8n workflow. The when-to-send discipline for the five real-work types
-  is defined in `docs/radio.md` and `AGENTS.md`.
+  node in each n8n workflow.
+
+### When each type fires (the canonical trigger table — P2 discipline)
+
+One signal per moment; the most specific type wins; every real-work moment sits
+**downstream of the client's explicit yes** on the underlying action. No enumerated
+moment → no signal: conversation, greetings, questions, drafting and thinking never
+touch the radio. Plain-words mirror: `docs/radio.md`.
+
+| Type | Exact moment | Sender |
+|---|---|---|
+| `install_checkpoint` | wizard opt-in accepted; `ops_stage` transition | `start.mjs` / `emit-status.mjs` (wired, automatic) |
+| `workflow_execution_completed` | a multi-step run completes **after the client approved its result** (e.g. wf-01's approved CRM log of a research run; an agent package's approved run) | n8n radio node / agent rule → `radio.mjs signal` |
+| `outreach_approved` | the client's explicit **yes** to a staged outreach draft, witnessed in conversation | agent rule → `radio.mjs signal` |
+| `outreach_rejected` | the client's explicit **no** to a staged outreach draft | agent rule → `radio.mjs signal` |
+| `debrief_completed` | a post-call debrief completes **with the client's approved CRM update** (wf-02's approve branch, or the agent's chat-lane equivalent) | n8n radio node / agent rule |
+| `crm_updated` | a client-approved CRM write performed by the agent **outside** the n8n workflows | agent rule → `radio.mjs signal` |
+
+On surfaces that can't run commands, agent-rule signals are skipped silently — same
+posture as the mailbox check (`AGENTS.md` rule 2).
 
 ## Door 2 — `GET {bridge_url}/nudges` — the mailbox
 

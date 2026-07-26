@@ -1,18 +1,13 @@
 # Screenshot shot list
 
-**Why this exists instead of real screenshots**: I can't produce these myself, for two
-separate reasons, not one. First, this repository isn't pushed to GitHub yet (by design —
-that's your step, not mine), so the "download ZIP" screen literally doesn't exist to
-photograph. Second, the rest of the shots (Attio's API-key screen, HubSpot's private-app
-screen, a Claude Project upload) all require being logged into a real account — either a
-brand-new one (which I'm not going to create — that's off-limits for me to do on your
-behalf) or one of Daily Practice's own real, live business accounts (which would risk
-capturing real client/business data in a screenshot destined for a public template repo,
-even by accident, in the background of a browser tab or a sidebar list). Computer-use
-access reconnected partway through this task, but that changes *whether I physically can*
-click around a screen, not whether doing so here would be appropriate — neither problem
-above is a capability gap. So: here's exactly what to capture, once the real repo exists
-and you're at your own keyboard.
+**The repository is live** (https://github.com/DailyPractice-Ltd/orion-self-install,
+public, since 2026-07-26), so every shot below is now capturable. **Why these are
+captured by a human at their own keyboard rather than generated**: most of them require
+being logged into a real account — either a brand-new one (off-limits for an AI to
+create on someone's behalf) or one of Daily Practice's own real, live business accounts,
+which would risk capturing real client/business data in a screenshot destined for this
+public template repo, even by accident, in the background of a browser tab or a sidebar
+list. So: here's exactly what to capture.
 
 Save each file at the exact path listed — the README already references these paths, so
 they'll appear automatically the moment the files exist. No other change needed.

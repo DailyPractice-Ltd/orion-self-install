@@ -74,8 +74,8 @@
         "resource": "message",
         "operation": "sendAndWait",
         "sendTo": "{{CLIENT_EMAIL}}",
-        "subject": "={{ 'Approve: CRM update for ' + $json.contact + '?' }}",
-        "message": "={{ '<p><b>Call Summary</b></p><p>' + $json.call_summary + '</p><p><b>Proposed CRM update</b> (stage → ' + $json.proposed_stage + ')</p><p>' + $json.crm_update + '</p><p>A follow-up draft is waiting in your Gmail Drafts. Approve to write this update to your CRM. Decline and the CRM is untouched.</p>' }}",
+        "subject": "={{ 'Approve: CRM update for ' + $('Split sections').first().json.contact + '?' }}",
+        "message": "={{ '<p><b>Call Summary</b></p><p>' + $('Split sections').first().json.call_summary + '</p><p><b>Proposed CRM update</b> (stage → ' + $('Split sections').first().json.proposed_stage + ')</p><p>' + $('Split sections').first().json.crm_update + '</p><p>A follow-up draft is waiting in your Gmail Drafts. Approve to write this update to your CRM. Decline and the CRM is untouched.</p>' }}",
         "responseType": "approval",
         "approvalOptions": { "values": { "approvalType": "double" } }
       }

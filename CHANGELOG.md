@@ -23,6 +23,36 @@ that applies to both gets made in both places, cited both ways.
 - ~~Repo visibility/license~~ — resolved 2026-07-26: **public + MIT**, live at
   https://github.com/DailyPractice-Ltd/orion-self-install (Template Repository).
 
+## 0.3.1 — 2026-07-27
+
+Backported three correctness fixes from the coach-led kit's own line
+(`packages/harness/templates/install-kit`, now kit 1.3.0) — this repo forked from that
+kit at an earlier point and never picked these up. Found while answering a cross-session
+audit's question about A1/A2/A3 status; all three were already fixed upstream, just not
+here.
+
+### Fixed
+
+- **A1 — n8n approval emails rendered "undefined"** (`n8n/wf-01-prospect-research-outreach.json`,
+  `n8n/wf-02-post-call-debrief.json`): both approval nodes read `prospect_name` /
+  `prospect_summary` / `contact` / `call_summary` / `proposed_stage` / `crm_update` off
+  bare `$json`, but their immediate upstream is the Gmail draft-create node, whose output
+  replaces `$json` with the created-draft resource — so the client's approval email showed
+  "Approve: add undefined to your pipeline?" with an undefined summary. The client would
+  have been approving blind, exactly the failure the staged-approval architecture exists
+  to prevent. Fixed by reading `$('Split sections').first().json.<field>` instead, matching
+  the CRM-write nodes two steps later (which already did this correctly).
+- **A2 — HubSpot `isClosed` sent as a boolean, not a string** (`crm/hubspot/apply-hubspot-template.mjs`):
+  HubSpot's Pipelines API expects deal-stage `metadata` values as strings; a JS boolean
+  could 400 with "property values were not valid," which the surrounding `catch` then
+  misclassified as a plan-tier limit — telling the client to rename their pipeline by hand
+  when the real cause was a malformed payload. Fixed: `isClosed: String(Boolean(...))`.
+- **A3 — pipeline-exists check was count-based, not name-based** (same file,
+  `ensureDealPipeline`): the script treated "more than one pipeline already exists" as
+  "ours is already there," so a portal with 2+ *unrelated* pipelines would silently skip
+  creating the Orion one and report success. Fixed: match by the target pipeline's own
+  label among existing pipelines, regardless of how many others exist.
+
 ## 0.3.0 — 2026-07-26
 
 Two same-day passes: the radio reconciled against the deployed bridge (002a), and the

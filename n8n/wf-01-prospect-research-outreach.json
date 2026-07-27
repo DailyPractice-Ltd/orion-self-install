@@ -72,8 +72,8 @@
         "resource": "message",
         "operation": "sendAndWait",
         "sendTo": "{{CLIENT_EMAIL}}",
-        "subject": "={{ 'Approve: add ' + $json.prospect_name + ' to your pipeline?' }}",
-        "message": "={{ '<p><b>Prospect Summary</b></p><p>' + $json.prospect_summary + '</p><p>An outreach draft is waiting in your Gmail Drafts. Approve to log this prospect + research note to your CRM (stage: Prospect, staged-draft flag on). Decline and nothing is written anywhere.</p>' }}",
+        "subject": "={{ 'Approve: add ' + $('Split sections').first().json.prospect_name + ' to your pipeline?' }}",
+        "message": "={{ '<p><b>Prospect Summary</b></p><p>' + $('Split sections').first().json.prospect_summary + '</p><p>An outreach draft is waiting in your Gmail Drafts. Approve to log this prospect + research note to your CRM (stage: Prospect, staged-draft flag on). Decline and nothing is written anywhere.</p>' }}",
         "responseType": "approval",
         "approvalOptions": { "values": { "approvalType": "double" } }
       }

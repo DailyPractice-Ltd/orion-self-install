@@ -113,9 +113,11 @@ async function ensureAssessmentProfileGroup(objectType, spec) {
 async function ensureDealPipeline(spec) {
   console.log('\nDeal pipeline:');
   const { results: existing } = await hubspot('GET', '/crm/v3/pipelines/deals');
-  if (existing.length > 1) {
-    console.log('  • multiple pipelines already exist on this portal — assuming Pro+, skipping auto-create.');
-    console.log(`    Create or rename one to "${spec.name}" manually if needed.`);
+  // A3 fix: match the target pipeline BY NAME — a count-based check wrongly
+  // skips creation on portals that have unrelated pipelines but not ours.
+  const already = existing.find((p) => p.label === spec.name);
+  if (already) {
+    console.log(`  • pipeline "${spec.name}" already exists — skipping create.`);
     return;
   }
   try {
@@ -126,14 +128,18 @@ async function ensureDealPipeline(spec) {
         label: s.label,
         displayOrder: s.order,
         metadata: {
-          isClosed: Boolean(s.closed_won || s.closed_lost),
+          // A2 fix: HubSpot's pipeline API requires metadata values as STRINGS
+          // ("true"/"false") — a JS boolean 400s the whole create.
+          isClosed: String(Boolean(s.closed_won || s.closed_lost)),
           probability: s.closed_won ? '1.0' : s.closed_lost ? '0.0' : '0.5',
         },
       })),
     });
     console.log(`  ✓ created pipeline "${spec.name}"`);
   } catch (err) {
-    if (err.status === 400 || /limit|not supported|plan/i.test(err.message)) {
+    // A2 follow-through: only genuine plan-tier messages get the tier
+    // remediation — a blanket 400 match used to mask payload bugs as tier limits.
+    if (/limit|not supported|plan/i.test(err.message)) {
       console.log('  • plan does not support multiple pipelines (Starter/Free tier).');
       console.log(`    Rename the existing default pipeline to "${spec.name}" manually:`);
       console.log('    Settings → Objects → Deals → Pipelines (this is a Settings-level action,');

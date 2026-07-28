@@ -54,10 +54,19 @@ available, and that promise is made to every reader in `README.md` — keep it.
      prospects. You can switch this off. Keep check-ins on?"* Default is yes; declining is
      one word, sets `sharing.status_signal_enabled` to `false` and `radio_choice` to
      `"declined"`, and changes nothing else. Accepting sets `radio_choice` to
-     `"accepted"`; if the client has a welcome pack (radio address, harness id, key), its
-     values go into `sharing` — the key is typed by the client, never read back aloud.
+     `"accepted"`; then, if the client has a **pairing code** from Daily Practice, run
+     `node start.mjs --code <THEIR-CODE>` — the wizard exchanges it for the key and
+     writes `bridge_url`, `harness_id`, `install_token` and `paired_at` itself. You never
+     handle a key by hand, and the client is never asked for one: the code is the only
+     thing they type, it works once, and it expires in 15 minutes. On a surface where you
+     cannot run scripts, tell them to run that one command themselves. No code yet is not
+     a blocker — the radio stays off and the next run re-offers it.
      If `radio_choice` is already set, respect it silently — this choice is never
      re-litigated. Full plain-words detail: `docs/radio.md`.
+   - **`sharing.install_token` never leaves that file.** Quote any other field of
+     `status.json` freely — when you print the file back for a client on a paste-only
+     surface, or read it aloud, replace the token with `····` plus its last four
+     characters. It is a live credential; a transcript is a place it would live forever.
 2. **Check the mailbox — every session start, when the radio is on.** "On" means
    `sharing.status_signal_enabled` is `true` AND `bridge_url`, `harness_id`,
    `install_token` are all set. If you can run scripts, run

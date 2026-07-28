@@ -16,7 +16,7 @@ live** — it must never be recorded as passed before then.
 ## 1 — Syntax gate (every script, every change)
 
 ```bash
-node --check start.mjs && node --check status/radio.mjs && node --check status/emit-status.mjs && node --check library/agents/call-planner/build-call-plan.mjs && echo ALL-PASS
+node --check start.mjs && node --check status/shapes.mjs && node --check status/radio.mjs && node --check status/emit-status.mjs && node --check library/agents/call-planner/build-call-plan.mjs && echo ALL-PASS
 ```
 
 **Pass**: `ALL-PASS` and nothing else.

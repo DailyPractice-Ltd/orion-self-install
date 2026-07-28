@@ -31,6 +31,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { radioOn as radioIsOn } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status.json');
@@ -71,8 +72,10 @@ if (!existsSync(STATUS_PATH)) {
 }
 const status = JSON.parse(readFileSync(STATUS_PATH, 'utf8'));
 const sharing = status.sharing || {};
-const radioOn = sharing.status_signal_enabled === true &&
-  Boolean(sharing.bridge_url) && Boolean(sharing.harness_id) && Boolean(sharing.install_token);
+// Shape, not mere presence (status/shapes.mjs). A settings file poisoned by a
+// misaligned scripted run — a stray "y" where the address belongs — used to
+// pass this gate and then fail every single call.
+const radioOn = radioIsOn(status);
 
 if (!radioOn) {
   console.log('Radio is off (or not configured) — nothing sent, nothing checked. Local work is unaffected.');
@@ -92,6 +95,7 @@ async function call(method, path, body) {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(10000),
     });
     return res;
   } catch (err) {

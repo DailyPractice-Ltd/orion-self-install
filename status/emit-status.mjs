@@ -18,6 +18,7 @@
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { radioOn } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status.json');
@@ -62,11 +63,11 @@ writeFileSync(STATUS_PATH, JSON.stringify(status, null, 2) + '\n');
 console.log(`status/status.json updated — harness_status: ${status.harness_status}, ops_stage: ${status.ops_stage}`);
 
 // Emit an install_checkpoint through the radio — the one outbound path — only when
-// explicitly enabled AND the welcome-pack fields are set (specs/002-production-line/
-// contracts/bridge-radio.md). Anything less is a silent local save.
+// explicitly enabled AND the radio settings actually hold their shape (see
+// status/shapes.mjs; specs/002-production-line/contracts/bridge-radio.md).
+// Anything less is a silent local save.
 const sharing = status.sharing;
-const bridgeConfigured = Boolean(sharing.bridge_url && sharing.harness_id && sharing.install_token);
-if (sharing.status_signal_enabled && bridgeConfigured) {
+if (radioOn(status)) {
   try {
     const res = await fetch(String(sharing.bridge_url).replace(/\/+$/, '') + '/signals', {
       method: 'POST',
@@ -84,6 +85,7 @@ if (sharing.status_signal_enabled && bridgeConfigured) {
           template_version: status.template_version,
         },
       }),
+      signal: AbortSignal.timeout(10000),
     });
     console.log(res.ok ? 'Status signal sent (via the radio).' : `Radio answered ${res.status} — not retried.`);
   } catch (err) {

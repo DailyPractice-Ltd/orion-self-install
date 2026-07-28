@@ -23,6 +23,32 @@ that applies to both gets made in both places, cited both ways.
 - ~~Repo visibility/license~~ — resolved 2026-07-26: **public + MIT**, live at
   https://github.com/DailyPractice-Ltd/orion-self-install (Template Repository).
 
+## 0.3.2 — 2026-07-28
+
+Found during the **first real client install** (Kira Hartig, Astute Tech — this repo's
+Vol. 1 in progress). The client worked entirely inside a code-capable agent with no
+terminal, so the agent drove `start.mjs` by piping answers to it — a supported path
+(the `pendingLines` queue exists for exactly that), but one with a sharp edge.
+
+### Fixed
+
+- **A misaligned piped run could poison the radio permanently, and silently.** The
+  AI-surface question in Step 1 only appears when a machine has more than one AI tool
+  installed, so a caller that guesses wrong shifts every later answer up by one — a `y`
+  intended for "keep check-ins on?" lands in the radio-address box. Nothing caught it:
+  the old guard only tested that the values were non-empty, and `"y"` is non-empty, so
+  `radioConfigured()` reported the radio as configured forever while every signal failed
+  against an address of `y`. Under the North Star that's the worst class of bug — a
+  harness that is genuinely running but can never be counted.
+  - The three welcome-pack values are now shape-checked at capture (`RADIO_URL_RE`,
+    `HARNESS_ID_RE`, `INSTALL_TOKEN_RE`). A value that doesn't match is never saved;
+    the wizard names each wrong field in plain words and leaves the radio unset, which
+    the existing `radio_choice === 'accepted' && !radioConfigured()` branch re-opens on
+    the next run.
+  - `radioConfigured()` now tests shape rather than mere presence, so a `status.json`
+    already poisoned by an earlier misaligned run **self-heals**: the next
+    `node start.mjs` re-offers the welcome-pack step instead of trusting the garbage.
+
 ## 0.3.1 — 2026-07-27
 
 Backported three correctness fixes from the coach-led kit's own line

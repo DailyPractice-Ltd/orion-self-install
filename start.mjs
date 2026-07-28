@@ -35,6 +35,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status', 'status.json');
 const TEMPLATE_PATH = join(__dirname, 'status', 'status.schema-template.json');
 
+// What each welcome-pack value has to look like. These exist because a piped or
+// scripted run can deliver answers one step out of sync with the questions — the
+// AI-surface question only appears on a machine with more than one AI tool, so a
+// caller that guesses wrong shifts every later answer up by one. The failure that
+// causes is silent and permanent without these: a stray "y" is a perfectly truthy
+// bridge_url, so the radio reads as configured forever while every signal fails.
+const RADIO_URL_RE = /^https:\/\/[^\s]+$/i;
+const HARNESS_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const INSTALL_TOKEN_RE = /^orion_[A-Za-z0-9_-]{20,}$/;
+
 // ── Talking to the human ────────────────────────────────────────────────────
 // Everything printed is plain words first (constitution Article I). One shared
 // readline interface; when stdin isn't a keyboard (a piped/automated run), every
@@ -393,7 +403,12 @@ async function main() {
 
 function radioConfigured(status) {
   const s = status.sharing;
-  return Boolean(s.bridge_url && s.harness_id && s.install_token);
+  // Shape, not just presence — see the regexes at the top. Anything that doesn't
+  // match counts as unconfigured, which is what re-opens the welcome-pack step on
+  // the next run instead of leaving a poisoned value in place forever.
+  return RADIO_URL_RE.test(s.bridge_url || '') &&
+    HARNESS_ID_RE.test(s.harness_id || '') &&
+    INSTALL_TOKEN_RE.test(s.install_token || '');
 }
 
 /**
@@ -423,10 +438,16 @@ async function welcomePackStep(status) {
   say('  bookmark file, where the radio reads it from.');
   const token = await askMasked('  Your key: ');
 
-  if (!url || !harnessId || !token) {
+  const wrong = [];
+  if (!RADIO_URL_RE.test(url)) wrong.push('the radio address — it should start with https://');
+  if (!HARNESS_ID_RE.test(harnessId)) wrong.push('the harness id — it should be letters and numbers in five dash-separated groups');
+  if (!INSTALL_TOKEN_RE.test(token)) wrong.push('the key — it should start with orion_');
+  if (wrong.length > 0) {
     say('');
-    say('  ✓ Some of that was blank, so I\'ve left the radio unconfigured — nothing');
-    say('    is lost, nothing sends, and running me again re-opens this step.');
+    say('  • That didn\'t look like a welcome pack, so I\'ve left the radio');
+    say('    unconfigured — nothing is lost and nothing sends. Check:');
+    for (const w of wrong) say(`      · ${w}`);
+    say('    Then run  node start.mjs  again to re-open this step.');
     return;
   }
 

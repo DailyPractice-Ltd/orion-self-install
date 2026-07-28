@@ -23,6 +23,65 @@ that applies to both gets made in both places, cited both ways.
 - ~~Repo visibility/license~~ — resolved 2026-07-26: **public + MIT**, live at
   https://github.com/DailyPractice-Ltd/orion-self-install (Template Repository).
 
+## 0.4.0 — 2026-07-28
+
+The first real client install (Kira Hartig, Astute Tech — this repo's Vol. 1) exposed
+two faults on the same afternoon. 0.3.2 patched the symptom; this release removes the
+cause.
+
+**What went wrong.** The coach ran `install-prep`, which minted an install token, and
+then carried that secret by hand to the client — through a Teams chat and a session
+transcript. It had to be rotated. That is not a mistake anyone made; it is what the
+design required, and any channel a secret crosses is a place it lives forever. Separately,
+the client's agent drove the wizard by piping answers; the AI-surface question is
+conditional, so every answer shifted by one and a stray `y` landed in the radio address.
+
+### Changed
+
+- **A pairing code replaces the four-value welcome pack.** The coach reads out one
+  twelve-letter code (`BCDF-GHJK-LMNP`); the wizard exchanges it at the new
+  `POST /api/bridge/pair` door, and **the install token is minted inside that exchange**.
+  No token exists until the client's own machine asks for one. `install-prep` no longer
+  prints — or can mint — a secret at all.
+  - The alphabet is RFC 8628's 20 consonants: no vowels (a code can never spell a word),
+    no digits (`0`-vs-`O` and `1`-vs-`I` cannot arise, because neither half of either
+    pair is in the alphabet). 51.9 bits, single use, 15-minute life.
+- **The wizard asks one question where it used to ask five.** "Do you have it handy?
+  [y/N]" is gone — it was the slot that swallowed the stray `y`, and "type your code or
+  press Enter" says the same thing without the ambiguity.
+- **`askMasked` removed.** A code read aloud on a call must be visible while you type it;
+  masking made typo recovery impossible for a non-technical client, and a pairing code is
+  not a password.
+
+### Added
+
+- **Keyed answers, so a scripted caller can never misalign again.** `code=…`,
+  `checkins=…`, `surface=…` in any order; a line addressed to one question is never
+  consumed by another, even when lines arrive faster than questions are asked. Plus
+  `--code`/`ORION_PAIRING_CODE` (the documented path for an AI agent — no piping at all),
+  `--checkins`, and a report naming any answer line that went unused. Today's bug would
+  have shouted instead of failing silently.
+- **`--repair-radio`** — clears the radio settings and pairs again. Required after a
+  rotation: a revoked key is still perfectly well-formed, so nothing else would reopen
+  the pairing step.
+- **401 self-heal** — an already-paired install asks the radio once, quietly, whether its
+  key still works. Only a definite 401 acts (offline or any other answer stays silent),
+  turning every future rotation into a re-pair rather than a support ticket.
+- **`status/shapes.mjs`** — one definition of what the radio settings must look like,
+  now shared by `start.mjs`, `status/radio.mjs` and `status/emit-status.mjs`. 0.3.2 only
+  hardened the wizard; the radio itself still trusted mere presence, so a poisoned
+  `status.json` would pass its gate and fail every call. A sibling `.mjs` import needs no
+  package.json and no install — the zero-dependency promise is untouched.
+- `sharing.paired_at` (schema 1.3.0), and timeouts on all five outbound `fetch` calls —
+  there were none, so a black-holed connection could hang the wizard in front of a client.
+
+### Fixed
+
+- `status.schema-template.json` stamped `template_version: "0.3.1"` while the repo was at
+  0.3.2. That value goes into every client's bookmark **and every signal payload**, so it
+  was quietly mislabelling fleet telemetry. Now 0.4.0.
+- The quickstart syntax gate now covers `status/shapes.mjs`.
+
 ## 0.3.2 — 2026-07-28
 
 Found during the **first real client install** (Kira Hartig, Astute Tech — this repo's

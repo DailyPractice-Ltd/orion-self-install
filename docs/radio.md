@@ -77,12 +77,25 @@ see your system running — so if you want help, you reach out first
 
 ## What the radio needs before it can transmit at all
 
-Your **welcome pack** — a short note from Daily Practice with your client id, your
-harness id, your key, and the radio address. No pack (or radio switched off) → nothing
-is ever sent, even if check-ins are "on." The key is typed by you, hidden as you type,
-stored only in your own `status/status.json`, and can be cancelled by Daily Practice
-and reissued if it's ever lost. If the radio address doesn't answer, nothing is lost —
-your harness just carries on and tries at the next natural moment.
+A **pairing code** — twelve letters in three groups, like `BCDF-GHJK-LMNP`, read out to
+you by your coach on the call. All letters, no vowels, no numbers, so there is no `0`
+that might be an `O` and no `1` that might be an `I`.
+
+That code is the only thing you ever type, and typing it is the whole setup: your
+machine sends it to Daily Practice, gets your key back, and stores that key in your own
+`status/status.json` and nowhere else. **The key does not exist until your machine asks
+for it** — so there is never a moment when your coach is holding your key, or could
+paste it into a chat by mistake. The code works **once**, expires after **15 minutes**,
+and is worthless to anyone who sees it after that.
+
+No code yet (or the radio switched off) → nothing is ever sent, even if check-ins are
+"on," and nothing else about your install is affected. Ask for a fresh code any time —
+it takes your coach two seconds, and the new one replaces the old.
+
+Your key can be cancelled by Daily Practice and reissued (say, if it ever leaked). When
+that happens the wizard notices by itself the next time you run it and simply asks for a
+new code. If the radio address doesn't answer, nothing is lost — your harness carries on
+and tries at the next natural moment.
 
 ## If your AI can't run commands (website-chat lane)
 

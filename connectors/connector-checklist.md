@@ -42,12 +42,20 @@ step by step, confirming each one works as you go.
 - [ ] Willing to add a card for a small, usage-based Anthropic account (see above) — this
       is the one step in this whole install that costs anything beyond what you already pay
 - [ ] You can log into your CRM as an admin or owner (needed to generate an access token)
-- [ ] You know your Google account password and have your phone handy — Google will
-      likely ask for a second confirmation code sent to your phone (this is called
-      **2FA**, short for two-factor authentication, and it's the step that most often
-      stalls if your phone isn't nearby)
-- [ ] If your Google account is a work or school one (not a personal Gmail): check with
-      whoever manages it that outside apps aren't blocked from connecting, before you start
+- [ ] **Which email and calendar do you actually use?** Almost everyone is one of two:
+      **Google** (Gmail, Google Calendar) or **Microsoft** (Outlook, Microsoft 365,
+      sometimes called Office 365). If you run your meetings in Teams, you're almost
+      certainly Microsoft. If you're not sure, look at what your own email address ends
+      in and what you open every morning. Pick your side below and skip the other: steps
+      2 and 3 each have a Google version and a Microsoft version, and they do the same job.
+- [ ] You know the password for that account and have your phone handy — you'll likely be
+      asked for a second confirmation code sent to your phone (this is called **2FA**,
+      short for two-factor authentication, and it's the step that most often stalls if
+      your phone isn't nearby)
+- [ ] If that account belongs to your company rather than to you personally: check with
+      whoever manages it that outside apps aren't blocked from connecting, before you
+      start. Both Google Workspace and Microsoft 365 can block this by default, and it is
+      the one item here that you cannot fix yourself in the moment
 
 ## 1 · CRM
 
@@ -76,7 +84,12 @@ step by step, confirming each one works as you go.
       whether n8n can connect directly depends on which tool you use; if not, this step
       can wait, since the knowledge-base and agent-assembly work don't depend on it
 
-## 2 · Gmail
+## 2 · Your email
+
+Do **one** of these two, whichever matches the answer you gave in Pre-flight. They achieve
+exactly the same thing; the rest of the install doesn't care which one you picked.
+
+### If you're on Google (Gmail)
 
 - [ ] In n8n, create a credential of type **Gmail**, and sign in with the Google account
       you actually send from (double-check this is the address prospects will see)
@@ -86,10 +99,36 @@ step by step, confirming each one works as you go.
 - [ ] **You'll know it's connected when**: n8n shows the credential as saved without an
       error
 
-## 3 · Google Calendar
+### If you're on Microsoft (Outlook / Microsoft 365)
+
+- [ ] In n8n, create a credential of type **Microsoft Outlook**, and sign in with the
+      Microsoft account you actually send from (double-check this is the address
+      prospects will see)
+- [ ] When Microsoft asks what to allow, say yes to reading, drafting, and sending mail —
+      same promise as above: sending is only ever used **after** you personally approve a
+      specific draft, and the default output is always a draft
+- [ ] If you see a message about needing an administrator's approval, that's your
+      company's Microsoft 365 settings, not a mistake you made. Whoever manages your IT
+      can approve it in a minute. This is the most common stall on the Microsoft path
+- [ ] **You'll know it's connected when**: n8n shows the credential as saved without an
+      error
+
+## 3 · Your calendar
+
+Same again: pick the one that matches your email above.
+
+### If you're on Google
 
 - [ ] In n8n, create a credential of type **Google Calendar** — same Google account as
       Gmail, unless you keep your calendar somewhere else (some people do — check)
+- [ ] **You'll know it's connected when**: n8n shows the credential as saved without an
+      error
+
+### If you're on Microsoft
+
+- [ ] In n8n, create a credential of type **Microsoft Outlook Calendar** — same Microsoft
+      account as your mail, unless you keep your calendar somewhere else (some people do —
+      check)
 - [ ] **You'll know it's connected when**: n8n shows the credential as saved without an
       error
 

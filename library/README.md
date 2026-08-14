@@ -7,6 +7,9 @@ on your real data, and writes it into your bookmark file. No package is ever "in
 because files exist; it's installed when its own **"you'll know it worked when…"** test
 passes on your data.
 
+Want a role that isn't on this shelf? Say **"I want to hire an agent"** — your AI runs
+the interview and builds the colleague with you: [how hiring works](HIRING.md).
+
 Four kinds live here, each in its own folder:
 
 | Kind | Plainly | Folder |

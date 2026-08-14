@@ -155,6 +155,25 @@ if (command === 'signal') {
     console.log(`signal needs --type, one of: ${SIGNAL_TYPES.join(', ')}`);
     process.exit(1);
   }
+  // How much work, and which routine did it. Without these a signal says only that
+  // something of this type happened — never that it was 236 contacts, which is the
+  // number the client and the coach actually care about.
+  //   --count   how many things (integer; rejected rather than sent if not a number)
+  //   --routine which named routine ran, e.g. "prospecting"
+  //   --note    one short human-readable line. Never names, emails or companies:
+  //             the bridge rejects PII outright and it is not ours to move.
+  const work = {};
+  if (flags.count !== undefined) {
+    const n = Number(flags.count);
+    if (!Number.isInteger(n) || n < 0) {
+      console.log('signal --count must be a whole number (how many things the routine did).');
+      process.exit(1);
+    }
+    work.count = n;
+  }
+  if (flags.routine) work.routine = String(flags.routine).slice(0, 60);
+  if (flags.note) work.note = String(flags.note).slice(0, 200);
+
   const res = await call('POST', '/signals', {
     harness_id: sharing.harness_id,
     signal_type: flags.type,
@@ -164,6 +183,7 @@ if (command === 'signal') {
       ops_stage: status.ops_stage,
       harness_status: status.harness_status,
       template_version: status.template_version,
+      ...work,
     },
   });
   if (res.status === 401) reportAuthProblem();

@@ -23,6 +23,36 @@ that applies to both gets made in both places, cited both ways.
 - ~~Repo visibility/license~~ — resolved 2026-07-26: **public + MIT**, live at
   https://github.com/DailyPractice-Ltd/orion-self-install (Template Repository).
 
+## 0.5.0 — 2026-08-11
+
+**The hiring layer.** Install #3 (4–5 Aug) invented the agent team live: a client drew
+her sales org on paper and left with a first agent hired, scheduled, and reporting.
+This release makes that repeatable without a coach writing prompts by hand.
+
+- **`library/HIRING.md`** — the canonical workflow: the six-part anatomy (job,
+  training, skill, tools, shift, report), a five-question interview that never re-asks
+  the knowledge base, the job-sheet readback, a nine-step execution checklist, the
+  shift-wiring ladder (native scheduled task → OS scheduler verbatim fallbacks →
+  handoff trigger), promotion rules with the two-of-three second-job test, the
+  create-skill delta, and honest lanes for chat-only surfaces, scheduler failures, and
+  half-done hires. Absorbs and replaces `ROUTINE-TEMPLATE.md`.
+- **`/hire-agent` and `/create-skill`** — thin skill wrappers so the workflow triggers
+  mid-conversation on Claude Code; `AGENTS.md` carries the same trigger for every
+  other surface. The teach line ships with it: **@ summons an agent — a who. / runs a
+  skill — a what.**
+- **`.claude/agents/README.md`** — the roster, seeded empty.
+- **Radio**: `signal` gains `--routine`, `--count`, `--note`, so a shift can say
+  "prospecting, 18" instead of only "something ran" (carried from the 4 Aug branch).
+  `AGENTS.md` rule 7 now carries the standing-yes clause — the approved job sheet is
+  the written yes for a shift's staging work and its report. Rule 2 says "radio",
+  never "mailbox" (install #3: the agent searched Outlook).
+- **Constitution 1.2.0** — Article V 1(b) discloses the routine label and count.
+  `docs/radio.md` gains the "a shift ran" row in lockstep.
+- **Contract**: `specs/002-production-line/contracts/agent-anatomy.md` — the shape of
+  a hired agent, probation → GO-LIVE semantics, naming rules, bookkeeping precedence.
+- **Connectors**: the checklist now branches Google/Microsoft at the top (install #3
+  ran Outlook + Microsoft 365 end to end against a Google-only checklist).
+
 ## 0.4.0 — 2026-07-28
 
 The first real client install (Kira Hartig, Astute Tech — this repo's Vol. 1) exposed

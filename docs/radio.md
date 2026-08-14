@@ -11,8 +11,10 @@ Four kinds of message, and nothing besides:
 
 1. **"Here's which step I'm on"** — your install stage and a timestamp, so Daily
    Practice knows to check in if you seem stuck.
-2. **"A task just ran"** — the *type* of task (say, "a post-call debrief completed") and
-   when. Never what was in it.
+2. **"A task just ran"** — the *type* of task (say, "a post-call debrief completed"),
+   when, and — for a hired agent's shift — which agent ran it and how many things it
+   did (a label and a number: say, "prospecting, 18"). Never what was in it, never who
+   it was about.
 3. **"This machine now runs X"** — when you install a Library package, its name, kind,
    and version. That's how Daily Practice knows who's affected when a package is
    improved.
@@ -37,17 +39,20 @@ loud: none of that ever touches the radio.
 | "Outreach declined" (`outreach_rejected`) | You explicitly say no to a staged outreach draft (equally useful for improving the kit) | Your agent, right after your no |
 | "Debrief done" (`debrief_completed`) | A post-call debrief finishes **and you approved its CRM update** | The debrief workflow's radio node, or your agent after your yes |
 | "CRM updated" (`crm_updated`) | Your agent performs a CRM write **you approved**, outside the workflows | Your agent, right after the approved write |
+| "A shift ran" | A hired agent finishes a scheduled shift — the standing yes you gave on its job sheet at hire covers exactly this report | The agent, as its shift's last step, with its name and a count |
 
 Three rules sit under that table: every real-work message is **downstream of your
-explicit yes** on the work itself (the radio never learns about anything you didn't
-approve); it's **one message per moment** (the most specific label wins — never two for
-the same event); and it's **the label and the time, never the content**.
+explicit yes** on the work itself — given in the conversation for conversational work,
+or given once at hire time for a hired agent's shift, when you approved the job sheet
+that names this report (the radio never learns about anything you didn't approve);
+it's **one message per moment** (the most specific label wins — never two for the same
+event); and it's **the label, the count, and the time — never the content**.
 
 ## What comes in
 
 Short plain-language messages from Daily Practice — think *"Your follow-up agent hasn't
 run in 6 days — want us to take a look?"*. At the start of a session, your AI checks the
-mailbox, reads anything waiting out loud, and asks what you'd like to do. **A reply is
+radio, reads anything waiting out loud, and asks what you'd like to do. **A reply is
 sent only when you say yes, in that conversation, and it's your words that go.** No
 reply happens on its own.
 
@@ -101,7 +106,7 @@ and tries at the next natural moment.
 
 On a plain website chat there's no way for your AI to dial anywhere, so: the check-in
 choice is still put to you in the same words and recorded in the same file — and the
-mailbox simply doesn't get checked from your side. Daily Practice reaches you by
+radio simply doesn't get checked from your side. Daily Practice reaches you by
 ordinary email instead. Same choice, same respect for it, slower lane — you lose
 nothing except automation.
 

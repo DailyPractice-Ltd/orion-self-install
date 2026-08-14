@@ -1,6 +1,18 @@
 # Orion Self-Install Constitution
 
-**Version**: 1.1.0 | **Ratified**: 2026-07-12 | **Last Amended**: 2026-07-25
+**Version**: 1.2.0 | **Ratified**: 2026-07-12 | **Last Amended**: 2026-08-11
+
+**Sync Impact Report** (amendment 1.2.0, 2026-08-11):
+- Version change: 1.1.0 → 1.2.0 (MINOR — Article V channel 1(b) materially expanded).
+- Work heartbeats now carry, for a hired agent's scheduled shift, the agent's routine
+  label and a count of things done — never content, never PII. The standing yes for a
+  shift's report is given once, at hire, on the approved job sheet
+  (`library/HIRING.md`; `specs/002-production-line/contracts/agent-anatomy.md`).
+- Prompted by: the radio's `--routine/--count/--note` flags and the hiring layer, both
+  extracted from install #3 (4–5 Aug 2026). Without this amendment the constitution's
+  disclosure understated what the radio carries — that gap is why the amendment ships
+  in the same change as the flags.
+- `docs/radio.md` updated in lockstep (new "a shift ran" row; counts disclosed).
 
 **Sync Impact Report** (amendment 1.1.0, 2026-07-25):
 - Version change: 1.0.0 → 1.1.0 (MINOR — Article V channel 1 materially expanded).
@@ -122,7 +134,10 @@ a EULA, never implied.
    exists, can offer help if asked, and can count a running system as running. Everything
    it carries is enumerated here, and nothing else rides on it: (a) install-stage signals
    (client identity, current install stage, a timestamp); (b) work heartbeats — "a task
-   of this type completed at this time," type and timestamp only; (c) package-install
+   of this type completed at this time" — the type, the timestamp, and for a hired
+   agent's scheduled shift, the agent's routine label and a count of things done; never
+   content, never a person's or company's name; the client's standing yes for a shift's
+   report is given once, at hire, on the job sheet that names it; (c) package-install
    reports — the name, kind, and version of a Library package installed on this machine;
    and (d) a two-way mailbox: short plain-language messages from Daily Practice that the
    client's agent reads out, with a reply sent only on the client's explicit yes in that

@@ -93,10 +93,15 @@ After — and only after — one of these exact moments, run
 - a post-call debrief finishes and {{CLIENT_NAME}} approves its CRM update → `debrief_completed`
 - you perform a CRM write {{CLIENT_NAME}} approved, outside the n8n workflows → `crm_updated`
 - a multi-step run completes and {{CLIENT_NAME}} approves its result → `workflow_execution_completed`
+- a hired agent's scheduled shift ends → the report step written in that agent's own
+  job file (`.claude/agents/<name>.md`), under the standing yes {{CLIENT_NAME}} gave on
+  its job sheet at hire — with `--routine <name> --count <n>`
 
 One signal per moment. NOTHING else ever fires one: not greetings, not questions, not
-drafts, not plans. The signal carries a type and a time, never content. If the radio is
-off, or you can't run scripts, skip silently — never mention it, never simulate it.
+drafts, not plans. The signal carries a type, a time, and for a shift a routine label
+and a count — never content. If the radio is off, or you can't run scripts, skip
+silently — never mention it, never simulate it. (A shift's local `status/shift-log.md`
+line never skips; only the radio half does.)
 ```
 
 ---

@@ -39,7 +39,7 @@ loud: none of that ever touches the radio.
 | "Outreach declined" (`outreach_rejected`) | You explicitly say no to a staged outreach draft (equally useful for improving the kit) | Your agent, right after your no |
 | "Debrief done" (`debrief_completed`) | A post-call debrief finishes **and you approved its CRM update** | The debrief workflow's radio node, or your agent after your yes |
 | "CRM updated" (`crm_updated`) | Your agent performs a CRM write **you approved**, outside the workflows | Your agent, right after the approved write |
-| "A shift ran" | A hired agent finishes a scheduled shift — the standing yes you gave on its job sheet at hire covers exactly this report | The agent, as its shift's last step, with its name and a count |
+| "A shift ran" (`routine_completed`) | A hired agent finishes a scheduled shift — the standing yes you gave on its job sheet at hire covers exactly this report | The agent, as its shift's last step, with its name and a count |
 
 Three rules sit under that table: every real-work message is **downstream of your
 explicit yes** on the work itself — given in the conversation for conversational work,

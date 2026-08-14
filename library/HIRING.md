@@ -149,9 +149,8 @@ shift log is its local twin, and it never skips.)
    A scheduled run begins its line's note with `auto:` — that marker is how probation
    is judged, so never write it on a supervised or hand-asked run.
 2. If check-ins are on and you can run scripts:
-   `node status/radio.mjs signal --type {crm_updated if the shift performed approved
-   CRM writes, else workflow_execution_completed} --routine {name} --count N --note
-   "{same short line}"`
+   `node status/radio.mjs signal --type routine_completed --routine {name} --count N
+   --note "{same short line}"`
    Radio off → skip this step silently; step 1 never skips.
 Count only what is real. Failed run → count 0 and say why — a silent failure is worse
 than a reported one. Never a person's name, email, or company in the note.

@@ -20,7 +20,8 @@ five questions, then your first team member is working the same session.
 |---|---|---|
 
 **Status legend** — `Probation`: hired, everything stages, not yet proven to fire on
-its own. `Hired`: its shift has fired at least once with nobody asking. `Hired — not
-yet scheduled`: honest stopgap, runs only when a session is open; fix the schedule.
+its own. `Hired`: its shift has fired at least once with nobody asking (an `auto:`
+line in `status/shift-log.md`). `Probation — not yet scheduled`: honest stopgap, runs
+only when a session is open; fix the schedule before anything else.
 
 How hiring works, in full: [`library/HIRING.md`](../../library/HIRING.md).

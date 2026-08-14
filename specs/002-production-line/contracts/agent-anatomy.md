@@ -69,6 +69,10 @@ Body sections, in order: `The job` · `What you must not do` · `Training` ·
 {YYYY-MM-DD HH:MM} | {name} | count: {N} | {≤120 chars, no person/company names}
 ```
 
+A scheduled (unattended) run prefixes its note with `auto:` — the marker is written by
+the task's own prompt, so it cannot appear on a supervised run. Probation flips to
+`hired` only on an `auto:` line (or a bridge signal no session was open for).
+
 Radio signal, when on: `--type crm_updated` if the shift performed client-approved CRM
 writes, else `--type workflow_execution_completed`; always `--routine {name}` and
 `--count {N}`. **Earmark**: a dedicated `routine_completed` type is planned server-side;
@@ -94,7 +98,11 @@ bespoke variant must take a different name.
 
 `status/status.json` `packages.{name}` is **truth** (`kind: "agent" | "skill"`, semver
 from `0.1.0`, `installed_at`, `smoke_test_passed`); the map's meaning widens from
-"installed library packages" to "installed capabilities, library or bespoke". The
+"installed library packages" to "installed capabilities, library or bespoke". A
+bespoke hire's entry is written **at hire** with `smoke_test_passed: false` and flips
+`true` only on a genuine pass — the no-optimism rule governs the flip, not the write;
+the early entry is what makes a half-done hire resumable. A failed smoke test parks
+the hire: the entry stays, the shelf is not told. The
 roster `.claude/agents/README.md` is the **view**. The agent file's own frontmatter is
 the agent's **copy**. On disagreement: status.json wins, the resume matrix in
 HIRING.md Part D is the reconciliation procedure.

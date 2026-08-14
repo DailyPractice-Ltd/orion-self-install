@@ -80,10 +80,16 @@ human name, and a roster of job titles reads like an org chart.
 > something happens (say, right after {upstream agent} finishes, or after a call)? If
 > it's on the clock: which days, what time, your time."
 
+(Schedule times use this machine's clock and assume it is the client's time — true for
+a laptop; say so out loud if the machine lives anywhere else. "After a call" and other
+real-world events need a carrier: they wire as a handoff from whichever agent or
+routine notices the event — the post-call debrief, usually. If no agent notices it yet,
+say so honestly and offer the clock instead.)
+
 **Q5 — the success line.**
 > "Last one. Finish this sentence: 'I'll know `@{name}` is doing the job when ______.'
-> That line becomes their probation test — we'll check it on their first shift in a
-> minute."
+> We test that line twice: on their first shift in a minute, while we watch (the smoke
+> test), and probation ends the first time a shift passes it with nobody asking."
 
 **Skip rule**: anything the client's opening message already answered is read back for
 confirmation, never re-asked. Never asked, ever: ICP, tone, offer, objections,
@@ -115,12 +121,14 @@ version: 0.1.0
 
 ## The job
 {Q1, in the client's own words, specific enough to check.}
+Today's output lands at `{path — e.g. morning-list.md}`, in this folder, where
+{client} reads it.
 
 ## What you must not do
 - Never send anything. Drafts only. Sending is always a separate yes.
 - Never write to {CRM} while `go_live` is false; after it flips, only the writes
   listed under GO-LIVE below — everything else still stages.
-- Never exceed the pacing limits in knowledge base §7.
+- Never exceed the commitments and pacing limits in knowledge base §7.
 - {Q3 extras, verbatim.}
 
 ## Training
@@ -134,8 +142,12 @@ of `.claude/agents/{upstream}.md`."} If a run is missed, run at the next opening
 never double up.
 
 ## The report — last step of every shift, no exceptions
+(The radio is your harness's check-in line to Daily Practice — `docs/radio.md`. The
+shift log is its local twin, and it never skips.)
 1. Append one line to `status/shift-log.md`:
    `{date} | {name} | count: N | {one short line — what you did, or why N is low}`
+   A scheduled run begins its line's note with `auto:` — that marker is how probation
+   is judged, so never write it on a supervised or hand-asked run.
 2. If check-ins are on and you can run scripts:
    `node status/radio.mjs signal --type {crm_updated if the shift performed approved
    CRM writes, else workflow_execution_completed} --routine {name} --count N --note
@@ -148,6 +160,7 @@ than a reported one. Never a person's name, email, or company in the note.
 While `go_live: false`: read and stage only — no external writes of any kind. When
 {client} flips it (tell your assistant "take {name} live" — the edit is the record),
 additionally allowed, unattended: {the enumerated standing writes from the job sheet}.
+When it flips, refresh the frontmatter `description` if it still says drafts-only.
 Outbound messages are never automatic, live or not. That rule has no flip.
 
 ## Changelog
@@ -176,15 +189,16 @@ not the runtime. Both facts are fine, and stated.
    `@{name} | {one-line job} | {schedule} | Probation | /{skill or —}`.
 5. **Record it** in `status/status.json`:
    `packages.{name} = { kind: "agent", version: "0.1.0", installed_at: now,
-   smoke_test_passed: false }`. While steps 2–8 are in flight, keep a note line
-   "hire in progress: {name}, next step N"; clear it at step 9.
+   smoke_test_passed: false }`. While steps 2–8 are in flight, keep a top-level
+   `notes` string in status.json — "hire in progress: {name}, next step N" — and
+   clear it at step 9.
 6. **Wire the shift** — show the client the exact task first; a scheduled task is a
    machine change and gets its own yes. The ladder:
    - **A — native scheduled task on THIS machine** (proven on install #3). The task's
      prompt, exactly:
      `Open {absolute folder path} and run the {name} shift: read
-     .claude/agents/{name}.md, do "The job", then "The report". Stage everything; ask
-     no questions.`
+     .claude/agents/{name}.md, do "The job", then "The report", beginning the
+     shift-log note with "auto:". Stage everything; ask no questions.`
      Cloud routines: refuse in one sentence — they run on a fresh copy fetched from
      the internet and cannot see this folder or the radio.
    - **B — OS scheduler**, when the surface has no native tasks or A fails. Windows:
@@ -194,28 +208,36 @@ not the runtime. Both facts are fine, and stated.
      StartCalendarInterval from Q4), then `launchctl load` it. The agent writes and
      loads it; the client types nothing. If the plain `claude` name fails in a
      scheduler, use its full path.
-   - **C — handoff-triggered** (Q4 said "when something happens"): no timer. Append
-     one line to the *upstream* agent's file — "When your shift ends, run the {name}
-     shift the same way" — plus a changelog line there. That edit is a small
-     promotion of the upstream agent and is named as such.
+   - **C — handoff-triggered** (Q4 said "when something happens"): no timer of its
+     own. Append one line to the *upstream* agent's file — "When your shift ends, run
+     the {name} shift the same way" — plus a changelog line there. That edit is a
+     small promotion of the upstream agent and is named as such. A handoff hire
+     **inherits the upstream's wake-up**, so C is only complete when the upstream
+     itself is wired by A or B — a chain of handoffs must end at a clock.
 7. **Smoke test now — two layers, both on real data, in this session.**
    *Logic*: run the shift body immediately, supervised — their first shift, while you
    both watch. Pass = the client's Q5 line is true on real data. Flip
    `smoke_test_passed: true`.
-   *Wiring*: trigger the scheduled task once **through the scheduler itself** (its
-   run-now button, or `launchctl kickstart`) and confirm a new line lands in
-   `status/shift-log.md`. The wake-up is the layer nobody has ever tested — test it,
-   not just the logic.
-8. **Report.** The supervised shift already sent its own signal (step 7's report
-   step, `--note "first shift, supervised"`). Now the shelf:
+   *Wiring*: trigger it once **through the wake-up itself** — the scheduled task's
+   run-now (or `launchctl kickstart`); for a handoff hire, run the upstream's shift
+   and watch the chain fire — and confirm a new line lands in `status/shift-log.md`.
+   The wake-up is the layer nobody has ever tested — test it, not just the logic.
+   **If either layer fails, stop here.** The hire parks honestly: `packages` entry
+   stays `smoke_test_passed: false`, the status note says why, step 8 does not
+   happen, and Part D's resume matrix picks it up next session. A parked hire is
+   honest; a shelf report of an unproven one is not.
+8. **Report — only on a step-7 pass.** The supervised shift already sent its own
+   signal (step 7's report step, `--note "first shift, supervised"`). Now the shelf —
+   Daily Practice's record of what this machine runs:
    `node status/radio.mjs report-install --slug {name} --kind agent --version 0.1.0`.
    Radio off → both skip, and say so **once, here only**: "Your check-ins are off, so
    Daily Practice won't see {name}'s reports — you will, in `status/shift-log.md`."
 9. **Close.** Teach the line: "`@{name}` summons them; `/{skill}` runs the judgment
-   anywhere." Then say plainly: "{name} is on probation until their shift fires once
-   with nobody asking — I'll check next time we talk." The roster stays `Probation`
-   until a later session finds an unattended line in `status/shift-log.md`; then flip
-   roster and frontmatter to `Hired`.
+   anywhere." Also, on the first hire only: delete the roster's "No one hired yet"
+   line. Then say plainly: "{name} is on probation until their shift fires once with
+   nobody asking — I'll check next time we talk." The roster stays `Probation` until
+   a later session finds an `auto:` line in `status/shift-log.md`; then flip roster
+   and frontmatter to `Hired`.
 
 `status/shift-log.md` is the local twin of the radio: one append-only line per shift.
 It answers "did it run?" when the radio is off, and the probation check reads it.
@@ -225,9 +247,11 @@ It answers "did it run?" when the radio is off, and the probation check reads it
 Four questions; the first three are how you get to the fourth.
 
 1. Does the agent file name a schedule, in the client's own time?
-2. Is something wired to wake it — ladder A or B, not C alone?
+2. Is something wired to wake it — its own clock (A or B), or a handoff chain that
+   ends at one?
 3. Does the last step of the shift report, locally always, radio when on?
-4. **Has it fired once, on its own, with nobody asking?**
+4. **Has it fired once, on its own, with nobody asking** — an `auto:` line in the
+   shift log?
 
 Install #3 enriched 236 contacts across six days and the coach console showed
 nothing — the work was real and invisible, because the agent doing it had no
@@ -299,8 +323,10 @@ trying to happen. Offer the hire path.
   under `.claude/agents/` or `.claude/skills/` (including `speckit-*`), anything in the
   `packages` map.
 - **Library slugs are reserved for library installs.** If the requested role matches a
-  shelf package, offer the package first — battle-tested beats bespoke. A bespoke
-  variant takes a different name, so one slug never means two things.
+  shelf package — same job, on the same kinds of sources, producing the same kind of
+  output — offer the package first: battle-tested beats bespoke. When in doubt, read
+  the package's one-line meaning to the client and let them choose. A bespoke variant
+  takes a different name, so one slug never means two things.
 - A file that already exists is never overwritten. Same role → offer promotion.
   Half-created → resume. Otherwise → propose another name and ask.
 
@@ -329,14 +355,16 @@ agent needs a machine that can run it on a clock. From here we can write the job
 together — you'll have it ready to hand to Claude Code on your computer, where the hire
 takes five minutes. What I can't honestly give you from a chat is the shift: running it
 by hand each morning is a habit, not an employee, and it dies the first busy week."*
-Job sheet as pasteable text, route to the code surface their machine profile names, and
-the hard rule: **a hire whose shift isn't wired is never recorded in `packages` and
-never reported to the shelf.** No pretending.
+Job sheet as pasteable text, route to the code-capable surface the client says they
+have (their machine profile records it, where you can read one), and the hard rule:
+**a hire whose shift isn't wired is never recorded in `packages` and never reported to
+the shelf.** No pretending.
 
 **Scheduler failure** after A and B both fail (locked-down IT, permissions): honest
-stop. Roster row reads `Hired — not yet scheduled (runs when you open a session, as a
-stopgap)`, a note in status.json, re-offer next session. The visible status is what
-keeps the stopgap from silently becoming the answer.
+stop. Roster row reads `Probation — not yet scheduled (runs when you open a session,
+as a stopgap)`, a note in status.json, re-offer next session. It is never `Hired` —
+hired means it fired with nobody asking, and this one can't yet. The visible status is
+what keeps the stopgap from silently becoming the answer.
 
 **Radio off**: the local shift-log line is unconditional — the client's "did it run?"
 is always answerable. The signal skips silently at shift time (rule 7), and the one

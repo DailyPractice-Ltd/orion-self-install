@@ -359,9 +359,9 @@ async function main() {
     say('');
     say('  • I only LOOK. The one thing I write is your bookmark file');
     say('    (status/status.json) — it lives in this folder and belongs to you.');
-    say('  • I never ask you for a password or a key. The only thing you\'ll type is');
-    say('    a short pairing code your coach reads out — and it stops working the');
-    say('    moment it\'s used.');
+    say('  • I never ask you for a password or a key. The only thing you might type is');
+    say('    a short pairing code, if Daily Practice has given you one — and it stops');
+    say('    working the moment it\'s used.');
     say('');
     say('This takes a few minutes. Stop anytime (Ctrl+C) — running me again picks up');
     say('exactly where you left off.');
@@ -417,7 +417,7 @@ async function main() {
       say('');
       say('One question — the only one this machine can\'t answer for you:');
       say('');
-      say('  Which of these should run your harness day to day?');
+      say('  Which of these should run Orion day to day?');
       surfaces.forEach((s, i) => say(`    ${i + 1}) ${SURFACE_WORDS[s]}`));
       say('');
       const answer = await ask('surface', '  Type a number and press Enter (or just Enter for 1): ', '1');
@@ -438,7 +438,7 @@ async function main() {
   rule();
   if (status.sharing.radio_choice === null) {
     say('');
-    say('Your harness checks in with Daily Practice so we can support you and count');
+    say('Orion checks in with Daily Practice so we can support you and count');
     say('your system as running. A check-in is small and boring on purpose: which');
     say('install step you\'re on, "a task ran just now," and which packages you\'ve');
     say('installed — never the content of your messages, your knowledge base, or your');
@@ -500,20 +500,24 @@ async function main() {
 /**
  * The pairing step — where the radio gets switched on (FR-B09).
  *
- * You are never asked for a key. Your coach reads you a short code; this sends
- * it to Daily Practice, which hands back the key and writes it straight into
- * your own bookmark file. Nothing secret is ever typed by a coach into a chat,
- * which is the whole reason this replaced the old four-value welcome pack.
+ * You are never asked for a key. If Daily Practice has given you a short code, typing
+ * it in sends it to Daily Practice, which hands back the key and writes it straight
+ * into your own bookmark file. Nothing secret is ever typed into a chat by whoever
+ * gave you the code, which is the whole reason this replaced the old four-value
+ * welcome pack. Going solo with no code at all is the default path, not a fallback.
  *
  * No code is never a blocker: the radio stays quietly off and the next run
  * re-opens this step (US4 edge case).
  */
 async function pairingStep(status) {
   say('');
-  say('Your coach will read you a pairing code on the call — twelve letters in');
-  say('three groups, like BCDF-GHJK-LMNP. All letters, no vowels, no numbers. It');
-  say('works once, and only for 15 minutes. Type it in and I\'ll set the radio up');
-  say('for you — you\'ll never be asked for a key or an address.');
+  say('If Daily Practice has given you a pairing code, type it in now and I\'ll set');
+  say('the radio up for you — you\'ll never be asked for a key or an address. If you');
+  say('don\'t have one, that\'s completely fine — press Enter to skip, and you can add');
+  say('it anytime later by running  node start.mjs  again.');
+  say('');
+  say('(A code is twelve letters in three groups, like BCDF-GHJK-LMNP — all letters,');
+  say('no vowels, no numbers, and it works once, for 15 minutes only.)');
   say('');
 
   const fromFlag = typeof cliFlags.code === 'string' ? cliFlags.code : process.env.ORION_PAIRING_CODE;
@@ -524,7 +528,7 @@ async function pairingStep(status) {
   if (!entered || !entered.trim()) {
     say('');
     say('  ✓ No problem — the radio stays quiet until you have a code. Nothing else');
-    say('    is affected. When your coach reads you one, run  node start.mjs  again.');
+    say('    is affected. When you get one, run  node start.mjs  again.');
     say('    Expecting a code and it never came? Ask support@dailypractice.world.');
     return;
   }
@@ -533,7 +537,7 @@ async function pairingStep(status) {
   if (problem) {
     say('');
     say(`  • ${problem}`);
-    say('    Nothing is saved and nothing was sent. Ask your coach to read it again,');
+    say('    Nothing is saved and nothing was sent. Ask Daily Practice for it again,');
     say('    then run  node start.mjs  once more.');
     return;
   }
@@ -558,7 +562,7 @@ async function pairingStep(status) {
 
   if (res.status === 404) {
     say('  • That code isn\'t valid, has expired (they only last 15 minutes), or has');
-    say('    already been used. Ask for a fresh one — it takes your coach two seconds.');
+    say('    already been used. Ask Daily Practice for a fresh one — it takes two seconds.');
     return;
   }
   if (res.status === 429) {

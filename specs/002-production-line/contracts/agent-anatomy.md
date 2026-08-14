@@ -69,12 +69,16 @@ Body sections, in order: `The job` · `What you must not do` · `Training` ·
 {YYYY-MM-DD HH:MM} | {name} | count: {N} | {≤120 chars, no person/company names}
 ```
 
-A scheduled (unattended) run prefixes its note with `auto:` — the marker is written by
-the task's own prompt, so it cannot appear on a supervised run. Probation flips to
-`hired` only on an `auto:` line (or a bridge signal no session was open for).
+A scheduled run prefixes its note with `auto:` — written by the task's own prompt. The
+task cannot know whether a person kicked it, so the hire session's wiring test (which
+hand-triggers the scheduler once) immediately renames its own line's marker to
+`auto-test:` (HIRING.md step 7). Probation flips to `hired` only on an `auto:` line —
+never `auto-test:`, never a supervised note — or a bridge signal no session was open
+for. The note text itself is **local only**: the radio carries the routine label and
+the count, never the note (constitution Article V).
 
 Radio signal, when on: `--type routine_completed`, always with `--routine {name}` and
-`--count {N}`. Live server-side since 11 Aug 2026 (mono PR #20): the replay key is
+`--count {N}`. Live server-side since 14 Aug 2026 (mono PR #20): the replay key is
 (harness, type, occurred_at, routine), so same-second shifts from different agents are
 distinct rows. The interim two-type mapping (crm_updated / workflow_execution_completed)
 is retired; signals sent under it remain valid history.
@@ -107,4 +111,4 @@ HIRING.md Part D is the reconciliation procedure.
 
 ## Changelog
 
-- 1.0.0 — 2026-08-11 — First written, from install #3's live shape.
+- 1.0.0 — 2026-08-14 — First written, from install #3's live shape.

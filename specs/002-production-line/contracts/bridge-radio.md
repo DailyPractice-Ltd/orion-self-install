@@ -38,15 +38,21 @@ checklist is resolved at the bottom.
 
 - **`occurred_at` is the server's field name** (not `sent_at`) and is required — a full
   ISO 8601 datetime, not date-only, not future beyond ~5 min clock skew. It anchors the
-  server's replay-idempotence key `(harness, signal_type, occurred_at)`: re-sending the
-  same signal is answered `200 { …, "replay": true }` with the original id and writes
-  nothing, so duplicates never inflate the count.
+  server's replay-idempotence key `(harness, signal_type, occurred_at, routine)` — the
+  routine label joined the key with agent teams (11 Aug 2026), so same-second shifts
+  from different agents are distinct rows; signals with no routine label match only
+  rows that also have none. Re-sending the same signal is answered
+  `200 { …, "replay": true }` with the original id and writes nothing, so duplicates
+  never inflate the count.
 - First write is `201 { "signal_id", "recorded_at", "replay": false }` and bumps the
   harness's last-active heartbeat.
-- All six `signal_type` values are accepted by the deployed server (002a
-  reconciliation): the five real-work types from the mono's `SignalType` union plus
+- All seven `signal_type` values are accepted by the deployed server: the five
+  in-session real-work types from the mono's `SignalType` union, plus
   `install_checkpoint` (installer tooling only — wizard opt-in moment, ops-stage
-  changes; deliberately distinct so install noise never counts as real work).
+  changes; deliberately distinct so install noise never counts as real work), plus
+  `routine_completed` (a hired agent's scheduled shift — including the supervised
+  first run at hire, whose job-sheet yes covers it; the shift-log marker, not the
+  signal type, is what distinguishes attended from unattended).
 - `payload` is optional: a **flat object of scalar values** (≤20 keys, ≤2 KB). The key
   `occurred_at` is reserved inside payload (the server stores the top-level value
   there itself).
@@ -70,10 +76,10 @@ touch the radio. Plain-words mirror: `docs/radio.md`.
 | `outreach_rejected` | the client's explicit **no** to a staged outreach draft | agent rule → `radio.mjs signal` |
 | `debrief_completed` | a post-call debrief completes **with the client's approved CRM update** (wf-02's approve branch, or the agent's chat-lane equivalent) | n8n radio node / agent rule |
 | `crm_updated` | a client-approved CRM write performed by the agent **outside** the n8n workflows | agent rule → `radio.mjs signal` |
-| `routine_completed` | a hired agent's scheduled shift completes **unattended** — the standing yes was given once, at hire, on the job sheet naming the shift and its report (`agent-anatomy.md`); carries `payload.routine` + `payload.count`, and the server's replay key includes the routine label so same-second shifts from different agents stay distinct rows | the shift's own report step → `radio.mjs signal` |
+| `routine_completed` | a hired agent's scheduled shift completes — the standing yes was given once, at hire, on the job sheet naming the shift and its report (`agent-anatomy.md`). Covers the supervised first run at hire too; attended vs unattended is the shift-log marker's job (`auto:` / `auto-test:`), not the type's. Requires `payload.routine` + `payload.count`; the replay key includes the routine label so same-second shifts from different agents stay distinct rows | the shift's own report step → `radio.mjs signal` |
 
 On surfaces that can't run commands, agent-rule signals are skipped silently — same
-posture as the mailbox check (`AGENTS.md` rule 2).
+posture as the session-start radio check (`AGENTS.md` rule 2).
 
 ## Door 2 — `GET {bridge_url}/nudges` — the mailbox
 

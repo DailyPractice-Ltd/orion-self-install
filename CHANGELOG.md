@@ -23,7 +23,56 @@ that applies to both gets made in both places, cited both ways.
 - ~~Repo visibility/license~~ — resolved 2026-07-26: **public + MIT**, live at
   https://github.com/DailyPractice-Ltd/orion-self-install (Template Repository).
 
-## 0.5.1 — 2026-08-11
+## 0.5.3 — 2026-08-14
+
+**The post-merge review's findings, fixed.** An adversarial review of 0.5.0/0.5.1
+found three semantic breaks behind the clean surface; all closed here.
+
+- **The note comes off the wire.** Every disclosure layer promised "never content"
+  while the shift report carried up to 200 chars of free text. Decision: the radio
+  carries the label, the count, and the time; the one-line story lives locally in
+  `status/shift-log.md`. `radio.mjs` no longer sends `--note` (it says so and sends
+  without it), and HIRING.md's report step matches. The constitution's Article V is
+  now true to the byte.
+- **The probation gate means something again.** The hire session's wiring test
+  hand-kicks the scheduler, whose prompt writes `auto:` — manufacturing the exact
+  evidence probation is defined by. The wiring test now renames its own line to
+  `auto-test:`, which never counts (HIRING.md step 7, the anatomy contract, the
+  roster legend).
+- **`routine_completed` requires its label and count client-side** — a bare shift
+  report re-creates the same-second collision the type shipped to fix. `--count`
+  accepts plain digits only (no `0x12`, no `1e3`, no empty value silently becoming a
+  false "failed run").
+- `radio.mjs`'s stale header (six types, "type + timestamp only") rewritten; its
+  runtime strings say "radio", never "Mailbox". The scheduler task prompt is now
+  quote-free so the schtasks/launchd fallback lines embed it verbatim safely.
+  bridge-radio.md's replay key, type count, and unattended qualifier reconciled;
+  the constitution's live Article V text says "radio inbox". `create-skill`'s
+  trigger routes schedule-shaped requests to the hire path.
+
+## 0.5.2 — 2026-08-14
+
+**Fixed a self-contradiction: "no coach" vs. "your coach will read you a code."**
+`README.md`'s opening line promised no coach or consultant is involved; six lines
+later in the actual flow, the wizard's opening promises, its pairing step, and
+`docs/radio.md`'s own explainer all presumed a coach exists and is on a call with the
+reader. A genuinely solo reader — the one this whole repo is written for — would hit
+"your coach" with no coach and no call, right at the moment they're most likely to
+doubt themselves.
+
+- `README.md` (opening line), `start.mjs` (opening promises, the pairing-step intro,
+  and three downstream messages in `pairingStep()`, plus its docstring), and
+  `docs/radio.md` all reworded so the pairing code is conditional ("if Daily Practice
+  has given you one") instead of assumed, and state plainly that going solo with no
+  code is the default path, not a fallback. Verified no remaining unconditional
+  "coach" references in any of the three client-facing files; `node --check start.mjs`
+  passes.
+- Re-checked `{{DAILY_PRACTICE_SUPPORT_CONTACT}}` against the goal text's "unfilled in
+  three files" claim — already resolved 2026-07-12 per `data-model.md`'s own
+  placeholder table (`support@dailypractice.world`, all three original files). No
+  action needed; noting it here since that claim is now stale.
+
+## 0.5.1 — 2026-08-14
 
 **`routine_completed` goes live.** The shift report gets its own signal type, mirrored
 from the bridge (mono PR #20, migration applied to production the same day).
@@ -36,7 +85,7 @@ from the bridge (mono PR #20, migration applied to production the same day).
   different agents are distinct rows, verified live with a two-agents-at-07:00 insert
   and a rejected exact duplicate.
 
-## 0.5.0 — 2026-08-11
+## 0.5.0 — 2026-08-14
 
 **The hiring layer.** Install #3 (4–5 Aug) invented the agent team live: a client drew
 her sales org on paper and left with a first agent hired, scheduled, and reporting.

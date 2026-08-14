@@ -4,17 +4,19 @@
  * the radio is on. Contract: specs/002-production-line/contracts/bridge-radio.md.
  *
  *   node status/radio.mjs check
- *       Read the mailbox (GET /nudges). Run at session start. Empty mailbox is the
+ *       Read the radio (GET /nudges). Run at session start. An empty radio is the
  *       normal, silent case.
  *
  *   node status/radio.mjs reply --nudge <id> --message "the client's reply"
  *       Send a reply back (POST /nudges/<id>/reply). Only ever run after the client's
  *       explicit yes in this session — the reply is theirs, not yours.
  *
- *   node status/radio.mjs signal --type <type>
+ *   node status/radio.mjs signal --type <type> [--routine <name> --count <n>]
  *       Report "real work happened" (POST /signals). Types: install_checkpoint,
  *       workflow_execution_completed, outreach_approved, outreach_rejected,
- *       debrief_completed, crm_updated. Type + timestamp only — no content, ever.
+ *       debrief_completed, crm_updated, routine_completed (which requires
+ *       --routine and --count). A label, a count, and a timestamp — never content:
+ *       the story of a shift stays local, in status/shift-log.md.
  *
  *   node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>
  *       Tell the shelf a Library package was installed here (POST /assets), after its
@@ -118,12 +120,12 @@ function reportAuthProblem() {
 if (command === 'check') {
   const res = await call('GET', '/nudges');
   if (res.status === 401) reportAuthProblem();
-  if (!res.ok) { console.log(`Mailbox check answered ${res.status} — skipped, will try next session.`); process.exit(0); }
+  if (!res.ok) { console.log(`Radio check answered ${res.status} — skipped, will try next session.`); process.exit(0); }
   // The server wraps the list: { "nudges": [...] } (bridge contract, BridgeNudgesResponse).
   const data = await res.json().catch(() => null);
   const nudges = Array.isArray(data?.nudges) ? data.nudges : [];
   if (nudges.length === 0) {
-    console.log('Mailbox empty — no messages from Daily Practice.');
+    console.log('Radio quiet — no messages from Daily Practice.');
     process.exit(0);
   }
   console.log(`${nudges.length} message${nudges.length === 1 ? '' : 's'} from Daily Practice:`);
@@ -161,21 +163,29 @@ if (command === 'signal') {
   // How much work, and which routine did it. Without these a signal says only that
   // something of this type happened — never that it was 236 contacts, which is the
   // number the client and the coach actually care about.
-  //   --count   how many things (integer; rejected rather than sent if not a number)
+  //   --count   how many things (plain digits only; rejected rather than sent
+  //             otherwise — Number() exotica like 0x12 or 1e3 don't belong on a wire)
   //   --routine which named routine ran, e.g. "prospecting"
-  //   --note    one short human-readable line. Never names, emails or companies:
-  //             the bridge rejects PII outright and it is not ours to move.
+  // There is deliberately no free-text field. The one-line story of a shift lives in
+  // status/shift-log.md, locally — the radio carries a label, a count, and a time,
+  // never content (constitution Article V; docs/radio.md).
   const work = {};
   if (flags.count !== undefined) {
-    const n = Number(flags.count);
-    if (!Number.isInteger(n) || n < 0) {
-      console.log('signal --count must be a whole number (how many things the routine did).');
+    if (!/^\d{1,9}$/.test(String(flags.count))) {
+      console.log('signal --count must be a whole number in plain digits (how many things the routine did).');
       process.exit(1);
     }
-    work.count = n;
+    work.count = Number(flags.count);
   }
-  if (flags.routine) work.routine = String(flags.routine).slice(0, 60);
-  if (flags.note) work.note = String(flags.note).slice(0, 200);
+  const routine = typeof flags.routine === 'string' ? flags.routine.trim().slice(0, 60) : '';
+  if (routine) work.routine = routine;
+  if (flags.note !== undefined) {
+    console.log('Note stays local: write it in status/shift-log.md — the radio never carries content. Sending without it.');
+  }
+  if (flags.type === 'routine_completed' && (!work.routine || work.count === undefined)) {
+    console.log('routine_completed needs both --routine <name> and --count <n> — a shift report must say who and how many.');
+    process.exit(1);
+  }
 
   const res = await call('POST', '/signals', {
     harness_id: sharing.harness_id,

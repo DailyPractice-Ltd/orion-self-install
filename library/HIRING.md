@@ -149,8 +149,9 @@ shift log is its local twin, and it never skips.)
    A scheduled run begins its line's note with `auto:` — that marker is how probation
    is judged, so never write it on a supervised or hand-asked run.
 2. If check-ins are on and you can run scripts:
-   `node status/radio.mjs signal --type routine_completed --routine {name} --count N
-   --note "{same short line}"`
+   `node status/radio.mjs signal --type routine_completed --routine {name} --count N`
+   The one-line story stays in the shift log, local — the radio carries the label,
+   the count, and the time, never content.
    Radio off → skip this step silently; step 1 never skips.
 Count only what is real. Failed run → count 0 and say why — a silent failure is worse
 than a reported one. Never a person's name, email, or company in the note.
@@ -196,8 +197,10 @@ not the runtime. Both facts are fine, and stated.
    - **A — native scheduled task on THIS machine** (proven on install #3). The task's
      prompt, exactly:
      `Open {absolute folder path} and run the {name} shift: read
-     .claude/agents/{name}.md, do "The job", then "The report", beginning the
-     shift-log note with "auto:". Stage everything; ask no questions.`
+     .claude/agents/{name}.md, do the job section, then the report section,
+     beginning the shift-log note with auto:. Stage everything; ask no questions.`
+     (The prompt deliberately contains no quote characters, so it embeds safely in
+     the OS-scheduler command lines below.)
      Cloud routines: refuse in one sentence — they run on a fresh copy fetched from
      the internet and cannot see this folder or the radio.
    - **B — OS scheduler**, when the surface has no native tasks or A fails. Windows:
@@ -220,13 +223,17 @@ not the runtime. Both facts are fine, and stated.
    *Wiring*: trigger it once **through the wake-up itself** — the scheduled task's
    run-now (or `launchctl kickstart`); for a handoff hire, run the upstream's shift
    and watch the chain fire — and confirm a new line lands in `status/shift-log.md`.
-   The wake-up is the layer nobody has ever tested — test it, not just the logic.
+   Then, immediately: **edit that line's marker from `auto:` to `auto-test:`** — the
+   scheduler wrote it, but a person kicked the scheduler, so it must not count as
+   probation evidence. The wake-up is the layer nobody has ever tested — test it,
+   not just the logic.
    **If either layer fails, stop here.** The hire parks honestly: `packages` entry
    stays `smoke_test_passed: false`, the status note says why, step 8 does not
    happen, and Part D's resume matrix picks it up next session. A parked hire is
    honest; a shelf report of an unproven one is not.
 8. **Report — only on a step-7 pass.** The supervised shift already sent its own
-   signal (step 7's report step, `--note "first shift, supervised"`). Now the shelf —
+   signal (step 7's report step; its shift-log line says "first shift, supervised",
+   and the wiring run's line says `auto-test:`). Now the shelf —
    Daily Practice's record of what this machine runs:
    `node status/radio.mjs report-install --slug {name} --kind agent --version 0.1.0`.
    Radio off → both skip, and say so **once, here only**: "Your check-ins are off, so

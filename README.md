@@ -6,7 +6,7 @@ tell it about a prospect; it researches them and drafts a message for you to loo
 After a call, you tell it how it went; it writes the summary, updates your pipeline, and
 drafts your follow-up — all as drafts waiting for you, never sent on their own.
 
-There's no coach or consultant involved. Your own AI assistant — Claude, ChatGPT,
+Nobody sits with you for this. Your own AI assistant — Claude, ChatGPT,
 Copilot, Codex, whichever you already use — installs it with you, using the files in
 this folder. This page is the control panel: **Press Start** below gets you going in
 three small moves; **the Library** underneath it is where you add capabilities, today or
@@ -32,7 +32,8 @@ Three moves, a few minutes, and your AI takes over:
    ([Step 1](#step-1--get-the-files-onto-your-computer)).
 2. **Give it a home** — move the folder out of Downloads to where it will live
    ([Step 2](#step-2--move-it-to-its-home)).
-3. **Run one line** — open a terminal in that folder and run:
+3. **Run one line** — open a terminal (a window for typing commands instead of
+   clicking — Step 3 shows exactly how) in that folder and run:
 
 ```bash
 node start.mjs
@@ -166,6 +167,10 @@ Downloads.
 Finder/File Explorer, and find the folder again at `Github → Projects →
 orion-self-install-main` (or wherever you chose) — and Downloads no longer has it.
 
+**If the drag didn't work**: click the folder once to select it, then copy it
+(⌘+C on Mac, Ctrl+C on Windows), click inside the new folder, and paste (⌘+V /
+Ctrl+V) — same result, no dragging required.
+
 ---
 
 ## Step 3 — Press Start
@@ -264,6 +269,9 @@ Then start chatting and say: **"Read AGENTS.md and let's get started."** As it a
 anything else it needs (it will tell you exactly what and why), upload that file the
 same way — you'll never touch more than a handful of files.
 
+**You'll know it worked when**: it introduces itself and starts asking about your
+business — not about the file you just uploaded.
+
 **If uploading files isn't working for some reason**: open `AGENTS.md` in any plain
 text program (Notes, Notepad, TextEdit — whatever came with your computer), select all
 the text, copy it, and paste it directly as your first message instead. This always
@@ -325,8 +333,8 @@ running `node start.mjs` again greets you with exactly where things stand.)
 - **It won't write anything that could embarrass you or your business.** If you ask for
   something that crosses a line, it'll tell you plainly and suggest a better way — not
   just refuse and leave you stuck.
-- **It won't send information about your business anywhere without telling you.** Your
-  harness can keep a small check-in "radio" open with Daily Practice — which install
+- **It won't send information about your business anywhere without telling you.** Orion
+  can keep a small check-in "radio" open with Daily Practice — which install
   step you're on, that a task ran, which packages you have; never the content of
   anything. It's presented to you plainly as a pre-ticked choice you can decline with
   one keystroke, during setup, and you can switch it off anytime after.

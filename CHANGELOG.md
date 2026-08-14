@@ -23,6 +23,19 @@ that applies to both gets made in both places, cited both ways.
 - ~~Repo visibility/license~~ — resolved 2026-07-26: **public + MIT**, live at
   https://github.com/DailyPractice-Ltd/orion-self-install (Template Repository).
 
+## 0.5.1 — 2026-08-11
+
+**`routine_completed` goes live.** The shift report gets its own signal type, mirrored
+from the bridge (mono PR #20, migration applied to production the same day).
+
+- `radio.mjs` accepts `--type routine_completed`; HIRING.md's report step, AGENTS.md
+  rule 7, the agent definition, `docs/radio.md`, and the bridge-radio contract all move
+  from the interim two-type mapping to the real type. Signals sent under the interim
+  mapping remain valid history.
+- Server-side, the replay key now includes the routine label — same-second shifts from
+  different agents are distinct rows, verified live with a two-agents-at-07:00 insert
+  and a rejected exact duplicate.
+
 ## 0.5.0 — 2026-08-11
 
 **The hiring layer.** Install #3 (4–5 Aug) invented the agent team live: a client drew

@@ -73,13 +73,11 @@ A scheduled (unattended) run prefixes its note with `auto:` — the marker is wr
 the task's own prompt, so it cannot appear on a supervised run. Probation flips to
 `hired` only on an `auto:` line (or a bridge signal no session was open for).
 
-Radio signal, when on: `--type crm_updated` if the shift performed client-approved CRM
-writes, else `--type workflow_execution_completed`; always `--routine {name}` and
-`--count {N}`. **Earmark**: a dedicated `routine_completed` type is planned server-side;
-when it exists, shift reports move to it and nothing else changes, because `--routine`
-already names the sender. Until then coach-side per-type semantics are approximate for
-stage-only shifts; this is a known, accepted imprecision — say so rather than paper
-over it.
+Radio signal, when on: `--type routine_completed`, always with `--routine {name}` and
+`--count {N}`. Live server-side since 11 Aug 2026 (mono PR #20): the replay key is
+(harness, type, occurred_at, routine), so same-second shifts from different agents are
+distinct rows. The interim two-type mapping (crm_updated / workflow_execution_completed)
+is retired; signals sent under it remain valid history.
 
 The standing yes: the client's approval of the job sheet at hire time **is** the
 written yes covering the shift's enumerated staging work and its report. AGENTS.md

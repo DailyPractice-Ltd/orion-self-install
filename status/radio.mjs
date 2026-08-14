@@ -43,6 +43,9 @@ const SIGNAL_TYPES = [
   'outreach_rejected',
   'debrief_completed',
   'crm_updated',
+  // A hired agent's scheduled shift completed — standing yes given at hire on
+  // the job sheet (contracts/agent-anatomy.md). Carries --routine and --count.
+  'routine_completed',
 ];
 const PACKAGE_KINDS = ['agent', 'skill', 'workflow', 'program'];
 

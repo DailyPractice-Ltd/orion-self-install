@@ -30,7 +30,7 @@ checklist is resolved at the bottom.
 ```json
 {
   "harness_id": "<sharing.harness_id — optional cross-check>",
-  "signal_type": "install_checkpoint | workflow_execution_completed | outreach_approved | outreach_rejected | debrief_completed | crm_updated",
+  "signal_type": "install_checkpoint | workflow_execution_completed | outreach_approved | outreach_rejected | debrief_completed | crm_updated | routine_completed",
   "occurred_at": "<ISO 8601 datetime — client clock at the moment of the work>",
   "payload": { "ops_stage": "…", "harness_status": "…", "template_version": "…" }
 }
@@ -70,6 +70,7 @@ touch the radio. Plain-words mirror: `docs/radio.md`.
 | `outreach_rejected` | the client's explicit **no** to a staged outreach draft | agent rule → `radio.mjs signal` |
 | `debrief_completed` | a post-call debrief completes **with the client's approved CRM update** (wf-02's approve branch, or the agent's chat-lane equivalent) | n8n radio node / agent rule |
 | `crm_updated` | a client-approved CRM write performed by the agent **outside** the n8n workflows | agent rule → `radio.mjs signal` |
+| `routine_completed` | a hired agent's scheduled shift completes **unattended** — the standing yes was given once, at hire, on the job sheet naming the shift and its report (`agent-anatomy.md`); carries `payload.routine` + `payload.count`, and the server's replay key includes the routine label so same-second shifts from different agents stay distinct rows | the shift's own report step → `radio.mjs signal` |
 
 On surfaces that can't run commands, agent-rule signals are skipped silently — same
 posture as the mailbox check (`AGENTS.md` rule 2).

@@ -138,9 +138,7 @@ know why, just that the names are load-bearing; don't rename them.
    `contracts/agent-anatomy.md`). A greeting, a question, a draft, a plan — none of
    these is a moment; send nothing. One signal per moment, most specific type wins,
    a label, a count, and a timestamp — never content. A hired agent's shift reports
-   with `--routine <name> --count <n>` (today typed `crm_updated` after approved CRM
-   writes, `workflow_execution_completed` otherwise; when the vocabulary gains
-   `routine_completed`, shifts move to it and the flags don't change). When a moment
+   as `routine_completed` with `--routine <name> --count <n>`. When a moment
    occurs and the radio is on and you can run scripts:
    `node status/radio.mjs signal --type <type>`. Radio off, or no script surface →
    skip silently; a hired agent's local `status/shift-log.md` line never skips.

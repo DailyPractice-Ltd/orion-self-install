@@ -67,12 +67,13 @@ available, and that promise is made to every reader in `README.md` — keep it.
      `status.json` freely — when you print the file back for a client on a paste-only
      surface, or read it aloud, replace the token with `····` plus its last four
      characters. It is a live credential; a transcript is a place it would live forever.
-2. **Check the mailbox — every session start, when the radio is on.** "On" means
-   `sharing.status_signal_enabled` is `true` AND `bridge_url`, `harness_id`,
-   `install_token` are all set. If you can run scripts, run
-   `node status/radio.mjs check`. An empty mailbox needs no mention at all. If a message
-   is waiting, read it to the client in plain words before other work, and send a reply
-   **only on their explicit yes, in their words**
+2. **Check the radio — every session start, when it is on.** (Say "radio", never
+   "mailbox" — once the client's email is connected, "mailbox" means their inbox and
+   you will search the wrong thing.) "On" means `sharing.status_signal_enabled` is
+   `true` AND `bridge_url`, `harness_id`, `install_token` are all set. If you can run
+   scripts, run `node status/radio.mjs check`. An empty radio needs no mention at all.
+   If a message is waiting, read it to the client in plain words before other work,
+   and send a reply **only on their explicit yes, in their words**
    (`node status/radio.mjs reply --nudge <id> --message "…"`). On a surface that can't
    run commands, skip this quietly — Daily Practice reaches those clients by email
    instead; never pretend to have checked.
@@ -127,15 +128,39 @@ know why, just that the names are load-bearing; don't rename them.
    in the relevant file — don't guess silently. Every fork like this is already anticipated
    somewhere in this repo; look before improvising.
 7. **Signals fire only at enumerated completion moments — never from conversation.** The
-   radio's outbound signals have exactly six named moments (the trigger table in
-   `docs/radio.md`; canonical form in `specs/002-production-line/contracts/bridge-radio.md`).
-   Each real-work moment sits *downstream of the client's explicit yes* on the work
-   itself. A greeting, a question, a draft, a plan — none of these is a moment; send
-   nothing. One signal per moment, most specific type wins, label and timestamp only.
-   When a moment does occur and the radio is on and you can run scripts:
+   trigger table lives in `docs/radio.md` (canonical form in
+   `specs/002-production-line/contracts/bridge-radio.md`). Each real-work moment sits
+   *downstream of the client's explicit yes* on the work itself — given **in-session**
+   for conversational work, or given **once, in writing, at hire time** for a hired
+   agent's scheduled shift: the job sheet the client approved names the shift and its
+   report step, and that standing yes covers exactly the shift's enumerated staging
+   work and its report, nothing more (`library/HIRING.md`;
+   `contracts/agent-anatomy.md`). A greeting, a question, a draft, a plan — none of
+   these is a moment; send nothing. One signal per moment, most specific type wins,
+   a label, a count, and a timestamp — never content. A hired agent's shift reports
+   with `--routine <name> --count <n>` (today typed `crm_updated` after approved CRM
+   writes, `workflow_execution_completed` otherwise; when the vocabulary gains
+   `routine_completed`, shifts move to it and the flags don't change). When a moment
+   occurs and the radio is on and you can run scripts:
    `node status/radio.mjs signal --type <type>`. Radio off, or no script surface →
-   skip silently. Never signal to "seem alive" — the count is only honest if it only
-   counts real, approved work.
+   skip silently; a hired agent's local `status/shift-log.md` line never skips.
+   Never signal to "seem alive" — the count is only honest if it only counts real
+   work.
+
+## Hiring, promoting, teaching — growing the client's team
+
+When the client says anything like **"hire an agent"**, **"I need someone to…"**,
+**"add someone to my team"**, **"promote {name}"**, **"{name} should also…"**, or
+**"teach it to {decide} the way I do"** — read `library/HIRING.md` and follow it
+exactly. On Claude Code the same procedures are invocable as `/hire-agent` and
+`/create-skill`; on every other surface this paragraph is the trigger.
+
+Teach the client the line once, at their first hire, and never lecture it again:
+**@ summons an agent — a who. / runs a skill — a what.**
+
+The roster lives at `.claude/agents/README.md`. At session start, scan it: any row not
+marked `Hired` gets exactly one plain sentence ("your {name} agent hasn't yet fired on
+its own — want me to check the schedule?"), never more.
 
 ## The Library — adding capabilities after (or during) the install
 
@@ -156,7 +181,8 @@ one:
 4. If the radio is on and you can run scripts, report it to the shelf:
    `node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>` —
    that's how Daily Practice knows what this machine runs when improvements ship. Radio
-   off → skip, say nothing, all is well.
+   off → skip, say nothing, all is well. (Bespoke hires and taught skills record and
+   report the same way — `contracts/agent-anatomy.md`.)
 5. Every agent package's safety rails are non-negotiable rules 3 and 4 above, restated —
    drafts only, refusal line intact, no exceptions because a package "needs" one.
 

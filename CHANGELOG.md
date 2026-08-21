@@ -10,6 +10,27 @@ that applies to both gets made in both places, cited both ways.
 
 ---
 
+## 0.6.0 — 2026-08-20
+
+**Radio v2: usage pings — the library learns WHAT is used, never what it was used
+on** (dailypractice-mono feature `004-skills-library`, FR-L05/FR-L08; server deployed
+first — a 0.5.x kit keeps working unchanged, its counting simply starts at upgrade).
+
+- `status/radio.mjs signal` accepts the asset fields on ANY signal — `--asset <slug>
+  --outcome <rep_logged|run_completed|skipped> [--surface agent|routine]
+  [--asset-version] [--asset-kind]` — and gains signal type `asset_used` for uses
+  with no other completion moment. One signal per moment, never two: a shift that
+  used a skill is the same `routine_completed` report, now naming the skill.
+- New sugar `status/radio.mjs report-use --slug <slug> --outcome <o>`. `rep_logged`
+  is reserved for the human's own yes — asked, never assumed; `skipped` is an honest
+  no that counts nowhere.
+- Every `library/*/PACKAGE.md` install prompt gains the standing "Log the rep?
+  Yes / Not yet" step after its smoke test — only an explicit yes ever sends.
+- `n8n/wf-01` + `wf-02` radio nodes (still opt-in/disabled until the wizard's yes)
+  now stamp the asset fields and the real template version when they fire.
+- `docs/radio.md` names the new fields in the content-blind promise and the
+  moments table.
+
 ## Unreleased — candidates
 
 - No self-serve *client* has been through this repo yet (the founder's own 26 Jul

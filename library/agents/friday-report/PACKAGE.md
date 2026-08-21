@@ -33,6 +33,10 @@ Install the Friday Report from my Orion folder.
    (kind "agent", version "1.0.0", smoke_test_passed true).
 6. If my check-ins are on and you can run scripts, report the install:
    node status/radio.mjs report-install --slug friday-report --kind agent --version 1.0.0
+7. From then on, after any real use where I actually did the hard action,
+   ask me: "Log the rep? Yes / Not yet." Only on my explicit yes run:
+   node status/radio.mjs report-use --slug friday-report --kind agent --outcome rep_logged
+   On "not yet", send nothing. Never log a rep I didn't confirm.
 ```
 
 ## What it does — the report, section by section

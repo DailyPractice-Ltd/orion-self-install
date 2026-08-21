@@ -12,11 +12,27 @@
  *       explicit yes in this session — the reply is theirs, not yours.
  *
  *   node status/radio.mjs signal --type <type> [--routine <name> --count <n>]
+ *                                [--asset <slug> --outcome <o> [--surface <s>]]
  *       Report "real work happened" (POST /signals). Types: install_checkpoint,
  *       workflow_execution_completed, outreach_approved, outreach_rejected,
  *       debrief_completed, crm_updated, routine_completed (which requires
- *       --routine and --count). A label, a count, and a timestamp — never content:
- *       the story of a shift stays local, in status/shift-log.md.
+ *       --routine and --count), asset_used (which requires --asset and
+ *       --outcome). A label, a count, and a timestamp — never content: the
+ *       story of a shift stays local, in status/shift-log.md. Since 0.6.0 any
+ *       signal MAY also name the Library capability that did the work
+ *       (--asset meeting-sizing --outcome run_completed) — still a label,
+ *       never content, and one signal per moment, never two: a shift that
+ *       used a skill is the SAME routine_completed report, now carrying the
+ *       asset fields.
+ *
+ *   node status/radio.mjs report-use --slug <slug> --outcome <o> [--surface agent|routine]
+ *                                    [--version <v>] [--kind <k>]
+ *       Tell the library an installed capability was USED here, when no other
+ *       completion moment exists (sugar for signal --type asset_used).
+ *       Outcomes: rep_logged — the human's own yes, "I did the hard action",
+ *       asked and never assumed; run_completed — automation finished;
+ *       skipped — offered, declined. Skips count nowhere; they just keep the
+ *       story honest.
  *
  *   node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>
  *       Tell the shelf a Library package was installed here (POST /assets), after its
@@ -48,8 +64,17 @@ const SIGNAL_TYPES = [
   // A hired agent's scheduled shift completed — standing yes given at hire on
   // the job sheet (contracts/agent-anatomy.md). Carries --routine and --count.
   'routine_completed',
+  // A Library capability was used where NO other completion moment exists (a
+  // skill applied in conversation). Every other type may also carry the asset
+  // fields — one signal per moment, never two (radio v2, 0.6.0).
+  'asset_used',
 ];
 const PACKAGE_KINDS = ['agent', 'skill', 'workflow', 'program'];
+// rep_logged is the human's own yes — asked, never assumed. run_completed is
+// automation finishing. skipped is an honest no; it counts nowhere.
+const ASSET_OUTCOMES = ['rep_logged', 'run_completed', 'skipped'];
+// This script IS the agent/routine surface; n8n nodes name their own.
+const ASSET_SURFACES = ['agent', 'routine'];
 
 // ── Arguments ───────────────────────────────────────────────────────────────
 
@@ -60,11 +85,11 @@ for (let i = 0; i < rest.length; i++) {
 }
 
 function usage() {
-  console.log('Usage: node status/radio.mjs <check | reply | signal | report-install> [--flags]');
+  console.log('Usage: node status/radio.mjs <check | reply | signal | report-use | report-install> [--flags]');
   console.log('Details in the header of this file, or specs/002-production-line/contracts/bridge-radio.md.');
 }
 
-if (!command || !['check', 'reply', 'signal', 'report-install'].includes(command)) {
+if (!command || !['check', 'reply', 'signal', 'report-use', 'report-install'].includes(command)) {
   usage();
   process.exit(command ? 1 : 0);
 }
@@ -186,6 +211,43 @@ if (command === 'signal') {
     console.log('routine_completed needs both --routine <name> and --count <n> — a shift report must say who and how many.');
     process.exit(1);
   }
+  // Radio v2 (0.6.0): any signal MAY name the Library capability that did the
+  // work. The fields travel together, the slug is a label (never content),
+  // and an empty slug is refused rather than normalised — the server's replay
+  // key treats '' and absent identically, so '' must never leave here.
+  const asset = typeof flags.asset === 'string' ? flags.asset.trim().slice(0, 200) : '';
+  if (!asset && ['outcome', 'surface', 'asset-version', 'asset-kind'].some((k) => flags[k] !== undefined)) {
+    console.log('Asset fields travel together — add --asset <slug> (which capability did the work).');
+    process.exit(1);
+  }
+  if (flags.type === 'asset_used' && !asset) {
+    console.log('asset_used needs --asset <slug> and --outcome — or use the sugar: node status/radio.mjs report-use --slug <slug> --outcome <o>.');
+    process.exit(1);
+  }
+  if (asset) {
+    if (!ASSET_OUTCOMES.includes(flags.outcome)) {
+      console.log(`--asset needs --outcome, one of: ${ASSET_OUTCOMES.join(', ')} — rep_logged is the human's own yes, never assumed.`);
+      process.exit(1);
+    }
+    const surface = flags.surface !== undefined
+      ? flags.surface
+      : (flags.type === 'routine_completed' ? 'routine' : 'agent');
+    if (!ASSET_SURFACES.includes(surface)) {
+      console.log(`--surface must be one of: ${ASSET_SURFACES.join(', ')}.`);
+      process.exit(1);
+    }
+    work.asset = asset;
+    work.outcome = flags.outcome;
+    work.surface = surface;
+    if (flags['asset-version'] !== undefined) work.asset_version = String(flags['asset-version']).trim().slice(0, 50);
+    if (flags['asset-kind'] !== undefined) {
+      if (!PACKAGE_KINDS.includes(flags['asset-kind'])) {
+        console.log(`--asset-kind must be one of: ${PACKAGE_KINDS.join(', ')}.`);
+        process.exit(1);
+      }
+      work.asset_kind = flags['asset-kind'];
+    }
+  }
 
   const res = await call('POST', '/signals', {
     harness_id: sharing.harness_id,
@@ -201,6 +263,48 @@ if (command === 'signal') {
   });
   if (res.status === 401) reportAuthProblem();
   console.log(res.ok ? `Signal sent (${flags.type}).` : `Signal answered ${res.status} — not retried.`);
+  process.exit(0);
+}
+
+if (command === 'report-use') {
+  if (!flags.slug || !String(flags.slug).trim() || !ASSET_OUTCOMES.includes(flags.outcome)) {
+    console.log(`report-use needs --slug <slug> and --outcome <${ASSET_OUTCOMES.join('|')}>.`);
+    console.log("rep_logged is the human's own yes — ask, never assume. skipped is an honest no; it counts nowhere.");
+    process.exit(1);
+  }
+  const surface = flags.surface ?? 'agent';
+  if (!ASSET_SURFACES.includes(surface)) {
+    console.log(`--surface must be one of: ${ASSET_SURFACES.join(', ')}.`);
+    process.exit(1);
+  }
+  const payload = {
+    ops_stage: status.ops_stage,
+    harness_status: status.harness_status,
+    template_version: status.template_version,
+    asset: String(flags.slug).trim().slice(0, 200),
+    outcome: flags.outcome,
+    surface,
+  };
+  if (flags.version) payload.asset_version = String(flags.version).trim().slice(0, 50);
+  if (flags.kind !== undefined) {
+    if (!PACKAGE_KINDS.includes(flags.kind)) {
+      console.log(`--kind must be one of: ${PACKAGE_KINDS.join(', ')}.`);
+      process.exit(1);
+    }
+    payload.asset_kind = flags.kind;
+  }
+  const res = await call('POST', '/signals', {
+    harness_id: sharing.harness_id,
+    signal_type: 'asset_used',
+    occurred_at: new Date().toISOString(),
+    payload,
+  });
+  if (res.status === 401) reportAuthProblem();
+  console.log(res.ok
+    ? (flags.outcome === 'rep_logged'
+        ? `Rep logged — ${payload.asset} counts in the library's totals. The content of the work stayed here.`
+        : `Use reported (${flags.outcome}) for ${payload.asset}. Labels only, as always.`)
+    : `Use report answered ${res.status} — not retried; the work itself is unaffected.`);
   process.exit(0);
 }
 

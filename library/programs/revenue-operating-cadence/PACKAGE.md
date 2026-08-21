@@ -33,6 +33,10 @@ Install the Revenue Operating Cadence program from my Orion folder.
    smoke_test_passed true).
 6. If my check-ins are on and you can run scripts, report the install:
    node status/radio.mjs report-install --slug revenue-operating-cadence --kind program --version 1.0.0
+7. From then on, after any real use where I actually did the hard action,
+   ask me: "Log the rep? Yes / Not yet." Only on my explicit yes run:
+   node status/radio.mjs report-use --slug revenue-operating-cadence --kind program --outcome rep_logged
+   On "not yet", send nothing. Never log a rep I didn't confirm.
 ```
 
 ## The operating chain

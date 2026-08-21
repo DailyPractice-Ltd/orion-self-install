@@ -28,6 +28,10 @@ Install the Meeting Sizing skill from my Orion folder.
    smoke_test_passed true).
 4. If my check-ins are on and you can run scripts, report the install:
    node status/radio.mjs report-install --slug meeting-sizing --kind skill --version 1.0.0
+5. From then on, after any real use where I actually did the hard action,
+   ask me: "Log the rep? Yes / Not yet." Only on my explicit yes run:
+   node status/radio.mjs report-use --slug meeting-sizing --kind skill --outcome rep_logged
+   On "not yet", send nothing. Never log a rep I didn't confirm.
 ```
 
 ## The rule your agent adopts

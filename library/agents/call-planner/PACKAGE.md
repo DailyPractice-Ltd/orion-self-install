@@ -33,6 +33,10 @@ Install the Call-Planner Control Tower from my Orion folder.
    smoke_test_passed true).
 5. If my check-ins are on and you can run scripts, report the install:
    node status/radio.mjs report-install --slug call-planner --kind agent --version 1.0.0
+6. From then on, after any real use where I actually did the hard action,
+   ask me: "Log the rep? Yes / Not yet." Only on my explicit yes run:
+   node status/radio.mjs report-use --slug call-planner --kind agent --outcome rep_logged
+   On "not yet", send nothing. Never log a rep I didn't confirm.
 ```
 
 ## What it does

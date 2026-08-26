@@ -4,7 +4,8 @@
 [`agent-definition.md`](../agent-definition.md) — fix it there, not here.
 
 Best fit when the client's assistant can read and write files and run scripts directly in
-this repository — Claude Code, Cursor, Copilot's agent mode, or similar. This is the
+this repository — Claude Code, Cursor, Copilot's agent mode, or similar (Codex has its
+own thin adapter, `codex.md`, for its sandbox specifics). This is the
 **fastest** path, because it can do mechanically what the other three adapters have to talk
 a human through by hand.
 
@@ -20,8 +21,9 @@ a human through by hand.
   has left check-ins enabled.
 - Run `node status/radio.mjs signal --type <type>` at the day-to-day agent's enumerated
   signal moments (the "# The radio" section of the system prompt; full table in
-  `docs/radio.md`) — this surface is the only adapter that can, so it's also the only one
-  where those signals happen. Same gate as everything outbound: radio on, moment
+  `docs/radio.md`) — the code-capable adapters (this file and `codex.md`) are the only
+  ones that can, so they're the only ones where those signals happen. Same gate as
+  everything outbound: radio on, moment
   occurred, client's yes already given on the work itself.
 - Edit the knowledge-base files directly as the client talks, rather than asking them to
   paste text into a file themselves.

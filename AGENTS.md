@@ -76,14 +76,21 @@ available, and that promise is made to every reader in `README.md` — keep it.
    and send a reply **only on their explicit yes, in their words**
    (`node status/radio.mjs reply --nudge <id> --message "…"`). On a surface that can't
    run commands, skip this quietly — Daily Practice reaches those clients by email
-   instead; never pretend to have checked.
+   instead; never pretend to have checked. **A fourth case is never silent**: if the
+   radio is on and you can run scripts but the command prints "The radio address didn't
+   answer", tell the client once this session, in one plain sentence — "the radio
+   couldn't reach Daily Practice; your work is unaffected" — and point at the fix for
+   their surface (Codex sandbox: `agent/adapters/codex.md`; corporate networks:
+   `docs/radio.md`, "If the radio can't get through"). Once per session, no nagging,
+   no retry loops.
 3. **Read `agent/agent-definition.md`.** That is the system prompt / identity you adopt for
    the actual day-to-day Orion agent you're helping build — not for this install
    conversation itself, but you'll be assembling it with the client as you go (their
    knowledge base, their tone, their agent name).
 4. **Read `agent/adapters/`** and open the one file matching the surface you're running on
-   right now (`claude.md`, `chatgpt.md`, `copilot.md`, or `claude-code.md` if you can read
-   and write files / run scripts in this repo directly). It tells you which parts of the
+   right now (`claude.md`, `chatgpt.md`, `copilot.md`, `codex.md` if you are Codex, or
+   `claude-code.md` if you can read and write files / run scripts in this repo
+   directly). It tells you which parts of the
    install you can do for the client mechanically versus which parts need a manual,
    click-by-click walkthrough.
 
@@ -123,7 +130,7 @@ know why, just that the names are load-bearing; don't rename them.
    of a session — this is the entire mechanism that makes the install resumable across
    days, machines, or a different AI tool entirely.
 6. **If you get stuck or the client's situation doesn't fit a documented path** (their AI
-   tool isn't `claude.md`/`chatgpt.md`/`copilot.md`/`claude-code.md`, their CRM isn't Attio
+   tool isn't `claude.md`/`chatgpt.md`/`copilot.md`/`codex.md`/`claude-code.md`, their CRM isn't Attio
    or HubSpot, they have no CRM at all), say so plainly and route to the fallback documented
    in the relevant file — don't guess silently. Every fork like this is already anticipated
    somewhere in this repo; look before improvising.
@@ -135,13 +142,16 @@ know why, just that the names are load-bearing; don't rename them.
    agent's scheduled shift: the job sheet the client approved names the shift and its
    report step, and that standing yes covers exactly the shift's enumerated staging
    work and its report, nothing more (`library/HIRING.md`;
-   `contracts/agent-anatomy.md`). A greeting, a question, a draft, a plan — none of
+   `specs/002-production-line/contracts/agent-anatomy.md`). A greeting, a question, a draft, a plan — none of
    these is a moment; send nothing. One signal per moment, most specific type wins,
    a label, a count, and a timestamp — never content. A hired agent's shift reports
    as `routine_completed` with `--routine <name> --count <n>`. When a moment
    occurs and the radio is on and you can run scripts:
    `node status/radio.mjs signal --type <type>`. Radio off, or no script surface →
-   skip silently; a hired agent's local `status/shift-log.md` line never skips.
+   skip silently; a hired agent's local `status/shift-log.md` line never skips. Radio
+   on but the call fails ("didn't answer") → the shift-log line gets "(radio
+   unreachable)" appended, and the client hears the session-start one-liner (step 2, "Check the radio") once this
+   session — an unreachable radio is a fixable fact, not a secret.
    Never signal to "seem alive" — the count is only honest if it only counts real
    work.
 
@@ -158,7 +168,10 @@ Teach the client the line once, at their first hire, and never lecture it again:
 
 The roster lives at `.claude/agents/README.md`. At session start, scan it: any row not
 marked `Hired` gets exactly one plain sentence ("your {name} agent hasn't yet fired on
-its own — want me to check the schedule?"), never more.
+its own — want me to check the schedule?"), never more. Scan `status/shift-log.md` too:
+"(radio unreachable)" on recent lines means shifts ran but couldn't report — deliver
+the session-start one-liner and the surface's fix once, even if this session's own
+radio check succeeds.
 
 ## The Library — adding capabilities after (or during) the install
 
@@ -180,7 +193,7 @@ one:
    `node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>` —
    that's how Daily Practice knows what this machine runs when improvements ship. Radio
    off → skip, say nothing, all is well. (Bespoke hires and taught skills record and
-   report the same way — `contracts/agent-anatomy.md`.)
+   report the same way — `specs/002-production-line/contracts/agent-anatomy.md`.)
 5. Every agent package's safety rails are non-negotiable rules 3 and 4 above, restated —
    drafts only, refusal line intact, no exceptions because a package "needs" one.
 

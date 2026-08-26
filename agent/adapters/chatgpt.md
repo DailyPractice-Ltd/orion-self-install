@@ -29,6 +29,23 @@ standing instructions," then paste each knowledge-base file. Tell the client thi
 slightly weaker — instructions can drift over a long conversation, so re-paste them if the
 agent starts sounding generic again.
 
+## The radio
+
+The radio does not run here, by design: a chat surface can't run scripts, so the
+check-in channel is carried by the client's code-capable sessions (Codex or Claude
+Code — see those adapters) and, once hired, by their agents' scheduled routines.
+Two consequences to say out loud, once, so nobody is surprised later:
+
+- Work done only in this surface is invisible to Daily Practice — real and valuable,
+  just unreported. If the client wants their work counted, the sales actions that hit
+  the enumerated signal moments belong in a code-capable session or a routine.
+- Never simulate a radio check or a signal from here, and never claim one happened.
+  "This surface can't reach the radio" is the honest sentence.
+
+(Actions stay disabled per the install steps above. A signals-only Action that would
+give this surface a voice is a considered future design, not something to improvise —
+it moves a credential into the GPT and needs its own review.)
+
 ## Known quirks
 
 - GPT knowledge retrieval is chunk-based; the numbered-section structure keeps references

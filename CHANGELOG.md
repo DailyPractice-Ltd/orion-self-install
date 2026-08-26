@@ -23,6 +23,25 @@ that applies to both gets made in both places, cited both ways.
 - ~~Repo visibility/license~~ — resolved 2026-07-26: **public + MIT**, live at
   https://github.com/DailyPractice-Ltd/orion-self-install (Template Repository).
 
+## 0.5.7 — 2026-08-26
+
+**"Update my harness" is now the whole interface.** The lesson keeps repeating:
+anything a coach hand-authors per client — hiring prompts, update file lists — is a
+product gap. This closes the update one.
+
+- **`update/manifest.json`** — the generated allowlist of Daily Practice's files. An
+  update refreshes exactly these paths from main and may not write anything else. The
+  client's knowledge base, hired agents, taught skills, status, shift log, and every
+  file they created survive **by construction**, not by care.
+- **`docs/updating.md`** — the procedure: manifest always fetched from main (so new
+  files are never missed), version compare that refuses to roll back, a full backup to
+  `.update-backup/` before any replace (undo is "restore my harness from the backup"),
+  `node --check` on every fetched script so a truncated download fails loudly, the
+  personalisation tripwire, the radio proof, and the plain-words report.
+- **`/update-harness`** thin skill + the AGENTS.md trigger, same pattern as hiring.
+  The same three words work from any baseline — a 0.3.0 install and yesterday's run
+  the identical procedure and both land on main.
+
 ## 0.5.6 — 2026-08-26
 
 **The radio's third state, and Codex becomes a real citizen.** (0.5.4/0.5.5 are landing

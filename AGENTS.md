@@ -173,6 +173,16 @@ its own — want me to check the schedule?"), never more. Scan `status/shift-log
 the session-start one-liner and the surface's fix once, even if this session's own
 radio check succeeds.
 
+## Updating — "update my harness"
+
+When the client says anything like **"update my harness"**, **"get the latest
+version"**, **"am I up to date?"**, or **"restore my harness from the backup"** — read
+`docs/updating.md` and follow it exactly. The short version you may never shorten
+further: the allowlist is `update/manifest.json` fetched fresh from main; nothing
+outside it is ever written; back up before replacing; never roll back; end with the
+plain-words report that the client's knowledge base, agents, skills, status and logs
+were not touched. On Claude Code this is also invocable as `/update-harness`.
+
 ## The Library — adding capabilities after (or during) the install
 
 `library/` holds installable packages — **Agents** (a colleague with a job), **Skills**

@@ -103,6 +103,34 @@ that happens the wizard notices by itself the next time you run it and simply as
 new code. If the radio address doesn't answer, nothing is lost — your harness carries on
 and tries at the next natural moment.
 
+## If the radio can't get through
+
+The radio never blocks your work and never retries on its own — it says one plain line
+and gets out of the way. What each line means:
+
+| The line you see | What it means | What to do |
+|---|---|---|
+| "Radio quiet — no messages" | Everything works; nothing waiting | Nothing |
+| "Radio is off (or not configured)" | Check-ins are off, or pairing never happened | Your choice — run `node start.mjs` to pair if you want it on |
+| "The radio address didn't answer (…)" | The call left your machine and hit a wall — see below | One of the two fixes below |
+| "that key isn't valid (401)" | Your key was revoked or replaced | Ask Daily Practice for a fresh pairing code |
+| "Radio check answered 4xx/5xx" | Reached Daily Practice, answered oddly | Nothing — it tries again next session |
+
+**"Didn't answer" has two usual causes:**
+
+1. **Codex's safety sandbox** (most common). Codex blocks network calls by default.
+   The one-time fix is in [`agent/adapters/codex.md`](../agent/adapters/codex.md):
+   `network_access = true` under `[sandbox_workspace_write]` in `~/.codex/config.toml`,
+   then prove it with one `check`.
+2. **A company network** (corporate laptops). Company proxies and security tools often
+   let your browser through but block command-line calls. Test: open
+   `https://www.dailypractice.world/api/bridge/nudges` in your browser — an ugly
+   technical error message means the address is reachable and the block is local to
+   commands; a company block page means the network itself is filtering. Either way the
+   ask for your IT team is one line: **allow HTTPS to `www.dailypractice.world`** — one
+   address, standard port, a small check-in API. Until then, everything local keeps
+   working and your shift log still records every run.
+
 ## If your AI can't run commands (website-chat lane)
 
 On a plain website chat there's no way for your AI to dial anywhere, so: the check-in

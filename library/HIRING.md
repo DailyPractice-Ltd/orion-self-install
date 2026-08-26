@@ -152,7 +152,9 @@ shift log is its local twin, and it never skips.)
    `node status/radio.mjs signal --type routine_completed --routine {name} --count N`
    The one-line story stays in the shift log, local — the radio carries the label,
    the count, and the time, never content.
-   Radio off → skip this step silently; step 1 never skips.
+   Radio off → skip this step silently; step 1 never skips. If the command prints
+   "didn't answer", append "(radio unreachable)" to step 1's line — the work still
+   counts locally, and the marker is what makes the silence diagnosable later.
 Count only what is real. Failed run → count 0 and say why — a silent failure is worse
 than a reported one. Never a person's name, email, or company in the note.
 
@@ -375,3 +377,9 @@ what keeps the stopgap from silently becoming the answer.
 **Radio off**: the local shift-log line is unconditional — the client's "did it run?"
 is always answerable. The signal skips silently at shift time (rule 7), and the one
 disclosure happens at hire time, step 8. Disclosure at hire, silence on shifts.
+
+**Radio on but unreachable** (the "didn't answer" line): not the same as off, and never
+treated as it. The shift appends "(radio unreachable)" to its shift-log line and carries
+on; the client hears the session-start one-liner (AGENTS.md, "Check the radio") once, at their next session, with the fix for
+their surface (`docs/radio.md`, "If the radio can't get through"). A week of unreachable
+markers is a wiring problem to fix, not a harness that stopped working.

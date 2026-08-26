@@ -23,6 +23,35 @@ that applies to both gets made in both places, cited both ways.
 - ~~Repo visibility/license~~ — resolved 2026-07-26: **public + MIT**, live at
   https://github.com/DailyPractice-Ltd/orion-self-install (Template Repository).
 
+## 0.5.6 — 2026-08-26
+
+**The radio's third state, and Codex becomes a real citizen.** (0.5.4/0.5.5 are landing
+separately from a concurrent working session — version numbers reserved by their drafted
+entries.)
+
+A live cohort running Codex + ChatGPT Work went radio-silent between sessions and the
+diagnosis found three compounding causes: Codex's safety sandbox blocks network by
+default, so `radio.mjs` calls died with "didn't answer"; `codex` was a first-class
+wizard surface with **zero** presence in any instruction file (no adapter, no AGENTS.md
+mention, while `claude-code.md` claimed signal exclusivity); and the state "radio on,
+scripts available, call failed" had no doctrine anywhere — every rule was a binary of
+on/off × scripts/no-scripts, so failures fell through to silence with exit 0.
+
+- **`agent/adapters/codex.md`** (new): the sandbox fix (`network_access = true` under
+  `[sandbox_workspace_write]` in `~/.codex/config.toml`, proven live with one `check`),
+  the approval-retry fallback, and Codex quirks. `claude-code.md`'s exclusivity line now
+  names both code-capable adapters; AGENTS.md rules 4 and 6 list `codex.md`.
+- **The third state enters doctrine**: rule 2 gains the fourth case ("didn't answer" →
+  one plain sentence to the client, once per session, with the fix pointer — never
+  silence, never retry loops); rule 7 mirrors it for signals; HIRING.md's shifts append
+  "(radio unreachable)" to their shift-log line so quiet weeks are diagnosable.
+- **`docs/radio.md` gains "If the radio can't get through"**: the five stdout lines and
+  their meanings, the Codex sandbox fix, and the corporate-network lane (browser test,
+  then the one-line IT allowlist ask) learned on a locked-down client machine.
+- **`chatgpt.md` finally says the word "radio"**: it does not run there, by design; what
+  that means for visibility; never simulate a check. A signals-only GPT Action is noted
+  as a considered future design, not improvised.
+
 ## 0.5.3 — 2026-08-14
 
 **The post-merge review's findings, fixed.** An adversarial review of 0.5.0/0.5.1

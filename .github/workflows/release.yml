@@ -1,0 +1,77 @@
+name: Release
+
+# A release is a CHANGELOG heading with a tag on it. Push `vX.Y.Z` (or run
+# this workflow by hand with the version) and the matching "## X.Y.Z — date"
+# section of CHANGELOG.md becomes the release notes. Clients never read git;
+# they ask their agent "what version is my harness on?" and compare it with
+# the Releases page, then say "update my harness".
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (a CHANGELOG heading, e.g. 0.5.7). The tag v<version> must already exist.'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The notes come from CHANGELOG.md on main, not from the tagged
+          # commit, so an old tag can be released after the fact.
+          ref: main
+          fetch-depth: 0
+
+      - name: Resolve version and tag
+        id: v
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          TAG="v${VERSION}"
+          git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || {
+            echo "Tag ${TAG} does not exist. Push the tag first." >&2; exit 1; }
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          VERSION="${{ steps.v.outputs.version }}"
+          awk -v v="$VERSION" '
+            /^## / { if (found) exit; if ($2 == v) { found=1; next } }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "No CHANGELOG.md section for ${VERSION}. Add the heading first." >&2; exit 1
+          fi
+          {
+            echo
+            echo '---'
+            echo
+            echo 'To move an installed harness to this version, open your Orion folder in your agent and say **update my harness**. Your knowledge base, hired agents, taught skills and status are untouched by construction; a full backup is taken first and **restore my harness from the backup** undoes it. Details: `docs/updating.md`.'
+          } >> notes.md
+          echo "Notes for ${VERSION}:"; cat notes.md
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.v.outputs.tag }}"
+          VERSION="${{ steps.v.outputs.version }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "Orion self-install ${VERSION}" --notes-file notes.md
+          else
+            gh release create "$TAG" --title "Orion self-install ${VERSION}" --notes-file notes.md --verify-tag
+          fi

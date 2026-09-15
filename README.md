@@ -21,6 +21,10 @@ months from now.
   below — and nothing is lost.
 - **Nothing happens without you saying yes.** Not one email, not one change to your
   contacts list, ever, without you approving it first. More on this below.
+- **It keeps up without you.** Daily Practice ships improvements as numbered
+  [releases](https://github.com/DailyPractice-Ltd/orion-self-install/releases). Ask your
+  AI "what version is my harness on?", and if it is behind, say "update my harness".
+  Your own files are never touched by an update ([how that is guaranteed](docs/updating.md)).
 
 ---
 

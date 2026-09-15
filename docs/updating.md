@@ -14,6 +14,25 @@ file the update replaces is copied aside first, so any update can be undone by s
 **If any other file describes updating differently, this file wins.** The allowlist
 lives in `update/manifest.json`; a path not on it may not be written, ever.
 
+## Which version am I on? (client)
+
+Ask your AI: **"what version is my harness on?"** It reads `template_version` from
+`status/status.json` and tells you, e.g. "0.3.0". Then look at the Releases page:
+
+https://github.com/DailyPractice-Ltd/orion-self-install/releases
+
+The top entry is the latest. Every release lists, in plain words, what changed and why
+it matters to you. If your number is lower than the top one, say **"update my
+harness"** and the procedure below runs. If it is the same, there is nothing to do.
+Daily Practice can also see your version over the radio, and will tell you when an
+update is worth your time — you never have to check by hand.
+
+**For maintainers:** a release is a `## X.Y.Z — date` heading in `CHANGELOG.md` with a
+git tag `vX.Y.Z` on the commit that shipped it. Push the tag and
+`.github/workflows/release.yml` publishes the release with that heading's section as
+the notes. The version a client sees in `status.json` and the version on the Releases
+page are the same number by construction.
+
 ---
 
 ## The procedure (installer: follow exactly — no improvised steps)

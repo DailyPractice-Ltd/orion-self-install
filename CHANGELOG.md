@@ -8,6 +8,12 @@ This changelog tracks **this repo's own** version history — independent of
 the coach-led kit this repo was adapted from. Cross-reference, don't duplicate: a change
 that applies to both gets made in both places, cited both ways.
 
+**Every heading below is a release.** `## X.Y.Z — date` is tagged `vX.Y.Z` on the commit
+that shipped it, and pushing that tag publishes a GitHub Release whose notes are the
+heading's section (`.github/workflows/release.yml`). Clients compare their
+`status.json` `template_version` with the Releases page and say "update my harness".
+Write each section for the client who will read it there.
+
 ---
 
 ## Unreleased — candidates

@@ -13,8 +13,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (a CHANGELOG heading, e.g. 0.5.7). The tag v<version> must already exist.'
+        description: 'Version to release (a CHANGELOG heading, e.g. 0.5.7).'
         required: true
+        type: string
+      commit:
+        description: 'Commit the tag should point at (sha). Leave empty to tag the current main, or if the tag already exists.'
+        required: false
         type: string
 
 permissions:
@@ -40,8 +44,19 @@ jobs:
             VERSION="${GITHUB_REF_NAME#v}"
           fi
           TAG="v${VERSION}"
-          git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || {
-            echo "Tag ${TAG} does not exist. Push the tag first." >&2; exit 1; }
+          if ! git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            # Dispatched for a version with no tag yet: create it here, on the
+            # named commit (or main), so a release never needs a local git push.
+            TARGET="${{ inputs.commit }}"
+            [ -n "$TARGET" ] || TARGET="$(git rev-parse HEAD)"
+            git rev-parse -q --verify "${TARGET}^{commit}" >/dev/null || {
+              echo "Commit ${TARGET} not found on main's history." >&2; exit 1; }
+            DATE="$(grep -m1 -E "^## ${VERSION} — " CHANGELOG.md | sed -E 's/^## [^ ]+ — //')"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" "$TARGET" -m "Orion self-install ${VERSION}${DATE:+ (${DATE})}"
+            git push origin "refs/tags/${TAG}"
+          fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 

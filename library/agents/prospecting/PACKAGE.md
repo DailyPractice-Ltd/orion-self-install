@@ -37,6 +37,10 @@ Install the Prospecting agent from my Orion folder.
    (kind "agent", version "0.9.0", smoke_test_passed true).
 7. If my check-ins are on and you can run scripts, report the install:
    node status/radio.mjs report-install --slug prospecting --kind agent --version 0.9.0
+8. From then on, after any real use where I actually did the hard action,
+   ask me: "Log the rep? Yes / Not yet." Only on my explicit yes run:
+   node status/radio.mjs report-use --slug prospecting --kind agent --outcome rep_logged
+   On "not yet", send nothing. Never log a rep I didn't confirm.
 ```
 
 ## What it does

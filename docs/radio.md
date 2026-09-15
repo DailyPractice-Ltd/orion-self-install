@@ -14,7 +14,9 @@ Four kinds of message, and nothing besides:
 2. **"A task just ran"** — the *type* of task (say, "a post-call debrief completed"),
    when, and — for a hired agent's shift — which agent ran it and how many things it
    did (a label and a number: say, "prospecting, 18"). Never what was in it, never who
-   it was about.
+   it was about. Since 0.6.0 a report may also name which Library capability did the
+   work — its slug, and whether you logged the rep yourself (your explicit yes),
+   automation completed a run, or it was skipped. Still a label. Never the work.
 3. **"This machine now runs X"** — when you install a Library package, its name, kind,
    and version. That's how Daily Practice knows who's affected when a package is
    improved.
@@ -40,13 +42,18 @@ loud: none of that ever touches the radio.
 | "Debrief done" (`debrief_completed`) | A post-call debrief finishes **and you approved its CRM update** | The debrief workflow's radio node, or your agent after your yes |
 | "CRM updated" (`crm_updated`) | Your agent performs a CRM write **you approved**, outside the workflows | Your agent, right after the approved write |
 | "A shift ran" (`routine_completed`) | A hired agent finishes a scheduled shift — the standing yes you gave on its job sheet at hire covers exactly this report | The agent, as its shift's last step, with its name and a count |
+| "A capability was used" (`asset_used`) | You say yes to "Log the rep?" for an installed Library capability, when none of the moments above already carries it | Your agent, right after your yes — asked, never assumed |
 
 Three rules sit under that table: every real-work message is **downstream of your
 explicit yes** on the work itself — given in the conversation for conversational work,
 or given once at hire time for a hired agent's shift, when you approved the job sheet
 that names this report (the radio never learns about anything you didn't approve);
 it's **one message per moment** (the most specific label wins — never two for the same
-event); and it's **the label, the count, and the time — never the content**.
+event: a shift that used a skill is the SAME shift report, now naming the skill); and
+it's **the label, the count, and the time — never the content**. The 0.6.0 asset
+fields obey all three: a slug, an outcome (rep_logged | run_completed | skipped), a
+surface — so Daily Practice can see that a capability earns its place, without ever
+seeing the work it was used on.
 
 ## What comes in
 

@@ -72,9 +72,19 @@ available, and that promise is made to every reader in `README.md` — keep it.
    you will search the wrong thing.) "On" means `sharing.status_signal_enabled` is
    `true` AND `bridge_url`, `harness_id`, `install_token` are all set. If you can run
    scripts, run `node status/radio.mjs check`. An empty radio needs no mention at all.
-   If a message is waiting, read it to the client in plain words before other work,
-   and send a reply **only on their explicit yes, in their words**
-   (`node status/radio.mjs reply --nudge <id> --message "…"`). On a surface that can't
+
+   **If a message is waiting, deliver it as a message, not as a report.** Someone at
+   Daily Practice wrote it to this client. Say who it is from and what they said, in
+   full, before other work. Never show the client a message id, a URL, a status code,
+   or the state of the connection — that is plumbing, and reciting it turns a person
+   getting in touch into a systems check. The command prints a fenced section marked
+   *for the assistant*; everything under that fence is yours, not theirs.
+
+   Send a reply **only on their explicit yes, in their words**
+   (`node status/radio.mjs reply --nudge <id> --message "…" --yes`). If they want to
+   raise something with nothing to reply to, that is
+   `node status/radio.mjs send --message "…" --yes` — same rule, their words, their
+   yes. On a surface that can't
    run commands, skip this quietly — Daily Practice reaches those clients by email
    instead; never pretend to have checked. **A fourth case is never silent**: if the
    radio is on and you can run scripts but the command prints "The radio address didn't
@@ -199,6 +209,14 @@ one:
    line is true.
 3. Only then record it in `status/status.json` under `packages.<slug>` (`kind`,
    `version`, `installed_at`, `smoke_test_passed: true`).
+3b. **When Daily Practice offers a skill over the radio**, collect it with
+   `node status/radio.mjs library --install <slug>` — with no `--yes` it only shows
+   what the skill is, what it needs, and where it would go. Tell the client that in
+   your own plain words, and run it again with `--yes` only if they want it. It writes
+   `.claude/skills/<slug>/SKILL.md`, never overwrites a skill they already have, and
+   reports the shelf itself. Then smoke-test it on something real before saying it
+   works.
+
 4. If the radio is on and you can run scripts, report it to the shelf:
    `node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>` —
    that's how Daily Practice knows what this machine runs when improvements ship. Radio

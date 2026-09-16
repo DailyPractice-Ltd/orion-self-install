@@ -33,6 +33,41 @@ git tag `vX.Y.Z` on the commit that shipped it. Push the tag and
 the notes. The version a client sees in `status.json` and the version on the Releases
 page are the same number by construction.
 
+## If your harness is older than 0.5.7 (one time only)
+
+The update layer itself — this file, and `update/manifest.json` — first shipped in
+0.5.7. If your harness was installed before that, those files are not on your machine,
+so **"update my harness" has nothing to act on**. Your AI is not being difficult; the
+instructions that phrase refers to genuinely are not there.
+
+One paste fixes it forever. Open your Orion folder in your AI and give it this:
+
+> Fetch these two files and save them at these exact paths in this folder, creating the
+> directories if they do not exist:
+>
+> - `https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/main/docs/updating.md`
+>   → `docs/updating.md`
+> - `https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/main/update/manifest.json`
+>   → `update/manifest.json`
+>
+> Write nothing else. Then read `docs/updating.md` and run the procedure in it, starting
+> at step 1.
+
+That is the whole bootstrap. It fetches the instructions and the allowlist, then hands
+over to the ordinary procedure below — which takes the backup, refuses to go backwards,
+and cannot touch anything you made. From then on **"update my harness"** works the way
+it does for everyone else, and this paste is never needed again.
+
+**If the fetch fails on Codex**, it is the sandbox, not the network: apply
+`agent/adapters/codex.md`'s one-time setting and try again. The same fix unblocks the
+radio, which is why a harness in that state usually looks silent to Daily Practice as
+well.
+
+**Why we cannot do this for you.** The radio carries labels and timestamps, never files
+or instructions, and nothing installs on your machine without you saying yes. So the one
+thing we cannot do is reach in and add the missing files ourselves. You paste it, your
+AI does the rest.
+
 ---
 
 ## The procedure (installer: follow exactly — no improvised steps)

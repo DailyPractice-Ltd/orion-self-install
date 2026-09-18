@@ -16,6 +16,28 @@ Write each section for the client who will read it there.
 
 ---
 
+
+## 0.6.0 — 2026-09-16
+
+The radio goes both ways, and it can carry a skill.
+
+- **Daily Practice can hand you a skill over the radio.** `library --install <slug>`
+  shows you what it is, what it needs and where it would go; on your yes it writes
+  `.claude/skills/<slug>/SKILL.md` and tells the shelf. It will never overwrite a
+  skill you already have — if the names clash, yours wins and nothing is touched.
+- **You can start a conversation.** Until now you could only answer something we
+  sent first, so if we had never messaged you there was no way to reach us at all.
+  `send` fixes that, and carries a retry-safe id so a flaky connection can never
+  turn one message into two.
+- **A message now arrives as a message.** It says who it is from and when, and the
+  connection details are fenced off where your assistant can see them and you are
+  not read them. A message from a person should not sound like a systems check.
+- **Your assistant reads its own instructions again.** `CLAUDE.md` only spoke to
+  installs, so once your harness was running, a new session never opened `AGENTS.md`
+  and never checked the radio. Messages sat unread on your machine. It now applies
+  to a running harness too — and it is on the update list, so it can be corrected
+  again, which it could not be before.
+
 ## Unreleased — candidates
 
 - No self-serve *client* has been through this repo yet (the founder's own 26 Jul

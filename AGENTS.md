@@ -217,6 +217,13 @@ one:
    reports the shelf itself. Then smoke-test it on something real before saying it
    works.
 
+3c. **When the client wants to give a skill back**, offer it up with
+   `node status/radio.mjs contribute --slug <slug>` — with no `--yes` it shows what
+   would be sent. Tell the client in your own plain words what they are offering, and
+   run it again with `--yes` only on their word. It sends that skill's `SKILL.md` for
+   a Daily Practice curator to read; nothing is published by sending it, and nothing
+   leaves the machine without their yes.
+
 4. If the radio is on and you can run scripts, report it to the shelf:
    `node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>` —
    that's how Daily Practice knows what this machine runs when improvements ship. Radio

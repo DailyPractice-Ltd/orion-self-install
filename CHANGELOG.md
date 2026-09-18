@@ -17,6 +17,20 @@ Write each section for the client who will read it there.
 ---
 
 
+## 0.6.1 — 2026-09-18
+
+**A skill can go back up the radio, and an offer reads as an offer.**
+
+- New: **`node status/radio.mjs contribute --slug <slug>`** offers a skill this
+  machine runs back to the Daily Practice library. With no `--yes` it shows what
+  would be sent; on your yes it sends `.claude/skills/<slug>/SKILL.md` for a
+  curator to read. Nothing is published by sending it, and nothing leaves this
+  machine without your yes. A skill over the library's size (200000 characters)
+  is not sent; you are told instead.
+- Fixed: when Daily Practice offers a skill, `check` now names it in plain words
+  ("Daily Practice is offering a skill: <name>") instead of leaving a raw
+  `[library:install]` line to be read aloud.
+
 ## 0.6.0 — 2026-09-16
 
 The radio goes both ways, and it can carry a skill.

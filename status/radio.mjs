@@ -20,6 +20,11 @@
  *       write it to .claude/skills/<slug>/SKILL.md, and report it to the shelf.
  *       Never overwrites a skill already there. Their yes first, always.
  *
+ *   node status/radio.mjs contribute --slug <slug> --yes
+ *       Offer a skill this machine runs back up to the library (POST /contributions).
+ *       Sends .claude/skills/<slug>/SKILL.md for a curator to read; nothing is
+ *       published by sending it. Same rule as send and reply: their yes first.
+ *
  *   node status/radio.mjs signal --type <type> [--routine <name> --count <n>]
  *       Report "real work happened" (POST /signals). Types: install_checkpoint,
  *       workflow_execution_completed, outreach_approved, outreach_rejected,
@@ -69,11 +74,11 @@ for (let i = 0; i < rest.length; i++) {
 }
 
 function usage() {
-  console.log('Usage: node status/radio.mjs <check | reply | send | library | signal | report-install> [--flags]');
+  console.log('Usage: node status/radio.mjs <check | reply | send | library | contribute | signal | report-install> [--flags]');
   console.log('Details in the header of this file, or specs/002-production-line/contracts/bridge-radio.md.');
 }
 
-if (!command || !['check', 'reply', 'send', 'library', 'signal', 'report-install'].includes(command)) {
+if (!command || !['check', 'reply', 'send', 'library', 'contribute', 'signal', 'report-install'].includes(command)) {
   usage();
   process.exit(command ? 1 : 0);
 }
@@ -172,11 +177,23 @@ if (command === 'check') {
     console.log('');
     for (const line of String(m.body).split('\n')) console.log(`  ${line}`);
   }
+  // A message may carry a machine-readable offer: `[library:install] <slug>@<ver>`
+  // on its first line. Name it plainly so the assistant tells the client a skill
+  // is on offer, rather than reading a raw directive aloud.
+  const offer = newest.body && String(newest.body).match(/^\[library:install\]\s+([a-z0-9]+(?:-[a-z0-9]+)*)(?:@(\S+))?/);
   console.log('');
   console.log('--- for the assistant, not to be read aloud ---');
-  console.log('Read the message above to the client in full. If they want to answer,');
-  console.log('take their words and run this, replacing only the message:');
-  console.log(`  node status/radio.mjs reply --nudge ${newest.key} --message "their words" --yes`);
+  if (offer) {
+    const [, offeredSlug, offeredVer] = offer;
+    console.log(`Daily Practice is offering a skill: ${offeredSlug}${offeredVer ? ` (version ${offeredVer})` : ''}.`);
+    console.log('Tell the client in plain words that it is on offer. On their yes, show it first with:');
+    console.log(`  node status/radio.mjs library --install ${offeredSlug}`);
+    console.log('then, only if they still want it, add --yes.');
+  } else {
+    console.log('Read the message above to the client in full. If they want to answer,');
+    console.log('take their words and run this, replacing only the message:');
+    console.log(`  node status/radio.mjs reply --nudge ${newest.key} --message "their words" --yes`);
+  }
   process.exit(0);
 }
 
@@ -300,6 +317,65 @@ if (command === 'library') {
   console.log('--- for the assistant, not to be read aloud ---');
   console.log('Record it under packages in status/status.json, then try it on something real');
   console.log('before telling the client it works.');
+  process.exit(0);
+}
+
+if (command === 'contribute') {
+  // Offer a skill this machine runs back up to the Daily Practice library.
+  // The markdown travels; a curator reads it and decides. Nothing is published
+  // by this call, and — like send and reply — it only goes on the client's yes.
+  const slug = flags.slug;
+  if (!slug || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
+    console.log('contribute needs --slug <slug>, the skill to offer, in lower-case words joined by hyphens.');
+    process.exit(1);
+  }
+
+  const file = join(__dirname, '..', '.claude', 'skills', slug, 'SKILL.md');
+  if (!existsSync(file)) {
+    console.log(`No skill called "${slug}" on this machine (looked for .claude/skills/${slug}/SKILL.md).`);
+    process.exit(0);
+  }
+  const content = readFileSync(file, 'utf8');
+  if (!content.trim()) {
+    console.log(`"${slug}" is empty — nothing to offer.`);
+    process.exit(0);
+  }
+  // The library door takes at most 200000 characters. A skill larger than that
+  // is not refused quietly — the person is told, and nothing is sent.
+  const MAX = 200000;
+  if (content.length > MAX) {
+    console.log(`"${slug}" is ${content.length} characters; the library takes at most ${MAX}. Nothing sent.`);
+    console.log('A skill this large usually means more than one file — tell Daily Practice and we will sort the shape.');
+    process.exit(0);
+  }
+
+  if (flags.yes === undefined) {
+    console.log(`You would offer "${slug}" to the Daily Practice library — ${content.length} characters.`);
+    console.log('A curator reads it and decides; nothing is published by sending it.');
+    console.log('');
+    console.log('The first lines of what would be sent:');
+    for (const line of content.split('\n').slice(0, 12)) console.log(`  ${line}`);
+    console.log('');
+    console.log('--- for the assistant, not to be read aloud ---');
+    console.log('Show the client what this offers, in your own plain words. On their yes:');
+    console.log(`  node status/radio.mjs contribute --slug ${slug} --yes`);
+    process.exit(0);
+  }
+
+  const res = await call('POST', '/contributions', {
+    harness_id: sharing.harness_id,
+    slug,
+    kind: 'skill',
+    content,
+  });
+  if (res.status === 401) reportAuthProblem();
+  if (res.status === 404 || res.status === 405) {
+    console.log('This Daily Practice address cannot take a skill offer yet. Nothing was sent.');
+    process.exit(0);
+  }
+  console.log(res.ok
+    ? `Offered "${slug}" to the Daily Practice library. A curator will look at it; nothing is published yet.`
+    : `The offer answered ${res.status} — not retried; nothing was lost locally.`);
   process.exit(0);
 }
 

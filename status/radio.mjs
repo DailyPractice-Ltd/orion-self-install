@@ -144,6 +144,17 @@ function whenWords(iso) {
   return days === 1 ? 'yesterday' : `${days} days ago`;
 }
 
+/**
+ * A backstop against the one mistake that keeps happening: cramming a skill into
+ * a message. `send` and `reply` carry a person's words; a skill goes up with
+ * `contribute`. A SKILL.md opens with YAML frontmatter naming the skill, so that
+ * is what we look for — and refuse to send, pointing at the right command.
+ */
+function looksLikeSkillFile(text) {
+  const t = String(text ?? '').replace(/^﻿/, '').trimStart();
+  return /^---\s*\r?\n[\s\S]{0,300}?\bname:\s*\S/.test(t);
+}
+
 if (command === 'check') {
   // v=1 is the conversation, with state and names; a server that has not got it
   // yet answers the old way and we still print something a person can read.
@@ -207,6 +218,13 @@ if (command === 'send') {
     console.log('Their words, their decision. Nothing leaves this machine without it.');
     process.exit(1);
   }
+  if (looksLikeSkillFile(flags.message)) {
+    console.log('That looks like a skill file, not a message — send carries words, not skills.');
+    console.log('To send a skill up to the library, use:');
+    console.log('  node status/radio.mjs contribute --slug <slug>');
+    console.log('Nothing was sent.');
+    process.exit(0);
+  }
   // An id of our own so a retry answers with the original instead of posting twice.
   const clientMsgId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
   const res = await call('POST', '/nudges', {
@@ -234,6 +252,13 @@ if (command === 'reply') {
   if (!flags.nudge || !flags.message) {
     console.log('reply needs --nudge <id> and --message "text".');
     process.exit(1);
+  }
+  if (looksLikeSkillFile(flags.message)) {
+    console.log('That looks like a skill file, not a reply — reply carries words, not skills.');
+    console.log('To send a skill up to the library, use:');
+    console.log('  node status/radio.mjs contribute --slug <slug>');
+    console.log('Nothing was sent.');
+    process.exit(0);
   }
   // Server field is `body` (bridge contract, BridgeNudgeReplyRequest); the CLI flag
   // stays --message because that's what it is to the client.

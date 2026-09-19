@@ -17,6 +17,19 @@ Write each section for the client who will read it there.
 ---
 
 
+## 0.6.3 — 2026-09-19
+
+**"Update my harness" no longer misses a release made minutes ago.**
+
+The update fetched the manifest from the bare `main` ref, and
+`raw.githubusercontent.com` caches that ref for five minutes. A harness that
+updated just after a release read the cached, older manifest and reported
+"nothing to update". The procedure now resolves main's current commit from the
+GitHub API and pins every fetch — manifest and each refreshed file — to that
+commit. A commit URL is always fresh, and the whole update comes from one
+consistent snapshot instead of a mix caught mid cache-rotation. Falls back to
+`main` if the commit lookup fails, so the update still runs.
+
 ## 0.6.2 — 2026-09-19
 
 **"Send this skill to the library" now reaches for the right lane.**

@@ -157,11 +157,14 @@ is where to look first.
 
 ## Sign-off
 
+Fill in only the two rows that match what you actually use: Google or Microsoft, not
+both.
+
 | Connector | Credential named in n8n | Connected without error | Confirmed via a real run | Date |
 |---|---|---|---|---|
 | CRM ({{CLIENT_CRM}}) | | | | |
-| Gmail | | | | |
-| Google Calendar | | | — | |
+| Email (Gmail or Outlook) | | | | |
+| Calendar (Google or Microsoft) | | | — | |
 
 All rows filled in → set `status/status.json`'s `connector_crm_live`,
 `connector_email_live`, and `connector_calendar_live` to `true`, and the install may move

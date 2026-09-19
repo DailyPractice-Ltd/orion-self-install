@@ -207,13 +207,15 @@ function migrate(status) {
   if (!('machine_profile' in status)) status.machine_profile = null;
   if (!status.packages || typeof status.packages !== 'object') status.packages = {};
   status.sharing = status.sharing || {};
-  for (const key of ['radio_choice', 'bridge_url', 'harness_id', 'install_token', 'paired_at']) {
+  for (const key of ['radio_choice', 'bridge_url', 'harness_id', 'install_token', 'paired_at', 'radio_seen_through']) {
     if (!(key in status.sharing)) status.sharing[key] = null;
   }
   delete status.sharing.status_signal_endpoint;
   // 1.3.0 adds sharing.paired_at — when the pairing code was exchanged for the
   // key. A bookmark written before pairing existed simply carries null.
-  status.schema_version = '1.3.0';
+  // 1.4.0 adds sharing.radio_seen_through: the newest message the radio has read
+  // out, so nothing is repeated. Null means the radio has not read one out yet.
+  status.schema_version = '1.4.0';
   return status;
 }
 
@@ -300,7 +302,7 @@ const STAGE_WORDS = {
   day2_wire_and_run: 'connecting your tools — CRM, email, calendar',
   validated: 'proving everything works against your real accounts',
   seven_day_checkin: 'up and running solo — your AI is on standby for questions',
-  formalised: 'complete — your harness is installed and confirmed stable',
+  formalised: 'complete — Orion is installed and confirmed stable',
 };
 
 // ── The wizard, step by step ────────────────────────────────────────────────
@@ -443,7 +445,8 @@ async function main() {
     say('install step you\'re on, "a task ran just now," and which packages you\'ve');
     say('installed — never the content of your messages, your knowledge base, or your');
     say('prospects. You can switch this off, now or with one edit later, and');
-    say('everything else works exactly the same. (Full detail: docs/radio.md.)');
+    say('everything else works exactly the same. (We call this the radio — full');
+    say('detail: docs/radio.md.)');
     say('');
     const keep = (typeof cliFlags.checkins === 'string'
       ? (say(`  Keep check-ins on? [Y/n] (from --checkins): ${cliFlags.checkins}`), cliFlags.checkins)

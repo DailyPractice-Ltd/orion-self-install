@@ -24,9 +24,10 @@ anything. Its contents ARE the answer to "where did we leave off."
 | `stage_history` | append-only list of `{stage, at}` | on every stage change — never edit or delete an existing entry |
 | `sharing.status_signal_enabled` | default `true` — the radio's master switch (constitution Article V, channel 1) | only the client changes this, and only if they ask to |
 | `sharing.radio_choice` | `null` until the check-in choice has been presented once; then `"accepted"` or `"declined"` | set once by the wizard (or by you, on the conversational path) — its presence is why the choice is never re-asked |
-| `sharing.bridge_url` / `sharing.harness_id` / `sharing.install_token` | the radio's address and key, from the client's welcome pack | during the wizard's check-in step (or its conversational equivalent). All three plus the master switch must be set before anything dials out — anything less is a silent local no-op. The token is typed by the client, never echoed, never logged |
+| `sharing.bridge_url` / `sharing.harness_id` / `sharing.install_token` | the radio's address and key, from the client's pairing code exchange | during the wizard's check-in step (or its conversational equivalent). All three plus the master switch must be set before anything dials out — anything less is a silent local no-op. The token is typed by the client, never echoed, never logged |
 | ~~`sharing.status_signal_endpoint`~~ | removed in schema 1.2.0 (002a reconciliation) — the 001-era unauthenticated webhook is gone; the authenticated radio (`bridge_url` + key) is the only outbound path | delete it if an old status.json still carries it |
 | `sharing.intelligence_library_opt_in` | default `false` | only on the client's explicit, separate say-so — see `docs/intelligence-library-opt-in.md` |
+| `sharing.radio_seen_through` | `null` until the radio has read a message out; then the time of the newest Daily Practice message already read to the client (schema 1.4.0). Messages up to it are not repeated at the next check | written by `radio.mjs check` after it reads a message out. Never by hand. Deleting it only means the most recent message may be read once more |
 | `notes` | free text scratch space | anything you want your future (possibly resumed, possibly different-AI-tool) self to know |
 
 ## The one rule that matters most

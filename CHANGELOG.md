@@ -17,6 +17,36 @@ Write each section for the client who will read it there.
 ---
 
 
+## 0.6.4 — 2026-09-19
+
+An offer arrives in words, and each message is read to you once.
+
+- **A skill on offer is announced in your words, not in code.** 0.6.1 to 0.6.3
+  named the offer to your assistant, but still read the machine line
+  `[library:install] …` to you first, as if a person had said it. Now you hear
+  "Daily Practice is offering you a skill: <name>, version <n>", then the note that
+  came with it. The exact `library --install` command goes to your assistant under
+  its fence, and every offer in the thread is named, not only the newest. Nothing is
+  written until you say yes.
+- **Each message is read to you once.** The radio hands your harness the recent
+  conversation every time it checks, so a session that stops mid-sentence cannot
+  lose a message. 0.6.0 to 0.6.3 then read all of it out again at every session
+  start. Your harness now remembers the newest message it has read to you, as
+  `radio_seen_through` (schema 1.4.0) in `status/status.json`, and repeats nothing.
+  The first check after this update may repeat the most recent message once. That
+  is the safe side.
+- **Tests, for the first time.** `node --test` runs the radio for real against a
+  bridge that answers from memory: an offer in words, a plain message as written, a
+  heard message not repeated, collecting a skill with and without your yes, and
+  offering one back without your yes sending nothing. No network, and no
+  `status/status.json` in your folder is touched.
+- **Small wording fixes from August that never shipped.** The connector sign-off
+  table has rows for Microsoft as well as Google. Every place that still said
+  "welcome pack" now says pairing code, which is the thing you actually have: the
+  radio's own message when a key is refused, the n8n setup step, the validation task
+  and the status schema. The wizard names the radio the first time it mentions it,
+  and says Orion where it used to say harness.
+
 ## 0.6.3 — 2026-09-19
 
 **"Update my harness" no longer misses a release made minutes ago.**

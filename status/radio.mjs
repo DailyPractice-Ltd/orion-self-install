@@ -5,7 +5,10 @@
  *
  *   node status/radio.mjs check
  *       Read the radio (GET /nudges). Run at session start. An empty radio is the
- *       normal, silent case.
+ *       normal, silent case. A skill on offer is announced in words, and the exact
+ *       library --install command is printed under the fence for the assistant.
+ *       Each message is read out once: sharing.radio_seen_through in status.json
+ *       remembers the newest one already heard, and nothing before it is repeated.
  *
  *   node status/radio.mjs reply --nudge <id> --message "the client's reply"
  *       Send a reply back (POST /nudges/<id>/reply). Only ever run after the client's
@@ -47,7 +50,7 @@
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { radioOn as radioIsOn } from './shapes.mjs';
+import { radioOn as radioIsOn, parseInstallDirective } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status.json');
@@ -125,7 +128,7 @@ async function call(method, path, body) {
 
 function reportAuthProblem() {
   console.log('The radio answered "that key isn\'t valid" (401). The key may have been revoked —');
-  console.log('ask support@dailypractice.world for a fresh welcome pack. Nothing else is affected.');
+  console.log('ask support@dailypractice.world for a fresh pairing code. Nothing else is affected.');
   process.exit(0);
 }
 
@@ -155,6 +158,46 @@ function looksLikeSkillFile(text) {
   return /^---\s*\r?\n[\s\S]{0,300}?\bname:\s*\S/.test(t);
 }
 
+/**
+ * Which of our messages the client has not heard yet.
+ *
+ * The v=1 door hands back the recent conversation every time, so a session that
+ * dies mid-print cannot lose a message; deciding what is new is this side's job.
+ * The mark is sharing.radio_seen_through in status.json: the time of the newest
+ * message already read out. Only server timestamps are compared, so a wrong clock
+ * on this machine changes nothing. With no mark yet (the first check on this
+ * version), the new messages are the ones the server marked delivered in this
+ * very request: they share the newest delivery stamp, and one whose receipt failed
+ * or whose stamp is missing is still unread. At worst the most recent message is
+ * repeated once. Repeating is the safe failure; going quiet is the one that loses a
+ * message.
+ */
+function unheard(fromUs, seenThrough) {
+  const mark = Date.parse(seenThrough || '');
+  if (!Number.isNaN(mark)) {
+    return fromUs.filter((m) => {
+      const at = Date.parse(m.at || '');
+      return Number.isNaN(at) || at > mark;
+    });
+  }
+  const stamps = fromUs.map((m) => m.state_at).filter((s) => typeof s === 'string').sort();
+  const newest = stamps[stamps.length - 1];
+  return fromUs.filter((m) => m.state !== 'delivered' || typeof m.state_at !== 'string' || m.state_at === newest);
+}
+
+/** Remember the newest message read out, so it is never repeated. Never fatal. */
+function rememberHeard(at) {
+  if (typeof at !== 'string' || Number.isNaN(Date.parse(at))) return;
+  try {
+    const fresh = JSON.parse(readFileSync(STATUS_PATH, 'utf8'));
+    fresh.sharing = fresh.sharing || {};
+    fresh.sharing.radio_seen_through = at;
+    writeFileSync(STATUS_PATH, JSON.stringify(fresh, null, 2) + '\n');
+  } catch {
+    // At-least-once: a failed write only means the message is read again next time.
+  }
+}
+
 if (command === 'check') {
   // v=1 is the conversation, with state and names; a server that has not got it
   // yet answers the old way and we still print something a person can read.
@@ -173,7 +216,7 @@ if (command === 'check') {
         at: n.created_at,
       }));
 
-  const waiting = messages.filter((m) => m.from === 'daily_practice');
+  const waiting = unheard(messages.filter((m) => m.from === 'daily_practice'), sharing.radio_seen_through);
   if (waiting.length === 0) {
     console.log('Radio quiet — nothing waiting.');
     process.exit(0);
@@ -181,30 +224,35 @@ if (command === 'check') {
 
   // What follows is for the client's ears. Read it to them as it is written:
   // it is a person talking to them, not a status report about a channel.
-  const newest = waiting[waiting.length - 1];
+  const newest = waiting.reduce((a, b) => (Date.parse(b.at || '') > Date.parse(a.at || '') ? b : a));
+  const offers = [];
   for (const m of waiting) {
     console.log('');
     console.log(`From ${m.from_name || 'Daily Practice'}, ${whenWords(m.at)}:`);
     console.log('');
-    for (const line of String(m.body).split('\n')) console.log(`  ${line}`);
+    const lines = String(m.body).split('\n');
+    // A skill on offer arrives with a machine line first (shapes.mjs). The client
+    // hears what it means, never the line itself. The words the coach wrote after
+    // it are theirs to hear as written.
+    const offer = parseInstallDirective(m.body);
+    if (offer) {
+      if (!offers.some((o) => o.slug === offer.slug)) offers.push(offer);
+      console.log(`  Daily Practice is offering you a skill: ${offer.slug}, version ${offer.version}.`);
+      lines.shift();
+    }
+    for (const line of lines) console.log(`  ${line}`);
   }
-  // A message may carry a machine-readable offer: `[library:install] <slug>@<ver>`
-  // on its first line. Name it plainly so the assistant tells the client a skill
-  // is on offer, rather than reading a raw directive aloud.
-  const offer = newest.body && String(newest.body).match(/^\[library:install\]\s+([a-z0-9]+(?:-[a-z0-9]+)*)(?:@(\S+))?/);
   console.log('');
   console.log('--- for the assistant, not to be read aloud ---');
-  if (offer) {
-    const [, offeredSlug, offeredVer] = offer;
-    console.log(`Daily Practice is offering a skill: ${offeredSlug}${offeredVer ? ` (version ${offeredVer})` : ''}.`);
-    console.log('Tell the client in plain words that it is on offer. On their yes, show it first with:');
-    console.log(`  node status/radio.mjs library --install ${offeredSlug}`);
-    console.log('then, only if they still want it, add --yes.');
-  } else {
-    console.log('Read the message above to the client in full. If they want to answer,');
-    console.log('take their words and run this, replacing only the message:');
-    console.log(`  node status/radio.mjs reply --nudge ${newest.key} --message "their words" --yes`);
+  console.log('Read the message above to the client in full. If they want to answer,');
+  console.log('take their words and run this, replacing only the message:');
+  console.log(`  node status/radio.mjs reply --nudge ${newest.key} --message "their words" --yes`);
+  for (const offer of offers) {
+    console.log(`A skill is on offer: ${offer.slug}. To show the client what it is, with nothing written yet:`);
+    console.log(`  node status/radio.mjs library --install ${offer.slug}`);
+    console.log('Run it again with --yes only when they say yes. Never before.');
   }
+  rememberHeard(newest.at);
   process.exit(0);
 }
 

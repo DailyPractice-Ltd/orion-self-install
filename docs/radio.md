@@ -1,6 +1,6 @@
-# The radio — your harness's check-in with Daily Practice, in plain words
+# The radio — Orion's check-in with Daily Practice, in plain words
 
-Your harness can keep a small two-way radio open with Daily Practice. This page is the
+Orion can keep a small two-way radio open with Daily Practice. This page is the
 whole story of what that means — what goes out, what comes in, how to say no, and what
 saying no changes (nothing else). It is the plain-words version of the constitution's
 Article V, channel 1; there is no fine print anywhere else.
@@ -56,6 +56,13 @@ radio, reads anything waiting out loud, and asks what you'd like to do. **A repl
 sent only when you say yes, in that conversation, and it's your words that go.** No
 reply happens on its own.
 
+Sometimes the message is an offer: a skill from the Daily Practice library. Your AI
+tells you which skill it is, what it needs and where it would go. Nothing is written
+until you say yes.
+
+Each message is read to you once. Your harness remembers what you have already heard,
+so nothing is repeated at the next session.
+
 ## The choice, and how it's put to you
 
 During Press Start (or the first conversation, if you skipped the wizard), you're asked
@@ -100,7 +107,7 @@ code any time — it takes two seconds, and the new one replaces the old.
 
 Your key can be cancelled by Daily Practice and reissued (say, if it ever leaked). When
 that happens the wizard notices by itself the next time you run it and simply asks for a
-new code. If the radio address doesn't answer, nothing is lost — your harness carries on
+new code. If the radio address doesn't answer, nothing is lost — Orion carries on
 and tries at the next natural moment.
 
 ## If the radio can't get through

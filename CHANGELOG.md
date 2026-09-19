@@ -17,6 +17,18 @@ Write each section for the client who will read it there.
 ---
 
 
+## 0.6.2 — 2026-09-19
+
+**"Send this skill to the library" now reaches for the right lane.**
+
+- `AGENTS.md`: the phrases a client actually uses — "send this skill to Daily
+  Practice", "push it to the library", "contribute this skill" — now route to
+  `contribute`, never to `send` or `reply`. `send` and `reply` are stated to
+  carry a person's words only, never a skill or a file.
+- `status/radio.mjs`: a backstop. If `send` or `reply` is handed something that
+  looks like a skill file (YAML frontmatter naming the skill), it refuses and
+  points at `contribute` instead of stuffing it into a 4000-character message.
+
 ## 0.6.1 — 2026-09-18
 
 **A skill can go back up the radio, and an offer reads as an offer.**

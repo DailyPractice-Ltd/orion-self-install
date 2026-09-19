@@ -84,7 +84,10 @@ available, and that promise is made to every reader in `README.md` — keep it.
    (`node status/radio.mjs reply --nudge <id> --message "…" --yes`). If they want to
    raise something with nothing to reply to, that is
    `node status/radio.mjs send --message "…" --yes` — same rule, their words, their
-   yes. On a surface that can't
+   yes. **`send` and `reply` carry a person's words and nothing else — never a skill,
+   a file, or the contents of one. If the client wants to send a skill to Daily
+   Practice or the library, that is `contribute` (step 3c), never `send`.** On a
+   surface that can't
    run commands, skip this quietly — Daily Practice reaches those clients by email
    instead; never pretend to have checked. **A fourth case is never silent**: if the
    radio is on and you can run scripts but the command prints "The radio address didn't
@@ -217,12 +220,17 @@ one:
    reports the shelf itself. Then smoke-test it on something real before saying it
    works.
 
-3c. **When the client wants to give a skill back**, offer it up with
-   `node status/radio.mjs contribute --slug <slug>` — with no `--yes` it shows what
-   would be sent. Tell the client in your own plain words what they are offering, and
-   run it again with `--yes` only on their word. It sends that skill's `SKILL.md` for
-   a Daily Practice curator to read; nothing is published by sending it, and nothing
-   leaves the machine without their yes.
+3c. **When the client wants to send a skill up to Daily Practice or the library** —
+   "send this skill to Daily Practice", "send it to the library", "push this to the
+   library", "contribute this skill", "offer this skill up", "give this skill back",
+   or any wording that means a skill (not a message) going *to* the library — the
+   command is **`node status/radio.mjs contribute --slug <slug>`**, never `send` and
+   never `reply`. With no `--yes` it shows what would be sent. Tell the client in your
+   own plain words what they are offering, and run it again with `--yes` only on their
+   word. It sends that skill's `SKILL.md` for a Daily Practice curator to read;
+   nothing is published by sending it, and nothing leaves the machine without their
+   yes. (A skill is more than one file — a `reference.md`, a script — only its
+   `SKILL.md` travels this way for now; say so if the skill has other files.)
 
 4. If the radio is on and you can run scripts, report it to the shelf:
    `node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>` —

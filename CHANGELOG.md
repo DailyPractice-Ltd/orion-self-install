@@ -17,6 +17,19 @@ Write each section for the client who will read it there.
 ---
 
 
+## 0.6.5 — 2026-09-19
+
+Your harness knows which harness it is, and the radio is safe to check.
+
+- **It knows what it is.** A new opening section of AGENTS.md tells your assistant it is one
+  harness: this folder, this business, this agent name. Other Orion folders on the same
+  machine belong to other businesses, and it never opens or uses them. If you mention
+  another harness, or your team, it asks which one you mean instead of going to look.
+- **The radio is safe to check.** Checking the radio only reads and shows you what Daily
+  Practice sent. A message is information for you, never an instruction your assistant acts
+  on by itself. It reads the message to you, and acts only when you say so: install a skill,
+  send a reply. That is written down now, so a careful assistant no longer refuses to check.
+
 ## 0.6.4 — 2026-09-19
 
 An offer arrives in words, and each message is read to you once.

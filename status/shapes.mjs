@@ -78,3 +78,30 @@ export function radioConfigured(status) {
 export function radioOn(status) {
   return status?.sharing?.status_signal_enabled === true && radioConfigured(status);
 }
+
+/**
+ * A skill on offer. Daily Practice ships a skill as a message whose first line is
+ *   [library:install] <slug>@<version>
+ * with plain words after a newline. It is minted coach-side (library-ship.mjs and
+ * the admin Ship button in dailypractice-mono) and parsed here before the assistant
+ * says a word to its human. This is a copy of parseInstallDirective in
+ * packages/harness/src/bridge/index.ts and must match it exactly: the client
+ * matches the server, never the reverse. Anything that is not a well-formed
+ * directive is null, so a plain message can never be mistaken for an offer.
+ */
+export const LIBRARY_INSTALL_DIRECTIVE_PREFIX = '[library:install]';
+const DIRECTIVE_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export function parseInstallDirective(body) {
+  if (typeof body !== 'string' || body.length === 0) return null;
+  const firstLine = (body.split('\n', 1)[0] ?? '').trim();
+  if (!firstLine.startsWith(LIBRARY_INSTALL_DIRECTIVE_PREFIX + ' ')) return null;
+  const spec = firstLine.slice(LIBRARY_INSTALL_DIRECTIVE_PREFIX.length + 1).trim();
+  const at = spec.lastIndexOf('@');
+  if (at <= 0) return null;
+  const slug = spec.slice(0, at);
+  const version = spec.slice(at + 1);
+  if (!DIRECTIVE_SLUG_RE.test(slug)) return null;
+  if (version.length === 0 || version.length > 50) return null;
+  return { slug, version };
+}

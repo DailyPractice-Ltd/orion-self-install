@@ -212,13 +212,14 @@ one:
    line is true.
 3. Only then record it in `status/status.json` under `packages.<slug>` (`kind`,
    `version`, `installed_at`, `smoke_test_passed: true`).
-3b. **When Daily Practice offers a skill over the radio**, collect it with
-   `node status/radio.mjs library --install <slug>` — with no `--yes` it only shows
-   what the skill is, what it needs, and where it would go. Tell the client that in
-   your own plain words, and run it again with `--yes` only if they want it. It writes
-   `.claude/skills/<slug>/SKILL.md`, never overwrites a skill they already have, and
-   reports the shelf itself. Then smoke-test it on something real before saying it
-   works.
+3b. **When Daily Practice offers a skill over the radio**, `check` says so in plain
+   words (which skill, which version) and prints the exact command under its fence:
+   `node status/radio.mjs library --install <slug>`. With no `--yes` that command only
+   shows what the skill is, what it needs, and where it would go. Tell the client that
+   in your own plain words, and run it again with `--yes` only if they want it. It
+   writes `.claude/skills/<slug>/SKILL.md`, never overwrites a skill they already
+   have, and reports the shelf itself. Then smoke-test it on something real before
+   saying it works.
 
 3c. **When the client wants to send a skill up to Daily Practice or the library** —
    "send this skill to Daily Practice", "send it to the library", "push this to the

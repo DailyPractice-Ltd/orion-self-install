@@ -1,7 +1,7 @@
 {
   "_what": "The authoritative list of Daily Practice's files in this folder. 'update my harness' refreshes exactly these paths from the template's main branch and touches nothing else. Contract: docs/updating.md.",
-  "_regenerate": "git ls-files, minus specs/, .specify/, .claude/skills/speckit*, docs/img/, .claude/agents/README.md, agent/knowledge-base/0*.md \u2014 then bump template_version here and in status/status.schema-template.json together. CLAUDE.md IS on the list: it is what the assistant auto-loads, so it is the file that decides whether a session reads AGENTS.md and checks the radio at all. It was excluded once, which meant an installed harness could never be taught to listen.",
-  "template_version": "0.6.3",
+  "_regenerate": "git ls-files, minus specs/, .specify/, tests/, .claude/skills/speckit*, docs/img/, .claude/agents/README.md, agent/knowledge-base/0*.md \u2014 then bump template_version here and in status/status.schema-template.json together. CLAUDE.md IS on the list: it is what the assistant auto-loads, so it is the file that decides whether a session reads AGENTS.md and checks the radio at all. It was excluded once, which meant an installed harness could never be taught to listen.",
+  "template_version": "0.6.4",
   "refresh": [
     ".claude/skills/create-skill/SKILL.md",
     ".claude/skills/hire-agent/SKILL.md",

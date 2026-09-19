@@ -113,7 +113,7 @@ already marks done.
 **Runs**: the radio (`status/radio.mjs` + `emit-status.mjs`), against the trigger table
 in `docs/radio.md`.
 
-**Steps**: with the radio on (check-ins enabled + welcome-pack values in
+**Steps**: with the radio on (check-ins enabled + the pairing values in
 `status/status.json` → `sharing`), (a) advance to any new stage — an
 `install_checkpoint` goes out; (b) complete one real, approved task (VT-03's approve
 path is perfect) and fire its one matching signal

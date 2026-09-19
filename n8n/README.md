@@ -60,8 +60,9 @@ model, and this is that. It only needs doing once.
      Same prompt your chat agent uses — one identity, two surfaces.
    - `BRIDGE_URL` + `HARNESS_ID` + `INSTALL_TOKEN` — only if you said yes to
      check-ins: the same three values the wizard saved into
-     `status/status.json` → `sharing` (radio address, harness id, and the key from
-     your welcome pack — treat the key like a password). They power the one
+     `status/status.json` → `sharing` (radio address, harness id, and the key Daily
+     Practice sent back when you entered your pairing code — treat it like a
+     password). They power the one
      "Radio signal" node in each workflow, which ships **disabled**; enable it only
      when the radio is on. It fires on the approved branch only and reports that a
      run completed — type and timestamp, never content.

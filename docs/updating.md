@@ -78,11 +78,22 @@ any fetch prints a network failure, apply `agent/adapters/codex.md`'s sandbox fi
 template, stop honestly: `docs/radio.md`, "If the radio can't get through" — the same
 one-line IT ask unblocks both.
 
-**1. Fetch the manifest from main — always main's copy, never the local one.**
-`https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/main/update/manifest.json`
-The local manifest describes the version you HAVE; main's describes the version you're
-getting. Files added since this install exist only in main's list — fetching the local
-one would miss them, which is exactly the failure this rule prevents.
+**1. Resolve main's current commit, then fetch the manifest pinned to it.**
+First read the commit `main` points at right now:
+`https://api.github.com/repos/DailyPractice-Ltd/orion-self-install/commits/main` — take
+the `sha`. Call it COMMIT. (If that request fails, fall back to the literal `main` in
+every URL below and carry on — you keep the update, you lose only the freshness
+guarantee.) Then fetch the manifest at that commit:
+`https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/{COMMIT}/update/manifest.json`
+
+Pin to the commit, never the bare `main`, for two reasons. `raw.githubusercontent.com`
+caches the `main` ref for five minutes, so a release made in the last few minutes still
+serves the old manifest and looks like "nothing to update" — a commit URL is always
+fresh. And every file in step 4 is fetched from this same COMMIT, so an update can never
+mix a new manifest with old file bodies. The local manifest describes the version you
+HAVE; the commit's describes the version you're getting. Files added since this install
+exist only in the commit's list — fetching the local one would miss them, which is
+exactly the failure this rule prevents.
 
 **2. Compare versions — never roll back.** Read `template_version` from the fetched
 manifest and from `status/status.json`.
@@ -96,7 +107,8 @@ that exists locally into it, preserving paths. This is the undo. Do not skip it 
 the update "looks small."
 
 **4. Refresh, allowlist only.** For each path in the manifest's `refresh` list: fetch
-`https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/main/{path}`
+`https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/{COMMIT}/{path}`
+— the same COMMIT resolved in step 1, so every file comes from one consistent snapshot —
 and replace the local file (create it if it is new to this version). Two rules with no
 exceptions:
 - **A path not on the list is never written.** Not "also tidied," not "while we're

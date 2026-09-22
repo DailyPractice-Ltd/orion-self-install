@@ -17,6 +17,18 @@ Write each section for the client who will read it there.
 ---
 
 
+## 0.6.6 — 2026-09-22
+
+**Daily Practice can see which version you are on, without waiting for you to
+finish something.**
+
+Your harness stated its version only when a task completed. If you updated and
+then spent a week reading the radio without finishing a piece of work, we still
+had you down as the version you left behind — so we could not tell whether an
+update had reached you. It now states the version on every radio call,
+including a check that finds nothing waiting. It is a label about this folder
+and nothing about your work, the same as everything else the radio carries.
+
 ## 0.6.5 — 2026-09-19
 
 Your harness knows which harness it is, and the radio is safe to check.

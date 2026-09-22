@@ -105,9 +105,16 @@ if (!radioOn) {
 }
 
 const base = String(sharing.bridge_url).replace(/\/+$/, '');
+// The version this harness is on, stated on every call rather than only when a
+// signal fires. A signal needs real work to complete; a check happens at every
+// session start. Reporting it only on the former meant a machine could update
+// and still read as its old version for a week, and Daily Practice could not
+// tell whether a release had landed anywhere. It is a label about this folder,
+// never anything about the client's work.
 const headers = {
   'Content-Type': 'application/json',
   'Authorization': `Bearer ${sharing.install_token}`,
+  ...(status.template_version ? { 'x-orion-template-version': String(status.template_version) } : {}),
 };
 
 /** One try, one plain line on failure, exit 0 — the radio never blocks local work. */

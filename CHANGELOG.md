@@ -16,6 +16,30 @@ Write each section for the client who will read it there.
 
 ---
 
+## Releases now run on a train
+
+From 23 September 2026 this repo ships **one release a month, on the last
+Thursday**, and a version number moves only when it passes the three gates in
+[`docs/release-policy.md`](docs/release-policy.md): a named problem, evidence
+from a real machine, and a tag with plain-words notes.
+
+**First train: Thursday 29 October 2026.** September's train is deliberately
+skipped. Nothing currently in `main` passes gate 2.
+
+**0.6.0 through 0.6.6 were shipped without a train and were never tagged.** No
+harness ever ran any of them. They are kept below as a record of the work, not
+as releases anyone is asked to adopt. Their contents go out together, once, at
+the first train that can show evidence for them.
+
+Anything that lands between trains collects under `## Unreleased` and does not
+move the version.
+
+## Unreleased
+
+Nothing yet for the 29 October train.
+
+---
+
 
 ## 0.6.6 — 2026-09-22
 

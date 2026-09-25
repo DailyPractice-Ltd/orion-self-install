@@ -117,12 +117,15 @@ commitments (knowledge base); their name or business name (status.json); machine
 (machine profile); timezone (schedule times are "your time" by construction).
 
 Then the **job sheet readback**: the whole agent file in plain words — job, must-nots,
-schedule, the report line, "starts on probation: reads and stages only" — and, when
-check-ins are on, the exact purpose sentence, word for word: *"One sentence goes to
-Daily Practice as what this agent is for: '{purpose — ≤140 chars, about the agent,
-never a person, company, or number}'."* — ending *"Say yes and I'll hire them."* That
-yes gates all file creation and is the yes that covers sending that sentence
-(constitution Article V, Tier 3). Machine-changing steps after
+schedule, the report line, "starts on probation: reads and stages only" — and the
+exact purpose sentence, word for word: *"One sentence describes what this agent is
+for: '{purpose — ≤140 chars, about the agent, never a person, company, or number}'.
+If your check-ins are on, that exact sentence goes to Daily Practice."* — ending
+*"Say yes and I'll hire them."* That yes gates all file creation and is the yes that
+covers sending that sentence (constitution Article V, Tier 3). The sentence is
+composed and approved whether or not check-ins are on — it lives in the agent file's
+`purpose:` line, so a later session (step 8, a promotion, check-ins switched on)
+sends the approved words, never a reconstruction. Machine-changing steps after
 it (the scheduled task especially) still get their own explicit yes.
 
 ### The job sheet — the agent file template
@@ -136,6 +139,7 @@ description: Use when {delegation trigger from Q1/Q5}. {One-sentence job}. Lists
 tools: {comma-separated allowlist from Q2, least privilege}
 skills: [{role skill, if extracted — else omit this key}]
 role: {bank slug from library/ROLES.md, or custom}
+purpose: "{the approved one-sentence purpose from the readback — the exact words the shelf report sends}"
 status: probation
 go_live: false
 schedule: "{weekdays 07:00 local | after: {upstream-agent}}"
@@ -228,7 +232,8 @@ not the runtime. Both facts are fine, and stated.
    aligned.)
 5. **Record it** in `status/status.json`:
    `packages.{name} = { kind: "agent", role: "{bank slug or custom}",
-   version: "0.1.0", installed_at: now, smoke_test_passed: false }`. While steps 2–8 are in flight, keep a top-level
+   purpose: "{the approved sentence}", version: "0.1.0", installed_at: now,
+   smoke_test_passed: false }`. While steps 2–8 are in flight, keep a top-level
    `notes` string in status.json — "hire in progress: {name}, next step N" — and
    clear it at step 9.
 6. **Wire the shift** — show the client the exact task first; a scheduled task is a
@@ -275,8 +280,9 @@ not the runtime. Both facts are fine, and stated.
    and the wiring run's line says `auto-test:`). Now the shelf —
    Daily Practice's record of what this machine runs:
    `node status/radio.mjs report-install --slug {name} --kind agent --version 0.1.0
-   --role {bank slug or custom} --purpose "{the job in one sentence, ≤140 chars —
-   about the agent only, never a person, company, or number}"`.
+   --role {the agent file's role line} --purpose "{the agent file's purpose line,
+   verbatim — the words the client approved in the readback, never a
+   reconstruction}"`.
    The role and purpose are how the bank in `library/ROLES.md` becomes
    evidence-based over time: labels, never content.
    Radio off → both skip, and say so **once, here only**: "Your check-ins are off, so
@@ -318,8 +324,9 @@ only if the new duty needs it — least privilege, never "while we're in here"; 
 `description` if the summons changes; bump the minor version; append a changelog line
 (`- 0.2.0 — {date} — Also {Y} (promoted).`); mirror the version into
 `packages.{name}.version`; smoke-test **the new duty only**; re-report the shelf with
-the same `--role` and `--purpose` as the hire (updating the purpose sentence — and
-re-reading it back for a yes — only if the job materially changed).
+the agent file's own `role:` and `purpose:` lines (updating the purpose sentence —
+and re-reading it back for a yes — only if the job materially changed; the file's
+line is always what is sent).
 
 Guardrails only ever grow in a promotion. Removing one requires the client saying so
 explicitly, and gets its own changelog line. If the new duty adds standing writes,

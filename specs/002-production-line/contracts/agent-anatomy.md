@@ -38,13 +38,15 @@ Path `.claude/agents/<name>.md`. Frontmatter keys, all lowercase:
 | `tools` | comma-separated allowlist | Claude Code |
 | `skills` | list of role-skill names; omit if none | Claude Code |
 | `role` | a `library/ROLES.md` slug \| `custom` | humans + shelf reports |
+| `purpose` | the client-approved one-sentence purpose (≤140 chars), verbatim | humans + shelf reports (the exact words sent) |
 | `status` | `probation` \| `hired` | humans + this workflow |
 | `go_live` | `false` \| `true` | humans + this workflow |
 | `schedule` | `"weekdays HH:MM local"` \| `"after: <upstream>"` | humans + this workflow |
+| `memory` | notebook areas the agent reads/writes (feature 003, `docs/memory.md`) | status/memory.mjs + humans |
 | `version` | semver, starts `0.1.0` | humans + shelf reports |
 
 The honesty split is deliberate and stated in HIRING.md: the first four keys are
-runtime-live; the last five are workflow-live. Neither set is decorative.
+runtime-live on Claude Code; the rest are workflow-live. Neither set is decorative.
 
 Body sections, in order: `The job` · `What you must not do` · `Training` ·
 `The schedule` · `The report` · `Probation and GO-LIVE` · `Changelog`.
@@ -100,7 +102,8 @@ bespoke variant must take a different name.
 ## Bookkeeping (which copy wins)
 
 `status/status.json` `packages.{name}` is **truth** (`kind: "agent" | "skill"`,
-`role` for agents — a `library/ROLES.md` slug or `custom` — semver
+`role` and `purpose` for agents — a `library/ROLES.md` slug or `custom`, and the
+client-approved sentence — semver
 from `0.1.0`, `installed_at`, `smoke_test_passed`); the map's meaning widens from
 "installed library packages" to "installed capabilities, library or bespoke". A
 bespoke hire's entry is written **at hire** with `smoke_test_passed: false` and flips

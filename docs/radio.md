@@ -25,6 +25,8 @@ Three tiers, by how your yes is given — and nothing besides:
 4. **Which template version this folder is on** — stated on every radio call, so
    Daily Practice can tell whether an update reached you. A label about this folder,
    never about your work.
+5. **Messages arriving from Daily Practice** — the inbound half (see "What comes
+   in"). Reading a message out sends nothing back.
 
 **Tier 2 — your words, your yes each time**: your replies, and messages you choose to
 start. Your sentences, sent only when you say yes in that conversation — never
@@ -97,8 +99,9 @@ you're never asked again.
 
 - **At the wizard**: answer `n` to "Keep check-ins on?" — done.
 - **Any time after**: open `status/status.json` (a plain text file in this folder) and
-  change `"status_signal_enabled": true` to `false`. That single edit switches off all
-  four message kinds at once.
+  change `"status_signal_enabled": true` to `false`. That single edit silences the
+  radio entirely — every message in the table above, all three tiers, outbound and
+  inbound alike.
 
 **What changes when the radio is off: nothing else.** Every agent, package, workflow,
 and validation task works identically. The only difference is that Daily Practice can't

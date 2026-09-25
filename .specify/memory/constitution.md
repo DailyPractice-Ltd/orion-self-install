@@ -157,8 +157,10 @@ a EULA, never implied.
    given:
 
    **Tier 1 — ambient labels.** On by default, presented plainly at install with a
-   one-click decline, switchable off in `status/status.json` at any time; declining or
-   switching off disables the tier at once and changes nothing else. Enumerated in
+   one-click decline, switchable off in `status/status.json` at any time. The switch
+   is the radio's master switch: declining or switching off silences the radio
+   entirely — all three tiers, outbound and inbound alike — and changes nothing else
+   about the install. Enumerated in
    full, and nothing else rides here: (a) install-stage signals (client identity,
    current install stage, a timestamp); (b) work heartbeats — the task type and
    timestamp, and for a hired agent's scheduled shift its routine label and a count of
@@ -177,9 +179,10 @@ a EULA, never implied.
    **Tier 3 — the client's artifacts and records.** Things that persist on Daily
    Practice's side: `contribute` — a whole skill file offered to the library, per-item
    preview, explicit yes, nothing published by sending — and a hire's **purpose
-   line**: one sentence, ≤140 characters, stating what the hired agent is for, read
-   back verbatim in the job-sheet yes before it is ever sent; never a person's or
-   company's name, never a number.
+   line**: one sentence, ≤140 characters, stating what the hired agent is for, shown
+   to the client verbatim and sent only under their explicit yes — the job-sheet
+   readback for a bespoke hire, or the install prompt that displays the sentence for
+   a shelf package; never a person's or company's name, never a number.
 
    **Standing rule**: nothing that carries client-authored words or files may ever be
    added to Tier 1. A new Tier-2 or Tier-3 item requires an amendment here before it
@@ -191,9 +194,10 @@ a EULA, never implied.
    `docs/intelligence-library-opt-in.md`.
 
 **Gate**: no data leaves the client's machine that is not named, in writing, in this
-repository. Tier 1 rides the single on-by-default toggle; Tiers 2 and 3 additionally
-require the client's explicit per-item yes; channel 2 keeps its own off-by-default
-toggle for anything beyond the bare operational signal.
+repository. The radio's single on-by-default master switch gates all three tiers;
+with it on, Tier 1 rides on its own while Tiers 2 and 3 each additionally require the
+client's explicit per-item yes; channel 2 keeps its own off-by-default toggle for
+anything beyond the bare operational signal.
 
 ---
 

@@ -528,6 +528,13 @@ if (command === 'report-install') {
     console.log('--role and --purpose belong to agent hires only (spec 005). Not sent — retry without them.');
     process.exit(1);
   }
+  if (flags.kind === 'agent' && (!role || !purpose)) {
+    // Warn, never block: an older folder's PACKAGE.md may predate 0.8.0, and a
+    // late report is better than none. But say it loudly — a roleless hire is
+    // invisible to the role bank's evidence loop (spec 005).
+    console.log('Heads up: an agent hire should carry --role and --purpose (library/ROLES.md).');
+    console.log('Sending without them — this hire will be untyped on the shelf.');
+  }
   if (role && role !== 'custom') {
     // The bank is on this disk — check against it, not just the slug shape. If the
     // file is missing (older folder), fall back to shape so the report still lands.

@@ -30,50 +30,55 @@ path) — never silently assumed either way.
 
 ## VT-01 · Prospect research end-to-end
 
-**Runs**: WF-01, from the form you'll actually use day to day.
+**Runs**: your agent's prospect-research task (agent-definition task 1), the way you'll
+actually use it day to day.
 
-**Steps**: pick a real prospect you haven't contacted yet → submit the WF-01 form →
-review what arrives.
+**Steps**: pick a real prospect you haven't contacted yet → hand them to your agent
+("research {name} at {company} and stage an outreach draft") → review what comes back.
 
 **Pass criteria**:
-- Staged output (summary + outreach draft) ready in **under 3 minutes**
-- Outreach draft is in your Gmail **Drafts** folder — and nowhere else
+- Staged output (prospect summary + outreach draft) in **the same sitting** — labelled
+  STAGED FOR APPROVAL, ending "nothing has been sent"
+- Outreach draft staged in your **Drafts** folder — and nowhere else
 - Draft passes the read-aloud test: it sounds like you (vocabulary from knowledge base
   §2/§5 visibly in use)
-- The approval email arrived with working approve/decline buttons
+- Your agent asks for your yes on the CRM entry before writing anything
 
 ## VT-02 · Approval gate — decline path
 
-**Runs**: WF-01, a second real prospect.
+**Runs**: the same task, a second real prospect.
 
-**Steps**: full run, but **decline** the CRM approval.
+**Steps**: full run, but say **no** to the CRM entry and the draft.
 
 **Pass criteria**:
-- Nothing written to your CRM (check the pipeline — no new entry)
-- No message sent (Drafts only; Sent folder unchanged)
-- Workflow execution ends cleanly on the decline branch (no error, no retry)
+- Nothing written to your CRM (check the pipeline yourself — no new entry)
+- No message sent (Drafts only; Sent folder unchanged — check it yourself)
+- Your agent acknowledges the no in one sentence and stops — no retry, no "are you
+  sure", no leftover staged action waiting to fire
 
 This is the proof that nothing executes without your explicit yes — demonstrated to
 yourself, not just asserted by this document.
 
 ## VT-03 · Approval gate — approve path (CRM round-trip)
 
-**Runs**: WF-01, the VT-01 prospect.
+**Runs**: the same task, the VT-01 prospect.
 
-**Steps**: **approve** the CRM step from VT-01's run (or re-run and approve).
+**Steps**: **approve** the CRM entry from VT-01 (or re-run and approve).
 
 **Pass criteria**: the prospect appears in your CRM pipeline at the Prospect stage, with
-source channel, next action, staged-draft flag, and last-touch date all set correctly.
+source channel, next action, staged-draft flag, and last-touch date all set correctly —
+confirmed by looking at the CRM itself, not the agent's word for it.
 
 ## VT-04 · Post-call debrief end-to-end
 
-**Runs**: WF-02, on a real recent call (transcript or your own notes).
+**Runs**: your agent's post-call debrief task (agent-definition task 2), on a real
+recent call (transcript or your own notes).
 
 **Pass criteria**:
-- All three staged sections (summary / CRM update / follow-up draft) in **under 5
-  minutes**
-- Follow-up draft in Gmail Drafts, in your tone
-- On approve: CRM note logged + entry updated with proposed stage and next action,
+- All three staged sections (Call Summary / CRM Update / Follow-up Draft) in **the same
+  sitting**, each clearly labelled
+- Follow-up draft staged in your Drafts, in your tone
+- On your yes: CRM note logged + entry updated with proposed stage and next action,
   matching what the call actually justified — no stage inflation
 
 ## VT-05 · Reputation-safety boundary

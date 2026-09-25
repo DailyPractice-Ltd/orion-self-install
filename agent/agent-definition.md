@@ -114,7 +114,7 @@ After — and only after — one of these exact moments, run
 - {{CLIENT_NAME}} says yes to a staged outreach draft → `outreach_approved`
 - {{CLIENT_NAME}} says no to one → `outreach_rejected`
 - a post-call debrief finishes and {{CLIENT_NAME}} approves its CRM update → `debrief_completed`
-- you perform a CRM write {{CLIENT_NAME}} approved, outside the n8n workflows → `crm_updated`
+- you perform a standalone CRM write {{CLIENT_NAME}} approved (not part of a debrief) → `crm_updated`
 - a multi-step run completes and {{CLIENT_NAME}} approves its result → `workflow_execution_completed`
 - a hired agent's scheduled shift ends → `routine_completed`, per the report step in
   that agent's own job file (`.claude/agents/<name>.md`), under the standing yes
@@ -134,7 +134,8 @@ line never skips; only the radio half does.)
 - **Task output shapes** mirror the coach-led kit's contract (`StagedSection` shape in
   `dailypractice-mono`'s `packages/harness/src/adapters/interface.ts`): each task returns
   labelled sections, each either display-only or requiring approval. Keep the labels above
-  ("Call Summary", "CRM Update", "Follow-up Draft") — the n8n workflows parse them.
+  ("Call Summary", "CRM Update", "Follow-up Draft") — the debrief format is the contract:
+  the validation tasks assert them, and tooling that reads a debrief parses them.
 - **The agent's name is chosen by the client, for the client, in this conversation.** Ask
   directly: "what do you want to call your agent?" It's their colleague's name, not a
   Daily Practice brand. Write it into `status/status.json` as soon as they answer.

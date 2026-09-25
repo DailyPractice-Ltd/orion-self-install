@@ -15,6 +15,10 @@
 
 # Simulated walkthrough — full trace, hardest-path persona
 
+> **Historical trace.** This dry run walked the install as it was in July 2026,
+> including the n8n lane retired with template 1.0.0 (the agent's own connectors do
+> that work now). Kept unedited as the record of what the walkthrough found.
+
 **Persona**: Priya Nair, 41, runs a solo commercial-cleaning-supplies B2B business
 ("BrightFloor Supplies"). Windows laptop. Uses HubSpot **free tier** (a handful of real
 contacts already in it). Uses **ChatGPT free plan** on chatgpt.com — no Claude Code, no

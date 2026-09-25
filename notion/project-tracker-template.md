@@ -35,7 +35,6 @@ the client actually looks at daily.
 ### 🔗 Quick Links
 
 - Their CRM (Attio or HubSpot, or wherever their pipeline lives)
-- Their n8n workspace
 - This repository (their local copy)
 - Support: **support@dailypractice.world**
 

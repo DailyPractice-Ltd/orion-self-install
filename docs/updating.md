@@ -101,10 +101,10 @@ manifest and from `status/status.json`.
 - Fetched older than local (should never happen against main) → **stop**, touch
   nothing, and say so plainly. An update never goes backwards.
 
-**3. Back up before anything is replaced.** Create
+**3. Back up before anything is replaced or removed.** Create
 `.update-backup/{local-version}-{YYYY-MM-DD}/` and copy every file on the refresh list
-that exists locally into it, preserving paths. This is the undo. Do not skip it because
-the update "looks small."
+**and every file on the `remove` list** that exists locally into it, preserving paths.
+This is the undo. Do not skip it because the update "looks small."
 
 **4. Refresh, allowlist only.** For each path in the manifest's `refresh` list: fetch
 `https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/{COMMIT}/{path}`
@@ -117,6 +117,15 @@ exceptions:
   the client's business or personal name (someone hand-edited what should never have
   been), stop for that file, show the client the difference, and let them choose. The
   backup already holds their copy either way.
+
+**4b. Prune, remove-list only.** If the fetched manifest has a `remove` list: delete
+each named path that exists locally (its copy is already in the backup from step 3), and
+tell the client in one plain sentence what was retired and why the release notes say so.
+If it has `remove_status_checklist_keys`: delete those keys from `status/status.json`'s
+`checklist` (they described steps that no longer exist). The same two rules apply in
+reverse: **a path not on the `remove` list is never deleted** — not "also tidied" — and
+a file the client visibly personalised gets the same tripwire: show them, let them
+choose, the backup holds it either way.
 
 **5. Prove the scripts survived the trip.** Run `node --check` on every `.mjs` file
 just fetched. A truncated download must fail here, loudly, not at 07:00 tomorrow. On

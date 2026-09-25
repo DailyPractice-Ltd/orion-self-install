@@ -45,6 +45,8 @@ const BASELINE_TAG = 'v0.5.3';
 
 const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
 const REFRESH = manifest.refresh;
+const REMOVE = manifest.remove || [];
+const REMOVE_KEYS = manifest.remove_status_checklist_keys || [];
 const TARGET_VERSION = manifest.template_version;
 
 function haveBaselineTag() {
@@ -132,11 +134,25 @@ function runUpdate(dir, { honourTripwire = true } = {}) {
     (existed ? refreshed : created).push(rel);
   }
 
+  // Step 4b: prune, remove-list only — backup first (step 3), then delete.
+  const removed = [];
+  for (const rel of REMOVE) {
+    const dest = join(dir, rel);
+    if (!existsSync(dest)) continue;
+    const bk = join(backupDir, rel);
+    mkdirSync(dirname(bk), { recursive: true });
+    copyFileSync(dest, bk);
+    backedUp.push(rel);
+    rmSync(dest);
+    removed.push(rel);
+  }
+
   const status = JSON.parse(readFileSync(join(dir, 'status/status.json'), 'utf8'));
+  for (const key of REMOVE_KEYS) delete (status.checklist || {})[key];
   status.template_version = TARGET_VERSION;
   writeFileSync(join(dir, 'status/status.json'), JSON.stringify(status, null, 2));
 
-  return { backupDir, backedUp, created, refreshed, tripped, from: localVersion };
+  return { backupDir, backedUp, created, refreshed, tripped, removed, from: localVersion };
 }
 
 test('0.5.3 genuinely lacks the update layer — the paste is the only way through', (t) => {
@@ -193,6 +209,31 @@ test('every shipped script still parses after the trip', (t) => {
     const r = spawnSync(process.execPath, ['--check', join(dir, rel)], { encoding: 'utf8' });
     assert.equal(r.status, 0, `node --check failed for ${rel}: ${r.stderr}`);
   }
+});
+
+test('the prune retires the n8n lane: files gone, backed up, checklist keys dropped', (t) => {
+  if (!haveBaselineTag()) return t.skip(`${BASELINE_TAG} not fetched`);
+  const dir = makeClient();
+  // A 0.5.3 tree genuinely has the lane this release removes.
+  assert.ok(existsSync(join(dir, 'n8n/README.md')), '0.5.3 baseline should ship n8n/');
+  const before = JSON.parse(readFileSync(join(dir, 'status/status.json'), 'utf8'));
+  assert.ok('n8n_wf01_imported' in before.checklist, 'baseline checklist should carry the key');
+
+  const { backupDir, removed } = runUpdate(dir);
+
+  assert.ok(REMOVE.length >= 3, 'this release names the three n8n files to remove');
+  for (const rel of REMOVE) {
+    assert.equal(existsSync(join(dir, rel)), false, `${rel} should be pruned`);
+    assert.ok(existsSync(join(backupDir, rel)), `${rel} pruned without a backup`);
+  }
+  assert.deepEqual(removed.sort(), [...REMOVE].sort());
+
+  const after = JSON.parse(readFileSync(join(dir, 'status/status.json'), 'utf8'));
+  for (const key of REMOVE_KEYS) {
+    assert.equal(key in after.checklist, false, `${key} should be dropped from checklist`);
+  }
+  // The keys the release did not name survive untouched.
+  assert.ok('connector_crm_live' in after.checklist, 'unrelated checklist keys must survive');
 });
 
 test('the tripwire stops on a Daily Practice file the client hand-edited', (t) => {

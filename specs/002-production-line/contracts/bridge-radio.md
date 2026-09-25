@@ -57,9 +57,10 @@ checklist is resolved at the bottom.
   `occurred_at` is reserved inside payload (the server stores the top-level value
   there itself).
 - Senders today: the wizard (first `install_checkpoint` on accepting check-ins),
-  `status/emit-status.mjs` (`install_checkpoint` on ops-stage change),
-  `status/radio.mjs signal --type <t>`, and the (disabled-by-default) "Radio signal"
-  node in each n8n workflow.
+  `status/emit-status.mjs` (`install_checkpoint` on ops-stage change), and
+  `status/radio.mjs signal --type <t>`. (A fourth sender, the n8n workflows'
+  disabled-by-default "Radio signal" node, was retired with template 1.0.0 — it never
+  ran in the field.)
 
 ### When each type fires (the canonical trigger table — P2 discipline)
 
@@ -71,11 +72,11 @@ touch the radio. Plain-words mirror: `docs/radio.md`.
 | Type | Exact moment | Sender |
 |---|---|---|
 | `install_checkpoint` | wizard opt-in accepted; `ops_stage` transition | `start.mjs` / `emit-status.mjs` (wired, automatic) |
-| `workflow_execution_completed` | a multi-step run completes **after the client approved its result** (e.g. wf-01's approved CRM log of a research run; an agent package's approved run) | n8n radio node / agent rule → `radio.mjs signal` |
+| `workflow_execution_completed` | a multi-step run completes **after the client approved its result** (e.g. an approved research run; an agent package's approved run) | agent rule → `radio.mjs signal` |
 | `outreach_approved` | the client's explicit **yes** to a staged outreach draft, witnessed in conversation | agent rule → `radio.mjs signal` |
 | `outreach_rejected` | the client's explicit **no** to a staged outreach draft | agent rule → `radio.mjs signal` |
-| `debrief_completed` | a post-call debrief completes **with the client's approved CRM update** (wf-02's approve branch, or the agent's chat-lane equivalent) | n8n radio node / agent rule |
-| `crm_updated` | a client-approved CRM write performed by the agent **outside** the n8n workflows | agent rule → `radio.mjs signal` |
+| `debrief_completed` | a post-call debrief completes **with the client's approved CRM update** (the agent's debrief task, client-approved) | agent rule |
+| `crm_updated` | a client-approved **standalone** CRM write by the agent (not part of a debrief — most specific type wins) | agent rule → `radio.mjs signal` |
 | `routine_completed` | a hired agent's scheduled shift completes — the standing yes was given once, at hire, on the job sheet naming the shift and its report (`agent-anatomy.md`). Covers the supervised first run at hire too; attended vs unattended is the shift-log marker's job (`auto:` / `auto-test:`), not the type's. Requires `payload.routine` + `payload.count`; the replay key includes the routine label so same-second shifts from different agents stay distinct rows | the shift's own report step → `radio.mjs signal` |
 
 On surfaces that can't run commands, agent-rule signals are skipped silently — same

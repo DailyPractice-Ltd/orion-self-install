@@ -3,7 +3,7 @@
 <!-- Capture prompts (delete once filled):
   - "What volume of [activity] feels comfortable per month?" → then: "+5% on that — deal?"
   - Agree each number explicitly, out loud (or in writing, if this is a chat). These get
-    wired into status/status.json's pacing and (if built) the n8n workflows — they are
+    wired into status/status.json's pacing and your hired agents' shifts — they are
     throughput targets, not aspirations.
   - Example shape: 100 IG DMs/mo, 7 blog posts/mo, 40 forum engagements/mo.
 -->

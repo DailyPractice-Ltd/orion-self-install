@@ -1,7 +1,7 @@
 {
   "_what": "The authoritative list of Daily Practice's files in this folder. 'update my harness' refreshes exactly these paths from the template's main branch and touches nothing else. Contract: docs/updating.md.",
-  "_regenerate": "git ls-files, minus specs/, .specify/, tests/, .claude/skills/speckit*, docs/img/, .claude/agents/README.md, agent/knowledge-base/0*.md \u2014 then bump template_version here and in status/status.schema-template.json together. CLAUDE.md IS on the list: it is what the assistant auto-loads, so it is the file that decides whether a session reads AGENTS.md and checks the radio at all. It was excluded once, which meant an installed harness could never be taught to listen.",
-  "template_version": "0.8.1",
+  "_regenerate": "git ls-files, minus specs/, .specify/, tests/, .claude/skills/speckit*, docs/img/, .claude/agents/README.md, agent/knowledge-base/0*.md — then bump template_version here and in status/status.schema-template.json together. CLAUDE.md IS on the list: it is what the assistant auto-loads, so it is the file that decides whether a session reads AGENTS.md and checks the radio at all. It was excluded once, which meant an installed harness could never be taught to listen.",
+  "template_version": "1.0.0",
   "refresh": [
     ".claude/skills/create-skill/SKILL.md",
     ".claude/skills/hire-agent/SKILL.md",
@@ -50,9 +50,6 @@
     "library/workflows/post-call-debrief/PACKAGE.md",
     "library/workflows/prospect-research-outreach/PACKAGE.md",
     "memory/README.md",
-    "n8n/README.md",
-    "n8n/wf-01-prospect-research-outreach.json",
-    "n8n/wf-02-post-call-debrief.json",
     "notion/project-tracker-template.md",
     "start.mjs",
     "status/emit-status.mjs",
@@ -65,13 +62,23 @@
     "validation/validation-tasks.md"
   ],
   "never_touch": {
-    "status/status.json": "the client's own record \u2014 pairing, stages, packages, choices",
+    "status/status.json": "the client's own record — pairing, stages, packages, choices",
     "status/shift-log.md": "the client's work history",
     "memory/ (everything but README.md)": "the client's own memory — facts, logs, lessons, the index; an update improves the notebook's binding, never its pages",
     "agent/knowledge-base/01..07*.md": "the client's business, captured in their words",
-    ".claude/agents/ (everything but nothing \u2014 the whole directory)": "the client's hired team; the roster README carries their rows",
+    ".claude/agents/ (everything but nothing — the whole directory)": "the client's hired team; the roster README carries their rows",
     ".claude/skills/ (any skill not in the refresh list)": "skills the client taught",
     ".update-backup/": "prior updates' safety copies",
-    "anything not in the refresh list": "the allowlist is the whole permission \u2014 no exceptions"
-  }
+    "anything not in the refresh list": "the allowlist is the whole permission — no exceptions"
+  },
+  "_remove": "Paths pruned on update, with the same backup-first safety as refresh (docs/updating.md step 3b/4b). A path lands here when a release retires it; it never returns to refresh.",
+  "remove": [
+    "n8n/README.md",
+    "n8n/wf-01-prospect-research-outreach.json",
+    "n8n/wf-02-post-call-debrief.json"
+  ],
+  "remove_status_checklist_keys": [
+    "n8n_wf01_imported",
+    "n8n_wf02_imported"
+  ]
 }

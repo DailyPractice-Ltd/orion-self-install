@@ -7,12 +7,14 @@ its job, its limits, its schedule, its report step. You are the manager — you 
 any job description, ask for a promotion, or fire someone by deleting their file.
 
 **No one hired yet.** Say **"I want to hire an agent"** and the interview starts —
-five questions, then your first team member is working the same session.
+you'll be offered the roles teams typically hire ([the bank](../../library/ROLES.md)),
+or just describe the work in your own words; five questions, then your first team
+member is working the same session.
 
 ## The team
 
-| Agent | Job | Shift | Status | Skill |
-|---|---|---|---|---|
+| Agent | Role | Job | Shift | Status | Skill |
+|---|---|---|---|---|---|
 
 ## What the team knows
 

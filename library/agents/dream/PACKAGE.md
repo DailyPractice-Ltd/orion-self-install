@@ -32,8 +32,9 @@ Hire the Dream agent from my Orion folder.
 3. Show me the job sheet, get my yes, then run the standard nine hire steps
    (roster, packages entry, wire the 02:00 shift, smoke test on tonight's real
    memory, report the install).
-4. Report the install if my check-ins are on:
-   node status/radio.mjs report-install --slug dream --kind agent --version 1.0.0
+4. Report the install if my check-ins are on (the purpose sentence below is what
+   gets sent — my yes to the job sheet covers it):
+   node status/radio.mjs report-install --slug dream --kind agent --version 1.0.0 --role custom --purpose "merges duplicate notes and keeps the team notebook's index honest"
 ```
 
 ## The shift — what the dream does, in order, every night

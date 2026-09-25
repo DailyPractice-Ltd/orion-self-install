@@ -56,13 +56,33 @@ Open with a readback, one message:
 
 ### The interview — five questions, one at a time
 
-**Q1 — the job.**
-> "What should this new team member take off your plate? Tell me like you'd brief a temp
-> on their first morning — what does a good day's work from them look like?"
+**Q1 — the role.** Open [`library/ROLES.md`](ROLES.md) silently first — the bank of
+jobs teams typically hire for. Offer it in the client's language, minus any role
+already on the roster, best fit for their pipeline first (knowledge base §4), up to
+six out loud:
 
-Derive the role title and the kebab-case name from the answer; confirm inline rather
-than asking separately: *"Sounds like a {title}. On the roster they'd be `@{name}` —
-good?"* Role agents get **job titles, not human names** — your assistant already has the
+> "Teams typically hire for jobs like these — {each: the role title, then its
+> 'what they do for you' in one clause}. Pick one, or describe the work in your own
+> words, like you'd brief a temp on their first morning."
+
+Two lanes out, both first-class:
+
+- **Picked from the bank** → confirm the tailored job rather than re-interviewing:
+  *"A {title} for {business} would {the role's job line, tailored to the knowledge
+  base}. Sound right, or anything you'd change?"* The role's sources pre-fill Q2 and
+  its typical shift pre-fills Q4 — offered as defaults to confirm, never assumed.
+  The job sheet records `role: {bank slug}`. Then confirm the roster name the same
+  way as the custom lane: *"On the roster they'd be `@{name}` — good?"* (default the
+  role's own slug when it's free; a head-start package install keeps the package's
+  slug). A role with a **Head start** line has a shelf package — offer that install
+  before a bespoke build.
+- **Described in their own words** → derive the role title and the kebab-case name
+  from the answer; confirm inline rather than asking separately: *"Sounds like a
+  {title}. On the roster they'd be `@{name}` — good?"* The job sheet records
+  `role: custom`. If the description lands within a clause of a bank role, say so
+  and offer its head start — but their words win.
+
+Role agents get **job titles, not human names** — your assistant already has the
 human name, and a roster of job titles reads like an org chart.
 
 **Q2 — sources and tools.**
@@ -97,8 +117,15 @@ commitments (knowledge base); their name or business name (status.json); machine
 (machine profile); timezone (schedule times are "your time" by construction).
 
 Then the **job sheet readback**: the whole agent file in plain words — job, must-nots,
-schedule, the report line, "starts on probation: reads and stages only" — ending *"Say
-yes and I'll hire them."* That yes gates all file creation. Machine-changing steps after
+schedule, the report line, "starts on probation: reads and stages only" — and the
+exact purpose sentence, word for word: *"One sentence describes what this agent is
+for: '{purpose — ≤140 chars, about the agent, never a person, company, or number}'.
+If your check-ins are on, that exact sentence goes to Daily Practice."* — ending
+*"Say yes and I'll hire them."* That yes gates all file creation and is the yes that
+covers sending that sentence (constitution Article V, Tier 3). The sentence is
+composed and approved whether or not check-ins are on — it lives in the agent file's
+`purpose:` line, so a later session (step 8, a promotion, check-ins switched on)
+sends the approved words, never a reconstruction. Machine-changing steps after
 it (the scheduled task especially) still get their own explicit yes.
 
 ### The job sheet — the agent file template
@@ -111,6 +138,8 @@ name: {name}
 description: Use when {delegation trigger from Q1/Q5}. {One-sentence job}. Lists and drafts only.
 tools: {comma-separated allowlist from Q2, least privilege}
 skills: [{role skill, if extracted — else omit this key}]
+role: {bank slug from library/ROLES.md, or custom}
+purpose: "{the approved one-sentence purpose from the readback — the exact words the shelf report sends}"
 status: probation
 go_live: false
 schedule: "{weekdays 07:00 local | after: {upstream-agent}}"
@@ -197,9 +226,13 @@ not the runtime. Both facts are fine, and stated.
    report") never earns a skill. If `library/skills/` already has the equivalent,
    install that package instead.
 4. **Append the roster row** to `.claude/agents/README.md`:
-   `@{name} | {one-line job} | {schedule} | Probation | /{skill or —}`.
+   `@{name} | {role title} | {one-line job} | {schedule} | Probation | /{skill or —}`.
+   (On a folder installed before 0.8.0 the roster header has no Role column — add the
+   column to the header and a `—` to any existing rows first, so the table stays
+   aligned.)
 5. **Record it** in `status/status.json`:
-   `packages.{name} = { kind: "agent", version: "0.1.0", installed_at: now,
+   `packages.{name} = { kind: "agent", role: "{bank slug or custom}",
+   purpose: "{the approved sentence}", version: "0.1.0", installed_at: now,
    smoke_test_passed: false }`. While steps 2–8 are in flight, keep a top-level
    `notes` string in status.json — "hire in progress: {name}, next step N" — and
    clear it at step 9.
@@ -246,7 +279,12 @@ not the runtime. Both facts are fine, and stated.
    signal (step 7's report step; its shift-log line says "first shift, supervised",
    and the wiring run's line says `auto-test:`). Now the shelf —
    Daily Practice's record of what this machine runs:
-   `node status/radio.mjs report-install --slug {name} --kind agent --version 0.1.0`.
+   `node status/radio.mjs report-install --slug {name} --kind agent --version 0.1.0
+   --role {the agent file's role line} --purpose "{the agent file's purpose line,
+   verbatim — the words the client approved in the readback, never a
+   reconstruction}"`.
+   The role and purpose are how the bank in `library/ROLES.md` becomes
+   evidence-based over time: labels, never content.
    Radio off → both skip, and say so **once, here only**: "Your check-ins are off, so
    Daily Practice won't see {name}'s reports — you will, in `status/shift-log.md`."
 9. **Close.** Teach the line: "`@{name}` summons them; `/{skill}` runs the judgment
@@ -285,7 +323,10 @@ A promotion **edits the agent's own file**: add the duty to *The job*; extend `t
 only if the new duty needs it — least privilege, never "while we're in here"; sharpen
 `description` if the summons changes; bump the minor version; append a changelog line
 (`- 0.2.0 — {date} — Also {Y} (promoted).`); mirror the version into
-`packages.{name}.version`; smoke-test **the new duty only**; re-report the shelf.
+`packages.{name}.version`; smoke-test **the new duty only**; re-report the shelf with
+the agent file's own `role:` and `purpose:` lines (updating the purpose sentence —
+and re-reading it back for a yes — only if the job materially changed; the file's
+line is always what is sent).
 
 Guardrails only ever grow in a promotion. Removing one requires the client saying so
 explicitly, and gets its own changelog line. If the new duty adds standing writes,

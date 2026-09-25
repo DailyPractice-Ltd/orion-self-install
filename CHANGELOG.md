@@ -17,6 +17,27 @@ Write each section for the client who will read it there.
 ---
 
 
+## 0.8.0 — 2026-09-25
+
+**Hiring now starts from the jobs sales teams actually hire for.**
+
+Saying "I want to hire an agent" used to open with a blank page: describe the
+job. If you sell for a living, a blank page is the wrong first question — you
+hire people by role. The interview now opens with the role bank
+(`library/ROLES.md`): eight jobs in plain words — an SDR who warms the leads
+already in your CRM, a BDR who goes out and finds new ones, a Deals agent for
+CRM admin and proposals, Pipeline Review, Reporting, Content, Research, and a
+Head of Sales to run the day. Pick one and the interview pre-fills the job,
+the sources, and the shift for you to confirm — or describe the work in your
+own words, exactly as before, and that stays every bit as first-class.
+
+Each hire now records which role it is (or `custom`), and — when your
+check-ins are on — the shelf report carries the role plus one sentence on
+what the agent is for. Labels and counts, never content: it is how the bank
+stops being our guess and becomes what teams like yours actually hire.
+The roster gains a Role column. Seeded as hypotheses from the first real
+installs and industry convention; spec: `specs/005-role-bank/`.
+
 ## 0.7.1 — 2026-09-25
 
 **Joining a company notebook now works from any starting point.**

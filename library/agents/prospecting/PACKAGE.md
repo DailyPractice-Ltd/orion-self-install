@@ -34,9 +34,10 @@ Install the Prospecting agent from my Orion folder.
    these numbers to my Friday Report if that package is installed.
 6. Run the smoke test at the bottom of the package page, and only when it
    passes, record the install in status/status.json under packages.prospecting
-   (kind "agent", version "0.9.0", smoke_test_passed true).
-7. If my check-ins are on and you can run scripts, report the install:
-   node status/radio.mjs report-install --slug prospecting --kind agent --version 0.9.0
+   (kind "agent", role "bdr", version "0.9.0", smoke_test_passed true).
+7. If my check-ins are on and you can run scripts, report the install (the purpose
+   sentence below is what gets sent — my yes to this prompt covers it):
+   node status/radio.mjs report-install --slug prospecting --kind agent --version 0.9.0 --role bdr --purpose "finds and enriches new leads that match the ideal customer profile"
 ```
 
 ## What it does

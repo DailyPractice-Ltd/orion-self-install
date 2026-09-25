@@ -1,6 +1,28 @@
 # Orion Self-Install Constitution
 
-**Version**: 1.2.0 | **Ratified**: 2026-07-12 | **Last Amended**: 2026-08-14
+**Version**: 1.3.0 | **Ratified**: 2026-07-12 | **Last Amended**: 2026-09-25
+
+**Sync Impact Report** (amendment 1.3.0, 2026-09-25):
+- Version change: 1.2.0 → 1.3.0 (MINOR — Article V channel 1 restructured and its
+  enumeration corrected and expanded).
+- **What prompted it**: PR #19's review found `role`/`purpose` about to ride the radio
+  undisclosed — and, underneath, that the disclosure had already drifted twice: 0.6.0
+  shipped `send` (client-initiated messages) and 0.6.1 shipped `contribute` (a whole
+  skill file, on preview + yes) with no amendment, and 0.6.6 began stating the template
+  version on every call. The flat four-part list plus a blanket "never content" was
+  false in practice; the amendment discipline (capability and amendment ship together)
+  had lapsed. This amendment restores it and names everything now crossing.
+- **The restructure**: channel 1 becomes three consent tiers — ambient labels (one
+  on-by-default toggle, never content), your words (per-session explicit yes:
+  `reply`, `send`), your artifacts and records (per-item preview + explicit yes:
+  `contribute`, and a hire's one-sentence `purpose`). New standing rule: nothing that
+  carries client-authored words or files may ever be added to the ambient tier.
+- New tier-1 items from feature 005: a hire's **role slug** (from `library/ROLES.md`'s
+  public menu, or `custom`) on the shelf report; template version on every call (0.6.6,
+  retroactive).
+- `docs/radio.md` updated in lockstep (the "four kinds" list becomes the three tiers).
+- Deliberately NOT touched: the Preamble's "no Daily Practice coach present" premise —
+  stale since the paired-delivery GTM decision, parked as its own future amendment.
 
 **Sync Impact Report** (amendment 1.2.0, 2026-08-14):
 - Version change: 1.1.0 → 1.2.0 (MINOR — Article V channel 1(b) materially expanded).
@@ -129,22 +151,42 @@ Two channels, and only two, carry information from a client's install back to Da
 Practice. Both are disclosed in plain language inside this repository — never bundled into
 a EULA, never implied.
 
-1. **Lifecycle status signal — the radio** — the operational check-in channel between a
-   client's install and Daily Practice, so Daily Practice knows a self-serve client
-   exists, can offer help if asked, and can count a running system as running. Everything
-   it carries is enumerated here, and nothing else rides on it: (a) install-stage signals
-   (client identity, current install stage, a timestamp); (b) work heartbeats — "a task
-   of this type completed at this time" — the type, the timestamp, and for a hired
-   agent's scheduled shift, the agent's routine label and a count of things done; never
-   content, never a person's or company's name; the client's standing yes for a shift's
-   report is given once, at hire, on the job sheet that names it; (c) package-install
-   reports — the name, kind, and version of a Library package installed on this machine;
-   and (d) a two-way radio inbox: short plain-language messages from Daily Practice that the
-   client's agent reads out, with a reply sent only on the client's explicit yes in that
-   session. Never message content, KB content, or prospect data — in any of the four.
-   **On by default**, presented plainly at install with a one-click decline, fully
-   visible in this repository, and switchable off in `status/status.json` at any time;
-   declining or switching off disables all four parts at once and changes nothing else.
+1. **The radio** — the check-in channel between a client's install and Daily Practice,
+   so Daily Practice knows a client exists, can offer help if asked, and can count a
+   running system as running. It carries three tiers, distinguished by how consent is
+   given:
+
+   **Tier 1 — ambient labels.** On by default, presented plainly at install with a
+   one-click decline, switchable off in `status/status.json` at any time. The switch
+   is the radio's master switch: declining or switching off silences the radio
+   entirely — all three tiers, outbound and inbound alike — and changes nothing else
+   about the install. Enumerated in
+   full, and nothing else rides here: (a) install-stage signals (client identity,
+   current install stage, a timestamp); (b) work heartbeats — the task type and
+   timestamp, and for a hired agent's scheduled shift its routine label and a count of
+   things done, under the standing yes given once at hire on the job sheet that names
+   the report; (c) package and hire reports — name, kind, version, and for an agent
+   hire its **role label**: a slug from `library/ROLES.md`'s public menu, or `custom`;
+   (d) the template version of this folder, stated on every radio call; and (e) the
+   inbound half of the two-way inbox: short plain-language messages from Daily
+   Practice that the client's agent reads out. Never content, never a person's or
+   company's name, never a client-authored sentence.
+
+   **Tier 2 — the client's words.** `reply` and `send`: the client's own sentences,
+   sent only on their explicit yes in that session, never automatically, and never a
+   file (the code refuses a skill-shaped payload).
+
+   **Tier 3 — the client's artifacts and records.** Things that persist on Daily
+   Practice's side: `contribute` — a whole skill file offered to the library, per-item
+   preview, explicit yes, nothing published by sending — and a hire's **purpose
+   line**: one sentence, ≤140 characters, stating what the hired agent is for, shown
+   to the client verbatim and sent only under their explicit yes — the job-sheet
+   readback for a bespoke hire, or the install prompt that displays the sentence for
+   a shelf package; never a person's or company's name, never a number.
+
+   **Standing rule**: nothing that carries client-authored words or files may ever be
+   added to Tier 1. A new Tier-2 or Tier-3 item requires an amendment here before it
+   ships — the capability and its disclosure travel in the same change.
 2. **Intelligence Library signal** — richer usage/outcome data (signal types, counts,
    timestamps — never message content, KB contents, or prospect data), used to improve
    future versions of this repository. **Off by default.** Turning it on is a separate,
@@ -152,8 +194,10 @@ a EULA, never implied.
    `docs/intelligence-library-opt-in.md`.
 
 **Gate**: no data leaves the client's machine that is not named, in writing, in this
-repository, with its own toggle defaulting to the more conservative state for anything
-beyond the bare operational status signal in item 1.
+repository. The radio's single on-by-default master switch gates all three tiers;
+with it on, Tier 1 rides on its own while Tiers 2 and 3 each additionally require the
+client's explicit per-item yes; channel 2 keeps its own off-by-default toggle for
+anything beyond the bare operational signal.
 
 ---
 

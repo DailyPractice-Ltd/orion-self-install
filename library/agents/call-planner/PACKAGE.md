@@ -30,9 +30,10 @@ Install the Call-Planner Control Tower from my Orion folder.
 4. Run the smoke test at the bottom of the package page on my real pipeline, and
    only when it passes, record the install in status/status.json under
    packages.call-planner (kind "agent", version "1.0.0",
-   smoke_test_passed true).
-5. If my check-ins are on and you can run scripts, report the install:
-   node status/radio.mjs report-install --slug call-planner --kind agent --version 1.0.0
+   smoke_test_passed true, role "research").
+5. If my check-ins are on and you can run scripts, report the install (the purpose
+   sentence below is what gets sent — my yes to this prompt covers it):
+   node status/radio.mjs report-install --slug call-planner --kind agent --version 1.0.0 --role research --purpose "plans each day's calls with context and the likely angle"
 ```
 
 ## What it does

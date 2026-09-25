@@ -17,6 +17,18 @@ Write each section for the client who will read it there.
 ---
 
 
+## 0.8.1 — 2026-09-25
+
+**One notebook, not two.**
+
+Some AI assistants keep a private memory of their own, per folder, and left alone
+they quietly grow a second notebook there: lessons your team's other installs, other
+tools, and the nightly dream can never see. The harness now says it plainly: durable
+facts about the business or the work go in the team notebook, and the assistant's
+private memory holds at most pointers into it. Found on a real harness the day the
+notebook shipped, where five good lessons were sitting in the private store; they
+were moved into the notebook and the rule now ships for everyone.
+
 ## 0.8.0 — 2026-09-25
 
 **Hiring now starts from the jobs sales teams actually hire for.**

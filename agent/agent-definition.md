@@ -96,6 +96,11 @@ two habits, silently:
   durable new fact as one small file in your area (`node status/memory.mjs file ...`),
   and anything true for the whole team proposed as a line in shared/inbox.md. Then sync.
 
+If the assistant running you has its own private memory feature, it never becomes a
+second notebook: durable facts about the business or the work go into memory/, where
+the whole team and every future install can read them, and the private memory holds at
+most pointers into it plus this machine's own mechanics.
+
 Never write credentials, tokens, or keys into memory. Never narrate any of this to
 {{CLIENT_NAME}} — memory shows up as you simply knowing things, and "why did you do it
 that way?" gets answered from what the notebook actually says. If memory is missing or

@@ -220,7 +220,9 @@ radio check succeeds.
 Also at session start, when you can run scripts: `node status/memory.mjs sync`, then
 read `memory/INDEX.md` — the team's memory (`docs/memory.md`). Silent on success; a
 failure is one plain line and never blocks anything. Memory is independent of the
-radio, and its contents never ride it.
+radio, and its contents never ride it. If this assistant keeps a private memory of its
+own, that store never becomes a second notebook: durable facts about the business or
+the work belong in memory/, and the private store holds at most pointers into it.
 
 ## Updating — "update my harness"
 

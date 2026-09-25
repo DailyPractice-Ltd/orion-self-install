@@ -128,13 +128,36 @@ const block = memoryBlock(status);
 const root = memoryRoot(status);
 
 if (command === 'init') {
-  if (block.backend === 'git' && !fs.existsSync(root)) {
+  if (block.backend === 'git' && !fs.existsSync(path.join(root, '.git'))) {
     if (!MEMORY_GIT_REMOTE_RE.test(block.remote || '')) offLine('git backend but no usable remote');
-    const r = git(HARNESS_ROOT, ['clone', block.remote, root]);
+    const tmp = root + '.clone-tmp';
+    fs.rmSync(tmp, { recursive: true, force: true });
+    const r = git(HARNESS_ROOT, ['clone', block.remote, tmp]);
     if (r.status !== 0) {
+      fs.rmSync(tmp, { recursive: true, force: true });
       console.log(`Couldn't clone the memory repo (${(r.stderr || '').trim().split('\n')[0] || 'git failed'}) — nothing written.`);
       process.exit(0);
     }
+    // A memory folder usually already exists (the template ships memory/README.md,
+    // or the folder backend ran first). Joining absorbs it: every local note moves
+    // into the clone; where local and repo copies differ, the local one wins and
+    // becomes a change the next sync commits — history keeps both. Nothing is lost.
+    if (fs.existsSync(root)) {
+      (function absorb(dir) {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (entry.name === '.git') continue;
+          const from = path.join(dir, entry.name);
+          if (entry.isDirectory()) { absorb(from); continue; }
+          const to = path.join(tmp, path.relative(root, from));
+          if (!fs.existsSync(to) || fs.readFileSync(from).compare(fs.readFileSync(to)) !== 0) {
+            fs.mkdirSync(path.dirname(to), { recursive: true });
+            fs.copyFileSync(from, to);
+          }
+        }
+      })(root);
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+    fs.renameSync(tmp, root);
   }
   fs.mkdirSync(root, { recursive: true });
   const made = ensureScaffold(root);

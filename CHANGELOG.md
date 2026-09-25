@@ -17,6 +17,19 @@ Write each section for the client who will read it there.
 ---
 
 
+## 0.7.1 — 2026-09-25
+
+**Joining a company notebook now works from any starting point.**
+
+0.7.0 shipped the notebook with one snag: a harness that already had a memory
+folder — every install does, the template ships one — could not join a
+company's shared notebook; the join step found the folder in the way and gave
+up. Joining now absorbs what is already there: every local note moves into the
+shared notebook, and where a local note and the company's copy disagree, your
+local version wins while the history keeps both. Nothing is lost either way.
+Your harness repository also no longer tracks the notebook's pages — they
+belong to the notebook.
+
 ## 0.7.0 — 2026-09-25
 
 **Your team keeps a shared notebook now, and it remembers between sessions.**

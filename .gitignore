@@ -1,3 +1,5 @@
 status/status.json
 .DS_Store
 .update-backup/
+memory/*
+!memory/README.md

@@ -12,7 +12,7 @@ Agreed with {{CLIENT_NAME}} on {{DATE}}, directly in this conversation.
 
 | # | Activity (their words) | Monthly number | Tracked where | Fed by which workflow |
 |---|---|---|---|---|
-| 1 | {{e.g. IG DMs to new seekers}} | {{100 / month}} | {{their CRM's daily-drive view}} | {{WF-01 prospect research → outreach}} |
+| 1 | {{e.g. IG DMs to new seekers}} | {{100 / month}} | {{their CRM's daily-drive view}} | {{e.g. the prospect-research-outreach workflow, or a hired agent's shift}} |
 | 2 | {{e.g. blog posts}} | {{7 / month}} | {{…}} | {{agent drafting, manual publish}} |
 | 3 | {{e.g. forum engagements}} | {{40 / month}} | {{…}} | {{…}} |
 

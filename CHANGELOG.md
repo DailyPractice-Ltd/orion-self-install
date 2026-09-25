@@ -41,8 +41,11 @@ What that means for you, in plain terms:
 - **Nothing about your protections changed.** Every external action still stages
   for your explicit yes — that rule lives in your agent, and always did.
 - **Updating cleans up after itself.** "Update my harness" can now retire files a
-  release removed (backed up first, same as everything else) — your n8n folder
-  and its two checklist entries go automatically when you update.
+  release removed (backed up first, same as everything else). Coming from an
+  older version, the update refreshes its own instructions first and then prunes
+  your n8n folder and its two checklist entries; if your assistant followed its
+  older instructions and the folder lingered, saying "update my harness" once
+  more clears it — and we'll nudge live harnesses over the radio either way.
 
 Why 1.0.0: this repository's own rule is that a change to the install sequence is
 a major version — and this one is earned by real installs, which is the bar 1.0.0

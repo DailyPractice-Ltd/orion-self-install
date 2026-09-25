@@ -39,7 +39,9 @@ actually use it day to day.
 **Pass criteria**:
 - Staged output (prospect summary + outreach draft) in **the same sitting** — labelled
   STAGED FOR APPROVAL, ending "nothing has been sent"
-- Outreach draft staged in your **Drafts** folder — and nowhere else
+- Outreach draft staged in your **Drafts** folder — and nowhere else (on a chat-only
+  surface with no email connector: staged in the conversation, and the agent says so
+  plainly, per VT-00's fallback rule)
 - Draft passes the read-aloud test: it sounds like you (vocabulary from knowledge base
   §2/§5 visibly in use)
 - Your agent asks for your yes on the CRM entry before writing anything
@@ -77,7 +79,8 @@ recent call (transcript or your own notes).
 **Pass criteria**:
 - All three staged sections (Call Summary / CRM Update / Follow-up Draft) in **the same
   sitting**, each clearly labelled
-- Follow-up draft staged in your Drafts, in your tone
+- Follow-up draft staged in your Drafts, in your tone (chat-only surface: in the
+  conversation, said plainly)
 - On your yes: CRM note logged + entry updated with proposed stage and next action,
   matching what the call actually justified — no stage inflation
 

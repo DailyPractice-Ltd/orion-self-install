@@ -1,5 +1,5 @@
 {
-  "_what": "The authoritative list of Daily Practice's files in this folder. 'update my harness' refreshes exactly these paths from the template's main branch and touches nothing else. Contract: docs/updating.md.",
+  "_what": "The authoritative lists of Daily Practice's files in this folder. 'update my harness' refreshes exactly the refresh paths and prunes exactly the remove paths from the template's main branch, and touches nothing else. Contract: docs/updating.md.",
   "_regenerate": "git ls-files, minus specs/, .specify/, tests/, .claude/skills/speckit*, docs/img/, .claude/agents/README.md, agent/knowledge-base/0*.md — then bump template_version here and in status/status.schema-template.json together. CLAUDE.md IS on the list: it is what the assistant auto-loads, so it is the file that decides whether a session reads AGENTS.md and checks the radio at all. It was excluded once, which meant an installed harness could never be taught to listen.",
   "template_version": "1.0.0",
   "refresh": [
@@ -62,16 +62,16 @@
     "validation/validation-tasks.md"
   ],
   "never_touch": {
-    "status/status.json": "the client's own record — pairing, stages, packages, choices",
+    "status/status.json": "the client's own record — pairing, stages, packages, choices. An update edits exactly three things in it: template_version, one appended notes line, and deleting keys named in remove_status_checklist_keys — nothing else, ever",
     "status/shift-log.md": "the client's work history",
     "memory/ (everything but README.md)": "the client's own memory — facts, logs, lessons, the index; an update improves the notebook's binding, never its pages",
     "agent/knowledge-base/01..07*.md": "the client's business, captured in their words",
     ".claude/agents/ (everything but nothing — the whole directory)": "the client's hired team; the roster README carries their rows",
     ".claude/skills/ (any skill not in the refresh list)": "skills the client taught",
     ".update-backup/": "prior updates' safety copies",
-    "anything not in the refresh list": "the allowlist is the whole permission — no exceptions"
+    "anything not in the refresh or remove lists": "refresh may write its paths, remove may delete its paths — nothing else may be touched at all. The two lists are the whole permission"
   },
-  "_remove": "Paths pruned on update, with the same backup-first safety as refresh (docs/updating.md step 3b/4b). A path lands here when a release retires it; it never returns to refresh.",
+  "_remove": "Paths pruned on update, with the same backup-first safety as refresh (docs/updating.md steps 3 and 4b). A path lands here when a release retires it; it never returns to refresh. A directory the prune empties is deleted too.",
   "remove": [
     "n8n/README.md",
     "n8n/wf-01-prospect-research-outreach.json",

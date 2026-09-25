@@ -134,7 +134,12 @@ function runUpdate(dir, { honourTripwire = true } = {}) {
     (existed ? refreshed : created).push(rel);
   }
 
-  // Step 4b: prune, remove-list only — backup first (step 3), then delete.
+  // Step 3 also holds one copy of status.json, so 4b's key deletions have an undo.
+  mkdirSync(join(backupDir, 'status'), { recursive: true });
+  copyFileSync(join(dir, 'status/status.json'), join(backupDir, 'status/status.json'));
+
+  // Step 4b: prune, remove-list only — backup first, tripwire honoured, then
+  // delete, then clear any directory the prune emptied.
   const removed = [];
   for (const rel of REMOVE) {
     const dest = join(dir, rel);
@@ -143,8 +148,14 @@ function runUpdate(dir, { honourTripwire = true } = {}) {
     mkdirSync(dirname(bk), { recursive: true });
     copyFileSync(dest, bk);
     backedUp.push(rel);
+    if (honourTripwire && readFileSync(dest, 'utf8').includes(businessName)) {
+      tripped.push(rel);
+      continue;
+    }
     rmSync(dest);
     removed.push(rel);
+    const parent = dirname(dest);
+    if (existsSync(parent) && readdirSync(parent).length === 0) rmSync(parent, { recursive: true });
   }
 
   const status = JSON.parse(readFileSync(join(dir, 'status/status.json'), 'utf8'));
@@ -227,6 +238,8 @@ test('the prune retires the n8n lane: files gone, backed up, checklist keys drop
     assert.ok(existsSync(join(backupDir, rel)), `${rel} pruned without a backup`);
   }
   assert.deepEqual(removed.sort(), [...REMOVE].sort());
+  assert.equal(existsSync(join(dir, 'n8n')), false, 'the emptied n8n/ directory should be gone too');
+  assert.ok(existsSync(join(backupDir, 'status/status.json')), 'status.json must be in the backup — the key deletions need an undo');
 
   const after = JSON.parse(readFileSync(join(dir, 'status/status.json'), 'utf8'));
   for (const key of REMOVE_KEYS) {

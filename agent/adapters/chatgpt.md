@@ -17,9 +17,10 @@ use the fallback below).
 3. **Knowledge**: upload the seven completed knowledge-base files with numbered filenames
    intact.
 4. **Capabilities**: enable web browsing (prospect research needs it). Connect only the
-   connectors the checklist names (CRM, email, calendar). The approval gate is the
-   agent's own rules — drafts only, nothing sends without the client's yes — the tool
-   never gets a send path the rules don't gate.
+   connectors the checklist names (CRM, email, calendar), read-and-draft. The approval
+   gate is the agent's own rules — drafts only; sending stays the client's own act,
+   from their own Drafts folder, never the agent instructing a tool
+   (agent-definition rule 1).
 5. **First-run check, right there in the conversation**: the vocabulary check — one
    prospect-research task, read the draft back, "does this sound like you?"
 

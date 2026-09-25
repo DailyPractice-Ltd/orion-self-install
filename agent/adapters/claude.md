@@ -37,5 +37,6 @@ persistent chat, first message = instructions, re-pinned as needed) adapted for 
 - Connectors/MCP inside Claude are **how the agent reaches the client's tools** —
   connect the three the checklist names (CRM, email, calendar) and nothing else. The
   approval gate is the agent's own non-negotiable rules (drafts only, explicit yes;
-  Article III), not the tool: a connector may read and draft, and a send happens only
-  after the client's yes on that specific item.
+  Article III), not the tool: connectors read and stage drafts; **sending stays the
+  client's own act, from their own Drafts folder** — the agent never instructs a tool
+  to send (agent-definition rule 1).

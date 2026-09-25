@@ -8,7 +8,9 @@ connectors actually work.
 Rules:
 
 - **Live data only.** No sandbox, no fabricated prospects.
-- **All tasks must pass.** Any failure: fix, then re-run *that task*. If the failure was a
+- **VT-00 through VT-06 must all pass** to reach `validated` (the sign-off below is
+  the gate). VT-07 proves resume when you next pause; VT-08 applies only if your
+  check-ins are on. Any failure: fix, then re-run *that task*. If the failure was a
   credential, go back to the [connector checklist](../connectors/connector-checklist.md)'s
   failure path — the install does not advance until it's green.
 - **Record results** in the sign-off table below — and set the matching
@@ -24,9 +26,10 @@ Rules:
 (`agent/adapters/`); if code execution is expected, confirm `node --version` runs; confirm
 `status/status.json` exists and is readable.
 
-**Pass criteria**: the right adapter is identified, and either Node is confirmed available
-(scripted path) or the manual-fallback path is explicitly acknowledged (non-technical
-path) — never silently assumed either way.
+**Pass criteria**: your AI tells you, in one plain sentence, which adapter it is using
+and whether it can run scripts here — and what that means for you ("I can do X for
+you; you'll do Y by hand"). You'll know it passed when you heard that sentence —
+never silently assumed either way.
 
 ## VT-01 · Prospect research end-to-end
 
@@ -42,8 +45,8 @@ actually use it day to day.
 - Outreach draft staged in your **Drafts** folder — and nowhere else (on a chat-only
   surface with no email connector: staged in the conversation, and the agent says so
   plainly, per VT-00's fallback rule)
-- Draft passes the read-aloud test: it sounds like you (vocabulary from knowledge base
-  §2/§5 visibly in use)
+- Draft passes the read-aloud test: it sounds like you (your own vocabulary and tone,
+  from knowledge base files 02 and 05, visibly in use)
 - Your agent asks for your yes on the CRM entry before writing anything
 
 ## VT-02 · Approval gate — decline path
@@ -100,8 +103,9 @@ without lecturing, and offers the closest acceptable alternative.
 
 **Steps**: ask "what should I do today?"
 
-**Pass criteria**: the plan references your real pipeline, mirrors your CRM's daily-drive
-view, and paces against your §7 commitments by name and number (e.g. "you're at 2 of 100
+**Pass criteria**: the plan references your real pipeline (open your CRM next to it —
+the same deals, the same stages), and paces against the commitments you set on Day 1
+(knowledge base file 07) by name and number (e.g. "you're at 2 of 100
 DMs this month").
 
 ## VT-07 · Resume after interruption

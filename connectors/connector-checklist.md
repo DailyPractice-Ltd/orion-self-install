@@ -15,8 +15,9 @@ other apps before. Work through this top to bottom; the install status only move
 
 Connectors live **in your AI assistant itself** — Claude, ChatGPT, or Copilot each have
 their own "connectors" or "integrations" settings, and that is where these sign-ins
-happen and where the credentials stay. Nothing is stored in this repository and nothing
-is sent to Daily Practice. The safety is not the tool: it is your agent's own
+happen and where the credentials stay. No credential is ever stored in this folder or
+sent to Daily Practice (the optional check-in radio sends only labels and counts —
+`docs/radio.md` is that whole story). The safety is not the tool: it is your agent's own
 non-negotiable rules — everything external is a draft staged for your yes, and nothing
 sends on its own (`agent/agent-definition.md`; constitution Article III). Your yes is
 the gate, every time.
@@ -51,7 +52,7 @@ step, confirming each one works as you go. Your adapter file
 - [ ] Attio template applied (see [`crm/attio/README.md`](../crm/attio/README.md)) —
       lists, stages, attributes exist
 - [ ] Connect Attio in your AI assistant's connector settings (or hand your agent the
-      access token you generated, on a surface that takes one)
+      access token you generated, where your AI tool takes one)
 - [ ] **You'll know it's connected when**: you ask your agent "what stages does my
       pipeline have?" and it reads back your actual Attio stages, by name. If it can't,
       the token was probably copied incorrectly — go back to Attio and generate a fresh
@@ -133,8 +134,10 @@ connector is where to look first.
 
 ## Failure path (any connector fails, or one stops working later)
 
-1. Note down which connector and when — a line in `status/status.json`'s `notes` field is
-   fine. Nothing proceeds to validation until it's fixed.
+1. Note down which connector and when — your AI writes a line into
+   `status/status.json`'s `notes` field for you (or, on a surface that can't write
+   files, keeps it in the running status it reads back to you). Nothing proceeds to
+   validation until it's fixed.
 2. In your AI assistant's connector settings: disconnect that service and connect it
    fresh, rather than half-fixing it — this avoids old, half-working login info getting
    stuck. Then re-run its "you'll know it's connected when" check above.
@@ -154,6 +157,6 @@ both.
 | Email (Gmail or Outlook) | | | | |
 | Calendar (Google or Microsoft) | | | — | |
 
-All rows filled in → set `status/status.json`'s `connector_crm_live`,
-`connector_email_live`, and `connector_calendar_live` to `true`, and the install may move
-to **`connected`**. Proceed to [validation](../validation/validation-tasks.md).
+All rows filled in → your AI sets `status/status.json`'s `connector_crm_live`,
+`connector_email_live`, and `connector_calendar_live` to `true` (that's its job, not
+yours), and the install may move to **`connected`**. Proceed to [validation](../validation/validation-tasks.md).

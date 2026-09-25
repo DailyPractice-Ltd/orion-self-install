@@ -7,7 +7,9 @@ Article V, channel 1; there is no fine print anywhere else.
 
 ## What goes out, exactly
 
-Four kinds of message, and nothing besides:
+Three tiers, by how your yes is given — and nothing besides:
+
+**Tier 1 — labels, on by default** (the check-in switch covers all of these at once):
 
 1. **"Here's which step I'm on"** — your install stage and a timestamp, so Daily
    Practice knows to check in if you seem stuck.
@@ -15,15 +17,28 @@ Four kinds of message, and nothing besides:
    when, and — for a hired agent's shift — which agent ran it and how many things it
    did (a label and a number: say, "prospecting, 18"). Never what was in it, never who
    it was about.
-3. **"This machine now runs X"** — when you install a Library package, its name, kind,
-   and version. That's how Daily Practice knows who's affected when a package is
-   improved.
-4. **Your replies** — if Daily Practice sends you a message (below) and you choose to
-   answer, your answer goes back.
+3. **"This machine now runs X"** — when you install a Library package or hire an
+   agent, its name, kind, and version — and for a hire, which role it is: a label from
+   [the public role menu](../library/ROLES.md) (or "custom"). That's how Daily
+   Practice knows who's affected when a package is improved, and which roles teams
+   actually hire.
+4. **Which template version this folder is on** — stated on every radio call, so
+   Daily Practice can tell whether an update reached you. A label about this folder,
+   never about your work.
+
+**Tier 2 — your words, your yes each time**: your replies, and messages you choose to
+start. Your sentences, sent only when you say yes in that conversation — never
+automatically, and never a file.
+
+**Tier 3 — your artifacts, shown to you first**: a skill you choose to offer the
+library (you see exactly what would be sent before it goes), and — when you hire an
+agent — one sentence you approve at hire saying what that agent is for, read back to
+you word for word before it is ever sent.
 
 **Never, under any setting**: the content of your messages or drafts, your knowledge
-base, your prospects or customers, anything from your CRM or email. The radio carries
-labels and timestamps, not contents.
+base, your prospects or customers, anything from your CRM or email. The label tier
+never carries content or names; your words and files cross only with your per-item
+yes, shown to you first.
 
 ## Exactly when each message fires — and when nothing does
 
@@ -40,6 +55,9 @@ loud: none of that ever touches the radio.
 | "Debrief done" (`debrief_completed`) | A post-call debrief finishes **and you approved its CRM update** | The debrief workflow's radio node, or your agent after your yes |
 | "CRM updated" (`crm_updated`) | Your agent performs a CRM write **you approved**, outside the workflows | Your agent, right after the approved write |
 | "A shift ran" (`routine_completed`) | A hired agent finishes a scheduled shift — the standing yes you gave on its job sheet at hire covers exactly this report | The agent, as its shift's last step, with its name and a count |
+| "This machine runs X" (`report-install`) | A package's smoke test passes, or a hire passes its first supervised shift — with the role label; the purpose sentence rides only after the job-sheet readback named it and you said yes | Your agent, right after the pass |
+| Your message (`send`) | You have something to say to Daily Practice and say yes to sending it — your words | Your agent, on your yes in that conversation |
+| A skill offered up (`contribute`) | You choose to offer a skill to the library, after seeing exactly what would be sent | Your agent, on your yes to the shown preview |
 
 Three rules sit under that table: every real-work message is **downstream of your
 explicit yes** on the work itself — given in the conversation for conversational work,

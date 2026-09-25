@@ -71,8 +71,11 @@ Two lanes out, both first-class:
   *"A {title} for {business} would {the role's job line, tailored to the knowledge
   base}. Sound right, or anything you'd change?"* The role's sources pre-fill Q2 and
   its typical shift pre-fills Q4 — offered as defaults to confirm, never assumed.
-  The job sheet records `role: {bank slug}`. A role with a **Head start** line has a
-  shelf package — offer that install before a bespoke build.
+  The job sheet records `role: {bank slug}`. Then confirm the roster name the same
+  way as the custom lane: *"On the roster they'd be `@{name}` — good?"* (default the
+  role's own slug when it's free; a head-start package install keeps the package's
+  slug). A role with a **Head start** line has a shelf package — offer that install
+  before a bespoke build.
 - **Described in their own words** → derive the role title and the kebab-case name
   from the answer; confirm inline rather than asking separately: *"Sounds like a
   {title}. On the roster they'd be `@{name}` — good?"* The job sheet records
@@ -114,8 +117,12 @@ commitments (knowledge base); their name or business name (status.json); machine
 (machine profile); timezone (schedule times are "your time" by construction).
 
 Then the **job sheet readback**: the whole agent file in plain words — job, must-nots,
-schedule, the report line, "starts on probation: reads and stages only" — ending *"Say
-yes and I'll hire them."* That yes gates all file creation. Machine-changing steps after
+schedule, the report line, "starts on probation: reads and stages only" — and, when
+check-ins are on, the exact purpose sentence, word for word: *"One sentence goes to
+Daily Practice as what this agent is for: '{purpose — ≤140 chars, about the agent,
+never a person, company, or number}'."* — ending *"Say yes and I'll hire them."* That
+yes gates all file creation and is the yes that covers sending that sentence
+(constitution Article V, Tier 3). Machine-changing steps after
 it (the scheduled task especially) still get their own explicit yes.
 
 ### The job sheet — the agent file template
@@ -216,6 +223,9 @@ not the runtime. Both facts are fine, and stated.
    install that package instead.
 4. **Append the roster row** to `.claude/agents/README.md`:
    `@{name} | {role title} | {one-line job} | {schedule} | Probation | /{skill or —}`.
+   (On a folder installed before 0.8.0 the roster header has no Role column — add the
+   column to the header and a `—` to any existing rows first, so the table stays
+   aligned.)
 5. **Record it** in `status/status.json`:
    `packages.{name} = { kind: "agent", role: "{bank slug or custom}",
    version: "0.1.0", installed_at: now, smoke_test_passed: false }`. While steps 2–8 are in flight, keep a top-level
@@ -307,7 +317,9 @@ A promotion **edits the agent's own file**: add the duty to *The job*; extend `t
 only if the new duty needs it — least privilege, never "while we're in here"; sharpen
 `description` if the summons changes; bump the minor version; append a changelog line
 (`- 0.2.0 — {date} — Also {Y} (promoted).`); mirror the version into
-`packages.{name}.version`; smoke-test **the new duty only**; re-report the shelf.
+`packages.{name}.version`; smoke-test **the new duty only**; re-report the shelf with
+the same `--role` and `--purpose` as the hire (updating the purpose sentence — and
+re-reading it back for a yes — only if the job materially changed).
 
 Guardrails only ever grow in a promotion. Removing one requires the client saying so
 explicitly, and gets its own changelog line. If the new duty adds standing writes,

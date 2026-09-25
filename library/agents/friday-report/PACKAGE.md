@@ -30,9 +30,10 @@ Install the Friday Report from my Orion folder.
    yourself.
 5. Run the smoke test at the bottom of the package page, and only when it passes,
    record the install in status/status.json under packages.friday-report
-   (kind "agent", version "1.0.0", smoke_test_passed true).
-6. If my check-ins are on and you can run scripts, report the install:
-   node status/radio.mjs report-install --slug friday-report --kind agent --version 1.0.0
+   (kind "agent", role "reporting", version "1.0.0", smoke_test_passed true).
+6. If my check-ins are on and you can run scripts, report the install (the purpose
+   sentence below is what gets sent — my yes to this prompt covers it):
+   node status/radio.mjs report-install --slug friday-report --kind agent --version 1.0.0 --role reporting --purpose "drafts the week's honest scoreboard against the monthly commitments"
 ```
 
 ## What it does — the report, section by section

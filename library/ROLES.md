@@ -19,9 +19,9 @@ on a team, never like software.
   job draft, Q2's sources and Q4's shift **as defaults to confirm**, tailored to the
   knowledge base — never assumed silently.
 
-Every role below is `status: hypothesis` — seeded from real installs and industry
-convention, promoted to `evidence_based` once real hires report against it over the
-radio. This file grows the same way the Library does: what teams actually hire comes
+Each role carries its own **Status** line — `hypothesis` (seeded from real installs
+and industry convention) until real hires report against it over the radio, when a
+curator promotes that one line to `evidence_based`. This file grows the same way the Library does: what teams actually hire comes
 back (as role slugs and counts, never content) and reshapes the menu.
 
 | Slug | Role | What they do for you |
@@ -49,6 +49,7 @@ back (as role slugs and counts, never content) and reshapes the menu.
   lead sits untouched longer than {n} days."
 - **Head start**: — (bespoke; the `prospect-research-outreach` workflow covers the
   drafting half if they have n8n).
+- **Status**: hypothesis
 
 ## `bdr` — BDR (prospector)
 
@@ -60,6 +61,7 @@ back (as role slugs and counts, never content) and reshapes the menu.
 - **Success line to offer**: "every morning there are fresh, researched candidates
   in the pipeline that actually look like our customer."
 - **Head start**: `library/agents/prospecting` (v0.9.0).
+- **Status**: hypothesis
 
 ## `deals` — Deals agent
 
@@ -70,6 +72,7 @@ back (as role slugs and counts, never content) and reshapes the menu.
 - **Success line to offer**: "I stop doing CRM admin, and a proposal draft is
   waiting the same day a call warrants one."
 - **Head start**: —
+- **Status**: hypothesis
 
 ## `pipeline-review` — Pipeline Review agent
 
@@ -81,6 +84,7 @@ back (as role slugs and counts, never content) and reshapes the menu.
 - **Success line to offer**: "nothing dies quietly — anything stalled gets named,
   with a suggested next move."
 - **Head start**: —
+- **Status**: hypothesis
 
 ## `reporting` — Reporting agent
 
@@ -90,6 +94,7 @@ back (as role slugs and counts, never content) and reshapes the menu.
 - **Typical shift**: Friday, before you close the week.
 - **Success line to offer**: "Friday tells me the truth about the week in one page."
 - **Head start**: `library/agents/friday-report` (v1.0.0).
+- **Status**: hypothesis
 
 ## `content` — Content agent
 
@@ -100,6 +105,7 @@ back (as role slugs and counts, never content) and reshapes the menu.
 - **Success line to offer**: "there is always a draft that sounds like me waiting
   when I have ten minutes to post."
 - **Head start**: —
+- **Status**: hypothesis
 
 ## `research` — Research agent
 
@@ -111,6 +117,7 @@ back (as role slugs and counts, never content) and reshapes the menu.
   call gets lost."
 - **Head start**: `library/agents/call-planner` (v1.0.0) for the daily call plan;
   the `post-call-debrief` workflow for the after-call half.
+- **Status**: hypothesis
 
 ## `head-of-sales` — Head of Sales (orchestrator)
 
@@ -123,6 +130,7 @@ back (as role slugs and counts, never content) and reshapes the menu.
 - **Success line to offer**: "I open the day to a plan that already accounts for
   what the team did overnight."
 - **Head start**: —
+- **Status**: hypothesis
 
 ---
 

@@ -514,20 +514,47 @@ if (command === 'signal') {
 if (command === 'report-install') {
   if (!flags.slug || !PACKAGE_KINDS.includes(flags.kind) || !flags.version) {
     console.log(`report-install needs --slug <slug>, --kind <${PACKAGE_KINDS.join('|')}>, --version <v>.`);
-    console.log('An agent hire also carries --role <library/ROLES.md slug | custom> and --purpose "<one sentence>".');
+    if (!flags.kind || flags.kind === 'agent') {
+      console.log('An agent hire also carries --role <library/ROLES.md slug | custom> and --purpose "<one sentence>".');
+    }
     process.exit(1);
   }
-  // The role bank's evidence loop (feature 005): a bank slug or "custom", plus one
-  // sentence on what this agent is FOR — about the agent, never a person, company,
-  // or number. Labels, not content; both optional until the server half lands.
+  // The role bank's evidence loop (feature 005, Article V Tier 1 + Tier 3): a bank
+  // slug or "custom", plus the one purpose sentence the client approved verbatim in
+  // the job-sheet readback. Agent hires only; labels never content.
   const role = (flags.role || '').trim();
-  if (role && !/^[a-z][a-z0-9-]{0,29}$/.test(role)) {
-    console.log('--role must be a kebab slug from library/ROLES.md, or "custom". Not sent.');
+  const purpose = (flags.purpose || '').trim();
+  if ((role || purpose) && flags.kind !== 'agent') {
+    console.log('--role and --purpose belong to agent hires only (spec 005). Not sent — retry without them.');
     process.exit(1);
   }
-  const purpose = (flags.purpose || '').trim();
+  if (role && role !== 'custom') {
+    // The bank is on this disk — check against it, not just the slug shape. If the
+    // file is missing (older folder), fall back to shape so the report still lands.
+    let bankSlugs = null;
+    try {
+      const bank = readFileSync(join(__dirname, '..', 'library', 'ROLES.md'), 'utf8');
+      bankSlugs = [...bank.matchAll(/^## `([a-z][a-z0-9-]{0,29})`/gm)].map((m) => m[1]);
+    } catch { /* no bank file — shape check below still applies */ }
+    if (bankSlugs && bankSlugs.length > 0 && !bankSlugs.includes(role)) {
+      console.log(`--role "${role}" is not in library/ROLES.md (${bankSlugs.join(', ')}) and is not "custom". Not sent.`);
+      process.exit(1);
+    }
+    if (!/^[a-z][a-z0-9-]{0,29}$/.test(role)) {
+      console.log('--role must be a kebab slug from library/ROLES.md, or "custom". Not sent.');
+      process.exit(1);
+    }
+  }
   if (purpose.length > 140) {
     console.log('--purpose is over 140 characters — shorten it to one sentence about the agent. Not sent.');
+    process.exit(1);
+  }
+  // Tier-3 tripwire, same spirit as the shift-log note rule and the send/reply
+  // skill-file refusal: the purpose describes the agent, never a person, a company,
+  // or a number. Digits and handles are machine-checkable — check them.
+  if (/\d/.test(purpose) || /@/.test(purpose)) {
+    console.log('--purpose may not carry numbers or handles — it describes the agent, never a person,');
+    console.log('a company, or a figure. Reword it (e.g. "warms CRM leads toward booked meetings"). Not sent.');
     process.exit(1);
   }
   const res = await call('POST', '/assets', {

@@ -113,9 +113,15 @@ posture as the session-start radio check (`AGENTS.md` rule 2).
   "slug": "<package slug>",
   "kind": "agent | skill | workflow | crm_template | program",
   "version": "<PACKAGE.md version at install>",
-  "installed_at": "<ISO 8601 — client clock at install>"
+  "installed_at": "<ISO 8601 — client clock at install>",
+  "role": "<agent hires only, optional — a library/ROLES.md slug or 'custom' (feature 005)>",
+  "purpose": "<agent hires only, optional — ≤140 chars, the client-approved sentence from the job-sheet yes; never a person, company, or number>"
 }
 ```
+
+- `role`/`purpose` (0.8.0, spec 005): sent only for `kind: "agent"`; a server that
+  predates them ignores unknown fields — the report must still land. Server-side
+  storage is spec 005 workstream C.
 
 - `program` is accepted by the deployed server (002a reconciliation) — the Library
   ships program packages. (`crm_template` exists server-side for coach-installed CRM

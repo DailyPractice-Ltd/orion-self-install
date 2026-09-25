@@ -80,6 +80,40 @@ export function radioOn(status) {
 }
 
 /**
+ * The memory block (docs/memory.md is the contract). Shape, not mere presence,
+ * for the same 2026-07-28 reason as the radio: a poisoned value must read as
+ * unconfigured, not as configured-and-broken-forever.
+ *
+ * Backends: 'folder' (a plain local folder — the client may open it in Obsidian
+ * and sync it with any tool of their own) and 'git' (a private repo the CLIENT
+ * owns; agents pull and push silently). Daily Practice hosts none of it.
+ */
+export const MEMORY_BACKENDS = ['folder', 'git'];
+// https, ssh, or an absolute local path (a repo on a shared drive counts).
+export const MEMORY_GIT_REMOTE_RE = /^(https:\/\/|git@|\/)[^\s]+$/;
+
+export function memoryBlock(status) {
+  return status?.memory ?? {};
+}
+
+export function memoryConfigured(status) {
+  const m = memoryBlock(status);
+  if (m.enabled !== true) return false;
+  if (!MEMORY_BACKENDS.includes(m.backend)) return false;
+  if (typeof m.path !== 'string' || m.path.length === 0 || m.path.includes('..')) return false;
+  if (m.backend === 'git' && !MEMORY_GIT_REMOTE_RE.test(m.remote || '')) return false;
+  return true;
+}
+
+/**
+ * Memory is deliberately independent of radioOn(): the shift-log asymmetry
+ * extends here — the local memory write never skips because the radio is off.
+ */
+export function memoryOn(status) {
+  return memoryConfigured(status);
+}
+
+/**
  * A skill on offer. Daily Practice ships a skill as a message whose first line is
  *   [library:install] <slug>@<version>
  * with plain words after a newline. It is minted coach-side (library-ship.mjs and

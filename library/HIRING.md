@@ -114,6 +114,7 @@ skills: [{role skill, if extracted — else omit this key}]
 status: probation
 go_live: false
 schedule: "{weekdays 07:00 local | after: {upstream-agent}}"
+memory: [shared, roles/{role-area}, agents/{name}]
 version: 0.1.0
 ---
 
@@ -134,7 +135,11 @@ Today's output lands at `{path — e.g. morning-list.md}`, in this folder, where
 ## Training
 Your knowledge of {business} lives in `agent/knowledge-base/` — ICP §2, tone §5,
 objections §6, commitments §7. Read what the job needs at the start of every shift;
-never re-ask {client} for what it holds.
+never re-ask {client} for what it holds. Your team's living memory is the `memory/`
+folder (`docs/memory.md`): at shift start, `node status/memory.mjs sync`, then read
+`memory/INDEX.md` and the areas in your `memory:` line above — and only those; other
+roles' areas are not your reading. New durable facts you learn go back in (a small
+file in your area; team-wide truths proposed in `shared/inbox.md`). Never credentials.
 
 ## The schedule
 {Q4. Clock: days + time. Handoff: "runs when {upstream} finishes — see the last line
@@ -148,6 +153,10 @@ shift log is its local twin, and it never skips.)
    `{date} | {name} | count: N | {one short line — what you did, or why N is low}`
    A scheduled run begins its line's note with `auto:` — that marker is how probation
    is judged, so never write it on a supervised or hand-asked run.
+   Then write the same line into the team memory, before any radio:
+   `node status/memory.mjs note --to agents/{name}/log.md --line "{the same line}"`
+   — memory missing or unusable → that half skips silently; the shift-log line
+   itself still never skips.
 2. If check-ins are on and you can run scripts:
    `node status/radio.mjs signal --type routine_completed --routine {name} --count N`
    The one-line story stays in the shift log, local — the radio carries the label,

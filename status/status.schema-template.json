@@ -1,6 +1,6 @@
 {
-  "schema_version": "1.4.0",
-  "template_version": "0.6.6",
+  "schema_version": "1.5.0",
+  "template_version": "0.7.0",
   "client_id": null,
   "business_name": null,
   "agent_name": null,
@@ -36,6 +36,12 @@
     "vt08_status_signal_emission": false
   },
   "packages": {},
+  "memory": {
+    "enabled": true,
+    "backend": "folder",
+    "remote": "",
+    "path": "memory"
+  },
   "stage_history": [],
   "sharing": {
     "status_signal_enabled": true,

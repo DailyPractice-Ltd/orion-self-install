@@ -17,6 +17,33 @@ Write each section for the client who will read it there.
 ---
 
 
+## 0.7.0 — 2026-09-25
+
+**Your team keeps a shared notebook now, and it remembers between sessions.**
+
+Until today, each session started blank: your agents knew their job and your
+knowledge base, but nothing they had learned doing the work. Now every harness
+has a `memory/` folder — the team's own notebook. Agents read it before work
+and write to it after: what they did, what they learned, what turned out to be
+true for the whole team. Ask "why did you do it that way?" and the answer comes
+from what the notebook actually says.
+
+- **Zero setup.** The notebook creates itself the first time an agent touches
+  it. Plain markdown files you can open, edit, and correct — it is yours.
+- **A company can share one notebook.** If several people run harnesses for the
+  same business, the notebook can live in a private repository your company
+  owns, and every install reads and writes the same one. Your assistant handles
+  the moving parts; you never touch them. Daily Practice does not host your
+  memory and will not — it stays in your folder or your company's own account.
+- **A nightly librarian.** The library offers a new agent, the dream: it works
+  while you sleep, merging duplicate notes, keeping the index honest, and making
+  sure nothing that looks like a password ever sits in a note. Hire it like any
+  other agent.
+- **Private, like everything else.** The notebook's contents never ride the
+  radio, and "update my harness" refreshes the notebook's binding — the scripts
+  and guides — never its pages. `docs/memory.md` is the whole contract in plain
+  words.
+
 ## 0.6.6 — 2026-09-22
 
 **Daily Practice can see which version you are on, without waiting for you to

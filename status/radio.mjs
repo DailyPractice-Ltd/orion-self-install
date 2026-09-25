@@ -36,8 +36,11 @@
  *       the story of a shift stays local, in status/shift-log.md.
  *
  *   node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>
+ *                                        [--role <slug|custom> --purpose "<sentence>"]
  *       Tell the shelf a Library package was installed here (POST /assets), after its
- *       smoke test passed.
+ *       smoke test passed. A hired agent adds --role (library/ROLES.md slug, or
+ *       custom) and --purpose (≤140 chars, about the agent, never a person/company/
+ *       number) — the labels that let the role bank become evidence-based.
  *
  * Radio-on means ALL of: sharing.status_signal_enabled is true, and bridge_url,
  * harness_id, install_token are set (the welcome pack). Anything less → every command
@@ -511,6 +514,20 @@ if (command === 'signal') {
 if (command === 'report-install') {
   if (!flags.slug || !PACKAGE_KINDS.includes(flags.kind) || !flags.version) {
     console.log(`report-install needs --slug <slug>, --kind <${PACKAGE_KINDS.join('|')}>, --version <v>.`);
+    console.log('An agent hire also carries --role <library/ROLES.md slug | custom> and --purpose "<one sentence>".');
+    process.exit(1);
+  }
+  // The role bank's evidence loop (feature 005): a bank slug or "custom", plus one
+  // sentence on what this agent is FOR — about the agent, never a person, company,
+  // or number. Labels, not content; both optional until the server half lands.
+  const role = (flags.role || '').trim();
+  if (role && !/^[a-z][a-z0-9-]{0,29}$/.test(role)) {
+    console.log('--role must be a kebab slug from library/ROLES.md, or "custom". Not sent.');
+    process.exit(1);
+  }
+  const purpose = (flags.purpose || '').trim();
+  if (purpose.length > 140) {
+    console.log('--purpose is over 140 characters — shorten it to one sentence about the agent. Not sent.');
     process.exit(1);
   }
   const res = await call('POST', '/assets', {
@@ -519,6 +536,8 @@ if (command === 'report-install') {
     kind: flags.kind,
     version: flags.version,
     installed_at: new Date().toISOString(),
+    ...(role ? { role } : {}),
+    ...(purpose ? { purpose } : {}),
   });
   if (res.status === 401) reportAuthProblem();
   console.log(res.ok

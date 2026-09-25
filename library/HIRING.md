@@ -56,13 +56,30 @@ Open with a readback, one message:
 
 ### The interview — five questions, one at a time
 
-**Q1 — the job.**
-> "What should this new team member take off your plate? Tell me like you'd brief a temp
-> on their first morning — what does a good day's work from them look like?"
+**Q1 — the role.** Open [`library/ROLES.md`](ROLES.md) silently first — the bank of
+jobs teams typically hire for. Offer it in the client's language, minus any role
+already on the roster, best fit for their pipeline first (knowledge base §4), up to
+six out loud:
 
-Derive the role title and the kebab-case name from the answer; confirm inline rather
-than asking separately: *"Sounds like a {title}. On the roster they'd be `@{name}` —
-good?"* Role agents get **job titles, not human names** — your assistant already has the
+> "Teams typically hire for jobs like these — {each: the role title, then its
+> 'what they do for you' in one clause}. Pick one, or describe the work in your own
+> words, like you'd brief a temp on their first morning."
+
+Two lanes out, both first-class:
+
+- **Picked from the bank** → confirm the tailored job rather than re-interviewing:
+  *"A {title} for {business} would {the role's job line, tailored to the knowledge
+  base}. Sound right, or anything you'd change?"* The role's sources pre-fill Q2 and
+  its typical shift pre-fills Q4 — offered as defaults to confirm, never assumed.
+  The job sheet records `role: {bank slug}`. A role with a **Head start** line has a
+  shelf package — offer that install before a bespoke build.
+- **Described in their own words** → derive the role title and the kebab-case name
+  from the answer; confirm inline rather than asking separately: *"Sounds like a
+  {title}. On the roster they'd be `@{name}` — good?"* The job sheet records
+  `role: custom`. If the description lands within a clause of a bank role, say so
+  and offer its head start — but their words win.
+
+Role agents get **job titles, not human names** — your assistant already has the
 human name, and a roster of job titles reads like an org chart.
 
 **Q2 — sources and tools.**
@@ -111,6 +128,7 @@ name: {name}
 description: Use when {delegation trigger from Q1/Q5}. {One-sentence job}. Lists and drafts only.
 tools: {comma-separated allowlist from Q2, least privilege}
 skills: [{role skill, if extracted — else omit this key}]
+role: {bank slug from library/ROLES.md, or custom}
 status: probation
 go_live: false
 schedule: "{weekdays 07:00 local | after: {upstream-agent}}"
@@ -197,10 +215,10 @@ not the runtime. Both facts are fine, and stated.
    report") never earns a skill. If `library/skills/` already has the equivalent,
    install that package instead.
 4. **Append the roster row** to `.claude/agents/README.md`:
-   `@{name} | {one-line job} | {schedule} | Probation | /{skill or —}`.
+   `@{name} | {role title} | {one-line job} | {schedule} | Probation | /{skill or —}`.
 5. **Record it** in `status/status.json`:
-   `packages.{name} = { kind: "agent", version: "0.1.0", installed_at: now,
-   smoke_test_passed: false }`. While steps 2–8 are in flight, keep a top-level
+   `packages.{name} = { kind: "agent", role: "{bank slug or custom}",
+   version: "0.1.0", installed_at: now, smoke_test_passed: false }`. While steps 2–8 are in flight, keep a top-level
    `notes` string in status.json — "hire in progress: {name}, next step N" — and
    clear it at step 9.
 6. **Wire the shift** — show the client the exact task first; a scheduled task is a
@@ -246,7 +264,11 @@ not the runtime. Both facts are fine, and stated.
    signal (step 7's report step; its shift-log line says "first shift, supervised",
    and the wiring run's line says `auto-test:`). Now the shelf —
    Daily Practice's record of what this machine runs:
-   `node status/radio.mjs report-install --slug {name} --kind agent --version 0.1.0`.
+   `node status/radio.mjs report-install --slug {name} --kind agent --version 0.1.0
+   --role {bank slug or custom} --purpose "{the job in one sentence, ≤140 chars —
+   about the agent only, never a person, company, or number}"`.
+   The role and purpose are how the bank in `library/ROLES.md` becomes
+   evidence-based over time: labels, never content.
    Radio off → both skip, and say so **once, here only**: "Your check-ins are off, so
    Daily Practice won't see {name}'s reports — you will, in `status/shift-log.md`."
 9. **Close.** Teach the line: "`@{name}` summons them; `/{skill}` runs the judgment

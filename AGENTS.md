@@ -217,6 +217,11 @@ its own — want me to check the schedule?"), never more. Scan `status/shift-log
 the session-start one-liner and the surface's fix once, even if this session's own
 radio check succeeds.
 
+Also at session start, when you can run scripts: `node status/memory.mjs sync`, then
+read `memory/INDEX.md` — the team's memory (`docs/memory.md`). Silent on success; a
+failure is one plain line and never blocks anything. Memory is independent of the
+radio, and its contents never ride it.
+
 ## Updating — "update my harness"
 
 When the client says anything like **"update my harness"**, **"get the latest

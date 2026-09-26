@@ -17,6 +17,24 @@ Write each section for the client who will read it there.
 ---
 
 
+## 0.8.2 — 2026-09-25
+
+The scheduled shift runs on any agent software, not only Claude Code.
+
+- **A hired agent's shift is wired to the tool you actually run.** The wake-up used to
+  hardcode Claude Code, so on Codex the scheduled task never ran and Daily Practice
+  never heard that the shift happened. The shift now uses the run command for your
+  surface, from `unattendedRunner(chosen_surface)` in `status/shapes.mjs`: `claude -p`
+  on Claude Code, `codex exec` on Codex, with the sandbox told to allow the radio's one
+  network call.
+- **Codex gets its own unattended command, documented.** `agent/adapters/codex.md` now
+  spells out the `codex exec` line and why a scheduled run needs sandbox network access.
+- **A woken agent knows which surface it is.** The scheduled prompt now reads
+  `machine_profile` and opens the matching adapter first, so it knows how to reach the
+  radio on its own surface.
+- Surfaces with no headless command (Cursor, Copilot, chat) are parked honestly, as
+  before: the shift runs while a session is open, and nothing pretends otherwise.
+
 ## 0.8.1 — 2026-09-25
 
 **One notebook, not two.**

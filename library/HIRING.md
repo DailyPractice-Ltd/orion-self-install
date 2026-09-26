@@ -238,22 +238,40 @@ not the runtime. Both facts are fine, and stated.
    clear it at step 9.
 6. **Wire the shift** — show the client the exact task first; a scheduled task is a
    machine change and gets its own yes. The ladder:
-   - **A — native scheduled task on THIS machine** (proven on install #3). The task's
-     prompt, exactly:
-     `Open {absolute folder path} and run the {name} shift: read
+   - **A — native scheduled task on THIS machine** (Claude Code's own scheduled
+     tasks, proven on install #3). This rung is surface-specific: only some surfaces
+     have a native task feature, so it is not always available — when it is not, use
+     B. The task's prompt, exactly:
+     `Open {absolute folder path} and run the {name} shift: first read
+     status/status.json machine_profile and open your surface's agent/adapters file,
+     so you know which surface you are and how to reach the radio here; then read
      .claude/agents/{name}.md, do the job section, then the report section,
      beginning the shift-log note with auto:. Stage everything; ask no questions.`
      (The prompt deliberately contains no quote characters, so it embeds safely in
      the OS-scheduler command lines below.)
      Cloud routines: refuse in one sentence — they run on a fresh copy fetched from
      the internet and cannot see this folder or the radio.
-   - **B — OS scheduler**, when the surface has no native tasks or A fails. Windows:
-     `schtasks /Create /TN "Orion {name} shift" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 07:00 /TR "cmd /c cd /d {folder} && claude -p \"{the same prompt}\""`
+   - **B — OS scheduler**, when the surface has no native tasks or A fails. The
+     command that runs the shift is **the unattended runner for this machine's
+     `machine_profile.chosen_surface`** — never a hardcoded tool. Get it from
+     `unattendedRunner(chosen_surface)` in `status/shapes.mjs` (the single source),
+     or read it from the table below and that surface's adapter:
+
+     | `chosen_surface` | unattended command (`{folder}` = this folder, `{prompt}` = the prompt above) |
+     |---|---|
+     | `claude-code` | `claude -p "{prompt}"` |
+     | `codex` | `codex exec -C "{folder}" --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"` |
+     | anything else | not schedulable unattended — park per Part D (runs when a session is open) |
+
+     Resolve the binary to an **absolute path** (`command -v claude` / `command -v
+     codex`) when you write the task: launchd and schtasks run with a bare PATH, so a
+     plain name often fails. Then wire the run command in:
+     Windows:
+     `schtasks /Create /TN "Orion {name} shift" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 07:00 /TR "cmd /c cd /d {folder} && {run command}"`
      macOS: write `~/Library/LaunchAgents/world.dailypractice.orion.{name}.plist`
-     (ProgramArguments: `zsh -lc 'cd {folder} && claude -p "{the same prompt}"'`,
+     (ProgramArguments: `zsh -lc 'cd {folder} && {run command}'`,
      StartCalendarInterval from Q4), then `launchctl load` it. The agent writes and
-     loads it; the client types nothing. If the plain `claude` name fails in a
-     scheduler, use its full path.
+     loads it; the client types nothing.
    - **C — handoff-triggered** (Q4 said "when something happens"): no timer of its
      own. Append one line to the *upstream* agent's file — "When your shift ends, run
      the {name} shift the same way" — plus a changelog line there. That edit is a

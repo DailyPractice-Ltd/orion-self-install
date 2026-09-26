@@ -139,3 +139,44 @@ export function parseInstallDirective(body) {
   if (version.length === 0 || version.length > 50) return null;
   return { slug, version };
 }
+
+/**
+ * How this surface wakes an agent for an unattended scheduled shift.
+ *
+ * A hired agent's shift has to be launched by a scheduler (launchd, schtasks, or
+ * a native task) with nobody watching, headless, pointed at this folder — and it
+ * must launch the SAME agent software the client runs. Claude Code and Codex are
+ * the two surfaces with a proven non-interactive command; the rest can run a
+ * shift only while a person has a session open, so they are not schedulable
+ * unattended and HIRING.md parks them honestly rather than wiring a command that
+ * will never fire.
+ *
+ * `{prompt}` is the surface-neutral shift prompt; `{folder}` is this harness's
+ * absolute path. Resolve the binary to an absolute path when you write the task
+ * (`command -v <bin>`): launchd and schtasks run with a bare PATH, which is the
+ * real reason a plain binary name can fail in a scheduler.
+ */
+export function unattendedRunner(chosenSurface) {
+  switch (chosenSurface) {
+    case 'claude-code':
+      return { schedulable: true, bin: 'claude', cmd: 'claude -p "{prompt}"' };
+    case 'codex':
+      // codex exec is the non-interactive form. The workspace-write sandbox
+      // blocks the network by default, so a scheduled run's radio call silently
+      // fails unless network_access is on — set it inline so the task never
+      // depends on a separate ~/.codex/config.toml edit having been made.
+      return {
+        schedulable: true,
+        bin: 'codex',
+        cmd: 'codex exec -C "{folder}" --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"',
+      };
+    default:
+      // cursor, copilot-vscode, claude-desktop, chatgpt-app, website-chat, unknown.
+      return {
+        schedulable: false,
+        bin: null,
+        cmd: null,
+        note: 'No proven unattended command on this surface. The shift runs only while a session is open (HIRING.md Part D parks it), unless Claude Code or Codex is also installed here.',
+      };
+  }
+}

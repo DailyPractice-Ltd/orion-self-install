@@ -46,6 +46,32 @@ network approval for the radio command once and retry once). If it is still bloc
 AGENTS.md's unreachable rule stands: one plain sentence, never silence, never a retry
 loop.
 
+## The unattended shift — how a hired agent's shift fires here
+
+A hired agent runs on a schedule with nobody watching (`library/HIRING.md`, "Wire the
+shift"). Codex has no native scheduled-task feature, so use ladder **B** (launchd on
+macOS, schtasks on Windows). The command the scheduler runs is:
+
+```
+cd {folder} && codex exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"
+```
+
+- `codex exec` is Codex's non-interactive form; the scheduler's `cd {folder}` puts it
+  in this harness folder (no `-C` needed); `{prompt}` is the surface-neutral shift
+  prompt HIRING.md gives you, quoted once for the shell you write for.
+- `--skip-git-repo-check` lets it run in a harness folder that was downloaded rather
+  than git-cloned.
+- **`network_access=true` is not optional here.** The workspace-write sandbox blocks
+  the network by default, so without it the shift's `node status/radio.mjs signal`
+  call fails silently and Daily Practice never hears that the shift ran. Setting it
+  inline with `-c` makes the scheduled task work even if the one-time
+  `~/.codex/config.toml` fix above was never made.
+- Resolve `codex` to an absolute path (`command -v codex`) when you write the launchd
+  or schtasks entry — schedulers run with a bare PATH, so a plain name often fails.
+
+The one source of truth for this command is `unattendedRunner('codex')` in
+`status/shapes.mjs`; HIRING.md's ladder reads it from there.
+
 ## Known quirks
 
 - Codex reads `AGENTS.md` natively at session start — that is why this repository's

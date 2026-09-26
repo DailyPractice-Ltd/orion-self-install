@@ -28,6 +28,26 @@ a human through by hand.
 - Edit the knowledge-base files directly as the client talks, rather than asking them to
   paste text into a file themselves.
 
+## The unattended shift — how a hired agent's shift fires here
+
+A hired agent runs on a schedule with nobody watching (`library/HIRING.md`, "Wire the
+shift"). Claude Code can use its own native scheduled task (ladder A) or the OS
+scheduler (ladder B). The headless command the scheduler runs is:
+
+```
+claude -p "{prompt}"
+```
+
+with this folder as the working directory (`cd {folder}` in the scheduler entry), where
+`{prompt}` is the surface-neutral shift prompt HIRING.md gives you. Resolve `claude` to
+an absolute path (`command -v claude`) when you write the entry — schedulers run with a
+bare PATH. The one source of truth for this command is `unattendedRunner('claude-code')`
+in `status/shapes.mjs`.
+
+Cursor and Copilot's agent mode reuse this adapter interactively, but neither has a
+proven headless command, so a shift on those surfaces runs only while a session is open;
+HIRING.md parks it per Part D rather than wiring a task that will not fire.
+
 ## What you still do exactly like the other adapters
 
 - The conversation itself — knowledge-base capture, tone-check, CRM-choice discussion — is

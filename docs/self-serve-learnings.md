@@ -67,6 +67,13 @@ code-capable AI adapter to do it for them. Worth watching for in the first few r
 installs — if this is where people actually get stuck, the fix is probably architectural
 (a different automation layer, or a much thinner n8n-config generator), not more wording.
 
+**Resolved 2026-09-25 (template 1.0.0) — the prediction held, and the fix was
+architectural.** Three real installs later, the n8n workflows had never been run once;
+the agent's own connectors were doing the work. The lane was retired: no n8n account,
+no separate billed AI account, connectors live in the client's own AI surface, and the
+validation tasks prove the same gates through the agent itself. The paragraph above
+stays as written — it called this outcome before any install existed.
+
 ## Explicitly out of scope for this channel
 
 - The IG/LinkedIn content-template layer and the Skool support system aren't built yet

@@ -8,7 +8,7 @@
  * CLIENT in their own workspace (Settings → Developers → API keys — see
  * crm/attio/README.md for a first-time, click-by-click walkthrough if they've never done
  * this before). The key is only ever used for this one command; delete it from anywhere
- * it was pasted once the install is validated (the n8n workflows use their own separate
+ * it was pasted once the install is validated (the agent's connectors use their own separate
  * credential — see connectors/connector-checklist.md).
  *
  * Idempotent: re-running skips anything that already exists (matched by api_slug), so a

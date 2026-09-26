@@ -47,8 +47,8 @@ back (as role slugs and counts, never content) and reshapes the menu.
 - **Typical shift**: weekday mornings, before you start selling.
 - **Success line to offer**: "meetings appear on my calendar with context, and no
   lead sits untouched longer than {n} days."
-- **Head start**: — (bespoke; the `prospect-research-outreach` workflow covers the
-  drafting half if they have n8n).
+- **Head start**: the `prospect-research-outreach` workflow covers the per-prospect
+  drafting half; this role adds the warming cadence around it.
 - **Status**: hypothesis
 
 ## `bdr` — BDR (prospector)

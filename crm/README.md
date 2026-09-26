@@ -37,7 +37,7 @@ Regardless of CRM, the goal is the same three things:
    AI tools, team size) — so the agent has a durable home for context beyond the
    knowledge-base files.
 3. **API access** the client generates themselves (an API key or private-app token) — used
-   once to apply the template, then handed to the client's own n8n workflows for ongoing
+   once to apply the template, then used by the client's own agent connectors for ongoing
    use. It is never stored in this repository and never sent to Daily Practice.
 
 ## Why this doesn't block the rest of the install

@@ -86,6 +86,13 @@ every URL below and carry on — you keep the update, you lose only the freshnes
 guarantee.) Then fetch the manifest at that commit:
 `https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/{COMMIT}/update/manifest.json`
 
+**1b. Refresh the instructions before following them further.** Fetch
+`docs/updating.md` from the same COMMIT and continue from step 2 using **the fetched
+copy** — the local copy describes the version you have, not the one you're getting,
+and a release can change the procedure itself (this step, and step 4b below, are the
+proof). A harness whose local copy predates this step simply gains it on its next
+update; the release nudge tells live harnesses when a one-off re-run is worth it.
+
 Pin to the commit, never the bare `main`, for two reasons. `raw.githubusercontent.com`
 caches the `main` ref for five minutes, so a release made in the last few minutes still
 serves the old manifest and looks like "nothing to update" — a commit URL is always
@@ -97,14 +104,19 @@ exactly the failure this rule prevents.
 
 **2. Compare versions — never roll back.** Read `template_version` from the fetched
 manifest and from `status/status.json`.
-- Equal → say "already on {version} — nothing to update," and stop.
+- Equal → one check before stopping: if any path on the fetched manifest's `remove`
+  list still exists locally, run steps 3 and 4b for those paths only (a maintenance
+  pass — an earlier update under older instructions may have skipped the prune), say
+  what was tidied, and then say "already on {version}." Otherwise say "already on
+  {version} — nothing to update," and stop.
 - Fetched older than local (should never happen against main) → **stop**, touch
   nothing, and say so plainly. An update never goes backwards.
 
-**3. Back up before anything is replaced.** Create
+**3. Back up before anything is replaced or removed.** Create
 `.update-backup/{local-version}-{YYYY-MM-DD}/` and copy every file on the refresh list
-that exists locally into it, preserving paths. This is the undo. Do not skip it because
-the update "looks small."
+**and every file on the `remove` list** that exists locally into it, preserving paths —
+plus one copy of `status/status.json`, so even the checklist keys step 4b deletes have
+an undo. This is the undo. Do not skip it because the update "looks small."
 
 **4. Refresh, allowlist only.** For each path in the manifest's `refresh` list: fetch
 `https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/{COMMIT}/{path}`
@@ -118,28 +130,47 @@ exceptions:
   been), stop for that file, show the client the difference, and let them choose. The
   backup already holds their copy either way.
 
+**4b. Prune, remove-list only.** If the fetched manifest has a `remove` list: delete
+each named path that exists locally (its copy is already in the backup from step 3),
+delete any directory that leaves empty, and tell the client in one plain sentence what
+was retired and why the release notes say so.
+If it has `remove_status_checklist_keys`: delete those keys from `status/status.json`'s
+`checklist` (they described steps that no longer exist; the pre-update copy in the
+backup still holds them). The same two rules apply in
+reverse: **a path not on the `remove` list is never deleted** — not "also tidied" — and
+a file the client visibly personalised gets the same tripwire: show them, let them
+choose, the backup holds it either way.
+
 **5. Prove the scripts survived the trip.** Run `node --check` on every `.mjs` file
 just fetched. A truncated download must fail here, loudly, not at 07:00 tomorrow. On
 any failure: restore that file from the backup and report which one.
 
-**6. Record it.** In `status/status.json` (the client's file — this is the one field an
-update may edit): set `template_version` to the new version, and append one line to
-`notes`: "updated to {version} on {date}; backup in .update-backup/…".
+**6. Record it.** In `status/status.json` (the client's file — an update may edit
+exactly three things in it: `template_version`, one appended `notes` line, and the key
+deletions step 4b names — nothing else, ever): set `template_version` to the new
+version, and append one line to `notes`: "updated to {version} on {date}; backup in
+.update-backup/…".
 
 **7. Prove the radio.** `node status/radio.mjs check` — expect "Radio quiet" or a real
 message. "Didn't answer" here is the third-state rule from AGENTS.md: one plain
 sentence, the fix pointer, never silence.
 
-**8. Report, in plain words, short.** Version from → to; how many files refreshed and
-how many are new; where the backup is; the one-line headline from the new CHANGELOG
-entry; and the sentence that matters: **"your knowledge base, your agents, your skills,
-your status and your logs were not touched."**
+**8. Report, in plain words, short.** Version from → to; how many files refreshed,
+how many are new, and what was pruned; where the backup is; the one-line headline from
+the new CHANGELOG entry; and the sentence that matters: **"your knowledge base, your
+agents, your skills and your logs were not touched — and in your status file, only the
+version number, one note line, and any retired checklist entries changed. Nothing of
+yours."**
 
 ## Restoring
 
-"Restore my harness from the backup" → copy everything from the newest
-`.update-backup/{…}/` back over the current files, set `template_version` back to the
-backup's version, append a notes line. One honest nuance: files that were **new** in the
+"Restore my harness from the backup" → copy every **refresh-list and remove-list**
+file from the newest `.update-backup/{…}/` back over the current files. 
+`status/status.json` is the one exception — it is the client's live record and is
+**never copied back wholesale**: from the backup's copy, re-add only the checklist
+keys the update deleted, set `template_version` back to the backup's version, and
+append a notes line. Everything else in the live status file (stages, packages,
+pairing, notes written since) stays exactly as it is. One honest nuance: files that were **new** in the
 update (they had no pre-update copy to back up) remain after a restore — they are inert
 without the new instructions that referenced them, and the next update refreshes them
 anyway. The backup folder itself is never deleted by any procedure — only the client may

@@ -146,7 +146,7 @@ Match this to `status/status.json`'s `ops_stage` field — each stage has its ow
 |---|---|---|
 | `booked` | Say hello, set expectations, confirm this is a fresh start or a resume | this file |
 | `day1_encode` | Capture the client's knowledge base (business, ICP, offer, tone, objections, commitments) and assemble their agent identity | `agent/agent-definition.md`, `agent/knowledge-base/README.md` |
-| `day2_wire_and_run` | CRM choice + setup, connector auth (CRM/Gmail/Calendar), import the n8n workflows | `crm/README.md`, `connectors/connector-checklist.md`, `n8n/README.md` |
+| `day2_wire_and_run` | CRM choice + setup, connector auth (CRM/email/calendar), first real task through the connectors | `crm/README.md`, `connectors/connector-checklist.md` |
 | `validated` | Run the validation tasks against the client's real accounts | `validation/validation-tasks.md` |
 | `seven_day_checkin` | Client is running solo; you're on standby for questions | `agent/agent-definition.md` (the agent's own daily-drive behaviour) |
 | `formalised` | Install complete and confirmed stable | — |

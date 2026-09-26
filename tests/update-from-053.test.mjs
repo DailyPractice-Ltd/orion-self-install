@@ -45,6 +45,8 @@ const BASELINE_TAG = 'v0.5.3';
 
 const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
 const REFRESH = manifest.refresh;
+const REMOVE = manifest.remove || [];
+const REMOVE_KEYS = manifest.remove_status_checklist_keys || [];
 const TARGET_VERSION = manifest.template_version;
 
 function haveBaselineTag() {
@@ -132,11 +134,36 @@ function runUpdate(dir, { honourTripwire = true } = {}) {
     (existed ? refreshed : created).push(rel);
   }
 
+  // Step 3 also holds one copy of status.json, so 4b's key deletions have an undo.
+  mkdirSync(join(backupDir, 'status'), { recursive: true });
+  copyFileSync(join(dir, 'status/status.json'), join(backupDir, 'status/status.json'));
+
+  // Step 4b: prune, remove-list only — backup first, tripwire honoured, then
+  // delete, then clear any directory the prune emptied.
+  const removed = [];
+  for (const rel of REMOVE) {
+    const dest = join(dir, rel);
+    if (!existsSync(dest)) continue;
+    const bk = join(backupDir, rel);
+    mkdirSync(dirname(bk), { recursive: true });
+    copyFileSync(dest, bk);
+    backedUp.push(rel);
+    if (honourTripwire && readFileSync(dest, 'utf8').includes(businessName)) {
+      tripped.push(rel);
+      continue;
+    }
+    rmSync(dest);
+    removed.push(rel);
+    const parent = dirname(dest);
+    if (existsSync(parent) && readdirSync(parent).length === 0) rmSync(parent, { recursive: true });
+  }
+
   const status = JSON.parse(readFileSync(join(dir, 'status/status.json'), 'utf8'));
+  for (const key of REMOVE_KEYS) delete (status.checklist || {})[key];
   status.template_version = TARGET_VERSION;
   writeFileSync(join(dir, 'status/status.json'), JSON.stringify(status, null, 2));
 
-  return { backupDir, backedUp, created, refreshed, tripped, from: localVersion };
+  return { backupDir, backedUp, created, refreshed, tripped, removed, from: localVersion };
 }
 
 test('0.5.3 genuinely lacks the update layer — the paste is the only way through', (t) => {
@@ -193,6 +220,53 @@ test('every shipped script still parses after the trip', (t) => {
     const r = spawnSync(process.execPath, ['--check', join(dir, rel)], { encoding: 'utf8' });
     assert.equal(r.status, 0, `node --check failed for ${rel}: ${r.stderr}`);
   }
+});
+
+test('the prune retires the n8n lane: files gone, backed up, checklist keys dropped', (t) => {
+  if (!haveBaselineTag()) return t.skip(`${BASELINE_TAG} not fetched`);
+  const dir = makeClient();
+  // A 0.5.3 tree genuinely has the lane this release removes.
+  assert.ok(existsSync(join(dir, 'n8n/README.md')), '0.5.3 baseline should ship n8n/');
+  const before = JSON.parse(readFileSync(join(dir, 'status/status.json'), 'utf8'));
+  assert.ok('n8n_wf01_imported' in before.checklist, 'baseline checklist should carry the key');
+
+  const { backupDir, removed } = runUpdate(dir);
+
+  assert.ok(REMOVE.length >= 3, 'this release names the three n8n files to remove');
+  for (const rel of REMOVE) {
+    assert.equal(existsSync(join(dir, rel)), false, `${rel} should be pruned`);
+    assert.ok(existsSync(join(backupDir, rel)), `${rel} pruned without a backup`);
+  }
+  assert.deepEqual(removed.sort(), [...REMOVE].sort());
+  assert.equal(existsSync(join(dir, 'n8n')), false, 'the emptied n8n/ directory should be gone too');
+  assert.ok(existsSync(join(backupDir, 'status/status.json')), 'status.json must be in the backup — the key deletions need an undo');
+
+  const after = JSON.parse(readFileSync(join(dir, 'status/status.json'), 'utf8'));
+  for (const key of REMOVE_KEYS) {
+    assert.equal(key in after.checklist, false, `${key} should be dropped from checklist`);
+  }
+  // The keys the release did not name survive untouched.
+  assert.ok('connector_crm_live' in after.checklist, 'unrelated checklist keys must survive');
+});
+
+test('the prune tripwire keeps a personalised remove-list file — backed up, flagged, not deleted', (t) => {
+  if (!haveBaselineTag()) return t.skip(`${BASELINE_TAG} not fetched`);
+  // The real 0.5.x cohort: the old install prompt had clients fill their business
+  // name into the workflow JSONs, so their prune ALWAYS takes this branch.
+  const dir = makeClient({ handEditedFile: 'n8n/wf-01-prospect-research-outreach.json' });
+  const theirs = readFileSync(join(dir, 'n8n/wf-01-prospect-research-outreach.json'), 'utf8');
+  const { backupDir, tripped, removed } = runUpdate(dir);
+
+  assert.ok(tripped.includes('n8n/wf-01-prospect-research-outreach.json'), 'personalised file was not flagged');
+  assert.ok(!removed.includes('n8n/wf-01-prospect-research-outreach.json'), 'a tripped file must not be deleted');
+  assert.equal(
+    readFileSync(join(dir, 'n8n/wf-01-prospect-research-outreach.json'), 'utf8'), theirs,
+    'their personalised copy was altered',
+  );
+  assert.ok(existsSync(join(backupDir, 'n8n/wf-01-prospect-research-outreach.json')), 'tripped file must still be backed up');
+  assert.ok(existsSync(join(dir, 'n8n')), 'the directory must survive while a tripped file remains in it');
+  // The other, untouched remove-list files still prune normally.
+  assert.equal(existsSync(join(dir, 'n8n/README.md')), false, 'clean siblings should still be pruned');
 });
 
 test('the tripwire stops on a Daily Practice file the client hand-edited', (t) => {

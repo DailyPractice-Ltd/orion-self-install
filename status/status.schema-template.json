@@ -1,6 +1,6 @@
 {
-  "schema_version": "1.5.0",
-  "template_version": "0.8.1",
+  "schema_version": "1.6.0",
+  "template_version": "1.0.0",
   "client_id": null,
   "business_name": null,
   "agent_name": null,
@@ -23,8 +23,6 @@
     "connector_crm_live": false,
     "connector_email_live": false,
     "connector_calendar_live": false,
-    "n8n_wf01_imported": false,
-    "n8n_wf02_imported": false,
     "vt00_environment_sanity": false,
     "vt01_research_e2e": false,
     "vt02_decline_path": false,

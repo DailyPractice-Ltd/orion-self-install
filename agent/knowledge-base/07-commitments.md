@@ -3,7 +3,7 @@
 <!-- Capture prompts (delete once filled):
   - "What volume of [activity] feels comfortable per month?" → then: "+5% on that — deal?"
   - Agree each number explicitly, out loud (or in writing, if this is a chat). These get
-    wired into status/status.json's pacing and (if built) the n8n workflows — they are
+    wired into status/status.json's pacing and your hired agents' shifts — they are
     throughput targets, not aspirations.
   - Example shape: 100 IG DMs/mo, 7 blog posts/mo, 40 forum engagements/mo.
 -->
@@ -12,7 +12,7 @@ Agreed with {{CLIENT_NAME}} on {{DATE}}, directly in this conversation.
 
 | # | Activity (their words) | Monthly number | Tracked where | Fed by which workflow |
 |---|---|---|---|---|
-| 1 | {{e.g. IG DMs to new seekers}} | {{100 / month}} | {{their CRM's daily-drive view}} | {{WF-01 prospect research → outreach}} |
+| 1 | {{e.g. IG DMs to new seekers}} | {{100 / month}} | {{their CRM's daily-drive view}} | {{e.g. the prospect-research-outreach workflow, or a hired agent's shift}} |
 | 2 | {{e.g. blog posts}} | {{7 / month}} | {{…}} | {{agent drafting, manual publish}} |
 | 3 | {{e.g. forum engagements}} | {{40 / month}} | {{…}} | {{…}} |
 

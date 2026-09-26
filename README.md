@@ -84,7 +84,7 @@ from there, fits it to your business, and proves it works on your real data.
 **Workflows** — automated chains, gated on your yes:
 
 - **[Prospect Research → Outreach](library/workflows/prospect-research-outreach/PACKAGE.md)**
-  — form in, researched draft out, waiting in your Drafts.
+  — a prospect's name in, researched draft out, waiting in your Drafts.
 - **[Post-Call Debrief](library/workflows/post-call-debrief/PACKAGE.md)** — call notes
   in; summary, CRM update and follow-up draft out.
 

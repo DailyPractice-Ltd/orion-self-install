@@ -34,6 +34,10 @@ persistent chat, first message = instructions, re-pinned as needed) adapted for 
 
 - Project knowledge is retrieved automatically — don't paste KB contents into the
   instructions as well (duplication drifts; the files are the single source).
-- Connectors/MCP inside Claude are **out of scope for the agent layer** — CRM/email/
-  calendar actions run through the n8n workflows, which carry the approval gates. Don't
-  wire a send-capable connector directly into the Project.
+- Connectors/MCP inside Claude are **how the agent reaches the client's tools** —
+  connect the three the checklist names (CRM read-and-write, email read-and-draft,
+  calendar read) and nothing else. The
+  approval gate is the agent's own non-negotiable rules (drafts only, explicit yes;
+  Article III), not the tool: connectors read and stage drafts; **sending stays the
+  client's own act, from their own Drafts folder** — the agent never instructs a tool
+  to send (agent-definition rule 1).

@@ -8,7 +8,7 @@
  * (Settings → Integrations → Private Apps — see crm/hubspot/README.md for a first-time,
  * click-by-click walkthrough) with crm.schemas.contacts.write, crm.schemas.companies.write,
  * and crm.objects.deals.write scopes. The token is only ever used for this one command;
- * deactivate the private app once the install is validated (the n8n workflows use their
+ * deactivate the private app once the install is validated (the agent's connectors use their
  * own separate credential — see connectors/connector-checklist.md).
  *
  * Idempotent: re-running skips anything that already exists (matched by internal name),

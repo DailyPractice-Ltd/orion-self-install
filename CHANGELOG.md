@@ -17,6 +17,40 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.0.0 — 2026-09-25
+
+**The install gets simpler: n8n is gone, and so is the one step that cost money.**
+
+Real installs told us something: nobody used n8n. The agent's own connectors did
+the work — reading your CRM, staging drafts in your actual Drafts folder, waiting
+for your yes — and the workflow tool sat unopened. So it's out of the foundations.
+
+What that means for you, in plain terms:
+
+- **No n8n account.** The "Step zero" signup is gone from the connector checklist.
+- **No second AI account with a card on file.** The separately-billed
+  console.anthropic.com account existed only to power the n8n workflows. It was
+  the one step in the whole install that cost anything beyond what you already
+  pay — it no longer exists.
+- **Connecting is simpler and the checks are more honest.** Each connector now
+  proves itself in conversation: your agent reads back your real calendar, names
+  your real pipeline stages, stages a real test draft. No dashboard to interpret.
+- **The two workflow packages stay — re-platformed.** Prospect Research → Outreach
+  and Post-Call Debrief (both 2.0.0) run as your agent's own standing procedures,
+  same approval gates: drafts only, CRM writes on your yes, no auto-send path.
+- **Nothing about your protections changed.** Every external action still stages
+  for your explicit yes — that rule lives in your agent, and always did.
+- **Updating cleans up after itself.** "Update my harness" can now retire files a
+  release removed (backed up first, same as everything else). Coming from an
+  older version, the update refreshes its own instructions first and then prunes
+  your n8n folder and its two checklist entries; if your assistant followed its
+  older instructions and the folder lingered, saying "update my harness" once
+  more clears it — and we'll nudge live harnesses over the radio either way.
+
+Why 1.0.0: this repository's own rule is that a change to the install sequence is
+a major version — and this one is earned by real installs, which is the bar 1.0.0
+was always meant to clear.
+
 ## 0.8.1 — 2026-09-25
 
 **One notebook, not two.**

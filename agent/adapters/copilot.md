@@ -16,7 +16,10 @@ organisation.
    the knowledge files.
 3. **Knowledge**: upload the seven knowledge-base files (or point the agent at a dedicated
    SharePoint/OneDrive folder containing exactly those seven files).
-4. **Actions/plugins**: **none**. External actions run through n8n with approval gates. In
+4. **Actions/plugins**: only the connectors the checklist names (CRM read-and-write, email read-and-draft,
+   calendar read). The approval gate is the agent's own rules — drafts only; sending
+   stays the client's own act, from their own Drafts folder, never the agent
+   instructing a tool (agent-definition rule 1). In
    a work/organisation tenant, an admin may need to approve the agent — if the client
    mentions this, tell them plainly it may take time and isn't something either of you can
    speed up.

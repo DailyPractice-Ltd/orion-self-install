@@ -95,8 +95,8 @@ placeholder references once captured.
   access toggles visible.
 - **HubSpot → Settings → Integrations → Private Apps**, the Scopes tab, with the five
   required scopes checked.
-- **n8n**, the blank canvas right after first login, and separately, the "Import from
-  file" menu item.
+- ~~n8n (blank canvas + "Import from file" menu)~~ — lane retired with template
+  1.0.0; never shot, no longer needed.
 - **Gmail Drafts folder**, showing one staged draft — the single best "trust me, it
   really does just wait for you" image in the whole repository, worth prioritising if
   you only add one more.

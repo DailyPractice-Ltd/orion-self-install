@@ -16,9 +16,12 @@ use the fallback below).
    knowledge files (they're already there — just remove the duplicated lines).
 3. **Knowledge**: upload the seven completed knowledge-base files with numbered filenames
    intact.
-4. **Capabilities**: enable web browsing (prospect research needs it). **Disable** any
-   Actions — external actions run through n8n with approval gates, never from the GPT
-   itself.
+4. **Capabilities**: enable web browsing (prospect research needs it). Connect only the
+   connectors the checklist names (CRM read-and-write, email read-and-draft, calendar
+   read). The approval
+   gate is the agent's own rules — drafts only; sending stays the client's own act,
+   from their own Drafts folder, never the agent instructing a tool
+   (agent-definition rule 1).
 5. **First-run check, right there in the conversation**: the vocabulary check — one
    prospect-research task, read the draft back, "does this sound like you?"
 

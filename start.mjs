@@ -215,7 +215,17 @@ function migrate(status) {
   // key. A bookmark written before pairing existed simply carries null.
   // 1.4.0 adds sharing.radio_seen_through: the newest message the radio has read
   // out, so nothing is repeated. Null means the radio has not read one out yet.
-  status.schema_version = '1.4.0';
+  // 1.5.0 adds the memory block (the team notebook's wiring — docs/memory.md).
+  if (!status.memory || typeof status.memory !== 'object') {
+    status.memory = { enabled: true, backend: 'folder', remote: null, path: 'memory' };
+  }
+  // 1.6.0 retires the n8n lane: its two checklist keys describe steps that no
+  // longer exist. Never resurrect them; drop them from older bookmarks.
+  if (status.checklist) {
+    delete status.checklist.n8n_wf01_imported;
+    delete status.checklist.n8n_wf02_imported;
+  }
+  status.schema_version = '1.6.0';
   return status;
 }
 

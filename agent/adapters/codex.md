@@ -53,11 +53,14 @@ shift"). Codex has no native scheduled-task feature, so use ladder **B** (launch
 macOS, schtasks on Windows). The command the scheduler runs is:
 
 ```
-codex exec -C "{folder}" --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"
+cd {folder} && codex exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"
 ```
 
-- `codex exec` is Codex's non-interactive form; `-C "{folder}"` points it at this
-  harness folder; `{prompt}` is the surface-neutral shift prompt HIRING.md gives you.
+- `codex exec` is Codex's non-interactive form; the scheduler's `cd {folder}` puts it
+  in this harness folder (no `-C` needed); `{prompt}` is the surface-neutral shift
+  prompt HIRING.md gives you, quoted once for the shell you write for.
+- `--skip-git-repo-check` lets it run in a harness folder that was downloaded rather
+  than git-cloned.
 - **`network_access=true` is not optional here.** The workspace-write sandbox blocks
   the network by default, so without it the shift's `node status/radio.mjs signal`
   call fails silently and Daily Practice never hears that the shift ran. Setting it

@@ -151,31 +151,37 @@ export function parseInstallDirective(body) {
  * unattended and HIRING.md parks them honestly rather than wiring a command that
  * will never fire.
  *
- * `{prompt}` is the surface-neutral shift prompt; `{folder}` is this harness's
- * absolute path. Resolve the binary to an absolute path when you write the task
- * (`command -v <bin>`): launchd and schtasks run with a bare PATH, which is the
- * real reason a plain binary name can fail in a scheduler.
+ * Returns the binary and its flags as SEPARATE, QUOTE-FREE parts — never a
+ * ready-quoted command string. The scheduler-writer resolves `bin` to an absolute
+ * path (`command -v <bin>`, since launchd and schtasks run with a bare PATH),
+ * appends `flags`, and quotes the shift prompt exactly ONCE for the shell it is
+ * writing for (single quotes inside a launchd wrapper, escaped `\"` inside a
+ * schtasks `/TR "..."`). The working directory is set by the scheduler's
+ * `cd {folder}`, so it is not a flag. Keeping every part quote-free is what stops
+ * a per-OS quoting bug — a ready-made string with baked-in quotes cannot be
+ * re-quoted safely for a second shell.
  */
 export function unattendedRunner(chosenSurface) {
   switch (chosenSurface) {
     case 'claude-code':
-      return { schedulable: true, bin: 'claude', cmd: 'claude -p "{prompt}"' };
+      return { schedulable: true, bin: 'claude', flags: ['-p'] };
     case 'codex':
-      // codex exec is the non-interactive form. The workspace-write sandbox
-      // blocks the network by default, so a scheduled run's radio call silently
-      // fails unless network_access is on — set it inline so the task never
-      // depends on a separate ~/.codex/config.toml edit having been made.
+      // codex exec is the non-interactive form. --skip-git-repo-check lets it run
+      // in a harness folder that was downloaded rather than git-cloned. The
+      // workspace-write sandbox blocks the network by default, so a scheduled
+      // run's radio call fails unless network_access is on — set it inline so the
+      // task never depends on a separate ~/.codex/config.toml edit having been made.
       return {
         schedulable: true,
         bin: 'codex',
-        cmd: 'codex exec -C "{folder}" --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"',
+        flags: ['exec', '--skip-git-repo-check', '--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=true'],
       };
     default:
       // cursor, copilot-vscode, claude-desktop, chatgpt-app, website-chat, unknown.
       return {
         schedulable: false,
         bin: null,
-        cmd: null,
+        flags: null,
         note: 'No proven unattended command on this surface. The shift runs only while a session is open (HIRING.md Part D parks it), unless Claude Code or Codex is also installed here.',
       };
   }

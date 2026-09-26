@@ -257,21 +257,28 @@ not the runtime. Both facts are fine, and stated.
      `unattendedRunner(chosen_surface)` in `status/shapes.mjs` (the single source),
      or read it from the table below and that surface's adapter:
 
-     | `chosen_surface` | unattended command (`{folder}` = this folder, `{prompt}` = the prompt above) |
-     |---|---|
-     | `claude-code` | `claude -p "{prompt}"` |
-     | `codex` | `codex exec -C "{folder}" --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"` |
-     | anything else | not schedulable unattended — park per Part D (runs when a session is open) |
+     The runner is a **binary** and its **flags**, both quote-free (the working
+     directory is set by the `cd {folder}` in the wrapper, not a flag):
 
-     Resolve the binary to an **absolute path** (`command -v claude` / `command -v
-     codex`) when you write the task: launchd and schtasks run with a bare PATH, so a
-     plain name often fails. Then wire the run command in:
-     Windows:
-     `schtasks /Create /TN "Orion {name} shift" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 07:00 /TR "cmd /c cd /d {folder} && {run command}"`
+     | `chosen_surface` | `{bin}` | `{flags}` |
+     |---|---|---|
+     | `claude-code` | `claude` | `-p` |
+     | `codex` | `codex` | `exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_write.network_access=true` |
+     | anything else | — | not schedulable unattended — park per Part D (runs when a session is open) |
+
+     Resolve `{bin}` to an **absolute path** (`command -v claude` / `command -v codex`)
+     when you write the task: launchd and schtasks run with a bare PATH, so a plain
+     name often fails. The shift prompt is quote-free, so quote it **once**, for the
+     shell you are writing — this is the step that used to break on Windows:
      macOS: write `~/Library/LaunchAgents/world.dailypractice.orion.{name}.plist`
-     (ProgramArguments: `zsh -lc 'cd {folder} && {run command}'`,
-     StartCalendarInterval from Q4), then `launchctl load` it. The agent writes and
-     loads it; the client types nothing.
+     (ProgramArguments `zsh -lc 'cd {folder} && {bin} {flags} "{prompt}"'`,
+     StartCalendarInterval from Q4), then `launchctl load` it. The single-quoted
+     wrapper means the prompt's double quotes are literal.
+     Windows:
+     `schtasks /Create /TN "Orion {name} shift" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 07:00 /TR "cmd /c cd /d {folder} && {bin} {flags} \"{prompt}\""`
+     — the quotes around `{prompt}` are escaped `\"` because the whole `/TR` value is
+     already double-quoted; without the escaping the command is truncated.
+     The agent writes and loads it; the client types nothing.
    - **C — handoff-triggered** (Q4 said "when something happens"): no timer of its
      own. Append one line to the *upstream* agent's file — "When your shift ends, run
      the {name} shift the same way" — plus a changelog line there. That edit is a

@@ -2,7 +2,9 @@
 
 Authenticated setup for the three connector families: **CRM** (Attio or HubSpot, or
 whatever you set up manually), **your email**, and **your calendar**. "Connecting" a
-service just means giving your AI assistant permission to read and draft on your behalf —
+service just means giving your AI assistant permission to work in it on your behalf —
+reading everywhere; drafting in your email; writing to your CRM only ever after your
+yes on that specific change —
 the same kind of "Sign in with Google" or "Allow access" screen you've clicked through for
 other apps before. Work through this top to bottom; the install status only moves from
 `configured` to `connected` once **every** item is actually confirmed working, not just
@@ -52,7 +54,9 @@ step, confirming each one works as you go. Your adapter file
 - [ ] Attio template applied (see [`crm/attio/README.md`](../crm/attio/README.md)) —
       lists, stages, attributes exist
 - [ ] Connect Attio in your AI assistant's connector settings (or hand your agent the
-      access token you generated, where your AI tool takes one)
+      access token you generated, where your AI tool takes one). Allow read **and**
+      write — the validation tasks prove a CRM round-trip, and every write still
+      waits for your yes (that rule lives in the agent, not the connector)
 - [ ] **You'll know it's connected when**: you ask your agent "what stages does my
       pipeline have?" and it reads back your actual Attio stages, by name. If it can't,
       the token was probably copied incorrectly — go back to Attio and generate a fresh
@@ -62,7 +66,9 @@ step, confirming each one works as you go. Your adapter file
 
 - [ ] Stages/properties configured per [`crm/hubspot/README.md`](../crm/hubspot/README.md)
 - [ ] Connect HubSpot in your AI assistant's connector settings and sign in with your
-      HubSpot account when prompted
+      HubSpot account when prompted. Allow read **and** write — the validation tasks
+      prove a CRM round-trip, and every write still waits for your yes (that rule
+      lives in the agent, not the connector)
 - [ ] **You'll know it's connected when**: you ask your agent "what stages does my
       pipeline have?" and it reads back your actual HubSpot stages, by name
 

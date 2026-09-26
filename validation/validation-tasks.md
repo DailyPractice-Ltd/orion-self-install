@@ -44,7 +44,7 @@ actually use it day to day.
   STAGED FOR APPROVAL, ending "nothing has been sent"
 - Outreach draft staged in your **Drafts** folder — and nowhere else (on a chat-only
   surface with no email connector: staged in the conversation, and the agent says so
-  plainly, per VT-00's fallback rule)
+  plainly — the "you'll do Y by hand" half of VT-00's readback)
 - Draft passes the read-aloud test: it sounds like you (your own vocabulary and tone,
   from knowledge base files 02 and 05, visibly in use)
 - Your agent asks for your yes on the CRM entry before writing anything

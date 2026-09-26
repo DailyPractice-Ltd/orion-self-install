@@ -27,7 +27,7 @@ Install the Prospecting agent from my Orion folder.
 3. Build my first batch: ~20 companies/people matching the ICP, each with a
    one-line "why them" tied to something checkable (size, trigger event, sector,
    vocabulary match) — never a guessed fact stated as truth.
-4. For the ones I pick, stage first-touch drafts (via the wf-01 workflow if it's
+4. For the ones I pick, stage first-touch drafts (via the Prospect Research → Outreach procedure if it's
    installed, otherwise as drafts in our chat for me to copy). Send nothing.
 5. Count only evidence: a prospect isn't "contacted" until a real touch is logged
    in my CRM, and isn't "interested" until a two-way exchange happened. Feed

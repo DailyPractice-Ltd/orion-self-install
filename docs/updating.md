@@ -104,7 +104,11 @@ exactly the failure this rule prevents.
 
 **2. Compare versions — never roll back.** Read `template_version` from the fetched
 manifest and from `status/status.json`.
-- Equal → say "already on {version} — nothing to update," and stop.
+- Equal → one check before stopping: if any path on the fetched manifest's `remove`
+  list still exists locally, run steps 3 and 4b for those paths only (a maintenance
+  pass — an earlier update under older instructions may have skipped the prune), say
+  what was tidied, and then say "already on {version}." Otherwise say "already on
+  {version} — nothing to update," and stop.
 - Fetched older than local (should never happen against main) → **stop**, touch
   nothing, and say so plainly. An update never goes backwards.
 
@@ -151,18 +155,22 @@ version, and append one line to `notes`: "updated to {version} on {date}; backup
 message. "Didn't answer" here is the third-state rule from AGENTS.md: one plain
 sentence, the fix pointer, never silence.
 
-**8. Report, in plain words, short.** Version from → to; how many files refreshed and
-how many are new; where the backup is; the one-line headline from the new CHANGELOG
-entry; and the sentence that matters: **"your knowledge base, your agents, your skills,
-your status and your logs were not touched."**
+**8. Report, in plain words, short.** Version from → to; how many files refreshed,
+how many are new, and what was pruned; where the backup is; the one-line headline from
+the new CHANGELOG entry; and the sentence that matters: **"your knowledge base, your
+agents, your skills and your logs were not touched — and in your status file, only the
+version number, one note line, and any retired checklist entries changed. Nothing of
+yours."**
 
 ## Restoring
 
-"Restore my harness from the backup" → copy everything from the newest
-`.update-backup/{…}/` back over the current files (files the update pruned included —
-their copies are in the backup too, and checklist keys the update deleted are restored
-from the backup's `status/status.json` copy), set `template_version` back to the
-backup's version, append a notes line. One honest nuance: files that were **new** in the
+"Restore my harness from the backup" → copy every **refresh-list and remove-list**
+file from the newest `.update-backup/{…}/` back over the current files. 
+`status/status.json` is the one exception — it is the client's live record and is
+**never copied back wholesale**: from the backup's copy, re-add only the checklist
+keys the update deleted, set `template_version` back to the backup's version, and
+append a notes line. Everything else in the live status file (stages, packages,
+pairing, notes written since) stays exactly as it is. One honest nuance: files that were **new** in the
 update (they had no pre-update copy to back up) remain after a restore — they are inert
 without the new instructions that referenced them, and the next update refreshes them
 anyway. The backup folder itself is never deleted by any procedure — only the client may

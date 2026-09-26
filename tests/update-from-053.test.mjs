@@ -249,6 +249,26 @@ test('the prune retires the n8n lane: files gone, backed up, checklist keys drop
   assert.ok('connector_crm_live' in after.checklist, 'unrelated checklist keys must survive');
 });
 
+test('the prune tripwire keeps a personalised remove-list file — backed up, flagged, not deleted', (t) => {
+  if (!haveBaselineTag()) return t.skip(`${BASELINE_TAG} not fetched`);
+  // The real 0.5.x cohort: the old install prompt had clients fill their business
+  // name into the workflow JSONs, so their prune ALWAYS takes this branch.
+  const dir = makeClient({ handEditedFile: 'n8n/wf-01-prospect-research-outreach.json' });
+  const theirs = readFileSync(join(dir, 'n8n/wf-01-prospect-research-outreach.json'), 'utf8');
+  const { backupDir, tripped, removed } = runUpdate(dir);
+
+  assert.ok(tripped.includes('n8n/wf-01-prospect-research-outreach.json'), 'personalised file was not flagged');
+  assert.ok(!removed.includes('n8n/wf-01-prospect-research-outreach.json'), 'a tripped file must not be deleted');
+  assert.equal(
+    readFileSync(join(dir, 'n8n/wf-01-prospect-research-outreach.json'), 'utf8'), theirs,
+    'their personalised copy was altered',
+  );
+  assert.ok(existsSync(join(backupDir, 'n8n/wf-01-prospect-research-outreach.json')), 'tripped file must still be backed up');
+  assert.ok(existsSync(join(dir, 'n8n')), 'the directory must survive while a tripped file remains in it');
+  // The other, untouched remove-list files still prune normally.
+  assert.equal(existsSync(join(dir, 'n8n/README.md')), false, 'clean siblings should still be pruned');
+});
+
 test('the tripwire stops on a Daily Practice file the client hand-edited', (t) => {
   if (!haveBaselineTag()) return t.skip(`${BASELINE_TAG} not fetched`);
   const dir = makeClient({ handEditedFile: 'AGENTS.md' });

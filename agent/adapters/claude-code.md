@@ -19,12 +19,13 @@ a human through by hand.
   it anywhere but the one command that needs it).
 - Run `status/emit-status.mjs` for the install checkpoint on stage changes, if the client
   has left check-ins enabled.
-- Run `node status/radio.mjs signal --type <type>` at the day-to-day agent's enumerated
-  signal moments (the "# The radio" section of the system prompt; full table in
-  `docs/radio.md`) — the code-capable adapters (this file and `codex.md`) are the only
-  ones that can, so they're the only ones where those signals happen. Same gate as
-  everything outbound: radio on, moment
-  occurred, client's yes already given on the work itself.
+- Report finished work, the way the "# The radio" section of the system prompt says
+  (full table in `docs/radio.md`): `node status/done.mjs` when a task the client set
+  is finished, and `node status/radio.mjs signal --type <type>` at the five approval
+  moments. The code-capable adapters (this file and `codex.md`) are the only ones
+  that can run those commands, so they are the only surfaces where work is
+  reported. Same gate as everything outbound: the radio is on, the work is
+  finished, and it is work the client asked for or approved.
 - Edit the knowledge-base files directly as the client talks, rather than asking them to
   paste text into a file themselves.
 

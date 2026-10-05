@@ -38,7 +38,7 @@ memory/
     inbox.md         append-only proposals: any agent may suggest a shared truth here
   roles/<area>/      memory by role area — sales/, ops/, recruitment/, ...
   agents/<name>/     each agent's own corner:
-    log.md             its shift summaries (the report step writes here)
+    log.md             its work log: one line per finished task or shift (the report step writes here)
     learning.md        curated lessons — ID, source, rule, status: active | candidate | superseded
 ```
 
@@ -58,16 +58,21 @@ A hired agent called the dream runs while you sleep (the package at
 fact files, then tidies: merges duplicates, replaces contradicted facts with the
 latest truth (marking the old one superseded, never deleting history), folds accepted
 inbox proposals into `shared/`, prunes noise, rewrites `INDEX.md`, and checks that
-nothing credential-shaped slipped in. It reports like any other shift: one shift-log
-line, one `routine_completed` ping with a count. You wake up to a cleaner notebook.
+nothing credential-shaped slipped in. It reports like any other shift (a shift is
+work a hired agent does on a schedule): one line in the shift log, and one signal
+with a count when check-ins are on. On the wire that signal is called
+`routine_completed`. You wake up to a cleaner notebook.
 
 ## The habits (already installed — you set up nothing)
 
 - **Before work**: sync, read `INDEX.md` and the job's scopes.
 - **After work**: one summary line to the agent's own log, any durable new fact as one
   small file, shared truths proposed to the inbox — then sync.
-- **The report step**: the same one-line shift summary is written into memory before
-  it is radioed. Local first, always; radio second, only when on.
+- **The report step**: when a task or a shift is finished, one command
+  (`node status/done.mjs`) writes its one-line summary on this machine first (the
+  work log or the shift log in `status/`, and this memory log), and only
+  then reports. The line itself stays here. What is radioed, when check-ins are on,
+  is a tag and a count. Local first, always; radio second, only when on.
 - Memory never blocks work: missing, misconfigured, or unsyncable memory means one
   plain line and the work carries on. Memory is also completely independent of the
   radio — check-ins off, memory still on.

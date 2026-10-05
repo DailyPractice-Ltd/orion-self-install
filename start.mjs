@@ -311,7 +311,7 @@ const STAGE_WORDS = {
   day1_encode: 'teaching your AI about your business (the knowledge base)',
   day2_wire_and_run: 'connecting your tools — CRM, email, calendar',
   validated: 'proving everything works against your real accounts',
-  seven_day_checkin: 'up and running solo — your AI is on standby for questions',
+  seven_day_checkin: 'driving it solo, with your AI on standby for questions',
   formalised: 'complete — Orion is installed and confirmed stable',
 };
 
@@ -450,13 +450,17 @@ async function main() {
   rule();
   if (status.sharing.radio_choice === null) {
     say('');
-    say('Orion checks in with Daily Practice so we can support you and count');
-    say('your system as running. A check-in is small and boring on purpose: which');
-    say('install step you\'re on, "a task ran just now," and which packages you\'ve');
-    say('installed — never the content of your messages, your knowledge base, or your');
-    say('prospects. You can switch this off, now or with one edit later, and');
-    say('everything else works exactly the same. (We call this the radio — full');
-    say('detail: docs/radio.md.)');
+    // These sentences are the consent itself. AGENTS.md presents the same choice in
+    // the same words, and tests/finished-work.test.mjs fails if the two ever differ.
+    say('Your harness checks in with Daily Practice so we can support you and');
+    say('count your system as running. It shares which step you\'re on, what kind');
+    say('of task finished (a general tag such as "prospecting", a count, and which');
+    say('skill or agent ran), and which packages you\'ve installed. Never the');
+    say('content of your messages, your knowledge base, or your prospects. You can');
+    say('switch this off.');
+    say('');
+    say('(We call this the radio. You can switch it off now or with one edit later,');
+    say('and everything else works exactly the same. Full detail: docs/radio.md.)');
     say('');
     const keep = (typeof cliFlags.checkins === 'string'
       ? (say(`  Keep check-ins on? [Y/n] (from --checkins): ${cliFlags.checkins}`), cliFlags.checkins)
@@ -635,8 +639,9 @@ async function sendFirstSignal(status) {
       signal: AbortSignal.timeout(NETWORK_TIMEOUT_MS),
     });
     if (res.ok) {
-      say('  ✓ The first check-in just landed with Daily Practice — your system now');
-      say('    counts as alive. That\'s the radio working.');
+      say('  ✓ The first check-in just landed with Daily Practice. That\'s the radio');
+      say('    working. Your system counts as running once it reports its first');
+      say('    finished task.');
     } else if (res.status === 401) {
       say('  • The radio says that key isn\'t valid (401) — unusual right after');
       say('    pairing. Ask support@dailypractice.world. Nothing else is affected.');

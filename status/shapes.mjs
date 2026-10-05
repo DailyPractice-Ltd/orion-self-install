@@ -9,6 +9,10 @@
  * check-in failed. A shape check was added to the wizard the same day, but the
  * radio itself still trusted mere presence. Now all three agree.
  *
+ * Since 1.1.0 it also holds the two shapes a finished-work report is made of: the
+ * tag menu (WORK_TAGS) and the label rule for what ran (isLabel). status/done.mjs
+ * and status/radio.mjs both read them from here, so they cannot disagree either.
+ *
  * Dependency-free: no imports at all. A sibling .mjs is not a dependency —
  * `import './shapes.mjs'` needs no package.json and no install, so the
  * zero-install promise in README.md is untouched.
@@ -112,6 +116,129 @@ export function memoryConfigured(status) {
 export function memoryOn(status) {
   return memoryConfigured(status);
 }
+
+/**
+ * The tag menu: the kind of work a finished task was, in one word.
+ *
+ * What it is for: every finished task reports one tag, so Daily Practice can see
+ * that a harness was prospecting or working its deals without ever seeing the
+ * task. The tag says what kind of work it was. The content stays on this machine.
+ *
+ * This is the one copy of the menu on the client side. status/done.mjs and
+ * status/radio.mjs refuse any tag that is not on it, docs/radio.md lists the same
+ * tags in the same words, and tests/finished-work.test.mjs fails if the two
+ * drift. The server keeps a twin (WORK_TAGS in packages/harness/src/bridge in the
+ * mono) so the console can group by tag. When nothing fits, the tag is `other`.
+ */
+export const WORK_TAGS = Object.freeze({
+  prospecting: 'finding and researching who to talk to',
+  outreach: 'messages, sequences, follow-up',
+  content: 'collateral, posts, decks, webinars',
+  crm: 'records and pipeline upkeep',
+  calls: 'call prep, debriefs, meeting notes',
+  deals: 'proposals, pricing, contracts',
+  accounts: 'work on existing customers',
+  hiring: 'recruitment and candidates',
+  finance: 'invoices, numbers, bookkeeping',
+  admin: 'inbox, calendar, files',
+  onboarding: 'getting a person or client started',
+  research: 'market, competitor or topic research',
+  reporting: 'reviews, summaries, dashboards',
+  ops: 'upkeep of the harness and the team itself',
+  other: 'anything that fits nowhere above',
+});
+
+/** The shape the server accepts for a tag. Every tag on the menu fits it. */
+export const WORK_TAG_RE = /^[a-z][a-z0-9-]{1,39}$/;
+
+/** Own keys only, so "constructor" or "toString" can never pass as a tag. */
+export function isWorkTag(value) {
+  return typeof value === 'string' && Object.hasOwn(WORK_TAGS, value);
+}
+
+/** The menu as plain lines, for a script to print when a tag is missing or wrong. */
+export function workTagMenu() {
+  const width = Math.max(...Object.keys(WORK_TAGS).map((tag) => tag.length));
+  return Object.entries(WORK_TAGS).map(([tag, meaning]) => `  ${tag.padEnd(width)}  ${meaning}`);
+}
+
+/**
+ * What ran: a skill's slug, or a hired agent's roster name. These ride the radio
+ * beside the tag, so they must be labels and never words: lowercase letters,
+ * digits and hyphens. No spaces, no capitals and no punctuation, so a sentence or
+ * an email address cannot travel in one.
+ *
+ * The two kinds follow the rules that already name them. A roster name is the
+ * naming rule in library/HIRING.md: it starts with a letter and is at most 30
+ * characters. A skill slug is the library's own slug rule (the same one the radio
+ * uses when it installs a skill): it may start with a digit, like "5-whys", and is
+ * at most 100 characters. A skill the radio can install must be a skill a report
+ * can name.
+ */
+export const LABEL_MAX = Object.freeze({ skill: 100, agent: 30 });
+const LABEL_RES = Object.freeze({
+  skill: /^[a-z0-9]+(-[a-z0-9]+)*$/,
+  agent: /^[a-z][a-z0-9-]*$/,
+});
+const LABEL_WORDS = Object.freeze({ skill: 'A slug', agent: 'A roster name' });
+const LABEL_RULES = Object.freeze({
+  skill: 'lowercase letters, digits and single hyphens (like "meeting-sizing")',
+  agent: 'lowercase letters, digits and hyphens, starting with a letter (like "prospecting")',
+});
+
+export function isLabel(value, kind) {
+  return typeof value === 'string' && Object.hasOwn(LABEL_MAX, kind) &&
+    value.length <= LABEL_MAX[kind] && LABEL_RES[kind].test(value);
+}
+
+/** Plain-words reason a skill slug or roster name was rejected, or null when it's fine. */
+export function labelProblem(value, kind) {
+  if (isLabel(value, kind)) return null;
+  const what = LABEL_WORDS[kind] || 'A label';
+  const max = LABEL_MAX[kind];
+  if (typeof value !== 'string' || value.length === 0) return `${what} is missing.`;
+  if (max !== undefined && value.length > max) {
+    return `${what} is at most ${max} characters. That one has ${value.length}.`;
+  }
+  return `${what} is ${LABEL_RULES[kind] || 'a short lowercase label'}. "${value}" is not.`;
+}
+
+/**
+ * How many things were done. One rule, read by status/done.mjs and
+ * status/radio.mjs both, so a count one accepts is never refused by the other.
+ * Plain digits only: Number() exotica like 0x12 or 1e3 do not belong on a wire.
+ * A finished task did at least one thing. Only a shift may report 0: it ran and
+ * found nothing to do. Returns a plain-words problem, or null when it's fine.
+ */
+export function countProblem(text, { allowZero = false } = {}) {
+  if (!/^\d{1,9}$/.test(String(text))) {
+    return 'The count must be a whole number in plain digits (how many things were done).';
+  }
+  if (Number(text) < 1 && !allowZero) {
+    return 'A count of 0 is only for a shift that ran and found nothing to do. A finished task did at least one thing.';
+  }
+  return null;
+}
+
+/**
+ * The credential tripwire. Narrow on purpose: broad patterns would refuse honest
+ * lines. status/memory.mjs refuses a note that matches, and status/done.mjs
+ * refuses a line that matches before it is written anywhere, because the same
+ * line goes to the local logs that other agents read.
+ */
+export const CREDENTIAL_RES = Object.freeze([
+  /orion_[A-Za-z0-9_-]{20,}/,            // an install token
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,  // a key file
+  /\bsk-[A-Za-z0-9_-]{16,}/,             // API-key shapes
+  /\b(password|passwd|api[_-]?key|client[_-]?secret)\s*[:=]\s*\S/i,
+]);
+
+export function looksLikeCredential(text) {
+  return CREDENTIAL_RES.some((re) => re.test(String(text)));
+}
+
+/** One line means one short line: the shift-log contract's own limit. */
+export const LINE_MAX = 120;
 
 /**
  * A skill on offer. Daily Practice ships a skill as a message whose first line is

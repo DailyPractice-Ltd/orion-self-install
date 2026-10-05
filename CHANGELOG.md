@@ -17,6 +17,61 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.1.0 — 2026-10-05
+
+**From this version your harness also tells Daily Practice when a task you set is finished, with a general tag (like "prospecting"), a count, and which skill or agent ran, never the content, and check-ins can still be switched off.**
+
+Running means running. Until now your harness could only report at five approval
+moments, or when a hired agent's schedule fired. So a harness that did real work for
+its owner every day, in ordinary sessions, looked silent to us. We could not tell a
+busy harness from an abandoned one. That was our rule's fault, not yours.
+
+What changed, in plain terms:
+
+- **A finished task is now the thing that gets reported.** When your AI finishes a
+  task you set it (you have the thing you asked for, or the action is taken), it
+  runs one command, `node status/done.mjs`. That command writes one line about the
+  work on your own machine and, if your check-ins are on, sends one signal. Chat
+  sends nothing: a greeting, a question, an answer, a plan, or a draft still waiting
+  on your yes is not finished work.
+- **What the signal carries.** A tag for the kind of work, from a short public menu:
+  prospecting, outreach, content, crm, calls, deals, accounts, hiring, finance,
+  admin, onboarding, research, reporting, ops, or other. A count. The time. And the
+  name of the skill or hired agent that did the work, if one did. That is all.
+- **What it never carries.** The content of the task, who it was for, or the line
+  your AI wrote about it. That line stays on your machine: the command has no way
+  to send it. Token counts are not reported either.
+- **Your switch is unchanged.** Check-ins are still one setting. Switch them off and
+  nothing is sent, while your own records are still written. `docs/radio.md` is the
+  whole story, with the full menu and what each tag means.
+- **Hiring got simpler.** An agent is hired once it has done its job on real work
+  and reported it. It no longer has to run on a schedule, with nobody asking, before
+  it counts. A schedule is optional now: an agent without one is "on call" and works
+  when you ask. An agent with a schedule shows, separately, whether that schedule is
+  proven: it has fired once on its own.
+- **If you hired agents before this version**, your roster may still state the old
+  rule, or show a working agent as "Probation". Your AI will mention it once and fix
+  the roster only on your okay. Agents you already hired keep reporting the way they
+  always did.
+- **Where your own line goes.** A task you asked for is logged in
+  `status/work-log.md`, a scheduled shift in `status/shift-log.md`, and both in your
+  memory log when memory is on. If a report could not reach Daily Practice, one more
+  line is added under it saying so. Neither file is ever touched by an update.
+- **The Dream agent** (1.0.1) reports with the same command. Nothing else about it
+  changed.
+- **Your AI's own instructions stay yours.** An update does not replace the agent
+  definition you filled in together unless you choose that, so its reporting section
+  may still describe the old rule. The new rule applies either way. Your AI will
+  offer, once, to bring that one section up to date, changing nothing else in the
+  file.
+
+One word now means one thing: a "shift" is work a hired agent does on a schedule,
+and nothing else. The short list of such words is in `AGENTS.md`.
+
+For maintainers: constitution 1.4.0 (Article V, Tier 1(b)); the wire is in
+`specs/002-production-line/contracts/bridge-radio.md`; the server side ships in
+`dailypractice-mono` alongside this release.
+
 ## 1.0.0 — 2026-09-25
 
 **The install gets simpler: n8n is gone, and so is the one step that cost money.**

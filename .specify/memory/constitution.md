@@ -1,6 +1,42 @@
 # Orion Self-Install Constitution
 
-**Version**: 1.3.0 | **Ratified**: 2026-07-12 | **Last Amended**: 2026-09-25
+**Version**: 1.4.0 | **Ratified**: 2026-07-12 | **Last Amended**: 2026-10-05
+
+**Sync Impact Report** (amendment 1.4.0, 2026-10-05):
+- Version change: 1.3.0 → 1.4.0 (MINOR: Article V channel 1, Tier 1(b) materially
+  expanded).
+- **What prompted it**: the definition of running was corrected. Running means
+  running: a harness is running when it does work for its human, whether that work
+  was asked for in a session or done on a schedule. Until now only five approval
+  moments and a hired agent's scheduled shift could report, so a harness that worked
+  every day in sessions sent nothing. Template 1.1.0 adds the missing moment, "a task
+  the human set is finished" (`task_completed`, sent by `status/done.mjs`).
+- **What Tier 1(b) now names**: any finished piece of work, asked or scheduled,
+  reports its type, a general tag for the kind of work, a count of things done, a
+  timestamp, and the name of the skill or hired agent that did it. The tag comes from
+  a fixed public menu in `docs/radio.md` (or `other`), and the client's own scripts
+  refuse a tag that is not on it. The names are the ones the shelf already holds
+  under (c).
+- **What did not change**: the never-list. No content, no person's or company's
+  name, no client-authored sentence. The one-line record of the work stays on the
+  client's machine: the script that reports never hands it to the radio, and it
+  checks every label it does hand over (the tag against the menu, each name against
+  the slug shape). The older direct path, `radio.mjs signal --routine`, still takes
+  a hired agent's label as given, so reports from agents hired before 1.1.0 keep
+  working; it has always been a label by instruction, and remains one. So the standing rule holds: nothing client-authored was added to
+  Tier 1. Tiers 2 and 3, the master switch, and channel 2 are untouched. Token
+  counts are not reported.
+- **Lockstep**: `docs/radio.md` (the new row, the tag menu, the three rules),
+  `AGENTS.md` (rule 7 and the consent sentence), `start.mjs` (the same consent
+  sentence) and the two 002 contracts (`bridge-radio.md`, `agent-anatomy.md`) change
+  in the same commit series. The capability and its disclosure ship together.
+- **Impact on installs already underway, and the migration note**: an installed
+  harness starts reporting finished tasks only after it updates to template 1.1.0.
+  The update's closing summary reads the disclosure to the client in full (the 1.1.0
+  CHANGELOG headline; `docs/updating.md` step 8), and check-ins remain one switch.
+  Agents hired before 1.1.0 keep reporting the old way, which stays valid.
+- Proposed in writing per the Amendment Process below. Approval is Daily Practice
+  (the founder) merging branch `007-running-means-running`.
 
 **Sync Impact Report** (amendment 1.3.0, 2026-09-25):
 - Version change: 1.2.0 → 1.3.0 (MINOR — Article V channel 1 restructured and its
@@ -162,9 +198,12 @@ a EULA, never implied.
    entirely — all three tiers, outbound and inbound alike — and changes nothing else
    about the install. Enumerated in
    full, and nothing else rides here: (a) install-stage signals (client identity,
-   current install stage, a timestamp); (b) work heartbeats — the task type and
-   timestamp, and for a hired agent's scheduled shift its routine label and a count of
-   things done, under the standing yes given once at hire on the job sheet that names
+   current install stage, a timestamp); (b) work heartbeats, for any finished piece
+   of work, whether the client asked for it in a session or a hired agent's schedule
+   started it: its type, a general tag for the kind of work from the public menu in
+   `docs/radio.md` (or `other`), a count of things done, a timestamp, and the name
+   of the skill or hired agent that did it, with a scheduled shift reporting under
+   the standing yes given once at hire on the job sheet that names
    the report; (c) package and hire reports — name, kind, version, and for an agent
    hire its **role label**: a slug from `library/ROLES.md`'s public menu, or `custom`;
    (d) the template version of this folder, stated on every radio call; and (e) the

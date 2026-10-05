@@ -162,6 +162,17 @@ agents, your skills and your logs were not touched — and in your status file, 
 version number, one note line, and any retired checklist entries changed. Nothing of
 yours."**
 
+**When an update changes what check-ins share, the client hears that in full.** The
+headline is the bold sentence directly under the version's heading in `CHANGELOG.md`.
+Read the entries for every version above the one the client was on, not only the
+newest. If any of them says the harness now tells Daily Practice something it did not
+tell it before, read that entry's headline to the client word for word, as its own
+sentence. Do not summarise it, and do not skip it because the update looks small.
+1.1.0 is the first such release: from 1.1.0 a harness also reports a finished task's
+general tag, a count, and which skill or agent ran, never the content. Then remind
+them in one clause that check-ins are still one switch (`docs/radio.md`, "Saying no,
+now or later").
+
 ## Restoring
 
 "Restore my harness from the backup" → copy every **refresh-list and remove-list**

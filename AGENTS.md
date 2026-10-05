@@ -327,7 +327,8 @@ outside it is ever written; back up before replacing; never roll back; end with 
 plain-words report that the client's knowledge base, agents, skills, status and logs
 were not touched. **The request is the consent**: the procedure runs start to finish
 without asking the client anything. No "apply the merge?", no diff to approve, no
-"shall I continue?". The backup is the safety. On Claude Code this is also invocable as
+"shall I continue?". A file the client has changed is kept as it is and named in the
+report, never replaced and never asked about. On Claude Code this is also invocable as
 `/update-harness`.
 
 ## The Library — adding capabilities after (or during) the install

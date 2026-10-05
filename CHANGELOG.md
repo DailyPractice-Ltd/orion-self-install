@@ -17,6 +17,19 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.1.3 — 2026-10-05
+
+**The notebook switches itself on after an update.**
+
+If your harness reached the notebook by saying "update my harness" rather than
+by a fresh install, the notebook's files arrived but the switch stayed off:
+updates never touch your status file, and that is where the switch lives. Found
+on a real harness, where the assistant quietly filed a team lesson in its own
+private memory because the notebook was dark. Now a missing switch means on:
+memory works out of the box as a plain local folder on every harness from this
+version, exactly as it always has on fresh installs. Nothing leaves your
+machine, and switching it off still works and is still respected.
+
 ## 1.1.2 — 2026-10-05
 
 **An update keeps every file you have changed, and still never asks.**

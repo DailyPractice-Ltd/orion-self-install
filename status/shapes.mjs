@@ -96,8 +96,18 @@ export const MEMORY_BACKENDS = ['folder', 'git'];
 // https, ssh, or an absolute local path (a repo on a shared drive counts).
 export const MEMORY_GIT_REMOTE_RE = /^(https:\/\/|git@|\/)[^\s]+$/;
 
+/**
+ * A status.json with NO memory block gets the defaults: memory on, plain local
+ * folder. Updates never touch status.json, so a harness that reached the
+ * notebook by UPDATE rather than fresh install would otherwise sit silently
+ * memory-off forever — found live on a real harness, 5 Oct 2026. The folder
+ * backend writes only inside this folder, so defaulting on shares nothing.
+ * An explicit `enabled: false` is still respected absolutely.
+ */
+const MEMORY_DEFAULTS = Object.freeze({ enabled: true, backend: 'folder', remote: '', path: 'memory' });
+
 export function memoryBlock(status) {
-  return status?.memory ?? {};
+  return { ...MEMORY_DEFAULTS, ...(status?.memory ?? {}) };
 }
 
 export function memoryConfigured(status) {

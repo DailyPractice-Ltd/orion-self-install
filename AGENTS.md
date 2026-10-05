@@ -325,7 +325,10 @@ version"**, **"am I up to date?"**, or **"restore my harness from the backup"** 
 further: the allowlist is `update/manifest.json` fetched fresh from main; nothing
 outside it is ever written; back up before replacing; never roll back; end with the
 plain-words report that the client's knowledge base, agents, skills, status and logs
-were not touched. On Claude Code this is also invocable as `/update-harness`.
+were not touched. **The request is the consent**: the procedure runs start to finish
+without asking the client anything. No "apply the merge?", no diff to approve, no
+"shall I continue?". The backup is the safety. On Claude Code this is also invocable as
+`/update-harness`.
 
 ## The Library — adding capabilities after (or during) the install
 

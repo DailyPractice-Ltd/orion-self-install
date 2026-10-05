@@ -22,8 +22,10 @@
  *      including status/shapes.mjs, which the current radio.mjs imports and
  *      whose absence or staleness would be a hard crash.
  *   4. Every shipped .mjs still parses after the trip.
- *   5. The personalisation tripwire fires on a Daily Practice file the client
- *      hand-edited, instead of silently overwriting their words.
+ *   5. A Daily Practice file the client hand-edited is replaced like any other,
+ *      backed up, and named in the report. The update never stops to ask: the
+ *      request is the consent (1.1.1, after a live update sat waiting on exactly
+ *      that question and never landed).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -76,7 +78,8 @@ function makeClient({ handEditedFile = null, businessName = 'Niven Consulting' }
     `# Business context\n\n${businessName} sells into mid-market logistics.\n`,
   );
 
-  // Optionally: they hand-edited one of OUR files. Step 4 must notice.
+  // Optionally: they hand-edited one of OUR files. Step 4 replaces it anyway;
+  // step 3 holds their copy and step 8 names it.
   if (handEditedFile) {
     const p = join(dir, handEditedFile);
     writeFileSync(p, `${readFileSync(p, 'utf8')}\n\n## Our notes\n${businessName} opens with logistics.\n`);
@@ -99,7 +102,7 @@ function fingerprintKnowledgeBase(dir) {
  * Steps 3 and 4 of docs/updating.md: back up, then refresh the allowlist only,
  * every file from one source. Returns what a truthful step 8 would report.
  */
-function runUpdate(dir, { honourTripwire = true } = {}) {
+function runUpdate(dir) {
   const localVersion = JSON.parse(readFileSync(join(dir, 'status/status.json'), 'utf8')).template_version;
   const businessName = JSON.parse(readFileSync(join(dir, 'status/status.json'), 'utf8')).business_name;
 
@@ -107,7 +110,7 @@ function runUpdate(dir, { honourTripwire = true } = {}) {
   const backedUp = [];
   const created = [];
   const refreshed = [];
-  const tripped = [];
+  const localEdits = []; // step 8 names these, with the backup path; it never asks
 
   for (const rel of REFRESH) {
     const dest = join(dir, rel);
@@ -121,12 +124,9 @@ function runUpdate(dir, { honourTripwire = true } = {}) {
       copyFileSync(dest, bk);
       backedUp.push(rel);
 
-      // The personalisation tripwire: their name inside one of our files means
-      // a human hand-edited it. Stop for that file; never overwrite it quietly.
-      if (honourTripwire && readFileSync(dest, 'utf8').includes(businessName)) {
-        tripped.push(rel);
-        continue;
-      }
+      // Their name inside one of our files means a human hand-edited it. The
+      // backup already holds their copy; replace it and say so in the report.
+      if (readFileSync(dest, 'utf8').includes(businessName)) localEdits.push(rel);
     }
 
     mkdirSync(dirname(dest), { recursive: true });
@@ -138,8 +138,8 @@ function runUpdate(dir, { honourTripwire = true } = {}) {
   mkdirSync(join(backupDir, 'status'), { recursive: true });
   copyFileSync(join(dir, 'status/status.json'), join(backupDir, 'status/status.json'));
 
-  // Step 4b: prune, remove-list only — backup first, tripwire honoured, then
-  // delete, then clear any directory the prune emptied.
+  // Step 4b: prune, remove-list only — backup first, then delete without asking,
+  // then clear any directory the prune emptied.
   const removed = [];
   for (const rel of REMOVE) {
     const dest = join(dir, rel);
@@ -148,10 +148,7 @@ function runUpdate(dir, { honourTripwire = true } = {}) {
     mkdirSync(dirname(bk), { recursive: true });
     copyFileSync(dest, bk);
     backedUp.push(rel);
-    if (honourTripwire && readFileSync(dest, 'utf8').includes(businessName)) {
-      tripped.push(rel);
-      continue;
-    }
+    if (readFileSync(dest, 'utf8').includes(businessName)) localEdits.push(rel);
     rmSync(dest);
     removed.push(rel);
     const parent = dirname(dest);
@@ -163,7 +160,7 @@ function runUpdate(dir, { honourTripwire = true } = {}) {
   status.template_version = TARGET_VERSION;
   writeFileSync(join(dir, 'status/status.json'), JSON.stringify(status, null, 2));
 
-  return { backupDir, backedUp, created, refreshed, tripped, removed, from: localVersion };
+  return { backupDir, backedUp, created, refreshed, localEdits, removed, from: localVersion };
 }
 
 test('0.5.3 genuinely lacks the update layer — the paste is the only way through', (t) => {
@@ -249,31 +246,42 @@ test('the prune retires the n8n lane: files gone, backed up, checklist keys drop
   assert.ok('connector_crm_live' in after.checklist, 'unrelated checklist keys must survive');
 });
 
-test('the prune tripwire keeps a personalised remove-list file — backed up, flagged, not deleted', (t) => {
+test('a personalised remove-list file is still pruned — backed up, named in the report, never asked about', (t) => {
   if (!haveBaselineTag()) return t.skip(`${BASELINE_TAG} not fetched`);
   // The real 0.5.x cohort: the old install prompt had clients fill their business
-  // name into the workflow JSONs, so their prune ALWAYS takes this branch.
+  // name into the workflow JSONs, so EVERY one of their updates hits this branch.
+  // Under the old rule that meant every one of their updates stopped on a question.
   const dir = makeClient({ handEditedFile: 'n8n/wf-01-prospect-research-outreach.json' });
   const theirs = readFileSync(join(dir, 'n8n/wf-01-prospect-research-outreach.json'), 'utf8');
-  const { backupDir, tripped, removed } = runUpdate(dir);
+  const { backupDir, localEdits, removed } = runUpdate(dir);
 
-  assert.ok(tripped.includes('n8n/wf-01-prospect-research-outreach.json'), 'personalised file was not flagged');
-  assert.ok(!removed.includes('n8n/wf-01-prospect-research-outreach.json'), 'a tripped file must not be deleted');
+  assert.ok(localEdits.includes('n8n/wf-01-prospect-research-outreach.json'), 'the report must name the personalised file');
+  assert.ok(removed.includes('n8n/wf-01-prospect-research-outreach.json'), 'a personalised remove-list file must still be pruned');
+  assert.equal(existsSync(join(dir, 'n8n/wf-01-prospect-research-outreach.json')), false, 'the file should be gone');
   assert.equal(
-    readFileSync(join(dir, 'n8n/wf-01-prospect-research-outreach.json'), 'utf8'), theirs,
-    'their personalised copy was altered',
+    readFileSync(join(backupDir, 'n8n/wf-01-prospect-research-outreach.json'), 'utf8'), theirs,
+    'the backup must hold their exact copy',
   );
-  assert.ok(existsSync(join(backupDir, 'n8n/wf-01-prospect-research-outreach.json')), 'tripped file must still be backed up');
-  assert.ok(existsSync(join(dir, 'n8n')), 'the directory must survive while a tripped file remains in it');
-  // The other, untouched remove-list files still prune normally.
-  assert.equal(existsSync(join(dir, 'n8n/README.md')), false, 'clean siblings should still be pruned');
+  assert.equal(existsSync(join(dir, 'n8n')), false, 'the emptied directory should be gone too');
 });
 
-test('the tripwire stops on a Daily Practice file the client hand-edited', (t) => {
+test('a Daily Practice file the client hand-edited is replaced, backed up, and named — not stopped on', (t) => {
   if (!haveBaselineTag()) return t.skip(`${BASELINE_TAG} not fetched`);
   const dir = makeClient({ handEditedFile: 'AGENTS.md' });
   const theirs = readFileSync(join(dir, 'AGENTS.md'), 'utf8');
-  const { tripped } = runUpdate(dir);
-  assert.ok(tripped.includes('AGENTS.md'), 'the hand-edited file was not flagged');
-  assert.equal(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), theirs, 'their words were overwritten');
+  const { backupDir, localEdits, refreshed } = runUpdate(dir);
+  assert.ok(localEdits.includes('AGENTS.md'), 'the report must name the hand-edited file');
+  assert.ok(refreshed.includes('AGENTS.md'), 'the hand-edited file must still be refreshed');
+  assert.equal(digest(join(dir, 'AGENTS.md')), digest(join(repo, 'AGENTS.md')), 'the live file must be the template\'s');
+  assert.equal(readFileSync(join(backupDir, 'AGENTS.md'), 'utf8'), theirs, 'the backup must hold their exact copy');
+});
+
+test('the procedure itself contains no stop-and-ask step', () => {
+  const doc = readFileSync(join(repo, 'docs/updating.md'), 'utf8');
+  for (const phrase of ['let them choose', 'tripwire', 'show the client the difference']) {
+    assert.equal(doc.includes(phrase), false, `docs/updating.md still says "${phrase}"`);
+  }
+  assert.ok(doc.includes('The request is the consent'), 'docs/updating.md must state that the request is the consent');
+  const agents = readFileSync(join(repo, 'AGENTS.md'), 'utf8');
+  assert.ok(agents.includes('The request is the consent'), 'AGENTS.md must carry the same rule');
 });

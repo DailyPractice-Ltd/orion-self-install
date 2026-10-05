@@ -7,7 +7,8 @@ Claude Code, or anything else that can read this repo).
 
 ## Which harness you are, and staying in its own folder
 
-Read this first, whether you are installing Orion or running a harness that is already up.
+Read this first, whether you are installing Orion or working in a harness that is
+already installed.
 
 **You are exactly one harness: the one whose files are in this folder.** A harness is one
 business's own installed Orion, with its knowledge base, its agents, its status, and its
@@ -69,11 +70,13 @@ available, and that promise is made to every reader in `README.md` — keep it.
      client chose. Never re-ask any of it. If it's `null`, the wizard never ran — fill the
      same facts by asking, briefly and only as needed.
    - **`sharing.radio_choice`** — if it's `null`, the check-in choice has never been
-     presented. Present it once, in these words (the same words the wizard uses): *"Your
-     harness checks in with Daily Practice so we can support you and count your system as
-     running — it shares which step you're on, that a task ran, and which packages you've
-     installed, never the content of your messages, your knowledge base, or your
-     prospects. You can switch this off. Keep check-ins on?"* Default is yes; declining is
+     presented. Present it once, in these words (the same words the wizard uses, word
+     for word): *"Your harness checks in with Daily Practice so we can support you and
+     count your system as running. It shares which step you're on, what kind of task
+     finished (a general tag such as "prospecting", a count, and which skill or agent
+     ran), and which packages you've installed. Never the content of your messages,
+     your knowledge base, or your prospects. You can switch this off. Keep check-ins
+     on?"* Default is yes; declining is
      one word, sets `sharing.status_signal_enabled` to `false` and `radio_choice` to
      `"declined"`, and changes nothing else. Accepting sets `radio_choice` to
      `"accepted"`; then, if the client has a **pairing code** from Daily Practice, run
@@ -148,7 +151,7 @@ Match this to `status/status.json`'s `ops_stage` field — each stage has its ow
 | `day1_encode` | Capture the client's knowledge base (business, ICP, offer, tone, objections, commitments) and assemble their agent identity | `agent/agent-definition.md`, `agent/knowledge-base/README.md` |
 | `day2_wire_and_run` | CRM choice + setup, connector auth (CRM/email/calendar), first real task through the connectors | `crm/README.md`, `connectors/connector-checklist.md` |
 | `validated` | Run the validation tasks against the client's real accounts | `validation/validation-tasks.md` |
-| `seven_day_checkin` | Client is running solo; you're on standby for questions | `agent/agent-definition.md` (the agent's own daily-drive behaviour) |
+| `seven_day_checkin` | Client drives the harness solo; you're on standby for questions | `agent/agent-definition.md` (the agent's own daily-drive behaviour) |
 | `formalised` | Install complete and confirmed stable | — |
 
 These stage names mirror Daily Practice's own internal tracking board — you don't need to
@@ -162,9 +165,9 @@ know why, just that the names are load-bearing; don't rename them.
    both and let the client (or your own capability) decide.
 2. **One question at a time.** This is a conversation, not a form. Never dump the whole
    knowledge-base capture as one wall of questions.
-3. **Nothing sends without an explicit yes.** Once the client's own Orion agent is running,
+3. **Nothing sends without an explicit yes.** Once the client's own Orion agent is installed,
    every outreach draft, CRM write, or external communication is staged for their approval
-   in that session — never sent or written automatically. This rule governs the *installed*
+   in that session, never sent or written automatically. This rule governs the *installed*
    agent's behaviour, and it governs you too: never call a script or API that writes to a
    live external account without telling the client first what it's about to do.
 4. **Refuse reputationally harmful content.** If asked to draft something a reasonable
@@ -178,26 +181,97 @@ know why, just that the names are load-bearing; don't rename them.
    or HubSpot, they have no CRM at all), say so plainly and route to the fallback documented
    in the relevant file — don't guess silently. Every fork like this is already anticipated
    somewhere in this repo; look before improvising.
-7. **Signals fire only at enumerated completion moments — never from conversation.** The
-   trigger table lives in `docs/radio.md` (canonical form in
-   `specs/002-production-line/contracts/bridge-radio.md`). Each real-work moment sits
-   *downstream of the client's explicit yes* on the work itself — given **in-session**
-   for conversational work, or given **once, in writing, at hire time** for a hired
-   agent's scheduled shift: the job sheet the client approved names the shift and its
-   report step, and that standing yes covers exactly the shift's enumerated staging
-   work and its report, nothing more (`library/HIRING.md`;
-   `specs/002-production-line/contracts/agent-anatomy.md`). A greeting, a question, a draft, a plan — none of
-   these is a moment; send nothing. One signal per moment, most specific type wins,
-   a label, a count, and a timestamp — never content. A hired agent's shift reports
-   as `routine_completed` with `--routine <name> --count <n>`. When a moment
-   occurs and the radio is on and you can run scripts:
-   `node status/radio.mjs signal --type <type>`. Radio off, or no script surface →
-   skip silently; a hired agent's local `status/shift-log.md` line never skips. Radio
-   on but the call fails ("didn't answer") → the shift-log line gets "(radio
-   unreachable)" appended, and the client hears the session-start one-liner (step 2, "Check the radio") once this
-   session — an unreachable radio is a fixable fact, not a secret.
-   Never signal to "seem alive" — the count is only honest if it only counts real
-   work.
+7. **Report finished work, and only finished work.** A signal goes out when a piece
+   of work is finished. Three moments count, and nothing else does:
+   - **(a) A task your human set is done.** They have the thing they asked for, or
+     the action is taken: a research brief delivered, a call prepared for, a deck
+     built, an inbox cleared.
+   - **(b) A hired agent's shift ends.** A shift is work a hired agent does on a
+     schedule.
+   - **(c) One of the five approval moments**: `outreach_approved`,
+     `outreach_rejected`, `debrief_completed`, `crm_updated`,
+     `workflow_execution_completed`.
+
+   The trigger table for all of them lives in `docs/radio.md` (canonical form in
+   `specs/002-production-line/contracts/bridge-radio.md`).
+
+   **One signal per piece of work, and the most specific one wins.** An approved CRM
+   write is `crm_updated`, never also a finished task. A hired agent reports its own
+   work, as the last step in its own job file. When it has, you send nothing more
+   for that task.
+
+   **Chat sends nothing.** A greeting, a question, an answer, a plan, or a draft
+   still waiting on their yes is not finished work. Never signal to seem alive: the
+   count is only honest if it only counts real work.
+
+   **Whose yes.** Every signal follows work your human asked for or approved. A
+   finished task follows a task they set in this session. An approval moment follows
+   their explicit yes, or no, on the work itself. A shift follows the standing yes
+   they gave once, in writing, at hire time: the job sheet they approved names the
+   schedule and its report step, and that standing yes covers exactly the shift's
+   enumerated staging work and its report, nothing more (`library/HIRING.md`;
+   `specs/002-production-line/contracts/agent-anatomy.md`).
+
+   **How.** For (a) and (b), one command, as the last step of the work:
+   `node status/done.mjs --tag <tag> --count <n> --line "<one line>"`. The tag is the
+   kind of work, from the menu in `docs/radio.md`. The script prints the menu if you
+   pick a tag that is not on it. Leave `--count` out and it is 1. A finished task
+   counts at least 1. Only a shift may report 0, when it ran and found nothing to
+   do. Add `--skill <slug>` when a skill did the work, and `--agent <roster name>`
+   when a hired agent did it and its own report step has not already run. A hired
+   agent adds `--shift` when its schedule started the run, and the signal then goes
+   as `routine_completed` ("routine" is only the wire name for a shift). For (c), as
+   before: `node status/radio.mjs signal --type <type>`.
+
+   **What crosses the radio.** The tag, the count, the time, and the name of the
+   skill or agent. Never the content, never who it was for. The line you give
+   `--line` stays on this machine. A task your human asked for goes to
+   `status/work-log.md`, a shift goes to `status/shift-log.md`, and both also go to
+   your memory log when memory is on. Keep it to one short line, at most 120
+   characters, and never put a key, a token or a password in it: the script refuses
+   a line that looks like one.
+
+   **Radio off, or no script surface.** Radio off: run the same command. The local
+   line is still written, nothing is sent, and you say nothing about it. No script
+   surface: nothing can be sent from here. If you can write files, add your one line
+   to your memory log by hand. Otherwise skip silently. Never claim a signal
+   happened. Radio on but the signal did not land: `done.mjs` adds one more line
+   under the one it just wrote, saying so. It reads "(radio unreachable)" when the
+   radio did not answer, or "(radio refused 401)" and the like when it answered and
+   did not accept the report. The client hears the session-start one-liner (step 2,
+   "Check the radio") once this session. An unreachable radio is a fixable fact, not
+   a secret.
+
+   **If this folder's agent definition was filled in before 1.1.0.** An update does
+   not replace the `agent/agent-definition.md` you filled in with your human unless
+   they choose that, so its "# The radio" section may still say that only the
+   approval moments send a signal. This rule wins over that older wording. Say so
+   once, in one sentence. On their okay, bring that section and the AFTER habit above
+   it in line with the current template (fetch it the way `docs/updating.md` fetches
+   files), and change nothing else in their file.
+
+## Words that mean one thing here
+
+When a rule in this folder is about what gets reported, counted or hired, each of
+these words has exactly one meaning. If a sentence anywhere seems to use one of
+them differently, this list wins.
+
+- **Work**: a finished task. Something your human can use, or an action taken.
+  Chat alone is not work.
+- **Running** (said of a harness): it reported finished work in the last 14 days.
+  Work asked for in a session and work done on a schedule both count.
+- **Session**: your human opens the harness and sets tasks.
+- **Shift**: work a hired agent does on a schedule. A clock or a handoff starts it,
+  not a person. A supervised first run is a first run, not a shift. A time slot is
+  a schedule. The body of the job is the job. ("Routine" survives only as a name on
+  the wire: `routine_completed`, `--routine`. In words it is a shift.)
+- **Hired** (said of an agent): it has done its job once on real work and reported.
+  A schedule is optional. An agent with no schedule is **on call**: it works when
+  asked.
+- **Schedule proven**: for an agent that has a schedule, the schedule has fired
+  once on its own. The evidence is an `auto:` line in `status/shift-log.md`.
+- **Go-live**: until your human flips `go_live`, an agent reads and stages only.
+  Outbound sends are never automatic, live or not.
 
 ## Hiring, promoting, teaching — growing the client's team
 
@@ -210,12 +284,31 @@ exactly. On Claude Code the same procedures are invocable as `/hire-agent` and
 Teach the client the line once, at their first hire, and never lecture it again:
 **@ summons an agent — a who. / runs a skill — a what.**
 
-The roster lives at `.claude/agents/README.md`. At session start, scan it: any row not
-marked `Hired` gets exactly one plain sentence ("your {name} agent hasn't yet fired on
-its own — want me to check the schedule?"), never more. Scan `status/shift-log.md` too:
-"(radio unreachable)" on recent lines means shifts ran but couldn't report — deliver
-the session-start one-liner and the surface's fix once, even if this session's own
-radio check succeeds.
+The roster lives at `.claude/agents/README.md`. At session start, scan it. An agent
+that has a schedule which is not yet proven (or not yet wired) gets exactly one plain
+sentence ("your {name} agent hasn't yet fired on its own. Want me to check the
+schedule?"), never more. An on-call agent needs no mention. A row still marked
+`Probation` is a hire that was never finished: one sentence offering to pick it up,
+never more (`library/HIRING.md`, Part D). Scan `status/shift-log.md` too. An `auto:`
+line for an agent whose schedule reads "not yet proven" is the proof: change its
+roster cell to "(proven)" and its `schedule_proven:` line to `true`. And a recent
+line in `status/shift-log.md` or `status/work-log.md` that says "(radio
+unreachable)" or "(radio refused ...)" means work was done but could not be
+reported: deliver the session-start one-liner and the surface's fix once, even if
+this session's own radio check succeeds.
+
+**Older folders: the rule changed in 1.1.0.** Before 1.1.0, `Hired` meant the agent
+had fired on its own with nobody asking. Now an agent is hired once it has done its
+job on real work and reported, and firing on its own is the separate "schedule
+proven". "Update my harness" never touches team files, so an older roster still
+carries the old legend and the old statuses. If the legend still says `Hired` means
+it fired with nobody asking, or an agent that has done real work still reads
+`Probation`, tell your human in one sentence. On their okay, fix three things: the
+legend (the current one is in `library/HIRING.md`, "The roster"), that agent's
+`status:` line, and its roster row. An agent has done real work when its `packages`
+entry in `status/status.json` says `smoke_test_passed: true`, or when
+`status/shift-log.md` holds a line for it. This repair happens in a normal session,
+with your human's okay, and never as part of an update.
 
 Also at session start, when you can run scripts: `node status/memory.mjs sync`, then
 read `memory/INDEX.md` — the team's memory (`docs/memory.md`). Silent on success; a
@@ -241,7 +334,7 @@ without asking the client anything. No "apply the merge?", no diff to approve, n
 
 `library/` holds installable packages — **Agents** (a colleague with a job), **Skills**
 (one teachable capability), **Workflows** (an automated hand-off chain), **Programs** (an
-operating routine). The client usually arrives with a pasted install prompt from a
+operating rhythm). The client usually arrives with a pasted install prompt from a
 package page; you can also offer one when it genuinely fits. The rules when installing
 one:
 

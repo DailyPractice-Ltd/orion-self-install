@@ -24,7 +24,7 @@
  *   4. Every shipped .mjs still parses after the trip.
  *   5. A Daily Practice file the client hand-edited is replaced like any other,
  *      backed up, and named in the report. The update never stops to ask: the
- *      request is the consent (1.0.1, after a live update sat waiting on exactly
+ *      request is the consent (1.1.1, after a live update sat waiting on exactly
  *      that question and never landed).
  */
 import { test } from 'node:test';

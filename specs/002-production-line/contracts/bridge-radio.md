@@ -30,11 +30,14 @@ checklist is resolved at the bottom.
 ```json
 {
   "harness_id": "<sharing.harness_id — optional cross-check>",
-  "signal_type": "install_checkpoint | workflow_execution_completed | outreach_approved | outreach_rejected | debrief_completed | crm_updated | routine_completed",
+  "signal_type": "install_checkpoint | workflow_execution_completed | outreach_approved | outreach_rejected | debrief_completed | crm_updated | routine_completed | task_completed",
   "occurred_at": "<ISO 8601 datetime — client clock at the moment of the work>",
   "payload": { "ops_stage": "…", "harness_status": "…", "template_version": "…" }
 }
 ```
+
+Every signal carries those three payload fields. A work signal may add the labels
+under "What a work signal carries", below.
 
 - **`occurred_at` is the server's field name** (not `sent_at`) and is required — a full
   ISO 8601 datetime, not date-only, not future beyond ~5 min clock skew. It anchors the
@@ -46,13 +49,20 @@ checklist is resolved at the bottom.
   never inflate the count.
 - First write is `201 { "signal_id", "recorded_at", "replay": false }` and bumps the
   harness's last-active heartbeat.
-- All seven `signal_type` values are accepted by the deployed server: the five
+- Eight `signal_type` values. Seven are accepted by the deployed server: the five
   in-session real-work types from the mono's `SignalType` union, plus
   `install_checkpoint` (installer tooling only — wizard opt-in moment, ops-stage
   changes; deliberately distinct so install noise never counts as real work), plus
-  `routine_completed` (a hired agent's scheduled shift — including the supervised
-  first run at hire, whose job-sheet yes covers it; the shift-log marker, not the
-  signal type, is what distinguishes attended from unattended).
+  `routine_completed` (a hired agent's shift: work it does on a schedule. "Routine"
+  is only the wire name). The eighth, `task_completed`, arrives with template
+  1.1.0: a task the human set in a session is finished. Its server support ships in
+  the mono alongside this template.
+- Since 1.1.0 a run that a person asked for or watched, including the supervised
+  first run at hire, reports as `task_completed` and names the agent in
+  `payload.routine`. Only a run its schedule started reports as
+  `routine_completed`. Agents hired before 1.1.0 keep their old report step and
+  still send `routine_completed` for every run. For those, the shift-log marker,
+  not the signal type, is what distinguishes attended from unattended.
 - `payload` is optional: a **flat object of scalar values** (≤20 keys, ≤2 KB). The key
   `occurred_at` is reserved inside payload (the server stores the top-level value
   there itself).
@@ -61,13 +71,47 @@ checklist is resolved at the bottom.
   `status/radio.mjs signal --type <t>`. (A fourth sender, the n8n workflows'
   disabled-by-default "Radio signal" node, was retired with template 1.0.0 — it never
   ran in the field.)
+- `status/done.mjs` (1.1.0) is not a fourth sender. It validates a finished-work
+  report, writes the local line, and then calls `status/radio.mjs signal` as a child
+  process. Its `--line` text is never passed on.
+
+### What a work signal carries (labels only)
+
+On top of the three payload fields every signal carries:
+
+| Field | Meaning | Rules |
+|---|---|---|
+| `tag` | the kind of work | Lowercase kebab, `^[a-z][a-z0-9-]{1,39}$`. The client only ever sends a tag from the public menu: `WORK_TAGS` in `status/shapes.mjs`, listed in plain words in `docs/radio.md`. Required on `task_completed`, optional on every other work type |
+| `count` | how many things were done | A whole number. Required on `task_completed`, where it is at least 1: a finished task did at least one thing. Required on `routine_completed`, where 0 is allowed: a shift may run and find nothing to do |
+| `routine` | the hired agent that did the work | Its roster name, the same key shifts have always used. Required on `routine_completed`, optional elsewhere |
+| `asset` | the skill, or other installed capability, that did the work | Its slug. When present, `outcome` and `surface` are required with it |
+| `asset_kind` | what kind of capability it is | `skill`, `agent`, `workflow` or `program`. Optional |
+| `outcome` | how it was used | `run_completed`, `rep_logged` or `skipped`. `status/done.mjs` only ever sends `run_completed` |
+| `surface` | where it was used | `agent` for work asked for in a session, `routine` for a shift |
+
+Never any free text, and never who the work was for. The client holds that line in
+code. `status/done.mjs` checks every label before anything is sent: the tag against
+the menu, the count as plain digits, the skill and the agent against the slug shape.
+It takes one line of free text, `--line`. That line goes to the client's own shift
+log or work log, and to the memory log when memory is on, and is never handed to
+the radio. `status/radio.mjs signal`
+drops `--note` with a plain line and sends without it, refuses a `--tag` that is not
+on the menu, and refuses an `--asset` that is not a slug.
+
+One older looseness remains, and it is known. On the types that existed before
+1.1.0, `--routine` is trimmed and cut to 60 characters but its shape is not checked.
+Agents hired earlier call that command directly, and a stricter check could silence
+a working shift report. On `task_completed` the shape is checked. Tightening the
+older types is a follow-up, to be done once the fleet's roster names are known to
+fit the rule.
 
 ### When each type fires (the canonical trigger table — P2 discipline)
 
-One signal per moment; the most specific type wins; every real-work moment sits
-**downstream of the client's explicit yes** on the underlying action. No enumerated
-moment → no signal: conversation, greetings, questions, drafting and thinking never
-touch the radio. Plain-words mirror: `docs/radio.md`.
+One signal per piece of work; the most specific type wins; every real-work signal
+follows work the client **asked for or approved**: a task they set in a session, an
+action they said yes to, or a shift under the standing yes given at hire. No finished
+work → no signal: conversation, greetings, questions, answers, plans, and drafts
+still waiting on a yes never touch the radio. Plain-words mirror: `docs/radio.md`.
 
 | Type | Exact moment | Sender |
 |---|---|---|
@@ -77,7 +121,8 @@ touch the radio. Plain-words mirror: `docs/radio.md`.
 | `outreach_rejected` | the client's explicit **no** to a staged outreach draft | agent rule → `radio.mjs signal` |
 | `debrief_completed` | a post-call debrief completes **with the client's approved CRM update** (the agent's debrief task, client-approved) | agent rule |
 | `crm_updated` | a client-approved **standalone** CRM write by the agent (not part of a debrief — most specific type wins) | agent rule → `radio.mjs signal` |
-| `routine_completed` | a hired agent's scheduled shift completes — the standing yes was given once, at hire, on the job sheet naming the shift and its report (`agent-anatomy.md`). Covers the supervised first run at hire too; attended vs unattended is the shift-log marker's job (`auto:` / `auto-test:`), not the type's. Requires `payload.routine` + `payload.count`; the replay key includes the routine label so same-second shifts from different agents stay distinct rows | the shift's own report step → `radio.mjs signal` |
+| `task_completed` | a task the client set in a session is finished: they have the thing they asked for, or the action is taken. Not an approval moment (each of those keeps its own, more specific type) and never chat. Requires `payload.tag` + `payload.count` (at least 1); may name what ran with `routine` and the asset fields | the last step of the task → `status/done.mjs` → `radio.mjs signal` |
+| `routine_completed` | a hired agent's shift completes: work its schedule started (a clock or a handoff, not a person). The standing yes was given once, at hire, on the job sheet naming the schedule and its report (`agent-anatomy.md`). Since 1.1.0 the supervised first run at hire is a `task_completed`, not a shift. A wiring test still arrives as `routine_completed`, because the schedule fired it: the shift-log marker (`auto:` / `auto-test:`), not the type, tells a test from the real thing. Requires `payload.routine` + `payload.count` (0 is allowed); may carry `tag` and the asset fields. The replay key includes the routine label so same-second shifts from different agents stay distinct rows | the shift's own report step → `status/done.mjs --shift` → `radio.mjs signal` |
 
 On surfaces that can't run commands, agent-rule signals are skipped silently — same
 posture as the session-start radio check (`AGENTS.md` rule 2).

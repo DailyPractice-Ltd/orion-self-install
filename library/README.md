@@ -17,7 +17,7 @@ Four kinds live here, each in its own folder:
 | **Agents** | A colleague with a job — it runs a whole role for you (always drafts-for-your-approval, never sending on its own) | [`agents/`](agents/) |
 | **Skills** | One teachable capability your agent applies everywhere (like how to size a meeting) | [`skills/`](skills/) |
 | **Workflows** | An automated chain that runs when you trigger it — form in, drafted work out | [`workflows/`](workflows/) |
-| **Programs** | An operating routine — a cadence your agent runs with you daily/weekly | [`programs/`](programs/) |
+| **Programs** | An operating rhythm: a cadence your agent runs with you daily or weekly | [`programs/`](programs/) |
 
 ## On the shelf today
 

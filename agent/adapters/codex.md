@@ -4,9 +4,9 @@
 [`agent-definition.md`](../agent-definition.md) — fix it there, not here. Everything
 [`claude-code.md`](claude-code.md) says about a code-capable surface applies here too —
 reading and writing `status/status.json`, running the CRM apply scripts, editing the
-knowledge base live, and firing radio signals at the enumerated moments. This file adds
-only what is Codex-specific. Signals happen on the code-capable adapters — this file and
-`claude-code.md` — because they are the surfaces that can run scripts.
+knowledge base live, and reporting finished work over the radio. This file adds
+only what is Codex-specific. Work is reported from the code-capable adapters (this
+file and `claude-code.md`), because they are the surfaces that can run scripts.
 
 Best fit when the client works in Codex — the CLI in a terminal, the IDE extension, or
 the desktop app. The wizard detects it (`codex` on PATH or `~/.codex` present) and hands
@@ -16,8 +16,9 @@ off to exactly the same prompt as Claude Code.
 
 Codex runs commands inside a safety sandbox, and by default that sandbox **allows file
 edits in this folder but blocks the network**. Good default for safety; it also means
-the radio's calls quietly fail — `node status/radio.mjs check` and `… signal` print
-"The radio address didn't answer" even though nothing is wrong with the radio itself.
+the radio's calls quietly fail: `node status/radio.mjs check`, `… signal` and
+`node status/done.mjs` all print "The radio address didn't answer", even though
+nothing is wrong with the radio itself.
 
 One plain sentence for the client before the fix, per Article I: *the radio is how your
 harness checks in with Daily Practice, and Codex's safety sandbox needs to be told that

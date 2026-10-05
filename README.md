@@ -88,7 +88,7 @@ from there, fits it to your business, and proves it works on your real data.
 - **[Post-Call Debrief](library/workflows/post-call-debrief/PACKAGE.md)** — call notes
   in; summary, CRM update and follow-up draft out.
 
-**Programs** — operating routines your agent runs with you:
+**Programs**, the operating rhythms your agent runs with you:
 
 - **[Revenue Operating Cadence](library/programs/revenue-operating-cadence/PACKAGE.md)**
   — the daily/weekly/monthly beat that moves revenue from attention to collected cash.
@@ -338,9 +338,10 @@ running `node start.mjs` again greets you with exactly where things stand.)
   something that crosses a line, it'll tell you plainly and suggest a better way — not
   just refuse and leave you stuck.
 - **It won't send information about your business anywhere without telling you.** Orion
-  can keep a small check-in "radio" open with Daily Practice — which install
-  step you're on, that a task ran, which packages you have; never the content of
-  anything. It's presented to you plainly as a pre-ticked choice you can decline with
+  can keep a small check-in "radio" open with Daily Practice. It shares which install
+  step you're on, what kind of task finished (a general tag such as "prospecting", a
+  count, and which skill or agent ran), and which packages you have. Never the
+  content of anything. It's presented to you plainly as a pre-ticked choice you can decline with
   one keystroke, during setup, and you can switch it off anytime after.
   [The radio, in plain words](docs/radio.md) is the whole story — no fine print.
 

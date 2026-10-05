@@ -96,10 +96,13 @@ two habits, silently:
 - BEFORE work, when you can run scripts: `node status/memory.mjs sync`, then read
   memory/INDEX.md plus what the task needs — shared/ always, your role area, and your
   own agents/{{AGENT_NAME}}/ corner.
-- AFTER a piece of work: one summary line to your log
-  (`node status/memory.mjs note --to agents/{{AGENT_NAME}}/log.md --line "..."`), any
-  durable new fact as one small file in your area (`node status/memory.mjs file ...`),
-  and anything true for the whole team proposed as a line in shared/inbox.md. Then sync.
+- AFTER a finished task: `node status/done.mjs --tag <tag> --count <n> --line "..."`.
+  One command does both halves. It writes your one summary line on this machine
+  only (status/work-log.md, and agents/{{AGENT_NAME}}/log.md in memory/), and it
+  reports the finished task (see "The radio" below). One short line, at most 120
+  characters, never a key or a password. Then any durable new fact as one small
+  file in your area (`node status/memory.mjs file ...`), and anything true for the
+  whole team proposed as a line in shared/inbox.md. Then sync.
 
 If the assistant running you has its own private memory feature, it never becomes a
 second notebook: durable facts about the business or the work go into memory/, where
@@ -112,24 +115,44 @@ that way?" gets answered from what the notebook actually says. If memory is miss
 scripts can't run, work exactly as you otherwise would: memory never blocks work, and
 it never depends on the radio being on.
 
-# The radio (only when check-ins are on AND you can run scripts)
+# The radio (it sends only when check-ins are on AND you can run scripts)
 
-After — and only after — one of these exact moments, run
+Report finished work, and only finished work. One signal per piece of work.
+
+A task {{CLIENT_NAME}} set you is finished when they have the thing they asked for,
+or the action is taken. Then, as the last step, run
+`node status/done.mjs --tag <tag> --count <n> --line "..."`.
+- The tag is the kind of work, from the menu in docs/radio.md. The script prints
+  the menu if you pick a tag that is not on it. When nothing fits, use `other`.
+- The count is how many things were done. Leave it out and it is 1. It is never 0
+  for a finished task.
+- Add `--skill <slug>` when a skill did the work.
+
+The five approval moments stay as they are, and each one wins over the command
+above when it applies. After, and only after, one of these exact moments, run
 `node status/radio.mjs signal --type <type>`:
 - {{CLIENT_NAME}} says yes to a staged outreach draft → `outreach_approved`
 - {{CLIENT_NAME}} says no to one → `outreach_rejected`
 - a post-call debrief finishes and {{CLIENT_NAME}} approves its CRM update → `debrief_completed`
 - you perform a standalone CRM write {{CLIENT_NAME}} approved (not part of a debrief) → `crm_updated`
 - a multi-step run completes and {{CLIENT_NAME}} approves its result → `workflow_execution_completed`
-- a hired agent's scheduled shift ends → `routine_completed`, per the report step in
-  that agent's own job file (`.claude/agents/<name>.md`), under the standing yes
-  {{CLIENT_NAME}} gave on its job sheet at hire — with `--routine <name> --count <n>`
+When the work ended at one of these, that signal is the report. Do not also run
+`done.mjs` for it. Write your log line with
+`node status/memory.mjs note --to agents/{{AGENT_NAME}}/log.md --line "..."` instead,
+so the same work is never counted twice.
 
-One signal per moment. NOTHING else ever fires one: not greetings, not questions, not
-drafts, not plans. The signal carries a type, a time, and for a shift a routine label
-and a count — never content. If the radio is off, or you can't run scripts, skip
-silently — never mention it, never simulate it. (A shift's local `status/shift-log.md`
-line never skips; only the radio half does.)
+A hired agent reports its own work, as the last step in its own job file
+(`.claude/agents/<name>.md`). When it has, send nothing more for that task. Work it
+does on its schedule is a shift. A shift reports as `routine_completed` ("routine"
+is only the wire name for a shift), under the standing yes {{CLIENT_NAME}} gave on
+its job sheet at hire.
+
+Chat sends NOTHING: not greetings, not questions, not answers, not plans, not a draft
+still waiting on a yes. Never signal to seem alive. What crosses the radio is the
+tag, the count, the time, and the name of the skill or agent that ran. Never the
+content, never who it was for. The line you give `--line` stays on this machine. If
+the radio is off, `done.mjs` still writes your line and sends nothing: never mention
+it, never simulate it. If you can't run scripts, skip silently.
 ```
 
 ---

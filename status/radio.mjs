@@ -28,12 +28,33 @@
  *       Sends .claude/skills/<slug>/SKILL.md for a curator to read; nothing is
  *       published by sending it. Same rule as send and reply: their yes first.
  *
- *   node status/radio.mjs signal --type <type> [--routine <name> --count <n>]
- *       Report "real work happened" (POST /signals). Types: install_checkpoint,
- *       workflow_execution_completed, outreach_approved, outreach_rejected,
- *       debrief_completed, crm_updated, routine_completed (which requires
- *       --routine and --count). A label, a count, and a timestamp — never content:
- *       the story of a shift stays local, in status/shift-log.md.
+ *   node status/radio.mjs signal --type <type> [--tag <tag>] [--count <n>] [--routine <name>]
+ *                                [--asset <slug> --outcome <o> [--surface <s>] [--asset-kind <k>]]
+ *       Report finished work (POST /signals). Most finished work does not call
+ *       this directly: status/done.mjs is the everyday command, and it calls this
+ *       one. The types:
+ *         task_completed      A task the human set is finished. Requires --tag and
+ *                             --count, and the count is at least 1.
+ *         routine_completed   A hired agent's shift ended. A shift is work done on
+ *                             a schedule, and "routine" is only its name on the
+ *                             wire. Requires --routine (the agent's roster name)
+ *                             and --count. A count of 0 is allowed here: the
+ *                             shift ran and found nothing to do.
+ *         outreach_approved, outreach_rejected, debrief_completed, crm_updated,
+ *         workflow_execution_completed
+ *                             The five approval moments, unchanged.
+ *         install_checkpoint  The install journey. It is not work, so it carries
+ *                             no tag and names nothing that ran.
+ *       Any work type may carry --tag: the kind of work, from the menu in
+ *       status/shapes.mjs. A tag that is not on the menu is refused, and the menu
+ *       is printed. Any work type may also name what ran: --routine for a hired
+ *       agent, and --asset <slug> --outcome <rep_logged|run_completed|skipped>
+ *       [--surface agent|routine] [--asset-kind skill|agent|workflow|program] for
+ *       a skill or another installed capability. One signal per piece of work,
+ *       never two: a shift that used a skill is the same report, now naming the
+ *       skill. Labels, a count, and a timestamp. Never content: there is no flag
+ *       for a note or a description, and the story of the work stays on this
+ *       machine, in the memory log and, for a shift, in status/shift-log.md.
  *
  *   node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>
  *                                        [--role <slug|custom> --purpose "<sentence>"]
@@ -53,7 +74,9 @@
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { radioOn as radioIsOn, parseInstallDirective } from './shapes.mjs';
+import {
+  radioOn as radioIsOn, parseInstallDirective, isWorkTag, workTagMenu, labelProblem, countProblem,
+} from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status.json');
@@ -68,8 +91,18 @@ const SIGNAL_TYPES = [
   // A hired agent's scheduled shift completed — standing yes given at hire on
   // the job sheet (contracts/agent-anatomy.md). Carries --routine and --count.
   'routine_completed',
+  // A task the human set in a session is finished: they have the thing they
+  // asked for, or the action is taken (1.1.0). Carries --tag and --count.
+  // status/done.mjs sends it as the last step of the task.
+  'task_completed',
 ];
 const PACKAGE_KINDS = ['agent', 'skill', 'workflow', 'program'];
+// How the capability was used. run_completed: it finished its run. rep_logged:
+// the human said they did the hard action themselves, asked and never assumed.
+// skipped: offered and declined. A skip counts nowhere. It keeps the story honest.
+const ASSET_OUTCOMES = ['rep_logged', 'run_completed', 'skipped'];
+// Where it was used: in a session (agent), or on a hired agent's shift (routine).
+const ASSET_SURFACES = ['agent', 'routine'];
 
 // ── Arguments ───────────────────────────────────────────────────────────────
 
@@ -132,13 +165,28 @@ async function call(method, path, body) {
     return res;
   } catch (err) {
     console.log(`The radio address didn't answer (${err?.cause?.code || err.code || err.message}) — not retried, nothing lost locally.`);
+    resultLine('unreachable');
     process.exit(0);
+  }
+}
+
+/**
+ * The outcome of a `signal`, as one line a script can read, printed only when the
+ * caller asks for it (--result-line). status/done.mjs asks, so it never has to
+ * guess what happened from the sentences above, which are written for people and
+ * may be reworded. One of: "sent", "unreachable", "refused <status>". The exit code
+ * stays 0 either way: the radio never blocks local work.
+ */
+function resultLine(outcome) {
+  if (command === 'signal' && flags['result-line'] !== undefined) {
+    console.log(`[radio-result] ${outcome}`);
   }
 }
 
 function reportAuthProblem() {
   console.log('The radio answered "that key isn\'t valid" (401). The key may have been revoked —');
   console.log('ask support@dailypractice.world for a fresh pairing code. Nothing else is affected.');
+  resultLine('refused 401');
   process.exit(0);
 }
 
@@ -467,19 +515,27 @@ if (command === 'signal') {
     console.log(`signal needs --type, one of: ${SIGNAL_TYPES.join(', ')}`);
     process.exit(1);
   }
-  // How much work, and which routine did it. Without these a signal says only that
-  // something of this type happened — never that it was 236 contacts, which is the
-  // number the client and the coach actually care about.
-  //   --count   how many things (plain digits only; rejected rather than sent
-  //             otherwise — Number() exotica like 0x12 or 1e3 don't belong on a wire)
-  //   --routine which named routine ran, e.g. "prospecting"
-  // There is deliberately no free-text field. The one-line story of a shift lives in
-  // status/shift-log.md, locally — the radio carries a label, a count, and a time,
-  // never content (constitution Article V; docs/radio.md).
+  // How much work, what kind, and what did it. Without these a signal says only
+  // that something of this type happened, never that it was 236 contacts, which is
+  // the number the client and the coach actually care about.
+  //   --count   how many things (plain digits only; anything else is rejected
+  //             rather than sent, because Number() exotica like 0x12 or 1e3 don't
+  //             belong on a wire)
+  //   --routine the roster name of the hired agent that did the work, e.g.
+  //             "prospecting" ("routine" is only the wire name)
+  //   --tag     the kind of work, from the menu in shapes.mjs
+  //   --asset   the slug of the skill, or other installed capability, that ran
+  // There is deliberately no free-text field. The one-line story of the work lives
+  // on this machine, in the memory log and status/shift-log.md. The radio carries
+  // labels, a count, and a time, never content (constitution Article V;
+  // docs/radio.md).
   const work = {};
   if (flags.count !== undefined) {
-    if (!/^\d{1,9}$/.test(String(flags.count))) {
-      console.log('signal --count must be a whole number in plain digits (how many things the routine did).');
+    // One rule for a count, shared with done.mjs (shapes.mjs). Zero is decided per
+    // type further down: only a shift may report it.
+    const problem = countProblem(flags.count, { allowZero: true });
+    if (problem) {
+      console.log(`signal --count: ${problem}`);
       process.exit(1);
     }
     work.count = Number(flags.count);
@@ -489,9 +545,95 @@ if (command === 'signal') {
   if (flags.note !== undefined) {
     console.log('Note stays local: write it in status/shift-log.md — the radio never carries content. Sending without it.');
   }
+
+  // The install journey is not work. A checkpoint carries no tag and names nothing
+  // that ran, so install noise can never be counted as a finished task.
+  if (flags.type === 'install_checkpoint' &&
+      ['tag', 'asset', 'outcome', 'surface', 'asset-kind'].some((k) => flags[k] !== undefined)) {
+    console.log('install_checkpoint is the install journey, not work. It takes no --tag and no --asset.');
+    process.exit(1);
+  }
+
+  // The kind of work: one tag from the public menu, never one made up on the spot.
+  if (flags.tag !== undefined) {
+    if (!isWorkTag(flags.tag)) {
+      console.log(String(flags.tag).trim()
+        ? `"${flags.tag}" is not a tag on the menu. Pick the closest one, or "other" when nothing fits:`
+        : '--tag needs a tag from the menu:');
+      for (const line of workTagMenu()) console.log(line);
+      console.log('Nothing was sent.');
+      process.exit(1);
+    }
+    work.tag = flags.tag;
+  }
+  if (flags.type === 'task_completed') {
+    if (!work.tag || work.count === undefined) {
+      console.log('task_completed needs both --tag <kind of work> and --count <n>: a finished task says what kind and how many.');
+      if (!work.tag) for (const line of workTagMenu()) console.log(line);
+      process.exit(1);
+    }
+    // A finished task that did zero things is a contradiction, and the server
+    // answers it with a 400. Only a shift may report 0: it ran and found nothing.
+    if (work.count < 1) {
+      console.log('task_completed needs --count of at least 1: a finished task did at least one thing. Only a shift (routine_completed) may report 0.');
+      process.exit(1);
+    }
+    // On this type the agent's name is held to the roster-name rule, so a new
+    // kind of signal opens no new way to put words on the wire. The older types
+    // keep taking --routine exactly as they always have, so no shift report
+    // already in the field starts failing; done.mjs checks the name for those
+    // before it ever gets here.
+    const routineProblem = work.routine ? labelProblem(work.routine, 'agent') : null;
+    if (routineProblem) {
+      console.log(`--routine names the hired agent by its roster name, never by a description. ${routineProblem}`);
+      process.exit(1);
+    }
+  }
+
   if (flags.type === 'routine_completed' && (!work.routine || work.count === undefined)) {
     console.log('routine_completed needs both --routine <name> and --count <n> — a shift report must say who and how many.');
     process.exit(1);
+  }
+  // What ran, when a skill or another installed capability did the work. The
+  // fields travel together, and the slug is a label, never content: an empty or
+  // free-text slug is refused here rather than tidied up, so nothing but a label
+  // can ever leave in this field. (The server's replay key also treats '' and
+  // absent as the same thing, so '' must never be sent.)
+  // This block sits exactly where the unmerged radio-v2 branch puts its own asset
+  // handling, on purpose. When that branch is rebased, git stops here and asks,
+  // instead of quietly keeping both copies. Keep this one, and add to it.
+  const asset = typeof flags.asset === 'string' ? flags.asset.trim() : '';
+  if (!asset && ['asset', 'outcome', 'surface', 'asset-kind'].some((k) => flags[k] !== undefined)) {
+    console.log('Asset fields travel together: add --asset <slug> (which skill or capability did the work).');
+    process.exit(1);
+  }
+  if (asset) {
+    const problem = labelProblem(asset, 'skill');
+    if (problem) {
+      console.log(`--asset names what ran by its slug, never by a description. ${problem}`);
+      process.exit(1);
+    }
+    if (!ASSET_OUTCOMES.includes(flags.outcome)) {
+      console.log(`--asset needs --outcome, one of: ${ASSET_OUTCOMES.join(', ')}.`);
+      process.exit(1);
+    }
+    const surface = flags.surface !== undefined
+      ? flags.surface
+      : (flags.type === 'routine_completed' ? 'routine' : 'agent');
+    if (!ASSET_SURFACES.includes(surface)) {
+      console.log(`--surface must be one of: ${ASSET_SURFACES.join(', ')}.`);
+      process.exit(1);
+    }
+    work.asset = asset;
+    work.outcome = flags.outcome;
+    work.surface = surface;
+    if (flags['asset-kind'] !== undefined) {
+      if (!PACKAGE_KINDS.includes(flags['asset-kind'])) {
+        console.log(`--asset-kind must be one of: ${PACKAGE_KINDS.join(', ')}.`);
+        process.exit(1);
+      }
+      work.asset_kind = flags['asset-kind'];
+    }
   }
 
   const res = await call('POST', '/signals', {
@@ -508,6 +650,7 @@ if (command === 'signal') {
   });
   if (res.status === 401) reportAuthProblem();
   console.log(res.ok ? `Signal sent (${flags.type}).` : `Signal answered ${res.status} — not retried.`);
+  resultLine(res.ok ? 'sent' : `refused ${res.status}`);
   process.exit(0);
 }
 

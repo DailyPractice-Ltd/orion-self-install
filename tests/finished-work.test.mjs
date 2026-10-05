@@ -308,6 +308,297 @@ test('existing behaviour: radio off is one plain line, exit 0, and nothing sent'
   assert.deepEqual(h.calls(), []);
 });
 
+// ── status/done.mjs ─────────────────────────────────────────────────────────
+
+test('done: one finished task sends exactly one task_completed, with the tag and a count of 1', (t) => {
+  const h = makeHarness(t);
+  const { code, out, err } = h.run('done.mjs', ['--tag', 'content']);
+  assert.equal(code, 0, err);
+  assert.match(out, /Signal sent \(task_completed\)\./);
+  const body = onlySignal(h);
+  assert.equal(body.signal_type, 'task_completed');
+  assert.deepEqual(body.payload, { ...BASE_PAYLOAD, tag: 'content', count: 1 });
+  assert.equal(h.shiftLog(), null, 'a task a person set is not a shift, so the shift log is not touched');
+});
+
+test('done: --skill and --agent put the asset fields and the routine label in the payload', (t) => {
+  const h = makeHarness(t);
+  const { code, err } = h.run('done.mjs', [
+    '--tag', 'prospecting', '--count', '18', '--skill', 'meeting-sizing', '--agent', 'prospecting',
+  ]);
+  assert.equal(code, 0, err);
+  const body = onlySignal(h);
+  assert.equal(body.signal_type, 'task_completed');
+  assert.deepEqual(body.payload, {
+    ...BASE_PAYLOAD,
+    tag: 'prospecting',
+    count: 18,
+    routine: 'prospecting',
+    asset: 'meeting-sizing',
+    asset_kind: 'skill',
+    outcome: 'run_completed',
+    surface: 'agent',
+  });
+});
+
+test('done: the --line text is written locally and appears in no request body', (t) => {
+  const h = makeHarness(t);
+  const line = 'drafted the Q4 webinar deck for Acme Freight, three slides still thin';
+  const { code, out, err } = h.run('done.mjs', ['--tag', 'content', '--count', '1', '--line', line]);
+  assert.equal(code, 0, err);
+  // The local half: the harness's own log in memory, word for word.
+  assert.equal(h.memoryLog('Neo'), `${line}\n`);
+  assert.match(out, /Noted in agents\/Neo\/log\.md\./);
+  // The radio half: labels only.
+  assert.deepEqual(onlySignal(h).payload, { ...BASE_PAYLOAD, tag: 'content', count: 1 });
+  for (const leak of ['drafted', 'webinar', 'Acme', 'Freight', 'slides', 'line']) {
+    assert.ok(!h.wire().includes(leak), `"${leak}" must not appear in any request`);
+  }
+});
+
+test('done: the radio script is handed labels only, never the line', (t) => {
+  // The wire check above would still pass if done.mjs handed the line to
+  // radio.mjs and radio.mjs dropped it. That is one mistake away from a leak, so
+  // this case swaps in a radio that only writes down what it was given.
+  const stub = `
+    import { appendFileSync } from 'node:fs';
+    import { fileURLToPath } from 'node:url';
+    import { dirname, join } from 'node:path';
+    appendFileSync(join(dirname(fileURLToPath(import.meta.url)), 'radio-args.log'), JSON.stringify(process.argv.slice(2)) + '\\n');
+    console.log('Signal sent (stub).');
+  `;
+  const h = makeHarness(t, { files: { 'status/radio.mjs': stub } });
+  const line = 'called Thandi at Acme Freight, she wants the Durban pricing';
+  h.run('done.mjs', ['--tag', 'calls', '--line', line]);
+  h.run('done.mjs', ['--tag', 'calls', '--count', '2', '--skill', 'meeting-sizing', '--agent', 'research', '--line', line]);
+  h.run('done.mjs', ['--tag', 'calls', '--count', '0', '--skill', 'meeting-sizing', '--agent', 'research', '--shift', '--line', line]);
+  const handed = readFileSync(join(h.dir, 'status', 'radio-args.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(handed, [
+    ['signal', '--type', 'task_completed', '--tag', 'calls', '--count', '1'],
+    ['signal', '--type', 'task_completed', '--tag', 'calls', '--count', '2', '--routine', 'research',
+      '--asset', 'meeting-sizing', '--asset-kind', 'skill', '--outcome', 'run_completed', '--surface', 'agent'],
+    ['signal', '--type', 'routine_completed', '--tag', 'calls', '--count', '0', '--routine', 'research',
+      '--asset', 'meeting-sizing', '--asset-kind', 'skill', '--outcome', 'run_completed', '--surface', 'routine'],
+  ]);
+  for (const args of handed) {
+    for (const arg of args) assert.ok(!/Thandi|Acme|Durban|pricing/.test(arg), `the line must not be handed over: ${arg}`);
+  }
+  // While the line itself is safe on this machine, three times over.
+  assert.equal(h.memoryLog('Neo'), `${line}\n`);
+  assert.ok(h.memoryLog('research').startsWith(`${line}\n`));
+  assert.ok(h.shiftLog().includes(`auto: ${line}`));
+});
+
+test('done: --shift sends routine_completed and writes an auto: line to the shift log and to memory', (t) => {
+  const h = makeHarness(t);
+  const { code, out, err } = h.run('done.mjs', [
+    '--tag', 'prospecting', '--count', '18', '--agent', 'prospecting', '--skill', 'meeting-sizing',
+    '--shift', '--line', '18 new candidates, 2 skipped as duplicates',
+  ]);
+  assert.equal(code, 0, err);
+  assert.match(out, /Signal sent \(routine_completed\)\./);
+  const body = onlySignal(h);
+  assert.equal(body.signal_type, 'routine_completed');
+  assert.deepEqual(body.payload, {
+    ...BASE_PAYLOAD,
+    tag: 'prospecting',
+    count: 18,
+    routine: 'prospecting',
+    asset: 'meeting-sizing',
+    asset_kind: 'skill',
+    outcome: 'run_completed',
+    surface: 'routine',
+  });
+  const log = h.shiftLog();
+  assert.match(
+    log,
+    /^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \| prospecting \| count: 18 \| auto: 18 new candidates, 2 skipped as duplicates\n$/,
+  );
+  assert.ok(log.includes('auto:'));
+  assert.equal(h.memoryLog('prospecting'), log, 'the agent\'s memory log gets the same line');
+  assert.ok(!h.wire().includes('candidates'), 'the line stays local on a shift too');
+});
+
+test('done: the auto: marker is never doubled, and a wiring test keeps its auto-test: marker', (t) => {
+  const h = makeHarness(t);
+  h.run('done.mjs', ['--tag', 'ops', '--agent', 'dream', '--shift', '--line', 'auto: merged 4 duplicate notes']);
+  h.run('done.mjs', ['--tag', 'ops', '--agent', 'dream', '--shift', '--line', 'auto-test: wiring check, kicked by hand']);
+  const lines = h.shiftLog().trimEnd().split('\n');
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], / \| dream \| count: 1 \| auto: merged 4 duplicate notes$/);
+  assert.match(lines[1], / \| dream \| count: 1 \| auto-test: wiring check, kicked by hand$/);
+  assert.ok(!h.shiftLog().includes('auto: auto'));
+});
+
+test('done: radio off sends nothing and says nothing about it, and a shift line is still written', (t) => {
+  const h = makeHarness(t, { sharing: { status_signal_enabled: false } });
+  const quiet = h.run('done.mjs', ['--tag', 'content', '--count', '2']);
+  const shift = h.run('done.mjs', [
+    '--tag', 'reporting', '--count', '1', '--agent', 'friday-report', '--shift', '--line', 'the week in one page',
+  ]);
+  for (const r of [quiet, shift]) {
+    assert.equal(r.code, 0, r.err);
+    assert.doesNotMatch(r.out, /radio|check-in|signal|sent|off/i, 'radio off is silent, not announced');
+  }
+  assert.deepEqual(h.calls(), [], 'nothing leaves the machine with the radio off');
+  assert.match(h.shiftLog(), / \| friday-report \| count: 1 \| auto: the week in one page\n$/);
+  assert.equal(h.memoryLog('friday-report'), h.shiftLog(), 'memory does not depend on the radio');
+});
+
+test('done: an unpaired harness is radio off too', (t) => {
+  const h = makeHarness(t, { sharing: { bridge_url: null, harness_id: null, install_token: null } });
+  const { code, out } = h.run('done.mjs', ['--tag', 'admin', '--line', 'cleared the inbox']);
+  assert.equal(code, 0);
+  assert.doesNotMatch(out, /radio/i);
+  assert.deepEqual(h.calls(), []);
+  assert.equal(h.memoryLog('Neo'), 'cleared the inbox\n');
+});
+
+test('done: a bad tag exits 1, prints the menu, and writes and sends nothing', (t) => {
+  const h = makeHarness(t);
+  const { code, out } = h.run('done.mjs', [
+    '--tag', 'prospectin', '--agent', 'prospecting', '--shift', '--line', 'found 18',
+  ]);
+  assert.equal(code, 1);
+  assert.match(out, /"prospectin" is not a tag on the menu/);
+  for (const menuLine of workTagMenu()) assert.ok(out.includes(menuLine), `the menu should show: ${menuLine}`);
+  assert.match(out, /Nothing was written and nothing was sent\./);
+  assert.deepEqual(h.calls(), []);
+  assert.equal(h.shiftLog(), null);
+  assert.equal(h.exists('memory'), false, 'no memory note either');
+});
+
+test('done: every other bad report is refused the same way', (t) => {
+  const h = makeHarness(t);
+  const good = ['--tag', 'crm'];
+  for (const [why, args] of [
+    ['no tag at all', []],
+    ['a tag made of prototype', ['--tag', 'constructor']],
+    ['a count with exotica', [...good, '--count', '1e3']],
+    ['a negative count', [...good, '--count', '-1']],
+    ['a fractional count', [...good, '--count', '2.5']],
+    ['a count with no value', [...good, '--count']],
+    ['a skill that is a title, not a slug', [...good, '--skill', 'Meeting Sizing']],
+    ['a skill slug over 100 characters', [...good, '--skill', 's'.repeat(101)]],
+    ['an agent with a capital', [...good, '--agent', 'Prospecting']],
+    ['a roster name over 30 characters', [...good, '--agent', 'a'.repeat(31)]],
+    ['an agent that is a person\'s name', [...good, '--agent', 'thandi@acme.co.za']],
+    ['--shift without --agent', [...good, '--shift', '--line', 'ran']],
+    ['an empty --line', [...good, '--line', '   ']],
+    ['a --line that swallowed the next flag', [...good, '--agent', 'prospecting', '--line', '--shift']],
+    ['a flag it does not know', [...good, '--note', 'called Thandi at Acme']],
+    ['a stray word', [...good, 'unquoted']],
+    ['the same flag twice', [...good, '--tag', 'deals']],
+  ]) {
+    const { code, out } = h.run('done.mjs', args);
+    assert.equal(code, 1, `should be refused: ${why}`);
+    assert.match(out, /Nothing was written and nothing was sent\./, why);
+  }
+  assert.deepEqual(h.calls(), []);
+  assert.equal(h.shiftLog(), null);
+  assert.equal(h.exists('memory'), false);
+});
+
+test('done: --count 0 is refused for a finished task and allowed for a shift', (t) => {
+  const h = makeHarness(t);
+  const task = h.run('done.mjs', ['--tag', 'crm', '--count', '0', '--line', 'nothing to tidy']);
+  assert.equal(task.code, 1);
+  assert.match(task.out, /--count 0 is only for a shift/);
+  assert.deepEqual(h.calls(), []);
+  assert.equal(h.exists('memory'), false);
+
+  const shift = h.run('done.mjs', [
+    '--tag', 'crm', '--count', '0', '--agent', 'pipeline-review', '--shift', '--line', 'nothing stale today',
+  ]);
+  assert.equal(shift.code, 0, shift.err);
+  const body = onlySignal(h);
+  assert.equal(body.signal_type, 'routine_completed');
+  assert.deepEqual(body.payload, { ...BASE_PAYLOAD, tag: 'crm', count: 0, routine: 'pipeline-review' });
+  assert.match(h.shiftLog(), / \| pipeline-review \| count: 0 \| auto: nothing stale today\n$/);
+});
+
+test('done: there is no way to report a skill as anything but run', (t) => {
+  const h = makeHarness(t);
+  for (const extra of [['--outcome', 'skipped'], ['--outcome=skipped'], ['--surface', 'routine'], ['--asset', 'x'], ['--type', 'asset_used']]) {
+    const { code } = h.run('done.mjs', ['--tag', 'calls', '--skill', 'meeting-sizing', ...extra]);
+    assert.equal(code, 1, `done.mjs must not take ${extra[0]}`);
+  }
+  assert.deepEqual(h.calls(), []);
+  // What it does send for a skill is always the same three words.
+  h.run('done.mjs', ['--tag', 'calls', '--skill', 'meeting-sizing']);
+  const { payload } = onlySignal(h);
+  assert.equal(payload.outcome, 'run_completed');
+  assert.equal(payload.asset_kind, 'skill');
+  assert.equal(payload.surface, 'agent');
+});
+
+test('done: an unreachable radio marks the shift line, and the report still exits 0', (t) => {
+  const h = makeHarness(t, { unreachable: true });
+  const { code, out, err } = h.run('done.mjs', [
+    '--tag', 'prospecting', '--count', '5', '--agent', 'prospecting', '--shift', '--line', '5 found',
+  ]);
+  assert.equal(code, 0, err);
+  assert.match(out, /The radio address didn't answer \(ENOTFOUND\)/);
+  assert.match(h.shiftLog(), / \| prospecting \| count: 5 \| auto: 5 found \(radio unreachable\)\n$/);
+  assert.equal(h.calls().length, 1, 'one try, never a retry');
+});
+
+test('done: the shift log is appended to, never rewritten', (t) => {
+  const earlier = '2026-08-05 07:00 | prospecting | count: 236 | auto: enriched the week\'s contacts';
+  // Written by hand before 1.1.0, and without a final newline.
+  const h = makeHarness(t, { files: { 'status/shift-log.md': earlier } });
+  h.run('done.mjs', ['--tag', 'prospecting', '--count', '4', '--agent', 'prospecting', '--shift', '--line', '4 found']);
+  const lines = h.shiftLog().split('\n');
+  assert.equal(lines[0], earlier);
+  assert.match(lines[1], / \| prospecting \| count: 4 \| auto: 4 found$/);
+  assert.equal(lines[2], '');
+  assert.equal(lines.length, 3);
+});
+
+test('done: a line break in --line cannot split the one-line shape', (t) => {
+  const h = makeHarness(t);
+  h.run('done.mjs', ['--tag', 'ops', '--agent', 'dream', '--shift', '--line', 'merged 4 notes\n  and pruned 2']);
+  assert.match(h.shiftLog(), / \| dream \| count: 1 \| auto: merged 4 notes and pruned 2\n$/);
+  assert.equal(h.shiftLog().trimEnd().split('\n').length, 1);
+});
+
+test('done: memory off skips the note silently, and the shift log still gets its line', (t) => {
+  const h = makeHarness(t, { status: { memory: { enabled: false, backend: 'folder', remote: null, path: 'memory' } } });
+  const { code, out, err } = h.run('done.mjs', [
+    '--tag', 'reporting', '--agent', 'friday-report', '--shift', '--line', 'the week in one page',
+  ]);
+  assert.equal(code, 0, err);
+  assert.doesNotMatch(out, /memory/i);
+  assert.equal(h.exists('memory'), false);
+  assert.match(h.shiftLog(), / \| friday-report \| count: 1 \| auto: the week in one page\n$/);
+  assert.equal(h.calls().length, 1);
+});
+
+test('done: no status/status.json is one plain line, exit 0, nothing written or sent', (t) => {
+  const h = makeHarness(t, { noStatus: true });
+  const { code, out } = h.run('done.mjs', ['--tag', 'ops', '--agent', 'dream', '--shift', '--line', 'ran']);
+  assert.equal(code, 0);
+  assert.equal(out, 'No status/status.json yet, so there is nothing to report from. Run  node start.mjs  first.\n');
+  assert.deepEqual(h.calls(), []);
+  assert.equal(h.shiftLog(), null);
+  // But a bad report is still a bad report: validation comes first.
+  assert.equal(h.run('done.mjs', ['--tag', 'nope']).code, 1);
+});
+
+test('done: a status file that will not parse costs a shift nothing locally, and sends nothing', (t) => {
+  const h = makeHarness(t, { noStatus: true, files: { 'status/status.json': '{ "sharing": ' } });
+  const { code, out } = h.run('done.mjs', ['--tag', 'ops', '--agent', 'dream', '--shift', '--line', 'ran']);
+  assert.equal(code, 0);
+  assert.match(out, /status\/status\.json could not be read/);
+  assert.match(h.shiftLog(), / \| dream \| count: 1 \| auto: ran\n$/);
+  assert.deepEqual(h.calls(), []);
+});
+
+test('nothing in this folder was touched by the cases above', () => {
+  assert.equal(existsSync(join(statusDir, 'status.json')), false, 'the template folder has no status.json');
+  assert.equal(existsSync(join(statusDir, 'shift-log.md')), false, 'and no shift log was written into it');
+});
+
 // ── The shapes ──────────────────────────────────────────────────────────────
 
 test('the tag menu is the fifteen agreed tags, and every one fits the wire shape', () => {

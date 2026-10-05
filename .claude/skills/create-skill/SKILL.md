@@ -5,6 +5,8 @@ description: Teach the client's team a reusable judgment as a skill. Use when th
 
 Read `library/HIRING.md`, Part C ("Teaching a skill instead"), and follow it exactly.
 
-A skill is invoked, not scheduled: no shift, no report step, no probation. One screen
+A skill is invoked, not scheduled: no schedule, no report step of its own, no
+probation. When a finished task used the skill, that task's report names it
+(`node status/done.mjs --skill <slug> …`). One screen
 maximum — if the file wants to be longer, it is an agent trying to happen, and you
 should offer the hire path (Part A) instead.

@@ -1,8 +1,9 @@
 # Hiring — how your team grows
 
 An agent is a colleague who happens to be software. Not a prompt you remember to run:
-an employee with a job, training, and a shift — one that turns up whether or not you
-opened anything.
+an employee with a job and training, who does real work and reports it. Every agent
+works when you ask. Give one a schedule and it also turns up on its own, whether or
+not you opened anything.
 
 The line worth learning once, because everything else hangs off it:
 
@@ -16,11 +17,20 @@ and your team appears.
 The shape it produces is contracted in
 `specs/002-production-line/contracts/agent-anatomy.md`.
 
+**What "hired" means.** An agent is hired once it has done its job on real work and
+reported it. It makes no difference whether you asked for that work or a schedule
+started it. A schedule is optional, and it has a separate proof of its own:
+"schedule proven" means the schedule has fired once on its own. An agent with no
+schedule is **on call**: it works when you ask. (Before 1.1.0 an agent only counted
+as hired after a scheduled run had fired on its own. That rule is gone.)
+
 ---
 
 ## The six parts of a hired agent
 
-An agent missing any one of these is not hired yet — it is a document.
+Four parts are required: the job, the training, the tools and the report. An agent
+missing any one of those is not hired yet. It is a document. The skill and the
+schedule are optional.
 
 | Part | Where it lives | Plain words |
 |---|---|---|
@@ -28,8 +38,8 @@ An agent missing any one of these is not hired yet — it is a document.
 | **The training** | `agent/knowledge-base/` | Your business, ICP, voice, numbers. Captured once, on Day 1. Shared by the whole team — nobody re-interviews you |
 | **The skill** | `.claude/skills/<name>/` | A reusable judgment this role applies — a rubric, a checklist. Only when the role has one |
 | **The tools** | the agent file's `tools:` line | Only what the role needs. The scoring agent reads your CRM; it never touches email |
-| **The shift** | a scheduled task on this machine | When it works, with nobody asking. **The part everyone skips, and the one that makes it an employee** |
-| **The report** | the last step of every shift | One line locally, one signal to Daily Practice if your check-ins are on. How you know it ran |
+| **The schedule (optional)** | a scheduled task on this machine | When it works without being asked: on a clock, or when another agent hands off. Work started this way is called a shift. An agent without a schedule is on call: it works when you ask |
+| **The report** | the last step of every piece of work | One command when the work is finished, whether you asked for it or a schedule started it. It writes one line on this machine and, if your check-ins are on, sends one signal to Daily Practice: the kind of work, how many, and who did it. Never the content. How you know the work was done |
 
 ---
 
@@ -70,7 +80,7 @@ Two lanes out, both first-class:
 - **Picked from the bank** → confirm the tailored job rather than re-interviewing:
   *"A {title} for {business} would {the role's job line, tailored to the knowledge
   base}. Sound right, or anything you'd change?"* The role's sources pre-fill Q2 and
-  its typical shift pre-fills Q4 — offered as defaults to confirm, never assumed.
+  its typical schedule pre-fills Q4. Both are defaults to confirm, never assumed.
   The job sheet records `role: {bank slug}`. Then confirm the roster name the same
   way as the custom lane: *"On the roster they'd be `@{name}` — good?"* (default the
   role's own slug when it's free; a head-start package install keeps the package's
@@ -95,34 +105,38 @@ human name, and a roster of job titles reads like an org chart.
 > without your yes, no invented facts, never past your pacing limits. Anything this one
 > specifically must never do, on top? 'No' is a fine answer."
 
-**Q4 — the shift.**
-> "When should `@{name}` work — on the clock (say, weekday mornings at 7), or when
-> something happens (say, right after {upstream agent} finishes, or after a call)? If
-> it's on the clock: which days, what time, your time."
+**Q4: when it works.**
+> "When should `@{name}` work? Three ways. On call: they work when you ask, and only
+> then. On the clock: say, weekday mornings at 7. Or when something happens: say,
+> right after {upstream agent} finishes, or after a call. If it's on the clock: which
+> days, what time, your time."
 
-(Schedule times use this machine's clock and assume it is the client's time — true for
-a laptop; say so out loud if the machine lives anywhere else. "After a call" and other
-real-world events need a carrier: they wire as a handoff from whichever agent or
-routine notices the event — the post-call debrief, usually. If no agent notices it yet,
-say so honestly and offer the clock instead.)
+(On call is a full answer, not a lesser one: the agent is hired the same way, and
+there is simply no schedule to wire. Schedule times use this machine's clock and
+assume it is the client's time. That is true for a laptop; say so out loud if the
+machine lives anywhere else. "After a call" and other real-world events need a
+carrier: they wire as a handoff from whichever agent or procedure notices the event,
+usually the post-call debrief. If no agent notices it yet, say so honestly and offer
+the clock, or on call, instead.)
 
 **Q5 — the success line.**
 > "Last one. Finish this sentence: 'I'll know `@{name}` is doing the job when ______.'
-> We test that line twice: on their first shift in a minute, while we watch (the smoke
-> test), and probation ends the first time a shift passes it with nobody asking."
+> We test that line in a minute, on their first run, on real work, while we both
+> watch. When it passes, they're hired."
 
 **Skip rule**: anything the client's opening message already answered is read back for
 confirmation, never re-asked. Never asked, ever: ICP, tone, offer, objections,
 commitments (knowledge base); their name or business name (status.json); machine facts
 (machine profile); timezone (schedule times are "your time" by construction).
 
-Then the **job sheet readback**: the whole agent file in plain words — job, must-nots,
-schedule, the report line, "starts on probation: reads and stages only" — and the
-exact purpose sentence, word for word: *"One sentence describes what this agent is
-for: '{purpose — ≤140 chars, about the agent, never a person, company, or number}'.
-If your check-ins are on, that exact sentence goes to Daily Practice."* — ending
-*"Say yes and I'll hire them."* That yes gates all file creation and is the yes that
-covers sending that sentence (constitution Article V, Tier 3). The sentence is
+Then the **job sheet readback**: the whole agent file in plain words (the job, the
+must-nots, when it works, the report line and its tag, "reads and stages only until
+you take it live"), and then the exact purpose sentence, word for word: *"One
+sentence describes what this agent is for: '{purpose: ≤140 chars, about the agent,
+never a person, company, or number}'. If your check-ins are on, that exact sentence
+goes to Daily Practice."* End with *"Say yes and I'll hire them."* That yes gates all
+file creation and is the yes that covers sending that sentence (constitution Article
+V, Tier 3). The sentence is
 composed and approved whether or not check-ins are on — it lives in the agent file's
 `purpose:` line, so a later session (step 8, a promotion, check-ins switched on)
 sends the approved words, never a reconstruction. Machine-changing steps after
@@ -142,7 +156,8 @@ role: {bank slug from library/ROLES.md, or custom}
 purpose: "{the approved one-sentence purpose from the readback — the exact words the shelf report sends}"
 status: probation
 go_live: false
-schedule: "{weekdays 07:00 local | after: {upstream-agent}}"
+schedule: "{on-call | weekdays 07:00 local | after: {upstream-agent}}"
+schedule_proven: {false, when there is a schedule. On call: omit this key}
 memory: [shared, roles/{role-area}, agents/{name}]
 version: 0.1.0
 ---
@@ -162,41 +177,57 @@ Today's output lands at `{path — e.g. morning-list.md}`, in this folder, where
 - {Q3 extras, verbatim.}
 
 ## Training
-Your knowledge of {business} lives in `agent/knowledge-base/` — ICP §2, tone §5,
-objections §6, commitments §7. Read what the job needs at the start of every shift;
-never re-ask {client} for what it holds. Your team's living memory is the `memory/`
-folder (`docs/memory.md`): at shift start, `node status/memory.mjs sync`, then read
-`memory/INDEX.md` and the areas in your `memory:` line above — and only those; other
-roles' areas are not your reading. New durable facts you learn go back in (a small
-file in your area; team-wide truths proposed in `shared/inbox.md`). Never credentials.
+Your knowledge of {business} lives in `agent/knowledge-base/`: ICP §2, tone §5,
+objections §6, commitments §7. Read what the job needs before every piece of work,
+and never re-ask {client} for what it holds. Your team's living memory is the
+`memory/` folder (`docs/memory.md`). Before work: `node status/memory.mjs sync`,
+then read `memory/INDEX.md` and the areas in your `memory:` line above, and only
+those. Other roles' areas are not your reading. New durable facts you learn go back
+in (a small file in your area; team-wide truths proposed in `shared/inbox.md`).
+Never credentials.
 
 ## The schedule
-{Q4. Clock: days + time. Handoff: "runs when {upstream} finishes — see the last line
-of `.claude/agents/{upstream}.md`."} If a run is missed, run at the next opening;
-never double up.
+{Q4. On call: "No schedule. I work when {client} asks." Clock: days + time. Handoff:
+"I run when {upstream} finishes. See the last line of
+`.claude/agents/{upstream}.md`."} If a scheduled run is missed, run at the next
+opening; never double up.
 
-## The report — last step of every shift, no exceptions
-(The radio is your harness's check-in line to Daily Practice — `docs/radio.md`. The
-shift log is its local twin, and it never skips.)
-1. Append one line to `status/shift-log.md`:
-   `{date} | {name} | count: N | {one short line — what you did, or why N is low}`
-   A scheduled run begins its line's note with `auto:` — that marker is how probation
-   is judged, so never write it on a supervised or hand-asked run.
-   Then write the same line into the team memory, before any radio:
-   `node status/memory.mjs note --to agents/{name}/log.md --line "{the same line}"`
-   — memory missing or unusable → that half skips silently; the shift-log line
-   itself still never skips.
-2. If check-ins are on and you can run scripts:
-   `node status/radio.mjs signal --type routine_completed --routine {name} --count N`
-   The one-line story stays in the shift log, local — the radio carries the label,
-   the count, and the time, never content.
-   Radio off → skip this step silently; step 1 never skips. If the command prints
-   "didn't answer", append "(radio unreachable)" to step 1's line — the work still
-   counts locally, and the marker is what makes the silence diagnosable later.
-Count only what is real. Failed run → count 0 and say why — a silent failure is worse
-than a reported one. Never a person's name, email, or company in the note.
+## The report: the last step of every piece of work, no exceptions
+One command, whether {client} asked for the work or your schedule started it:
+
+`node status/done.mjs --agent {name} --tag {tag} --count N --line "{one short line: what you did, or why N is low}"`
+
+Add `--shift` when your schedule or a handoff started the run, and only then. Never
+add it to a run a person asked for or watched: `--shift` is what writes the `auto:`
+marker, and that marker is how your schedule is proven. {If the role has a skill:
+"Add `--skill {skill}` when you used it."}
+
+The tag says what kind of work this job is. It comes from the menu in
+`docs/radio.md`, and it was chosen at hire: `{tag}`.
+
+What the command does, in order:
+1. It writes your line on this machine. This half never skips. With `--shift` the
+   line goes to `status/shift-log.md` as
+   `{date} | {name} | count: N | auto: {your line}`. Every line also goes to the
+   team memory, in `agents/{name}/log.md`. Memory missing or unusable: that half
+   skips silently.
+2. If check-ins are on, it sends one signal: the tag, the count, the time, and your
+   name. Your line is never sent. (The radio is your harness's check-in line to
+   Daily Practice: `docs/radio.md`.) Radio off: nothing is sent, and nothing is said
+   about it. If the command prints "didn't answer", it marks your shift-log line
+   "(radio unreachable)" by itself. The work still counts locally, and the marker
+   is what makes the silence diagnosable later.
+
+Count only what is real. A shift that fails, or finds nothing to do, still reports:
+count 0, and the line says why. A silent failure is worse than a reported one. A
+task {client} asked for that did not get finished reports nothing: it is not
+finished work, and they are there to see it. Never a person's name, email, or
+company in the line.
 
 ## Probation and GO-LIVE
+Probation is short. It lasts only until your first run passes {client}'s success
+line, on real work, in the hire session itself. It does not wait for your schedule
+to fire. GO-LIVE is separate, and it is the safety rule.
 While `go_live: false`: read and stage only — no external writes of any kind. When
 {client} flips it (tell your assistant "take {name} live" — the edit is the record),
 additionally allowed, unattended: {the enumerated standing writes from the job sheet}.
@@ -217,6 +248,9 @@ not the runtime. Both facts are fine, and stated.
    go to Part B. Half-created leftovers → resume matrix, Part D.
 2. **Write `.claude/agents/{name}.md`** from the template, every placeholder filled
    from the interview and the knowledge base. `status: probation`, `go_live: false`.
+   `schedule:` is `on-call` when Q4 chose no schedule, and `schedule_proven: false`
+   is written only when there is one. The report's `{tag}` is one tag from the menu
+   in `docs/radio.md`: the kind of work this job is.
 3. **Extract the role skill, if warranted.** The test: *does this job contain a
    reusable judgment — a rubric the client or another agent would want applied
    identically outside this role's schedule?* Yes → write
@@ -227,22 +261,28 @@ not the runtime. Both facts are fine, and stated.
    install that package instead.
 4. **Append the roster row** to `.claude/agents/README.md`:
    `@{name} | {role title} | {one-line job} | {schedule} | Probation | /{skill or —}`.
+   The schedule cell reads `on call` for an on-call agent. For an agent with a
+   schedule it reads the schedule and how far its proof has got, starting at e.g.
+   `weekdays 07:00 (not yet wired)`. The roster's legend explains each state ("The
+   roster", below).
    (On a folder installed before 0.8.0 the roster header has no Role column — add the
    column to the header and a `—` to any existing rows first, so the table stays
-   aligned.)
+   aligned. On a folder installed before 1.1.0 the fourth column still carries its
+   old heading and the legend states the old rule: see "The roster", below.)
 5. **Record it** in `status/status.json`:
    `packages.{name} = { kind: "agent", role: "{bank slug or custom}",
    purpose: "{the approved sentence}", version: "0.1.0", installed_at: now,
    smoke_test_passed: false }`. While steps 2–8 are in flight, keep a top-level
    `notes` string in status.json — "hire in progress: {name}, next step N" — and
    clear it at step 9.
-6. **Wire the shift** — show the client the exact task first; a scheduled task is a
-   machine change and gets its own yes. The ladder:
+6. **Wire the schedule, only if Q4 chose one.** An on-call agent has nothing to wire:
+   go straight to step 7. Otherwise show the client the exact task first. A scheduled
+   task is a machine change and gets its own yes. The ladder:
    - **A — native scheduled task on THIS machine** (proven on install #3). The task's
      prompt, exactly:
      `Open {absolute folder path} and run the {name} shift: read
-     .claude/agents/{name}.md, do the job section, then the report section,
-     beginning the shift-log note with auto:. Stage everything; ask no questions.`
+     .claude/agents/{name}.md, do the job section, then the report section with
+     --shift. Stage everything; ask no questions.`
      (The prompt deliberately contains no quote characters, so it embeds safely in
      the OS-scheduler command lines below.)
      Cloud routines: refuse in one sentence — they run on a fresh copy fetched from
@@ -260,58 +300,106 @@ not the runtime. Both facts are fine, and stated.
      small promotion of the upstream agent and is named as such. A handoff hire
      **inherits the upstream's wake-up**, so C is only complete when the upstream
      itself is wired by A or B — a chain of handoffs must end at a clock.
-7. **Smoke test now — two layers, both on real data, in this session.**
-   *Logic*: run the shift body immediately, supervised — their first shift, while you
-   both watch. Pass = the client's Q5 line is true on real data. Flip
-   `smoke_test_passed: true`.
-   *Wiring*: trigger it once **through the wake-up itself** — the scheduled task's
-   run-now (or `launchctl kickstart`); for a handoff hire, run the upstream's shift
-   and watch the chain fire — and confirm a new line lands in `status/shift-log.md`.
-   Then, immediately: **edit that line's marker from `auto:` to `auto-test:`** — the
-   scheduler wrote it, but a person kicked the scheduler, so it must not count as
-   probation evidence. The wake-up is the layer nobody has ever tested — test it,
-   not just the logic.
-   **If either layer fails, stop here.** The hire parks honestly: `packages` entry
-   stays `smoke_test_passed: false`, the status note says why, step 8 does not
-   happen, and Part D's resume matrix picks it up next session. A parked hire is
-   honest; a shelf report of an unproven one is not.
-8. **Report — only on a step-7 pass.** The supervised shift already sent its own
-   signal (step 7's report step; its shift-log line says "first shift, supervised",
-   and the wiring run's line says `auto-test:`). Now the shelf —
-   Daily Practice's record of what this machine runs:
+
+   If A and B both fail, the schedule stops honestly and the hire does not: carry on
+   to step 7 (Part D, "Scheduler failure").
+7. **First run now, on real work, in this session.** Two checks. The first one makes
+   the hire. The second applies only when there is a schedule.
+   *The job*: run the job section immediately, supervised, while you both watch.
+   This is a first run, not a shift: a person started it. Then run its report
+   section, without `--shift`. Pass = the client's Q5 line is true on real data, and
+   the report ran. On a pass, in this order: flip `smoke_test_passed: true`, set
+   `status: hired` in the agent file, and change the roster row from `Probation` to
+   `Hired`.
+   *The wake-up (only when there is a schedule)*: trigger it once **through the
+   wake-up itself**: the scheduled task's run-now (or `launchctl kickstart`), or for
+   a handoff hire, the upstream's shift, watching the chain fire. Confirm a new line
+   lands in `status/shift-log.md`. Then, immediately: **edit that line's marker from
+   `auto:` to `auto-test:`**. The scheduler wrote it, but a person kicked the
+   scheduler, so it must not count as proof that the schedule fires on its own. The
+   wake-up is the layer nobody tests. Test it, not just the job. On a pass, the
+   roster's schedule cell moves from "(not yet wired)" to "(not yet proven)".
+   **If the job check fails, stop here.** The hire parks honestly: the `packages`
+   entry stays `smoke_test_passed: false`, the agent stays `status: probation`, the
+   status note says why, step 8 does not happen, and Part D's resume matrix picks it
+   up next session. A parked hire is honest. A shelf report of an agent that has not
+   done its job is not.
+   **If only the wake-up check fails, the hire stands.** The agent is `Hired` and
+   works when asked. Its schedule cell stays "(not yet wired)", the status note says
+   why, and Part D's "Scheduler failure" lane picks it up next session.
+8. **Report the hire. Only when step 7's job check passed.** It does not wait for the
+   schedule. The supervised first run already sent its own finished-task signal
+   (step 7's report step), and a wiring run's shift-log line says `auto-test:`. Now
+   the shelf, which is Daily Practice's record of what this machine runs:
    `node status/radio.mjs report-install --slug {name} --kind agent --version 0.1.0
    --role {the agent file's role line} --purpose "{the agent file's purpose line,
    verbatim — the words the client approved in the readback, never a
    reconstruction}"`.
    The role and purpose are how the bank in `library/ROLES.md` becomes
    evidence-based over time: labels, never content.
-   Radio off → both skip, and say so **once, here only**: "Your check-ins are off, so
-   Daily Practice won't see {name}'s reports — you will, in `status/shift-log.md`."
+   Radio off: both skip, and say so **once, here only**: "Your check-ins are off, so
+   Daily Practice won't see {name}'s reports. You will: in your memory log, and in
+   `status/shift-log.md` for scheduled work."
 9. **Close.** Teach the line: "`@{name}` summons them; `/{skill}` runs the judgment
    anywhere." Also, on the first hire only: delete the roster's "No one hired yet"
-   line. Then say plainly: "{name} is on probation until their shift fires once with
-   nobody asking — I'll check next time we talk." The roster stays `Probation` until
-   a later session finds an `auto:` line in `status/shift-log.md`; then flip roster
-   and frontmatter to `Hired`.
+   line. Then say plainly where things stand. On call: "{name} is hired, and on
+   call. Ask whenever you need them." With a schedule: "{name} is hired. Their
+   schedule shows as not yet proven until it fires once with nobody asking. I'll
+   check next time we talk." The schedule cell stays "(not yet proven)" until a later
+   session finds an `auto:` line in `status/shift-log.md`. That session changes the
+   cell to "(proven)" and sets `schedule_proven: true` in the agent file.
 
-`status/shift-log.md` is the local twin of the radio: one append-only line per shift.
-It answers "did it run?" when the radio is off, and the probation check reads it.
+`status/shift-log.md` is the local twin of the radio for scheduled work: one
+append-only line per shift. It answers "did it run?" when the radio is off, and it is
+where a schedule is proven. Work a person asked for leaves its line in the memory log
+instead (`memory/agents/{name}/log.md`).
+
+### The roster
+
+`.claude/agents/README.md` is the view the client reads. Its columns are
+`Agent | Role | Job | Schedule | Status | Skill`, and its legend reads, word for word:
+
+> **Status legend.** `Probation`: the hire is still in flight. Its first run has not
+> passed yet. `Hired`: it has done its job once on real work and reported it,
+> whether you asked or its schedule started it. A hired agent still reads and stages
+> only, until you take it live.
+>
+> **Schedule legend.** `on call`: no schedule. It works when you ask. Otherwise the
+> cell shows the schedule, then how far its proof has got. `(not yet wired)`: a
+> schedule was chosen, but nothing wakes the agent yet. It works when you ask.
+> `(not yet proven)`: the wake-up is wired, and has not fired on its own yet.
+> `(proven)`: it has fired at least once with nobody asking (an `auto:` line in
+> `status/shift-log.md`; `auto-test:` lines are the hire session's own wiring test and
+> never count).
+
+An update never touches the roster, so a folder installed before 1.1.0 still shows
+the old one: a fourth column that is not yet headed `Schedule`, and a legend that
+makes `Hired` wait for a schedule to fire. When you meet that, follow AGENTS.md
+("Older folders: the rule changed in 1.1.0"): one sentence to the client, and on
+their okay rename the fourth column to `Schedule`, replace the legend with the one
+above, and bring each row up to date. A row moves to `Hired` when that agent has done
+real work. Its schedule cell becomes `on call`, or its schedule with the right proof
+beside it.
 
 ### The only test that matters
 
-Four questions; the first three are how you get to the fourth.
+Three questions. The third applies only when there is a schedule.
 
-1. Does the agent file name a schedule, in the client's own time?
-2. Is something wired to wake it — its own clock (A or B), or a handoff chain that
-   ends at one?
-3. Does the last step of the shift report, locally always, radio when on?
-4. **Has it fired once, on its own, with nobody asking** — an `auto:` line in the
-   shift log?
+1. **Did it do the job on real work?** The client's success line is true, on their
+   own data.
+2. **Did it report?** The last step of the work ran `node status/done.mjs`: a line on
+   this machine always, a signal when check-ins are on.
+3. **If it has a schedule: is the wake-up wired, and has it fired once on its own?**
+   Its own clock (A or B), or a handoff chain that ends at one, and then an `auto:`
+   line in the shift log. Until both are true the schedule is shown as not yet
+   wired, or not yet proven. The agent is hired either way.
 
 Install #3 enriched 236 contacts across six days and the coach console showed
-nothing — the work was real and invisible, because the agent doing it had no
-instruction to report and no schedule to report from. Do not hire another agent
-without both.
+nothing. The work was real and invisible, because the agent doing it had no
+instruction to report. Later a harness that worked in sessions every day sent
+nothing for weeks, because only approvals and scheduled runs could report. So: never
+hire an agent without its report step, and never make a schedule the price of being
+counted.
 
 ---
 
@@ -330,7 +418,15 @@ line is always what is sent).
 
 Guardrails only ever grow in a promotion. Removing one requires the client saying so
 explicitly, and gets its own changelog line. If the new duty adds standing writes,
-`go_live` resets to `false` — new powers earn their own probation.
+`go_live` resets to `false`. New powers start staged again, until the client takes
+them live.
+
+**Giving an on-call agent a schedule is a promotion too.** Set its `schedule:` line,
+add `schedule_proven: false`, wire it by step 6, run step 7's wake-up check, and
+show the roster's schedule cell as "(not yet proven)". The agent stays `Hired`
+throughout: it already did its job on real work. Taking a schedule away is the
+reverse: remove the scheduled task, set `schedule: on-call`, drop the
+`schedule_proven:` line, and the roster cell reads `on call`.
 
 **When a promotion should be a new hire instead** — would you give this to the same
 employee, or is it a second job? Two of three means a second job:
@@ -339,7 +435,7 @@ employee, or is it a second job? Two of three means a second job:
 - it needs **different sources or tools**;
 - you'd want its results **counted separately**.
 
-Hard rule regardless: **one agent, one schedule.** An agent never gets a second clock;
+Hard rule regardless: **one agent, at most one schedule.** An agent never gets a second clock;
 two clocks is two agents (who may share a skill — that is what skills are for).
 
 ---
@@ -347,8 +443,9 @@ two clocks is two agents (who may share a skill — that is what skills are for)
 ## Part C — Teaching a skill instead
 
 Sometimes what the client wants is not a colleague but a judgment: "I want it to size
-meetings the way I do." That is a skill — invoked, not scheduled. No shift, no report,
-no probation, because a skill stages nothing by itself.
+meetings the way I do." That is a skill. It is invoked, not scheduled: no schedule,
+no report step of its own, no probation, because a skill stages nothing by itself.
+When a task uses the skill, that task's report names it (`--skill {name}`).
 
 The interview is three questions:
 
@@ -395,41 +492,68 @@ trying to happen. Offer the hire path.
 **A half-done hire** resumes from its artefacts, in creation order — whatever exists
 last tells you the next step:
 
-| Found | Missing | Resume at step |
+| Found | Missing | Resume at |
 |---|---|---|
-| agent file | skill named in its frontmatter | 3 |
-| agent file (+ skill) | roster row | 4 |
-| roster row | `packages` entry | 5 |
-| `packages` entry, smoke test false | scheduled task | 6 |
-| task exists | shift-log line | 7 |
-| smoke passed | shelf report | 8 |
-| everything | an unattended fire | probation check |
+| agent file | skill named in its frontmatter | step 3 |
+| agent file (+ skill) | roster row | step 4 |
+| roster row | `packages` entry | step 5 |
+| `packages` entry, smoke test false, a schedule chosen | scheduled task | step 6 |
+| scheduled task exists, or the agent is on call | a first run that passed | step 7 |
+| smoke passed | `status: hired`, the roster's `Hired`, the shelf report | the end of step 7, then step 8 |
+| hired, a schedule chosen | a wired wake-up | step 6, then step 7's wake-up check |
+| hired, wake-up wired | an `auto:` line in the shift log | the schedule check below |
 
-Belt: the "hire in progress" note in status.json, and the session-start roster scan —
-any row not `Hired` gets one sentence at session start, never nagging.
+Belt: the "hire in progress" note in status.json, and the session-start roster scan.
+A row still at `Probation` gets one sentence at session start. So does a schedule
+that is not yet wired or not yet proven. Never nagging.
 
-**A chat-only surface** (no files, no scheduler) gets the honest version: *"A hired
-agent needs a machine that can run it on a clock. From here we can write the job sheet
-together — you'll have it ready to hand to Claude Code on your computer, where the hire
-takes five minutes. What I can't honestly give you from a chat is the shift: running it
-by hand each morning is a habit, not an employee, and it dies the first busy week."*
+**The schedule check** belongs to a later session, never to the hire itself. Look in
+`status/shift-log.md` for an `auto:` line from that agent. `auto-test:` lines are the
+hire session's own wiring test and never count. Found: set `schedule_proven: true` in
+the agent file and change the roster's schedule cell to "(proven)". Not found: say
+the one sentence and offer to look at the wake-up.
+
+**A chat-only surface** (no files, no scripts, no scheduler) gets the honest version:
+*"A hired agent lives in your Orion folder: its job file, its record, its report. A
+chat can't write any of those. From here we can write the job sheet together, and
+you'll have it ready to hand to Claude Code on your computer, where the hire takes
+five minutes. What I can't honestly give you from a chat is the hire itself, or a
+schedule: a job re-explained by hand each morning is a habit, not an employee, and
+it dies the first busy week."*
 Job sheet as pasteable text, route to the code-capable surface the client says they
 have (their machine profile records it, where you can read one), and the hard rule:
-**a hire whose shift isn't wired is never recorded in `packages` and never reported to
-the shelf.** No pretending.
+**a hire is recorded as passed (`smoke_test_passed: true`) and reported to the shelf
+once its first real run passes, and not before. A schedule that is not wired, or not
+proven, is shown as exactly that, never as proven.** No pretending.
 
-**Scheduler failure** after A and B both fail (locked-down IT, permissions): honest
-stop. Roster row reads `Probation — not yet scheduled (runs when you open a session,
-as a stopgap)`, a note in status.json, re-offer next session. It is never `Hired` —
-hired means it fired with nobody asking, and this one can't yet. The visible status is
-what keeps the stopgap from silently becoming the answer.
+**Scheduler failure** after A and B both fail (locked-down IT, permissions): the
+schedule stops honestly, and the hire does not. Carry on to step 7. Once the first
+run passes, the agent is hired, and it works when the client asks. The roster says so
+in plain sight: `Hired`, with the schedule cell `{when} (not yet wired)`. In words:
+"Hired, schedule not yet wired (works when you ask)". Leave a note in status.json and
+re-offer the wiring next session. The schedule is never shown as proven: proven means
+it fired with nobody asking, and this one can't yet. The visible "not yet wired" is
+what keeps working-when-asked from quietly becoming the whole answer for a client
+who wanted a schedule.
 
-**Radio off**: the local shift-log line is unconditional — the client's "did it run?"
-is always answerable. The signal skips silently at shift time (rule 7), and the one
-disclosure happens at hire time, step 8. Disclosure at hire, silence on shifts.
+**Radio off**: the local line does not depend on the radio. `done.mjs` writes it
+whether check-ins are on or off, so the client's "did it run?" stays answerable: from
+`status/shift-log.md` for a shift, from the memory log for work they asked for.
+Nothing is sent, silently (AGENTS.md rule 7), and the one disclosure happens at hire
+time, step 8. Disclosure at hire, silence after.
 
 **Radio on but unreachable** (the "didn't answer" line): not the same as off, and never
-treated as it. The shift appends "(radio unreachable)" to its shift-log line and carries
-on; the client hears the session-start one-liner (AGENTS.md, "Check the radio") once, at their next session, with the fix for
+treated as it. `done.mjs` appends "(radio unreachable)" to the shift's line in the
+shift log and carries on; the client hears the session-start one-liner (AGENTS.md,
+"Check the radio") once, at their next session, with the fix for
 their surface (`docs/radio.md`, "If the radio can't get through"). A week of unreachable
 markers is a wiring problem to fix, not a harness that stopped working.
+
+**An agent hired before 1.1.0** still carries the old report section: it writes its
+own shift-log line and sends its signal with `node status/radio.mjs signal`. That
+keeps working, and it still counts as the agent's report. Its signals simply carry no
+tag. To give them one, swap the agent file's report section for the one in the
+template above. That is a small promotion: the client's okay, a version bump, and a
+changelog line. Its roster row and `status:` line may also still say `Probation`
+under the old rule. AGENTS.md ("Older folders: the rule changed in 1.1.0") is the
+repair.

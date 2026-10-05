@@ -692,3 +692,16 @@ test('tripwire: the consent sentence is the same words in AGENTS.md, the wizard,
   assert.ok(said.includes(body), `the wizard should say the consent word for word.\nExpected: ${body}\nSaid: ${said}`);
   assert.ok(said.includes('Keep check-ins on?'));
 });
+
+test('tripwire: the roster legend in library/HIRING.md is the one a new roster ships with', () => {
+  const legendOf = (text) => {
+    const from = text.indexOf('**Status legend.**');
+    const to = text.indexOf('never count).', from);
+    assert.ok(from !== -1 && to !== -1, 'the legend should run from "Status legend." to "never count)."');
+    return squash(text.slice(from, to + 'never count).'.length).replace(/^> ?/gm, ''));
+  };
+  const roster = readFileSync(join(repo, '.claude', 'agents', 'README.md'), 'utf8');
+  const hiring = readFileSync(join(repo, 'library', 'HIRING.md'), 'utf8');
+  assert.equal(legendOf(hiring), legendOf(roster));
+  assert.match(roster, /^\| Agent \| Role \| Job \| Schedule \| Status \| Skill \|$/m);
+});

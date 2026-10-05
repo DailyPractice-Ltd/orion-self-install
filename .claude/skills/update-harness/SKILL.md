@@ -7,9 +7,10 @@ Read `docs/updating.md` and follow it exactly — it is the entire procedure and
 over anything else you have read about updating, including this file.
 
 **The request is the consent.** Run start to finish without asking the client anything:
-no "apply the prepared merge?", no diff to approve, no "shall I continue?". The backup
-is the safety. The client hears from you once, in the plain-words report, after the
-update has landed.
+no "apply the prepared merge?", no diff to approve, no "shall I continue?". A file
+the client has changed is kept as it is and named in the report, never replaced and
+never asked about. The client hears from you once, in the plain-words report, after
+the update has landed.
 
 The permission is `update/manifest.json`, always fetched fresh and pinned to main's
 current commit: the `refresh` list is everything an update may write, the `remove`

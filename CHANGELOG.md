@@ -17,6 +17,22 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.1.2 — 2026-10-05
+
+**An update keeps every file you have changed, and still never asks.**
+
+1.1.1 removed the question an update used to stop on. It also said that a Daily
+Practice file carrying your own changes would be replaced and reported afterwards.
+That was wrong, and it is corrected here the same day. Setting up your agent writes
+its identity into one of those files, and your own assistant may have added to
+others, so "replace" would have sent real work to the backup.
+
+From this version: a file you, your assistant or the install has changed is kept
+exactly as it is and named in the report. A file you never touched is refreshed.
+Nothing is asked either way. The one exception is the radio's own scripts, which
+are always refreshed as a set so check-ins keep working; a changed one is copied to
+the backup first and named.
+
 ## 1.1.1 — 2026-10-05
 
 **"Update my harness" no longer stops to ask.**

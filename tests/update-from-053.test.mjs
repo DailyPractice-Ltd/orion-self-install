@@ -22,10 +22,13 @@
  *      including status/shapes.mjs, which the current radio.mjs imports and
  *      whose absence or staleness would be a hard crash.
  *   4. Every shipped .mjs still parses after the trip.
- *   5. A Daily Practice file the client hand-edited is replaced like any other,
- *      backed up, and named in the report. The update never stops to ask: the
- *      request is the consent (1.1.1, after a live update sat waiting on exactly
- *      that question and never landed).
+ *   5. The update never stops to ask: the request is the consent (1.1.1, after
+ *      a live update sat waiting on exactly that question and never landed).
+ *   6. A Daily Practice file the client has changed is KEPT, byte for byte, and
+ *      named in the report (1.1.2). The install writes the agent's identity into
+ *      agent/agent-definition.md, so "replace it like any other" would have sent
+ *      every real harness's identity to the backup. The radio's own scripts are
+ *      the one exception: they are replaced as a set.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -78,8 +81,8 @@ function makeClient({ handEditedFile = null, businessName = 'Niven Consulting' }
     `# Business context\n\n${businessName} sells into mid-market logistics.\n`,
   );
 
-  // Optionally: they hand-edited one of OUR files. Step 4 replaces it anyway;
-  // step 3 holds their copy and step 8 names it.
+  // Optionally: they changed one of OUR files. Step 4 keeps it as it is (the
+  // radio's scripts excepted); step 8 names it.
   if (handEditedFile) {
     const p = join(dir, handEditedFile);
     writeFileSync(p, `${readFileSync(p, 'utf8')}\n\n## Our notes\n${businessName} opens with logistics.\n`);
@@ -88,6 +91,20 @@ function makeClient({ handEditedFile = null, businessName = 'Niven Consulting' }
 }
 
 const digest = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
+
+/** The template's copy of a file at the version the client is on (null if absent). */
+const baseCache = new Map();
+function baseAt(tag, rel) {
+  const key = `${tag}:${rel}`;
+  if (!baseCache.has(key)) {
+    const r = spawnSync('git', ['show', key], { cwd: repo, maxBuffer: 1 << 26 });
+    baseCache.set(key, r.status === 0 ? r.stdout : null);
+  }
+  return baseCache.get(key);
+}
+
+/** The radio's scripts run as a set, so they are always replaced. */
+const isRadioScript = (rel) => /^status\/[^/]+\.mjs$/.test(rel);
 
 function fingerprintKnowledgeBase(dir) {
   const kb = join(dir, 'agent/knowledge-base');
@@ -110,7 +127,8 @@ function runUpdate(dir) {
   const backedUp = [];
   const created = [];
   const refreshed = [];
-  const localEdits = []; // step 8 names these, with the backup path; it never asks
+  const kept = [];       // changed by the client: left exactly as they are, named in step 8
+  const localEdits = []; // replaced or removed although changed: named with the backup path
 
   for (const rel of REFRESH) {
     const dest = join(dir, rel);
@@ -124,9 +142,15 @@ function runUpdate(dir) {
       copyFileSync(dest, bk);
       backedUp.push(rel);
 
-      // Their name inside one of our files means a human hand-edited it. The
-      // backup already holds their copy; replace it and say so in the report.
-      if (readFileSync(dest, 'utf8').includes(businessName)) localEdits.push(rel);
+      // Step 4: compare with the template's copy at the version they are on.
+      // Identical means they never touched it. Anything else is theirs now.
+      const base = baseAt(`v${localVersion}`, rel);
+      const changed = base === null || !readFileSync(dest).equals(base);
+      if (changed && !isRadioScript(rel)) {
+        kept.push(rel);
+        continue;
+      }
+      if (changed) localEdits.push(rel);
     }
 
     mkdirSync(dirname(dest), { recursive: true });
@@ -160,7 +184,7 @@ function runUpdate(dir) {
   status.template_version = TARGET_VERSION;
   writeFileSync(join(dir, 'status/status.json'), JSON.stringify(status, null, 2));
 
-  return { backupDir, backedUp, created, refreshed, localEdits, removed, from: localVersion };
+  return { backupDir, backedUp, created, refreshed, kept, localEdits, removed, from: localVersion };
 }
 
 test('0.5.3 genuinely lacks the update layer — the paste is the only way through', (t) => {
@@ -265,15 +289,39 @@ test('a personalised remove-list file is still pruned — backed up, named in th
   assert.equal(existsSync(join(dir, 'n8n')), false, 'the emptied directory should be gone too');
 });
 
-test('a Daily Practice file the client hand-edited is replaced, backed up, and named — not stopped on', (t) => {
+test('a Daily Practice file the client changed is kept byte for byte, and named — never replaced, never asked about', (t) => {
   if (!haveBaselineTag()) return t.skip(`${BASELINE_TAG} not fetched`);
   const dir = makeClient({ handEditedFile: 'AGENTS.md' });
   const theirs = readFileSync(join(dir, 'AGENTS.md'), 'utf8');
-  const { backupDir, localEdits, refreshed } = runUpdate(dir);
-  assert.ok(localEdits.includes('AGENTS.md'), 'the report must name the hand-edited file');
-  assert.ok(refreshed.includes('AGENTS.md'), 'the hand-edited file must still be refreshed');
-  assert.equal(digest(join(dir, 'AGENTS.md')), digest(join(repo, 'AGENTS.md')), 'the live file must be the template\'s');
-  assert.equal(readFileSync(join(backupDir, 'AGENTS.md'), 'utf8'), theirs, 'the backup must hold their exact copy');
+  const { backupDir, kept, refreshed } = runUpdate(dir);
+  assert.ok(kept.includes('AGENTS.md'), 'the report must name the kept file');
+  assert.ok(!refreshed.includes('AGENTS.md'), 'a changed file must not be replaced');
+  assert.equal(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), theirs, 'their file was altered');
+  assert.equal(readFileSync(join(backupDir, 'AGENTS.md'), 'utf8'), theirs, 'the backup must hold their exact copy too');
+  // Everything they did not touch still lands.
+  assert.ok(refreshed.length > 0, 'untouched files must still be refreshed');
+  assert.equal(digest(join(dir, 'CLAUDE.md')), digest(join(repo, 'CLAUDE.md')), 'an untouched file should be the new template copy');
+});
+
+test('the identity the install wrote into agent/agent-definition.md survives an update', (t) => {
+  if (!haveBaselineTag()) return t.skip(`${BASELINE_TAG} not fetched`);
+  // Every real harness is in this state: setting up the agent fills this file in.
+  const dir = makeClient({ handEditedFile: 'agent/agent-definition.md' });
+  const theirs = readFileSync(join(dir, 'agent/agent-definition.md'), 'utf8');
+  const { kept } = runUpdate(dir);
+  assert.ok(kept.includes('agent/agent-definition.md'), 'the report must name it as kept');
+  assert.equal(readFileSync(join(dir, 'agent/agent-definition.md'), 'utf8'), theirs, 'the agent\'s identity was overwritten');
+});
+
+test('a changed radio script is the one exception: replaced with the set, backed up, named', (t) => {
+  if (!haveBaselineTag()) return t.skip(`${BASELINE_TAG} not fetched`);
+  const dir = makeClient({ handEditedFile: 'status/radio.mjs' });
+  const theirs = readFileSync(join(dir, 'status/radio.mjs'), 'utf8');
+  const { backupDir, kept, localEdits } = runUpdate(dir);
+  assert.ok(!kept.includes('status/radio.mjs'), 'a radio script is never held back');
+  assert.ok(localEdits.includes('status/radio.mjs'), 'the report must name the replaced script');
+  assert.equal(digest(join(dir, 'status/radio.mjs')), digest(join(repo, 'status/radio.mjs')), 'the radio must match the release');
+  assert.equal(readFileSync(join(backupDir, 'status/radio.mjs'), 'utf8'), theirs, 'the backup must hold their exact copy');
 });
 
 test('the procedure itself contains no stop-and-ask step', () => {
@@ -282,6 +330,8 @@ test('the procedure itself contains no stop-and-ask step', () => {
     assert.equal(doc.includes(phrase), false, `docs/updating.md still says "${phrase}"`);
   }
   assert.ok(doc.includes('The request is the consent'), 'docs/updating.md must state that the request is the consent');
+  assert.ok(doc.includes('A file the client has changed is kept'), 'docs/updating.md must state that a changed file is kept');
+  assert.equal(doc.includes('replace it\n  like any other'), false, 'docs/updating.md must not tell the installer to replace a changed file');
   const agents = readFileSync(join(repo, 'AGENTS.md'), 'utf8');
   assert.ok(agents.includes('The request is the consent'), 'AGENTS.md must carry the same rule');
 });

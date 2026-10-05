@@ -9,8 +9,9 @@ files — the instructions, the adapters, the Library recipes, the scripts — a
 touch yours. Your knowledge base, your hired agents, the skills you've taught, your
 status file, your shift log, and every file you created stay exactly as they are. Every
 file the update replaces is copied aside first, so any update can be undone by saying
-**"restore my harness from the backup."** Updates never go backwards. And an update
-runs start to finish without asking you anything: the three words are the yes.
+**"restore my harness from the backup."** Updates never go backwards. An update
+runs start to finish without asking you anything: the three words are the yes. And a
+Daily Practice file you have changed counts as yours: the update keeps it as it is.
 
 **If any other file describes updating differently, this file wins.** The allowlist
 lives in `update/manifest.json`; a path not on it may not be written, ever.
@@ -128,16 +129,21 @@ an undo. This is the undo. Do not skip it because the update "looks small."
 **4. Refresh, allowlist only.** For each path in the manifest's `refresh` list: fetch
 `https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/{COMMIT}/{path}`
 — the same COMMIT resolved in step 1, so every file comes from one consistent snapshot —
-and replace the local file (create it if it is new to this version). Two rules with no
-exceptions:
+and replace the local file (create it if it is new to this version). Two rules:
 - **A path not on the list is never written.** Not "also tidied," not "while we're
   here." The allowlist is the whole permission.
-- **Every path on the list is written, without asking.** A refresh-list file is Daily
-  Practice's by construction, and step 3 already holds the client's copy of it. If one
-  turns out to carry local edits (a business name, a hand-tweak to a script), replace it
-  like any other and name it in the step 8 report with the backup path, as a statement,
-  never as a question. The client can ask for anything they want carried forward after
-  the update has landed.
+- **A file the client has changed is kept. Never replaced, and nobody is asked.** Some
+  files on this list do not stay ours. The install itself writes the agent's identity
+  into `agent/agent-definition.md`, and a client's own assistant may have added to
+  `AGENTS.md`, `CLAUDE.md` or others. So before writing over a local file, fetch the
+  template's copy of that file **at the version the client is on now** (the same URL
+  with `v{local-version}` in place of `{COMMIT}`) and compare the two. Identical: the
+  client never touched it, so replace it. Different in any way, or that copy cannot be
+  fetched: the file is the client's now. Leave it exactly as it is and name it in the
+  step 8 report as kept. Do not replace it, do not merge it by hand, do not ask.
+  One exception, because they run as a set and a mismatched set goes silent: the
+  radio's own scripts (`status/*.mjs`) are always replaced. A changed one is already in
+  the backup from step 3; name it in the report with the backup path.
 
 **4b. Prune, remove-list only.** If the fetched manifest has a `remove` list: delete
 each named path that exists locally (its copy is already in the backup from step 3),
@@ -165,9 +171,10 @@ message. "Didn't answer" here is the third-state rule from AGENTS.md: one plain
 sentence, the fix pointer, never silence.
 
 **8. Report, in plain words, short.** Version from → to; how many files refreshed,
-how many are new, and what was pruned; where the backup is; any refreshed or removed
-file that carried local edits, named, with the backup path (one sentence, not a
-question); the one-line headline from the new CHANGELOG entry; and the sentence that
+how many are new, and what was pruned; where the backup is; every file kept because
+the client had changed it, named, and any replaced radio script or removed file that
+carried local edits, named with the backup path (statements, never questions); the
+one-line headline from the new CHANGELOG entry; and the sentence that
 matters: **"your knowledge base, your agents, your skills and your logs were not
 touched — and in your status file, only the version number, one note line, and any
 retired checklist entries changed. Nothing of yours."** Apart from a hard stop in step

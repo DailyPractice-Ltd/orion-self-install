@@ -13,10 +13,13 @@ Three tiers, by how your yes is given — and nothing besides:
 
 1. **"Here's which step I'm on"** — your install stage and a timestamp, so Daily
    Practice knows to check in if you seem stuck.
-2. **"A task just ran"** — the *type* of task (say, "a post-call debrief completed"),
-   when, and — for a hired agent's shift — which agent ran it and how many things it
-   did (a label and a number: say, "prospecting, 18"). Never what was in it, never who
-   it was about.
+2. **"A piece of work finished"**: what kind of work it was, how many things were
+   done, when, and what did it. The kind is one general tag from a short public menu
+   (see "The tag menu" below), such as "prospecting". The count is a number: say, 18.
+   What did it is the name of the skill or hired agent that ran, if one did. This
+   covers a task you set your AI in a session, a hired agent's shift (work it does
+   on a schedule), and the approval moments in the table below. Never what was in
+   the work, never who it was for.
 3. **"This machine now runs X"** — when you install a Library package or hire an
    agent, its name, kind, and version — and for a hire, which role it is: a label from
    [the public role menu](../library/ROLES.md) (or "custom"). That's how Daily
@@ -42,31 +45,74 @@ base, your prospects or customers, anything from your CRM or email. The label ti
 never carries content or names; your words and files cross only with your per-item
 yes, shown to you first.
 
+## The tag menu
+
+A finished task or shift carries one tag, so Daily Practice can see what kind of
+work your harness is doing without ever seeing the work. The tag comes from this
+menu, and only from this menu. When nothing fits, the tag is `other`. (The approval
+moments in the table below already name their own kind of work: an approved
+outreach draft is outreach. They carry a tag only when your AI adds one.)
+
+| Tag | The kind of work |
+|---|---|
+| `prospecting` | finding and researching who to talk to |
+| `outreach` | messages, sequences, follow-up |
+| `content` | collateral, posts, decks, webinars |
+| `crm` | records and pipeline upkeep |
+| `calls` | call prep, debriefs, meeting notes |
+| `deals` | proposals, pricing, contracts |
+| `accounts` | work on existing customers |
+| `hiring` | recruitment and candidates |
+| `finance` | invoices, numbers, bookkeeping |
+| `admin` | inbox, calendar, files |
+| `onboarding` | getting a person or client started |
+| `research` | market, competitor or topic research |
+| `reporting` | reviews, summaries, dashboards |
+| `ops` | upkeep of the harness and the team itself |
+| `other` | anything that fits nowhere above |
+
+Your AI picks the tag when it reports. It cannot make one up: the script that
+reports refuses any tag that is not on this menu.
+
 ## Exactly when each message fires — and when nothing does
 
 Every outgoing message has one named moment. If a moment isn't in this table, nothing
-is sent — your AI saying good morning, answering questions, drafting, thinking out
-loud: none of that ever touches the radio.
+is sent. Your AI saying good morning, answering a question, making a plan, thinking
+out loud, or showing you a draft that still waits on your yes: none of that touches
+the radio. A task you set that is now finished does. That is the "A task finished"
+row.
 
 | Message | The one moment it fires | Sent by |
 |---|---|---|
 | "Here's which step I'm on" (`install_checkpoint`) | You accept check-ins in the wizard; your install moves to a new stage | The wizard / the status script — automatic |
-| "A task just ran" (`workflow_execution_completed`) | A multi-step run (like a prospect-research chain) finishes **and you approved its result** | Your agent, after your yes |
+| "A task finished" (`task_completed`) | A task you set your AI is finished: you have the thing you asked for, or the action is taken. One message per finished task. A finished task did at least one thing, so its count is 1 or more | Your agent, as the last step of the task (`node status/done.mjs`), with a tag, a count, and the name of the skill or agent that ran, if one did |
+| "A run you approved" (`workflow_execution_completed`) | A multi-step run (like a prospect-research chain) finishes **and you approved its result** | Your agent, after your yes |
 | "Outreach approved" (`outreach_approved`) | You explicitly say yes to a staged outreach draft, in conversation | Your agent, right after your yes |
 | "Outreach declined" (`outreach_rejected`) | You explicitly say no to a staged outreach draft (equally useful for improving the kit) | Your agent, right after your no |
 | "Debrief done" (`debrief_completed`) | A post-call debrief finishes **and you approved its CRM update** | Your agent, after your yes |
 | "CRM updated" (`crm_updated`) | Your agent performs a standalone CRM write **you approved** (not part of a debrief) | Your agent, right after the approved write |
-| "A shift ran" (`routine_completed`) | A hired agent finishes a scheduled shift — the standing yes you gave on its job sheet at hire covers exactly this report | The agent, as its shift's last step, with its name and a count |
-| "This machine runs X" (`report-install`) | A package's smoke test passes, or a hire passes its first supervised shift — with the role label; the purpose sentence rides only after the job-sheet readback named it and you said yes | Your agent, right after the pass |
+| "A shift ran" (`routine_completed`) | A hired agent finishes a shift: work it does on a schedule, started by a clock or a handoff and not by a person. The standing yes you gave on its job sheet at hire covers exactly this report. A shift may report a count of 0: it ran and found nothing to do. ("Routine" is only the name on the wire. In plain words it is a shift.) | The agent, as the last step of the shift (`node status/done.mjs --shift`), with its name, a tag, and a count |
+| "This machine runs X" (`report-install`) | A package's smoke test passes, or a hired agent's first run on real work passes. A hire carries its role label. The purpose sentence rides only after the job-sheet readback named it and you said yes | Your agent, right after the pass |
 | Your message (`send`) | You have something to say to Daily Practice and say yes to sending it — your words | Your agent, on your yes in that conversation |
 | A skill offered up (`contribute`) | You choose to offer a skill to the library, after seeing exactly what would be sent | Your agent, on your yes to the shown preview |
 
-Three rules sit under that table: every real-work message is **downstream of your
-explicit yes** on the work itself — given in the conversation for conversational work,
-or given once at hire time for a hired agent's shift, when you approved the job sheet
-that names this report (the radio never learns about anything you didn't approve);
-it's **one message per moment** (the most specific label wins — never two for the same
-event); and it's **the label, the count, and the time — never the content**.
+Three rules sit under that table.
+
+First, every real-work message **follows work you asked for or approved**: a task you
+set in a session, an action you said yes to, or a shift you approved once, at hire,
+on the job sheet that names its schedule and this report. The radio never learns
+about anything you didn't ask for or approve.
+
+Second, it's **one message per piece of work**. The most specific label wins, and
+there are never two for the same piece of work. An approved CRM update is "CRM
+updated", not also "A task finished". A shift that used a skill is one message that
+names the skill.
+
+Third, it's **the labels, the count, and the time. Never the content.** When your AI
+reports finished work it also writes one line about it for your own records: in your
+memory log, and for a shift in `status/shift-log.md`. That line never leaves your
+machine. The script that reports (`status/done.mjs`) does not pass it to the radio,
+and it has no way to send free text at all.
 
 ## What comes in
 
@@ -86,10 +132,17 @@ so nothing is repeated at the next session.
 ## The choice, and how it's put to you
 
 During Press Start (or the first conversation, if you skipped the wizard), you're asked
-once, in exactly this spirit:
+once, in these words:
 
 > Your harness checks in with Daily Practice so we can support you and count your
-> system as running. You can switch this off.
+> system as running. It shares which step you're on, what kind of task finished (a
+> general tag such as "prospecting", a count, and which skill or agent ran), and
+> which packages you've installed. Never the content of your messages, your
+> knowledge base, or your prospects. You can switch this off. Keep check-ins on?
+
+"Running" has one meaning here: your harness reported finished work in the last 14
+days. Work you asked for in a session counts, and so does work a hired agent did on
+a schedule.
 
 The box is pre-ticked — most people keep it, and it's genuinely how we spot problems
 before you have to report them — and declining is one keystroke. Once you've answered,
@@ -144,6 +197,10 @@ and gets out of the way. What each line means:
 | "that key isn't valid (401)" | Your key was revoked or replaced | Ask Daily Practice for a fresh pairing code |
 | "Radio check answered 4xx/5xx" | Reached Daily Practice, answered oddly | Nothing — it tries again next session |
 
+The command that reports a finished task (`node status/done.mjs`) calls the radio to
+do it, so it prints these same lines. With the radio off it prints nothing about the
+radio at all, and still writes your own line.
+
 **"Didn't answer" has two usual causes:**
 
 1. **Codex's safety sandbox** (most common). Codex blocks network calls by default.
@@ -157,7 +214,8 @@ and gets out of the way. What each line means:
    commands; a company block page means the network itself is filtering. Either way the
    ask for your IT team is one line: **allow HTTPS to `www.dailypractice.world`** — one
    address, standard port, a small check-in API. Until then, everything local keeps
-   working and your shift log still records every run.
+   working, and your own records still get every line: the shift log for each
+   shift, the memory log for each finished task.
 
 ## If your AI can't run commands (website-chat lane)
 

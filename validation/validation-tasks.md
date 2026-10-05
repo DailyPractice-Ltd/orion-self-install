@@ -122,20 +122,29 @@ already marks done.
 
 ## VT-08 · The radio, both disciplines (only if you've opted in)
 
-**Runs**: the radio (`status/radio.mjs` + `emit-status.mjs`), against the trigger table
-in `docs/radio.md`.
+**Runs**: the radio (`status/done.mjs`, `status/radio.mjs` and `emit-status.mjs`),
+against the trigger table in `docs/radio.md`.
 
 **Steps**: with the radio on (check-ins enabled + the pairing values in
-`status/status.json` → `sharing`), (a) advance to any new stage — an
-`install_checkpoint` goes out; (b) complete one real, approved task (VT-03's approve
-path is perfect) and fire its one matching signal
-(`node status/radio.mjs signal --type debrief_completed` for a debrief, per the table);
-(c) then hold a short ordinary conversation — greetings, a question, a draft — and
-confirm **nothing** was sent for it. If you switched the radio off instead: confirm
-nothing was sent at all, at any of those moments.
+`status/status.json` → `sharing`):
 
-**Pass criteria**: signals appear for exactly the enumerated moments and for nothing
-else — matching your own toggle, never ambiguous, never silent, never chatty.
+- (a) Advance to any new stage. An `install_checkpoint` goes out.
+- (b) Finish one real task. Ask your agent for something you can use, such as a
+  research brief or prep for a real call, and let it finish. Its last step is
+  `node status/done.mjs --tag <tag> --count <n> --line "…"`, and that command prints
+  "Signal sent (task_completed)." Confirm exactly one signal went out for that task:
+  one "Signal sent" line, not two. (If the task you pick ends in an approval, like
+  VT-03's approved CRM entry, its one signal is that approval's own type instead:
+  `node status/radio.mjs signal --type crm_updated`. Still exactly one.)
+- (c) Then hold a short ordinary conversation: greetings, a question, a plan, a
+  draft you have not approved. Confirm **nothing** was sent for it.
+
+If you switched the radio off instead: confirm nothing was sent at all, at any of
+those moments.
+
+**Pass criteria**: one signal for each finished piece of work, and none for
+conversation. It matches your own toggle, and it is never ambiguous, never silent,
+never chatty.
 
 ---
 

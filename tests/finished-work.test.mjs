@@ -13,6 +13,9 @@
  * in NODE_OPTIONS, so a script that starts another script takes it along.
  *
  *   node --test
+ *
+ * The last cases are tripwires: words and lists that live in two places and
+ * must say the same thing in both.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -634,4 +637,58 @@ test('a label is a slug or a roster name, never words', () => {
   assert.ok(!isLabel('sdr', 'gadget'), 'an unknown kind is never a pass');
   assert.match(labelProblem('a'.repeat(31), 'agent'), /at most 30 characters/);
   assert.match(labelProblem('', 'skill'), /missing/);
+});
+
+// ── Tripwires: one thing written in two places ──────────────────────────────
+
+const squash = (text) => text.replace(/\s+/g, ' ').trim();
+
+test('tripwire: the tag menu in docs/radio.md is the menu in shapes.mjs', () => {
+  const doc = readFileSync(join(repo, 'docs', 'radio.md'), 'utf8');
+  const start = doc.indexOf('\n## The tag menu\n');
+  assert.ok(start !== -1, 'docs/radio.md should have a "## The tag menu" section');
+  const section = doc.slice(start + 1, doc.indexOf('\n## ', start + 1));
+  const rows = [...section.matchAll(/^\| `([^`]+)` \| (.+?) \|$/gm)].map((m) => [m[1], m[2]]);
+  // Same tags, same order, same words: what the client reads is what the scripts enforce.
+  assert.deepEqual(rows, Object.entries(WORK_TAGS));
+});
+
+test('tripwire: the consent sentence is the same words in AGENTS.md, the wizard, and docs/radio.md', (t) => {
+  const agents = readFileSync(join(repo, 'AGENTS.md'), 'utf8');
+  const quoted = agents.match(/\*"(Your\s+harness\s+checks\s+in[\s\S]+?)"\*/);
+  assert.ok(quoted, 'AGENTS.md should present the consent sentence in *"…"*');
+  const consent = squash(quoted[1]);
+  assert.match(consent, /Keep check-ins on\?$/);
+  for (const promise of ['what kind of task finished', 'a general tag such as "prospecting"', 'which skill or agent ran', 'Never the content', 'You can switch this off.']) {
+    assert.ok(consent.includes(promise), `the consent should say: ${promise}`);
+  }
+
+  // docs/radio.md quotes it in full.
+  const radio = squash(readFileSync(join(repo, 'docs', 'radio.md'), 'utf8').replace(/^> ?/gm, ''));
+  assert.ok(radio.includes(consent), 'docs/radio.md should quote the consent word for word');
+
+  // The wizard, run for real in a scratch folder, declining check-ins so that
+  // nothing is ever dialled. Its fetch is a tripwire of its own.
+  const dir = mkdtempSync(join(tmpdir(), 'orion-wizard-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(join(dir, 'status'));
+  copyFileSync(join(repo, 'start.mjs'), join(dir, 'start.mjs'));
+  for (const f of ['shapes.mjs', 'status.schema-template.json']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
+  const noNetwork = join(dir, 'no-network.mjs');
+  writeFileSync(noNetwork, `
+    import { writeFileSync } from 'node:fs';
+    globalThis.fetch = async (url) => {
+      writeFileSync(${JSON.stringify(join(dir, 'dialled'))}, String(url));
+      throw new Error('the wizard must not dial out in this test');
+    };
+  `);
+  const r = spawnSync(process.execPath, ['--import', pathToFileURL(noNetwork).href, join(dir, 'start.mjs'), '--checkins', 'no'], {
+    encoding: 'utf8', input: '', cwd: dir,
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(existsSync(join(dir, 'dialled')), false);
+  const said = squash(r.stdout);
+  const body = consent.replace(/ Keep check-ins on\?$/, '');
+  assert.ok(said.includes(body), `the wizard should say the consent word for word.\nExpected: ${body}\nSaid: ${said}`);
+  assert.ok(said.includes('Keep check-ins on?'));
 });

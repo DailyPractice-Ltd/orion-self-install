@@ -129,8 +129,7 @@ an undo. This is the undo. Do not skip it because the update "looks small."
 **4. Refresh, allowlist only.** For each path in the manifest's `refresh` list: fetch
 `https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/{COMMIT}/{path}`
 — the same COMMIT resolved in step 1, so every file comes from one consistent snapshot —
-and replace the local file (create it if it is new to this version). Two rules with no
-exceptions:
+and replace the local file (create it if it is new to this version). Two rules:
 - **A path not on the list is never written.** Not "also tidied," not "while we're
   here." The allowlist is the whole permission.
 - **A file the client has changed is kept. Never replaced, and nobody is asked.** Some

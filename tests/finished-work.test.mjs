@@ -705,3 +705,31 @@ test('tripwire: the roster legend in library/HIRING.md is the one a new roster s
   assert.equal(legendOf(hiring), legendOf(roster));
   assert.match(roster, /^\| Agent \| Role \| Job \| Schedule \| Status \| Skill \|$/m);
 });
+
+test('tripwire: the release has one version, and it ships done.mjs', () => {
+  const manifest = JSON.parse(readFileSync(join(repo, 'update', 'manifest.json'), 'utf8'));
+  const template = JSON.parse(readFileSync(join(statusDir, 'status.schema-template.json'), 'utf8'));
+  const changelog = readFileSync(join(repo, 'CHANGELOG.md'), 'utf8');
+  const newest = changelog.match(/^## (\d+\.\d+\.\d+) — \d{4}-\d{2}-\d{2}$/m);
+  assert.ok(newest, 'CHANGELOG.md should open with a "## X.Y.Z — date" heading');
+  assert.equal(template.template_version, manifest.template_version);
+  assert.equal(newest[1], manifest.template_version);
+  // A script the manifest does not list never reaches an installed harness.
+  for (const script of ['status/done.mjs', 'status/radio.mjs', 'status/shapes.mjs', 'status/memory.mjs']) {
+    assert.ok(manifest.refresh.includes(script), `${script} must be on the refresh list`);
+  }
+});
+
+test('tripwire: the 1.1.0 headline is the disclosure, in one sentence, on one line', () => {
+  const changelog = readFileSync(join(repo, 'CHANGELOG.md'), 'utf8');
+  const at = changelog.indexOf('\n## 1.1.0 — ');
+  assert.ok(at !== -1);
+  // docs/updating.md step 8 reads "the one-line headline" to the client. That is
+  // the first non-empty line under the heading, so the whole disclosure is on it.
+  const headline = changelog.slice(at + 1).split('\n').slice(1).find((l) => l.trim() !== '');
+  assert.match(headline, /^\*\*From this version your harness also tells Daily Practice .+\*\*$/);
+  for (const part of ['when a task you set is finished', 'a general tag (like "prospecting")', 'a count', 'which skill or agent ran', 'never the content', 'check-ins can still be switched off']) {
+    assert.ok(headline.includes(part), `the headline should say: ${part}`);
+  }
+  assert.equal(headline.split('. ').length, 1, 'one sentence');
+});

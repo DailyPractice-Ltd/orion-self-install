@@ -17,6 +17,23 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.0.1 — 2026-10-05
+
+**"Update my harness" no longer stops to ask.**
+
+A live update caught the problem: the assistant prepared everything, then paused with
+"apply the prepared merge, preserving your customisations?" and waited. The procedure
+told it to, in a rule meant to protect files you had edited by hand. In practice the
+question sat unanswered, the update never landed, and harnesses stayed on old versions
+while their owners believed they had updated.
+
+The rule is gone. Saying "update my harness" is the yes; the procedure now runs start
+to finish without asking you anything, and you hear from it once, in the plain-words
+report, after the update has landed. Your protection is unchanged and it never relied
+on the question: every file the update replaces is copied aside first, and "restore my
+harness from the backup" undoes any update. If a replaced file did carry your own
+edits, the report now says so and names the backup, as a statement, not a question.
+
 ## 1.0.0 — 2026-09-25
 
 **The install gets simpler: n8n is gone, and so is the one step that cost money.**

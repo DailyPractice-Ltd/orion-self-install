@@ -9,7 +9,8 @@ files — the instructions, the adapters, the Library recipes, the scripts — a
 touch yours. Your knowledge base, your hired agents, the skills you've taught, your
 status file, your shift log, and every file you created stay exactly as they are. Every
 file the update replaces is copied aside first, so any update can be undone by saying
-**"restore my harness from the backup."** Updates never go backwards.
+**"restore my harness from the backup."** Updates never go backwards. And an update
+runs start to finish without asking you anything: the three words are the yes.
 
 **If any other file describes updating differently, this file wins.** The allowlist
 lives in `update/manifest.json`; a path not on it may not be written, ever.
@@ -70,7 +71,13 @@ AI does the rest.
 
 ---
 
-## The procedure (installer: follow exactly — no improvised steps)
+## The procedure (installer: follow exactly — no improvised steps, no questions)
+
+**The request is the consent.** "Update my harness" is the yes. From here to step 8
+there is nothing to ask the client: no "apply the prepared merge?", no diff to approve,
+no "shall I continue?". The backup in step 3 is the safety, not a question. An update
+that pauses for approval is an update that never happens: the client has walked away,
+the question sits unanswered, and the harness stays old.
 
 **0. Network first, on Codex.** Fetching needs the same network access as the radio. If
 any fetch prints a network failure, apply `agent/adapters/codex.md`'s sandbox fix first
@@ -125,10 +132,12 @@ and replace the local file (create it if it is new to this version). Two rules w
 exceptions:
 - **A path not on the list is never written.** Not "also tidied," not "while we're
   here." The allowlist is the whole permission.
-- **The personalisation tripwire**: before replacing, if a refresh-list file contains
-  the client's business or personal name (someone hand-edited what should never have
-  been), stop for that file, show the client the difference, and let them choose. The
-  backup already holds their copy either way.
+- **Every path on the list is written, without asking.** A refresh-list file is Daily
+  Practice's by construction, and step 3 already holds the client's copy of it. If one
+  turns out to carry local edits (a business name, a hand-tweak to a script), replace it
+  like any other and name it in the step 8 report with the backup path, as a statement,
+  never as a question. The client can ask for anything they want carried forward after
+  the update has landed.
 
 **4b. Prune, remove-list only.** If the fetched manifest has a `remove` list: delete
 each named path that exists locally (its copy is already in the backup from step 3),
@@ -138,8 +147,8 @@ If it has `remove_status_checklist_keys`: delete those keys from `status/status.
 `checklist` (they described steps that no longer exist; the pre-update copy in the
 backup still holds them). The same two rules apply in
 reverse: **a path not on the `remove` list is never deleted** — not "also tidied" — and
-a file the client visibly personalised gets the same tripwire: show them, let them
-choose, the backup holds it either way.
+**every path on it is deleted without asking**; if one carried local edits, name it in
+the step 8 report with the backup path. The backup holds it either way.
 
 **5. Prove the scripts survived the trip.** Run `node --check` on every `.mjs` file
 just fetched. A truncated download must fail here, loudly, not at 07:00 tomorrow. On
@@ -156,11 +165,14 @@ message. "Didn't answer" here is the third-state rule from AGENTS.md: one plain
 sentence, the fix pointer, never silence.
 
 **8. Report, in plain words, short.** Version from → to; how many files refreshed,
-how many are new, and what was pruned; where the backup is; the one-line headline from
-the new CHANGELOG entry; and the sentence that matters: **"your knowledge base, your
-agents, your skills and your logs were not touched — and in your status file, only the
-version number, one note line, and any retired checklist entries changed. Nothing of
-yours."**
+how many are new, and what was pruned; where the backup is; any refreshed or removed
+file that carried local edits, named, with the backup path (one sentence, not a
+question); the one-line headline from the new CHANGELOG entry; and the sentence that
+matters: **"your knowledge base, your agents, your skills and your logs were not
+touched — and in your status file, only the version number, one note line, and any
+retired checklist entries changed. Nothing of yours."** Apart from a hard stop in step
+0 or step 2, this report is the only thing the update says to the client, and it comes
+after the work, never before it.
 
 ## Restoring
 

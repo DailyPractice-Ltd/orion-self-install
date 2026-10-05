@@ -29,6 +29,10 @@
  *      agent/agent-definition.md, so "replace it like any other" would have sent
  *      every real harness's identity to the backup. The radio's own scripts are
  *      the one exception: they are replaced as a set.
+ *   7. "Changed" is decided against update/pristine.json, the fingerprint of every
+ *      copy of every file we have shipped (1.1.4), not against the copy at the
+ *      client's version tag: 0.6.0 to 0.6.6 were never tagged, and a CRLF checkout
+ *      of our own file must still read as ours.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -41,6 +45,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { computePristine, fingerprint, hasFullHistory, serialise, PRISTINE_PATH } from './helpers/pristine.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..');
@@ -59,10 +64,21 @@ function haveBaselineTag() {
   return r.status === 0;
 }
 
-/** A 0.5.3 tree, plus the things a real client has that the tag does not. */
-function makeClient({ handEditedFile = null, businessName = 'Niven Consulting' } = {}) {
+/**
+ * The last commit on which the template called itself 0.6.6: the parent of the
+ * commit that bumped it to 0.7.0. 0.6.0 to 0.6.6 were never tagged, and a real
+ * client is on 0.6.6.
+ */
+const UNTAGGED_066 = 'c5470c0c3f5273d52ca345b4474c3741cb82c669^';
+
+function haveRef(ref) {
+  return spawnSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], { cwd: repo }).status === 0;
+}
+
+/** A released tree, plus the things a real client has that the release does not. */
+function makeClient({ handEditedFile = null, businessName = 'Niven Consulting', ref = BASELINE_TAG, version = '0.5.3' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'orion-053-'));
-  const tar = execFileSync('git', ['archive', BASELINE_TAG], { cwd: repo, maxBuffer: 1 << 28 });
+  const tar = execFileSync('git', ['archive', ref], { cwd: repo, maxBuffer: 1 << 28 });
   const tarPath = join(dir, 'baseline.tar');
   writeFileSync(tarPath, tar);
   execFileSync('tar', ['-xf', tarPath, '-C', dir]);
@@ -70,7 +86,7 @@ function makeClient({ handEditedFile = null, businessName = 'Niven Consulting' }
 
   // The tag ships a template; an installed harness has the real file.
   const status = JSON.parse(readFileSync(join(dir, 'status/status.schema-template.json'), 'utf8'));
-  status.template_version = '0.5.3';
+  status.template_version = version;
   status.business_name = businessName;
   writeFileSync(join(dir, 'status/status.json'), JSON.stringify(status, null, 2));
 
@@ -92,19 +108,15 @@ function makeClient({ handEditedFile = null, businessName = 'Niven Consulting' }
 
 const digest = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 
-/** The template's copy of a file at the version the client is on (null if absent). */
-const baseCache = new Map();
-function baseAt(tag, rel) {
-  const key = `${tag}:${rel}`;
-  if (!baseCache.has(key)) {
-    const r = spawnSync('git', ['show', key], { cwd: repo, maxBuffer: 1 << 26 });
-    baseCache.set(key, r.status === 0 ? r.stdout : null);
-  }
-  return baseCache.get(key);
-}
+/** Every copy of every file we have shipped: what docs/updating.md step 4 checks against. */
+const PRISTINE = JSON.parse(readFileSync(join(repo, PRISTINE_PATH), 'utf8')).files;
+const isOurs = (rel, buf) => (PRISTINE[rel] || []).includes(fingerprint(buf));
 
-/** The radio's scripts run as a set, so they are always replaced. */
-const isRadioScript = (rel) => /^status\/[^/]+\.mjs$/.test(rel);
+/**
+ * Always replaced, changed or not: the radio's scripts run as a set, and the
+ * shipped-copies list is pure data that cannot hold its own fingerprint.
+ */
+const isRadioScript = (rel) => /^status\/[^/]+\.mjs$/.test(rel) || rel === PRISTINE_PATH;
 
 function fingerprintKnowledgeBase(dir) {
   const kb = join(dir, 'agent/knowledge-base');
@@ -142,15 +154,14 @@ function runUpdate(dir) {
       copyFileSync(dest, bk);
       backedUp.push(rel);
 
-      // Step 4: compare with the template's copy at the version they are on.
-      // Identical means they never touched it. Anything else is theirs now.
-      const base = baseAt(`v${localVersion}`, rel);
-      const changed = base === null || !readFileSync(dest).equals(base);
+      // Step 4: a fingerprint on the shipped list means they never touched it.
+      // Anything else is theirs now.
+      const changed = !isOurs(rel, readFileSync(dest));
       if (changed && !isRadioScript(rel)) {
         kept.push(rel);
         continue;
       }
-      if (changed) localEdits.push(rel);
+      if (changed && rel !== PRISTINE_PATH) localEdits.push(rel);
     }
 
     mkdirSync(dirname(dest), { recursive: true });
@@ -324,6 +335,57 @@ test('a changed radio script is the one exception: replaced with the set, backed
   assert.equal(readFileSync(join(backupDir, 'status/radio.mjs'), 'utf8'), theirs, 'the backup must hold their exact copy');
 });
 
+test('update/pristine.json is up to date with everything this release ships', (t) => {
+  if (!hasFullHistory()) return t.skip('shallow clone: the shipped history is not here to check against');
+  assert.equal(
+    readFileSync(join(repo, PRISTINE_PATH), 'utf8'), serialise(computePristine()),
+    'update/pristine.json is stale: run node tests/helpers/pristine.mjs --write as the last edit of the release',
+  );
+});
+
+test('a harness on a version that was never tagged (0.6.6) is recognised file by file', (t) => {
+  if (!haveRef(UNTAGGED_066)) return t.skip('0.6.6 commit not fetched');
+  const dir = makeClient({ ref: UNTAGGED_066, version: '0.6.6', handEditedFile: 'agent/agent-definition.md' });
+  const theirs = readFileSync(join(dir, 'agent/agent-definition.md'), 'utf8');
+  const { kept, refreshed, created } = runUpdate(dir);
+  // The one file they changed is kept; nothing else is mistaken for theirs.
+  assert.deepEqual(kept, ['agent/agent-definition.md'], 'only the changed file may be kept');
+  assert.equal(readFileSync(join(dir, 'agent/agent-definition.md'), 'utf8'), theirs);
+  assert.ok(refreshed.length >= 40, `an untagged version must still refresh (got ${refreshed.length})`);
+  assert.ok(created.length > 0, 'files new since 0.6.6 should be created');
+  assert.equal(digest(join(dir, 'status/radio.mjs')), digest(join(repo, 'status/radio.mjs')));
+});
+
+test('our own files checked out with CRLF line endings still read as ours', (t) => {
+  if (!haveBaselineTag()) return t.skip(`${BASELINE_TAG} not fetched`);
+  const dir = makeClient();
+  for (const rel of REFRESH) {
+    const p = join(dir, rel);
+    if (existsSync(p)) writeFileSync(p, readFileSync(p, 'utf8').replace(/\r?\n/g, '\r\n'));
+  }
+  const { kept, refreshed } = runUpdate(dir);
+  assert.deepEqual(kept, [], 'a CRLF copy of our file must not be mistaken for the client\'s');
+  assert.ok(refreshed.length > 0);
+});
+
+test('the manifest opens with the note that sends an older harness to the current procedure', () => {
+  const keys = Object.keys(manifest);
+  assert.equal(keys[0], '_read_first', 'the note must be the first thing an assistant reads in the manifest');
+  for (const phrase of ['never stop to ask', 'never replace a file the client has changed', 'docs/updating.md', 'update/pristine.json']) {
+    assert.ok(manifest._read_first.includes(phrase), `_read_first must mention "${phrase}"`);
+  }
+  assert.ok(REFRESH.includes(PRISTINE_PATH), 'update/pristine.json must itself be refreshed');
+  // Every refresh path has an entry, and every shipped file's own fingerprint is on it.
+  for (const rel of REFRESH) {
+    if (rel === PRISTINE_PATH) {
+      assert.equal(rel in PRISTINE, false, 'the list must not carry an entry for itself');
+      continue;
+    }
+    assert.ok(Array.isArray(PRISTINE[rel]), `${rel} has no entry in update/pristine.json`);
+    assert.ok(isOurs(rel, readFileSync(join(repo, rel))), `${rel} as shipped is not on its own list`);
+  }
+});
+
 test('the procedure itself contains no stop-and-ask step', () => {
   const doc = readFileSync(join(repo, 'docs/updating.md'), 'utf8');
   for (const phrase of ['let them choose', 'tripwire', 'show the client the difference']) {
@@ -331,6 +393,7 @@ test('the procedure itself contains no stop-and-ask step', () => {
   }
   assert.ok(doc.includes('The request is the consent'), 'docs/updating.md must state that the request is the consent');
   assert.ok(doc.includes('A file the client has changed is kept'), 'docs/updating.md must state that a changed file is kept');
+  assert.ok(doc.includes('update/pristine.json'), 'docs/updating.md must name the shipped-copies list');
   assert.equal(doc.includes('replace it\n  like any other'), false, 'docs/updating.md must not tell the installer to replace a changed file');
   const agents = readFileSync(join(repo, 'AGENTS.md'), 'utf8');
   assert.ok(agents.includes('The request is the consent'), 'AGENTS.md must carry the same rule');

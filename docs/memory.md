@@ -69,7 +69,8 @@ with a count when check-ins are on. On the wire that signal is called
 - **After work**: one summary line to the agent's own log, any durable new fact as one
   small file, shared truths proposed to the inbox — then sync.
 - **The report step**: when a task or a shift is finished, one command
-  (`node status/done.mjs`) writes its one-line summary into memory first, and only
+  (`node status/done.mjs`) writes its one-line summary on this machine first (the
+  work log or the shift log in `status/`, and this memory log), and only
   then reports. The line itself stays here. What is radioed, when check-ins are on,
   is a tag and a count. Local first, always; radio second, only when on.
 - Memory never blocks work: missing, misconfigured, or unsyncable memory means one

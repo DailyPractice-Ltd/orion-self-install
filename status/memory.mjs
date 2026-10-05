@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { memoryConfigured, memoryBlock, MEMORY_GIT_REMOTE_RE } from './shapes.mjs';
+import { memoryConfigured, memoryBlock, MEMORY_GIT_REMOTE_RE, CREDENTIAL_RES } from './shapes.mjs';
 
 const HARNESS_ROOT = process.cwd();
 
@@ -51,14 +51,9 @@ function offLine(reason) {
 
 /**
  * The credential tripwire. Narrow on purpose: broad patterns would refuse
- * honest sentences. The dream agent's nightly grep is the second net.
+ * honest sentences. The dream agent's nightly grep is the second net. The shapes
+ * themselves live in shapes.mjs (CREDENTIAL_RES), shared with status/done.mjs.
  */
-const CREDENTIAL_RES = [
-  /orion_[A-Za-z0-9_-]{20,}/,            // an install token
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,  // a key file
-  /\bsk-[A-Za-z0-9_-]{16,}/,             // API-key shapes
-  /\b(password|passwd|api[_-]?key|client[_-]?secret)\s*[:=]\s*\S/i,
-];
 function credentialProblem(text) {
   for (const re of CREDENTIAL_RES) {
     if (re.test(text)) return 'that looks like a credential, and credentials never go into memory — keep it in the tool that owns it';

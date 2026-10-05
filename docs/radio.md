@@ -109,10 +109,12 @@ updated", not also "A task finished". A shift that used a skill is one message t
 names the skill.
 
 Third, it's **the labels, the count, and the time. Never the content.** When your AI
-reports finished work it also writes one line about it for your own records: in your
-memory log, and for a shift in `status/shift-log.md`. That line never leaves your
-machine. The script that reports (`status/done.mjs`) does not pass it to the radio,
-and it has no way to send free text at all.
+reports finished work it also writes one line about it for your own records: in
+`status/work-log.md` for a task you asked for, in `status/shift-log.md` for a shift,
+and in your memory log too when memory is on. That line never leaves your machine.
+The script that reports (`status/done.mjs`) does not pass it to the radio, and it
+has no way to send free text at all. It also refuses a line that looks like a key,
+a token or a password, so one never lands in a log.
 
 ## What comes in
 
@@ -215,7 +217,8 @@ radio at all, and still writes your own line.
    ask for your IT team is one line: **allow HTTPS to `www.dailypractice.world`** — one
    address, standard port, a small check-in API. Until then, everything local keeps
    working, and your own records still get every line: the shift log for each
-   shift, the memory log for each finished task.
+   shift, the work log for each finished task. Under each one that could not be
+   reported, the script adds a line saying so, so nothing goes missing quietly.
 
 ## If your AI can't run commands (website-chat lane)
 

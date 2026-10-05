@@ -24,13 +24,17 @@
  *
  * It does two things, in this order.
  *
- * 1. The local record, when --line is given. It never skips, radio on or off.
- *    A shift's line is appended to status/shift-log.md as
+ * 1. The local record, when --line is given. It never skips: radio on or off,
+ *    memory on or off. One dated line, appended to a plain file in status/.
+ *    A shift's line goes to status/shift-log.md as
  *      {YYYY-MM-DD HH:MM} | {agent} | count: {N} | auto: {line}
  *    This script writes the auto: marker itself, because that marker is what
- *    proves a schedule fired on its own. The line is also written to the memory
- *    log, memory/agents/<who>/log.md, when memory is on. <who> is --agent, or
- *    else this harness's own agent_name. Memory trouble never blocks anything.
+ *    proves a schedule fired on its own. A task a person asked for goes to
+ *    status/work-log.md as
+ *      {YYYY-MM-DD HH:MM} | {who} | count: {N} | {tag} | {line}
+ *    The same dated line is also written to the memory log,
+ *    memory/agents/<who>/log.md, when memory is on. <who> is --agent, or else
+ *    this harness's own agent_name. Memory trouble never blocks anything.
  *
  * 2. The radio half, only when the radio is on: one signal through
  *    status/radio.mjs, carrying labels only. The tag, the count, the time, and
@@ -38,14 +42,17 @@
  *    radio, and no flag here can put free text on the wire. A finished task goes
  *    as task_completed. A shift goes as routine_completed ("routine" is only the
  *    wire name for a shift). Radio off: nothing is sent, and nothing is said
- *    about it.
+ *    about it. Radio on but the signal did not land (no answer, or an answer
+ *    that was not a yes): one more line is appended under the local one, saying
+ *    so, which is what makes an unreported piece of work findable later.
  *
  * A skill named here always reports as "it ran" (outcome run_completed). This
  * script has no way to send any other outcome.
  *
  * Validation comes first. A tag that is not on the menu, a bad count, a name
- * that is not a label, or --shift without --agent: one plain explanation, exit
- * 1, nothing written, nothing sent. After any valid report the exit code is 0,
+ * that is not a label, --shift without --agent, a line longer than one short
+ * line, or a line that looks like a credential: one plain explanation, exit 1,
+ * nothing written, nothing sent. After any valid report the exit code is 0,
  * even when the radio could not be reached: the local record is the half that
  * must never fail. No status/status.json yet: one plain line, exit 0, the same
  * posture as radio.mjs.
@@ -54,16 +61,20 @@
  * package.json, no npm install.
  */
 
-import { readFileSync, existsSync, appendFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { isWorkTag, workTagMenu, labelProblem, radioOn, memoryOn } from './shapes.mjs';
+import {
+  isWorkTag, workTagMenu, labelProblem, countProblem, looksLikeCredential, LINE_MAX,
+  radioOn, memoryOn,
+} from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HARNESS_ROOT = join(__dirname, '..');
 const STATUS_PATH = join(__dirname, 'status.json');
 const SHIFT_LOG_PATH = join(__dirname, 'shift-log.md');
+const WORK_LOG_PATH = join(__dirname, 'work-log.md');
 
 const USAGE = 'Usage: node status/done.mjs --tag <tag> [--count <n>] [--skill <slug>] [--agent <roster name>] [--shift] [--line "<one line that stays on this machine>"]';
 
@@ -120,18 +131,13 @@ if (flags.tag === undefined || !String(flags.tag).trim()) {
 
 const shift = flags.shift === true;
 
+// One rule for a count, shared with radio.mjs (shapes.mjs): a finished task
+// did at least one thing, and only a shift may report 0.
 const countText = flags.count === undefined ? '1' : String(flags.count);
 let count = null;
-if (!/^\d{1,9}$/.test(countText)) {
-  problems.push('--count must be a whole number in plain digits (how many things were done).');
-} else {
-  count = Number(countText);
-  // A finished task that did zero things is a contradiction. A shift is
-  // different: "it ran and found nothing to do" is real, and worth reporting.
-  if (count < 1 && !shift) {
-    problems.push('--count 0 is only for a shift (--shift) that ran and found nothing to do. A finished task did at least one thing.');
-  }
-}
+const countTrouble = countProblem(countText, { allowZero: shift });
+if (countTrouble) problems.push(`--count: ${countTrouble}`);
+else count = Number(countText);
 
 for (const [flag, kind] of [['skill', 'skill'], ['agent', 'agent']]) {
   if (flags[flag] === undefined) continue;
@@ -152,6 +158,12 @@ if (flags.line !== undefined) {
     problems.push('--line was given but is empty. Write the one line, or leave --line out.');
   } else if (line.startsWith('--')) {
     problems.push(`--line needs its one line right after it, in quotes. It got "${line}" instead.`);
+  } else if (line.length > LINE_MAX) {
+    problems.push(`--line is one short line, at most ${LINE_MAX} characters. That one has ${line.length}. Say what was done, not how.`);
+  } else if (looksLikeCredential(line)) {
+    // Checked before anything is written: the line goes to plain files that
+    // other agents read, and a key must never land in one.
+    problems.push('--line looks like it holds a credential (a key, a token or a password). Credentials are never written to a log. Rewrite the line without it.');
   }
 }
 
@@ -199,28 +211,11 @@ function localStamp(now = new Date()) {
   return `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())} ${two(now.getHours())}:${two(now.getMinutes())}`;
 }
 
-/** Append one line to the shift log, creating the file if this is its first. */
-function appendShiftLog(text) {
-  const existing = existsSync(SHIFT_LOG_PATH) ? readFileSync(SHIFT_LOG_PATH, 'utf8') : '';
+/** Append one line to a local log, creating the file if this is its first. Append only: a log is never rewritten. */
+function appendLog(path, text) {
+  const existing = existsSync(path) ? readFileSync(path, 'utf8') : '';
   const gap = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
-  appendFileSync(SHIFT_LOG_PATH, `${gap}${text}\n`);
-}
-
-/**
- * The radio was on and could not be reached. Say so on the shift's own line,
- * which is what makes the silence diagnosable at the next session
- * (library/HIRING.md, "Radio on but unreachable").
- */
-function markUnreachable(text) {
-  try {
-    const log = readFileSync(SHIFT_LOG_PATH, 'utf8');
-    const at = `\n${log}`.lastIndexOf(`\n${text}\n`);
-    if (at === -1) return;
-    const end = at + text.length;
-    writeFileSync(SHIFT_LOG_PATH, `${log.slice(0, end)} (radio unreachable)${log.slice(end)}`);
-  } catch {
-    // The line itself is already written. The marker is best effort.
-  }
+  appendFileSync(path, `${gap}${text}\n`);
 }
 
 /** Run a sibling script and hand back what it printed. Never throws. */
@@ -233,21 +228,35 @@ function runSibling(script, args, timeoutMs) {
   return { out: String(run.stdout || '').trim(), ok: run.status === 0 && !run.error };
 }
 
-// What gets recorded locally: a shift's line in the shift-log shape, anything
-// else exactly as given.
-let localLine = line;
-let shiftLogged = false;
-if (line !== null && shift) {
-  // The marker is how a schedule is proven. If the caller already wrote one
-  // (auto-test: for a wiring test a person kicked off), it is kept as given.
-  const note = /^auto(-test)?:/i.test(line) ? line : `auto: ${line}`;
-  localLine = `${localStamp()} | ${agent} | count: ${count} | ${note}`;
+// Who did the work, for the local line. A hired agent's roster name, or else
+// this harness's own agent. A status file that will not parse leaves only the
+// first of those, which is enough for a line.
+const ownName = status && typeof status.agent_name === 'string' ? status.agent_name.trim() : '';
+const who = agent || ownName || 'assistant';
+
+// What gets recorded locally: one dated line, in the shape of the log it joins.
+// A shift goes to the shift log. Work a person asked for goes to the work log.
+// Neither depends on the radio, and neither depends on memory.
+const stamp = localStamp();
+const logPath = shift ? SHIFT_LOG_PATH : WORK_LOG_PATH;
+const logName = shift ? 'status/shift-log.md' : 'status/work-log.md';
+let localLine = null;
+let logged = false;
+if (line !== null) {
+  if (shift) {
+    // The marker is how a schedule is proven. If the caller already wrote one
+    // (auto-test: for a wiring test a person kicked off), it is kept as given.
+    const note = /^auto(-test)?:/i.test(line) ? line : `auto: ${line}`;
+    localLine = `${stamp} | ${agent} | count: ${count} | ${note}`;
+  } else {
+    localLine = `${stamp} | ${who} | count: ${count} | ${tag} | ${line}`;
+  }
   try {
-    appendShiftLog(localLine);
-    shiftLogged = true;
-    console.log('Written to status/shift-log.md.');
+    appendLog(logPath, localLine);
+    logged = true;
+    console.log(`Written to ${logName}.`);
   } catch (err) {
-    console.log(`Could not write status/shift-log.md (${err.code || err.message}). The rest of the report carries on.`);
+    console.log(`Could not write ${logName} (${err.code || err.message}). The rest of the report carries on.`);
   }
 } else if (shift) {
   console.log('No --line given, so no line was added to status/shift-log.md.');
@@ -258,14 +267,12 @@ if (status === null) {
   process.exit(0);
 }
 
-if (localLine !== null && memoryOn(status)) {
-  const who = agent || (typeof status.agent_name === 'string' ? status.agent_name.trim() : '');
-  if (who) {
-    // A shift's memory line is the same line the shift log got. memory.mjs
-    // prints its own one line, whether it wrote the note or could not.
-    const note = runSibling('memory.mjs', ['note', '--to', `agents/${who}/log.md`, '--line', localLine], 15000);
-    if (note.out) console.log(note.out);
-  }
+// The same dated line, into the team's memory, when memory is on. The file
+// above is the record that never skips. This one is for the notebook.
+if (localLine !== null && memoryOn(status) && (agent || ownName)) {
+  // memory.mjs prints its own one line, whether it wrote the note or could not.
+  const note = runSibling('memory.mjs', ['note', '--to', `agents/${agent || ownName}/log.md`, '--line', localLine], 15000);
+  if (note.out) console.log(note.out);
 }
 
 // ── 2. The radio half: labels only ──────────────────────────────────────────
@@ -284,11 +291,31 @@ if (radioOn(status)) {
     args.push('--asset', skill, '--asset-kind', 'skill', '--outcome', 'run_completed',
       '--surface', shift ? 'routine' : 'agent');
   }
+  // Ask the radio to say what happened in one line a script can read, so this
+  // never depends on the wording of the sentences it prints for people.
+  args.push('--result-line', 'yes');
   const radio = runSibling('radio.mjs', args, 30000);
-  if (radio.out) console.log(radio.out);
-  else if (!radio.ok) console.log('The radio script could not finish, so nothing was sent. Nothing is lost locally.');
-  const unreachable = /didn't answer/.test(radio.out) || (!radio.ok && !radio.out);
-  if (shiftLogged && unreachable) markUnreachable(localLine);
+  const lines = radio.out ? radio.out.split('\n') : [];
+  const resultAt = lines.findIndex((l) => l.startsWith('[radio-result] '));
+  const result = resultAt === -1 ? null : lines[resultAt].slice('[radio-result] '.length).trim();
+  const forPeople = lines.filter((_, i) => i !== resultAt).join('\n').trim();
+  if (forPeople) console.log(forPeople);
+  else if (result === null) console.log('The radio script could not finish, so nothing was sent. Nothing is lost locally.');
+
+  // Anything but "sent" means Daily Practice did not get this piece of work. Say
+  // so under the local line, as one more appended line. Never by rewriting the
+  // log: two agents can finish at the same minute, and an append cannot lose the
+  // other one's line.
+  if (logged && result !== 'sent') {
+    const why = result === null || result === 'unreachable'
+      ? '(radio unreachable)'
+      : `(radio ${result})`;
+    try {
+      appendLog(logPath, `${stamp} | ${shift ? agent : who} | ${why} the line above was not reported`);
+    } catch {
+      // The line itself is already written. The marker is best effort.
+    }
+  }
 }
 
 // A valid report ends here, with exit code 0, whatever the radio did.

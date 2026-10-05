@@ -97,9 +97,10 @@ two habits, silently:
   memory/INDEX.md plus what the task needs — shared/ always, your role area, and your
   own agents/{{AGENT_NAME}}/ corner.
 - AFTER a finished task: `node status/done.mjs --tag <tag> --count <n> --line "..."`.
-  One command does both halves. It writes your one summary line to your log
-  (agents/{{AGENT_NAME}}/log.md in memory/, on this machine only), and it reports
-  the finished task (see "The radio" below). Then any durable new fact as one small
+  One command does both halves. It writes your one summary line on this machine
+  only (status/work-log.md, and agents/{{AGENT_NAME}}/log.md in memory/), and it
+  reports the finished task (see "The radio" below). One short line, at most 120
+  characters, never a key or a password. Then any durable new fact as one small
   file in your area (`node status/memory.mjs file ...`), and anything true for the
   whole team proposed as a line in shared/inbox.md. Then sync.
 

@@ -225,17 +225,22 @@ know why, just that the names are load-bearing; don't rename them.
 
    **What crosses the radio.** The tag, the count, the time, and the name of the
    skill or agent. Never the content, never who it was for. The line you give
-   `--line` stays on this machine: it goes to your memory log, and for a shift to
-   `status/shift-log.md`.
+   `--line` stays on this machine. A task your human asked for goes to
+   `status/work-log.md`, a shift goes to `status/shift-log.md`, and both also go to
+   your memory log when memory is on. Keep it to one short line, at most 120
+   characters, and never put a key, a token or a password in it: the script refuses
+   a line that looks like one.
 
    **Radio off, or no script surface.** Radio off: run the same command. The local
    line is still written, nothing is sent, and you say nothing about it. No script
    surface: nothing can be sent from here. If you can write files, add your one line
    to your memory log by hand. Otherwise skip silently. Never claim a signal
-   happened. Radio on but the call fails ("didn't answer"): a shift's line in
-   `status/shift-log.md` gets "(radio unreachable)" appended (`done.mjs` does this
-   itself), and the client hears the session-start one-liner (step 2, "Check the
-   radio") once this session. An unreachable radio is a fixable fact, not a secret.
+   happened. Radio on but the signal did not land: `done.mjs` adds one more line
+   under the one it just wrote, saying so. It reads "(radio unreachable)" when the
+   radio did not answer, or "(radio refused 401)" and the like when it answered and
+   did not accept the report. The client hears the session-start one-liner (step 2,
+   "Check the radio") once this session. An unreachable radio is a fixable fact, not
+   a secret.
 
    **If this folder's agent definition was filled in before 1.1.0.** An update does
    not replace the `agent/agent-definition.md` you filled in with your human unless
@@ -286,10 +291,11 @@ schedule?"), never more. An on-call agent needs no mention. A row still marked
 `Probation` is a hire that was never finished: one sentence offering to pick it up,
 never more (`library/HIRING.md`, Part D). Scan `status/shift-log.md` too. An `auto:`
 line for an agent whose schedule reads "not yet proven" is the proof: change its
-roster cell to "(proven)" and its `schedule_proven:` line to `true`. And "(radio
-unreachable)" on recent lines means shifts ran but couldn't report: deliver the
-session-start one-liner and the surface's fix once, even if this session's own radio
-check succeeds.
+roster cell to "(proven)" and its `schedule_proven:` line to `true`. And a recent
+line in `status/shift-log.md` or `status/work-log.md` that says "(radio
+unreachable)" or "(radio refused ...)" means work was done but could not be
+reported: deliver the session-start one-liner and the surface's fix once, even if
+this session's own radio check succeeds.
 
 **Older folders: the rule changed in 1.1.0.** Before 1.1.0, `Hired` meant the agent
 had fired on its own with nobody asking. Now an agent is hired once it has done its

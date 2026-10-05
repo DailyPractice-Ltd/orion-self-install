@@ -206,17 +206,21 @@ The tag says what kind of work this job is. It comes from the menu in
 `docs/radio.md`, and it was chosen at hire: `{tag}`.
 
 What the command does, in order:
-1. It writes your line on this machine. This half never skips. With `--shift` the
-   line goes to `status/shift-log.md` as
-   `{date} | {name} | count: N | auto: {your line}`. Every line also goes to the
-   team memory, in `agents/{name}/log.md`. Memory missing or unusable: that half
-   skips silently.
+1. It writes your line on this machine. This half never skips, whatever the radio
+   or the memory is doing. With `--shift` the line goes to `status/shift-log.md` as
+   `{date} | {name} | count: N | auto: {your line}`. Without it, the line goes to
+   `status/work-log.md` as `{date} | {name} | count: N | {tag} | {your line}`. The
+   same dated line also goes to the team memory, in `agents/{name}/log.md`, when
+   memory is on. One short line: at most 120 characters, and never a key, a token
+   or a password. The command refuses a line that looks like one.
 2. If check-ins are on, it sends one signal: the tag, the count, the time, and your
    name. Your line is never sent. (The radio is your harness's check-in line to
    Daily Practice: `docs/radio.md`.) Radio off: nothing is sent, and nothing is said
-   about it. If the command prints "didn't answer", it marks your shift-log line
-   "(radio unreachable)" by itself. The work still counts locally, and the marker
-   is what makes the silence diagnosable later.
+   about it. If the signal does not land, the command adds one more line under
+   yours by itself: "(radio unreachable)" when the radio did not answer, or
+   "(radio refused 401)" and the like when it answered and did not accept the
+   report. The work still counts locally, and that line is what makes the silence
+   diagnosable later.
 
 Count only what is real. A shift that fails, or finds nothing to do, still reports:
 count 0, and the line says why. A silent failure is worse than a reported one. A
@@ -314,10 +318,12 @@ not the runtime. Both facts are fine, and stated.
    *The wake-up (only when there is a schedule)*: trigger it once **through the
    wake-up itself**: the scheduled task's run-now (or `launchctl kickstart`), or for
    a handoff hire, the upstream's shift, watching the chain fire. Confirm a new line
-   lands in `status/shift-log.md`. Then, immediately: **edit that line's marker from
-   `auto:` to `auto-test:`**. The scheduler wrote it, but a person kicked the
-   scheduler, so it must not count as proof that the schedule fires on its own. The
-   wake-up is the layer nobody tests. Test it, not just the job. On a pass, the
+   lands in `status/shift-log.md`. Then, immediately: **edit the marker from `auto:`
+   to `auto-test:` on every line that run wrote**. For a handoff hire that is two
+   lines or more: the upstream agent's own line as well as the new agent's, because
+   kicking the upstream by hand wrote a fresh `auto:` line for it too. The scheduler
+   wrote them, but a person kicked the scheduler, so none of them may count as proof
+   that a schedule fires on its own. The wake-up is the layer nobody tests. Test it, not just the job. On a pass, the
    roster's schedule cell moves from "(not yet wired)" to "(not yet proven)".
    **If the job check fails, stop here.** The hire parks honestly: the `packages`
    entry stays `smoke_test_passed: false`, the agent stays `status: probation`, the
@@ -338,8 +344,8 @@ not the runtime. Both facts are fine, and stated.
    The role and purpose are how the bank in `library/ROLES.md` becomes
    evidence-based over time: labels, never content.
    Radio off: both skip, and say so **once, here only**: "Your check-ins are off, so
-   Daily Practice won't see {name}'s reports. You will: in your memory log, and in
-   `status/shift-log.md` for scheduled work."
+   Daily Practice won't see {name}'s reports. You will: in `status/work-log.md` for
+   work you ask for, and in `status/shift-log.md` for scheduled work."
 9. **Close.** Teach the line: "`@{name}` summons them; `/{skill}` runs the judgment
    anywhere." Also, on the first hire only: delete the roster's "No one hired yet"
    line. Then say plainly where things stand. On call: "{name} is hired, and on
@@ -351,8 +357,9 @@ not the runtime. Both facts are fine, and stated.
 
 `status/shift-log.md` is the local twin of the radio for scheduled work: one
 append-only line per shift. It answers "did it run?" when the radio is off, and it is
-where a schedule is proven. Work a person asked for leaves its line in the memory log
-instead (`memory/agents/{name}/log.md`).
+where a schedule is proven. Work a person asked for leaves its line in
+`status/work-log.md` instead, in the same one-line shape. Both lines are also
+written to the memory log (`memory/agents/{name}/log.md`) when memory is on.
 
 ### The roster
 
@@ -538,13 +545,15 @@ who wanted a schedule.
 
 **Radio off**: the local line does not depend on the radio. `done.mjs` writes it
 whether check-ins are on or off, so the client's "did it run?" stays answerable: from
-`status/shift-log.md` for a shift, from the memory log for work they asked for.
+`status/shift-log.md` for a shift, from `status/work-log.md` for work they asked for.
 Nothing is sent, silently (AGENTS.md rule 7), and the one disclosure happens at hire
 time, step 8. Disclosure at hire, silence after.
 
-**Radio on but unreachable** (the "didn't answer" line): not the same as off, and never
-treated as it. `done.mjs` appends "(radio unreachable)" to the shift's line in the
-shift log and carries on; the client hears the session-start one-liner (AGENTS.md,
+**Radio on but the signal did not land** (the "didn't answer" line, or an answer
+that was not a yes): not the same as off, and never treated as it. `done.mjs` adds
+one line under the work's own line, "(radio unreachable)" or "(radio refused ...)",
+and carries on. It appends that line and never rewrites the log, so two agents
+finishing in the same minute cannot lose each other's line. The client hears the session-start one-liner (AGENTS.md,
 "Check the radio") once, at their next session, with the fix for
 their surface (`docs/radio.md`, "If the radio can't get through"). A week of unreachable
 markers is a wiring problem to fix, not a harness that stopped working.

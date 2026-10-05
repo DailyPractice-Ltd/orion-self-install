@@ -53,6 +53,12 @@ What changed, in plain terms:
   rule, or show a working agent as "Probation". Your AI will mention it once and fix
   the roster only on your okay. Agents you already hired keep reporting the way they
   always did.
+- **Where your own line goes.** A task you asked for is logged in
+  `status/work-log.md`, a scheduled shift in `status/shift-log.md`, and both in your
+  memory log when memory is on. If a report could not reach Daily Practice, one more
+  line is added under it saying so. Neither file is ever touched by an update.
+- **The Dream agent** (1.0.1) reports with the same command. Nothing else about it
+  changed.
 - **Your AI's own instructions stay yours.** An update does not replace the agent
   definition you filled in together unless you choose that, so its reporting section
   may still describe the old rule. The new rule applies either way. Your AI will

@@ -92,10 +92,13 @@ node status/done.mjs --agent {name} --tag {tag} --count {N} [--skill {slug}] [--
 then. `{tag}` is one tag from the public menu (`WORK_TAGS` in `status/shapes.mjs`;
 `docs/radio.md`), chosen at hire for the kind of work the job is.
 
-The local half comes first, and it never depends on the radio. Every line is
-written to the agent's memory log, `memory/agents/{name}/log.md`, when memory is on.
-A shift's line is also appended to `status/shift-log.md`, which is append-only, one
-line per shift:
+The local half comes first, and it depends on neither the radio nor memory. A line
+is always appended to a plain file in `status/`: `shift-log.md` for a shift,
+`work-log.md` (`{date} | {name} | count: {N} | {tag} | {line}`) for any other run.
+The same dated line is also written to the agent's memory log,
+`memory/agents/{name}/log.md`, when memory is on. Both files are append-only.
+`done.mjs` refuses a line over 120 characters, or one that looks like a
+credential, before anything is written. The shift log is one line per shift:
 
 ```
 {YYYY-MM-DD HH:MM} | {name} | count: {N} | auto: {≤120 chars, no person/company names}
@@ -119,8 +122,12 @@ Radio signal, when on, sent by `done.mjs` through `radio.mjs signal`:
 - either one names a skill that did the work as `asset`, with `asset_kind: skill`,
   `outcome: run_completed`, and `surface: routine` for a shift or `agent` otherwise.
 
-If the radio is on and does not answer, `done.mjs` appends "(radio unreachable)" to
-the shift's line in the shift log.
+If the radio is on and the signal does not land, `done.mjs` appends one more line
+under the work's own line: "(radio unreachable)" when there was no answer, or
+"(radio refused {status})" when there was one that was not a yes. It learns the
+outcome from a machine-readable line `radio.mjs signal` prints on request
+(`--result-line`), never from the sentences written for people. A marker line
+carries no `auto:`, so it can never read as proof that a schedule fired.
 
 `routine_completed` has been live server-side since 14 Aug 2026 (mono PR #20): the
 replay key is

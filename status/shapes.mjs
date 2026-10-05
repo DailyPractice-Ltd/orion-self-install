@@ -164,19 +164,31 @@ export function workTagMenu() {
 
 /**
  * What ran: a skill's slug, or a hired agent's roster name. These ride the radio
- * beside the tag, so they must be labels and never words. The rule is the naming
- * rule in library/HIRING.md: lowercase letters, digits and hyphens, starting with
- * a letter. No spaces, no capitals and no punctuation, so a sentence or an email
- * address cannot travel in one. A roster name is at most 30 characters. A skill
- * slug is at most 100, because library slugs run longer than roster names.
+ * beside the tag, so they must be labels and never words: lowercase letters,
+ * digits and hyphens. No spaces, no capitals and no punctuation, so a sentence or
+ * an email address cannot travel in one.
+ *
+ * The two kinds follow the rules that already name them. A roster name is the
+ * naming rule in library/HIRING.md: it starts with a letter and is at most 30
+ * characters. A skill slug is the library's own slug rule (the same one the radio
+ * uses when it installs a skill): it may start with a digit, like "5-whys", and is
+ * at most 100 characters. A skill the radio can install must be a skill a report
+ * can name.
  */
 export const LABEL_MAX = Object.freeze({ skill: 100, agent: 30 });
-const LABEL_RE = /^[a-z][a-z0-9-]*$/;
+const LABEL_RES = Object.freeze({
+  skill: /^[a-z0-9]+(-[a-z0-9]+)*$/,
+  agent: /^[a-z][a-z0-9-]*$/,
+});
 const LABEL_WORDS = Object.freeze({ skill: 'A slug', agent: 'A roster name' });
+const LABEL_RULES = Object.freeze({
+  skill: 'lowercase letters, digits and single hyphens (like "meeting-sizing")',
+  agent: 'lowercase letters, digits and hyphens, starting with a letter (like "prospecting")',
+});
 
 export function isLabel(value, kind) {
   return typeof value === 'string' && Object.hasOwn(LABEL_MAX, kind) &&
-    value.length <= LABEL_MAX[kind] && LABEL_RE.test(value);
+    value.length <= LABEL_MAX[kind] && LABEL_RES[kind].test(value);
 }
 
 /** Plain-words reason a skill slug or roster name was rejected, or null when it's fine. */
@@ -188,8 +200,45 @@ export function labelProblem(value, kind) {
   if (max !== undefined && value.length > max) {
     return `${what} is at most ${max} characters. That one has ${value.length}.`;
   }
-  return `${what} is lowercase letters, digits and hyphens, starting with a letter (like "meeting-sizing"). "${value}" is not.`;
+  return `${what} is ${LABEL_RULES[kind] || 'a short lowercase label'}. "${value}" is not.`;
 }
+
+/**
+ * How many things were done. One rule, read by status/done.mjs and
+ * status/radio.mjs both, so a count one accepts is never refused by the other.
+ * Plain digits only: Number() exotica like 0x12 or 1e3 do not belong on a wire.
+ * A finished task did at least one thing. Only a shift may report 0: it ran and
+ * found nothing to do. Returns a plain-words problem, or null when it's fine.
+ */
+export function countProblem(text, { allowZero = false } = {}) {
+  if (!/^\d{1,9}$/.test(String(text))) {
+    return 'The count must be a whole number in plain digits (how many things were done).';
+  }
+  if (Number(text) < 1 && !allowZero) {
+    return 'A count of 0 is only for a shift that ran and found nothing to do. A finished task did at least one thing.';
+  }
+  return null;
+}
+
+/**
+ * The credential tripwire. Narrow on purpose: broad patterns would refuse honest
+ * lines. status/memory.mjs refuses a note that matches, and status/done.mjs
+ * refuses a line that matches before it is written anywhere, because the same
+ * line goes to the local logs that other agents read.
+ */
+export const CREDENTIAL_RES = Object.freeze([
+  /orion_[A-Za-z0-9_-]{20,}/,            // an install token
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,  // a key file
+  /\bsk-[A-Za-z0-9_-]{16,}/,             // API-key shapes
+  /\b(password|passwd|api[_-]?key|client[_-]?secret)\s*[:=]\s*\S/i,
+]);
+
+export function looksLikeCredential(text) {
+  return CREDENTIAL_RES.some((re) => re.test(String(text)));
+}
+
+/** One line means one short line: the shift-log contract's own limit. */
+export const LINE_MAX = 120;
 
 /**
  * A skill on offer. Daily Practice ships a skill as a message whose first line is

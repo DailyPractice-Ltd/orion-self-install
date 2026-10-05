@@ -10,7 +10,7 @@ person kept it.
 |---|---|
 | **Name** | Dream |
 | **Kind** | agent |
-| **Version** | 1.0.0 |
+| **Version** | 1.0.1 |
 | **Requires** | Memory set up (`node status/memory.mjs check` answers healthily — it does by default from template 0.7.0). Works on both backends; on the shared git setup it also syncs for the whole team. |
 
 ## Install prompt — copy this whole block and paste it to your AI
@@ -23,8 +23,8 @@ Hire the Dream agent from my Orion folder.
    pre-answered below — confirm with me instead of re-asking.
 2. Job sheet answers: name `dream`; job = the nightly consolidation in the
    package's "The shift" section; tools = file read/write in memory/ plus
-   running status/memory.mjs and status/radio.mjs — nothing else, no CRM, no
-   email; schedule = daily at 02:00 my time; success line = "I'll know dream is
+   running status/memory.mjs, status/done.mjs and status/radio.mjs — nothing
+   else, no CRM, no email; schedule = daily at 02:00 my time; success line = "I'll know dream is
    doing the job when the morning INDEX.md reads clean and I stop seeing
    duplicate or contradicting notes." Its memory: frontmatter is [shared, roles,
    agents] — the dream is the one agent that reads everything, because tidying
@@ -34,7 +34,7 @@ Hire the Dream agent from my Orion folder.
    memory, report the install).
 4. Report the install if my check-ins are on (the purpose sentence below is what
    gets sent — my yes to the job sheet covers it):
-   node status/radio.mjs report-install --slug dream --kind agent --version 1.0.0 --role custom --purpose "merges duplicate notes and keeps the team notebook's index honest"
+   node status/radio.mjs report-install --slug dream --kind agent --version 1.0.1 --role custom --purpose "merges duplicate notes and keeps the team notebook's index honest"
 ```
 
 ## The shift — what the dream does, in order, every night
@@ -62,10 +62,12 @@ Hire the Dream agent from my Orion folder.
 5. **The safety grep**: search the whole memory folder for credential shapes
    (tokens, keys, `password:`). Anything found is cut from the file, replaced with
    `[removed: credential — never store these]`, and named in the shift-log line.
-6. **Sync again**, then **the report step, exactly as HIRING.md writes it**: one
-   shift-log line (`auto:` when scheduled) with `count:` = items consolidated, then
-   `node status/radio.mjs signal --type routine_completed --routine dream --count N`
-   when check-ins are on. The count is the label; the contents stay local, always.
+6. **Sync again**, then **the report step, exactly as HIRING.md writes it**, one
+   command: `node status/done.mjs --agent dream --tag ops --count N --line "..."`,
+   with `--shift` added when the schedule started the run. N is the number of items
+   consolidated. The command writes the shift-log line (with its `auto:` marker)
+   and sends the tag and the count when check-ins are on. The count is the label.
+   The contents stay local, always.
 
 ## What it must not do
 
@@ -85,4 +87,7 @@ replacement. Then flip `smoke_test_passed: true` and edit the wiring run's marke
 
 ## Changelog
 
+- 1.0.1 — 2026-10-05 — The report step is the one command every agent now uses,
+  `status/done.mjs` (template 1.1.0). Same job, same count, and its signal now carries
+  the `ops` tag.
 - 1.0.0 — 2026-09-25 — First release, shipped with template 0.7.0 (the memory build).

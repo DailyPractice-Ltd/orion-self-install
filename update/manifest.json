@@ -65,6 +65,7 @@
   "never_touch": {
     "status/status.json": "the client's own record — pairing, stages, packages, choices. An update edits exactly three things in it: template_version, one appended notes line, and deleting keys named in remove_status_checklist_keys — nothing else, ever",
     "status/shift-log.md": "the client's work history",
+    "status/work-log.md": "the client's work history: one line per finished task they asked for (since 1.1.0)",
     "memory/ (everything but README.md)": "the client's own memory — facts, logs, lessons, the index; an update improves the notebook's binding, never its pages",
     "agent/knowledge-base/01..07*.md": "the client's business, captured in their words",
     ".claude/agents/ (everything but nothing — the whole directory)": "the client's hired team; the roster README carries their rows",

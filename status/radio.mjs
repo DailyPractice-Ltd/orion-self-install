@@ -75,7 +75,7 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  radioOn as radioIsOn, parseInstallDirective, isWorkTag, workTagMenu, labelProblem,
+  radioOn as radioIsOn, parseInstallDirective, isWorkTag, workTagMenu, labelProblem, countProblem,
 } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -165,13 +165,28 @@ async function call(method, path, body) {
     return res;
   } catch (err) {
     console.log(`The radio address didn't answer (${err?.cause?.code || err.code || err.message}) — not retried, nothing lost locally.`);
+    resultLine('unreachable');
     process.exit(0);
+  }
+}
+
+/**
+ * The outcome of a `signal`, as one line a script can read, printed only when the
+ * caller asks for it (--result-line). status/done.mjs asks, so it never has to
+ * guess what happened from the sentences above, which are written for people and
+ * may be reworded. One of: "sent", "unreachable", "refused <status>". The exit code
+ * stays 0 either way: the radio never blocks local work.
+ */
+function resultLine(outcome) {
+  if (command === 'signal' && flags['result-line'] !== undefined) {
+    console.log(`[radio-result] ${outcome}`);
   }
 }
 
 function reportAuthProblem() {
   console.log('The radio answered "that key isn\'t valid" (401). The key may have been revoked —');
   console.log('ask support@dailypractice.world for a fresh pairing code. Nothing else is affected.');
+  resultLine('refused 401');
   process.exit(0);
 }
 
@@ -516,8 +531,11 @@ if (command === 'signal') {
   // docs/radio.md).
   const work = {};
   if (flags.count !== undefined) {
-    if (!/^\d{1,9}$/.test(String(flags.count))) {
-      console.log('signal --count must be a whole number in plain digits (how many things were done).');
+    // One rule for a count, shared with done.mjs (shapes.mjs). Zero is decided per
+    // type further down: only a shift may report it.
+    const problem = countProblem(flags.count, { allowZero: true });
+    if (problem) {
+      console.log(`signal --count: ${problem}`);
       process.exit(1);
     }
     work.count = Number(flags.count);
@@ -632,6 +650,7 @@ if (command === 'signal') {
   });
   if (res.status === 401) reportAuthProblem();
   console.log(res.ok ? `Signal sent (${flags.type}).` : `Signal answered ${res.status} — not retried.`);
+  resultLine(res.ok ? 'sent' : `refused ${res.status}`);
   process.exit(0);
 }
 

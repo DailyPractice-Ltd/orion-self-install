@@ -21,7 +21,9 @@
   name, no client-authored sentence. The one-line record of the work stays on the
   client's machine: the script that reports never hands it to the radio, and it
   checks every label it does hand over (the tag against the menu, each name against
-  the slug shape). So the standing rule holds: nothing client-authored was added to
+  the slug shape). The older direct path, `radio.mjs signal --routine`, still takes
+  a hired agent's label as given, so reports from agents hired before 1.1.0 keep
+  working; it has always been a label by instruction, and remains one. So the standing rule holds: nothing client-authored was added to
   Tier 1. Tiers 2 and 3, the master switch, and channel 2 are untouched. Token
   counts are not reported.
 - **Lockstep**: `docs/radio.md` (the new row, the tag menu, the three rules),

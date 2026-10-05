@@ -93,7 +93,8 @@ Never any free text, and never who the work was for. The client holds that line 
 code. `status/done.mjs` checks every label before anything is sent: the tag against
 the menu, the count as plain digits, the skill and the agent against the slug shape.
 It takes one line of free text, `--line`. That line goes to the client's own shift
-log and memory log, and is never handed to the radio. `status/radio.mjs signal`
+log or work log, and to the memory log when memory is on, and is never handed to
+the radio. `status/radio.mjs signal`
 drops `--note` with a plain line and sends without it, refuses a `--tag` that is not
 on the menu, and refuses an `--asset` that is not a slug.
 

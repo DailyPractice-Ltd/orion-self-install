@@ -15,8 +15,10 @@
  *     in its name;
  *   - on really installs the schedule, and run really fires it through the
  *     scheduler (not by calling the wake-up directly);
- *   - the stand-in receives every argument intact, in the right folder, and can
- *     find node although a scheduler starts with a bare PATH;
+ *   - the stand-in receives every argument intact, in the right folder;
+ *   - the wake-up really puts the command's folder on PATH (the stand-in can only
+ *     start through it), which is the line that makes node findable on a machine
+ *     where a version manager installed it;
  *   - off really removes it, and run then refuses.
  * On Linux it also waits for cron to fire the schedule at the clock, because
  * cron has no run-now of its own.
@@ -50,26 +52,47 @@ writeFileSync(join(folder, '.claude', 'agents', 'probe.md'), SHEET);
 
 // The stand-in writes down what it was handed, then exits.
 writeFileSync(join(standIn, 'agent.mjs'), `
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
-writeFileSync(join(here, 'markers', Date.now() + '-' + process.pid + '.json'), JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd() }));
+// Written under another name first, so a reader never sees half a file.
+const name = Date.now() + '-' + process.pid + '.json';
+writeFileSync(join(here, 'markers', name + '.part'), JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd() }));
+renameSync(join(here, 'markers', name + '.part'), join(here, 'markers', name));
 `);
-// The command the wake-up starts. It finds node only if the wake-up put it on PATH.
+// The command the wake-up starts. It calls a helper by its bare name, and the
+// helper sits only in this folder: the scheduler's own PATH does not hold it and
+// the working folder is the harness. So the stand-in runs at all only if the
+// wake-up really put the command's folder on PATH, which is the same line that
+// makes node findable on a machine where a version manager installed it.
 const bin = join(standIn, WIN ? 'agent.cmd' : 'agent');
-if (WIN) writeFileSync(bin, '@echo off\r\nnode "%~dp0agent.mjs" %*\r\n');
-else { writeFileSync(bin, '#!/bin/sh\nexec node "$(dirname "$0")/agent.mjs" "$@"\n'); chmodSync(bin, 0o755); }
+const helper = join(standIn, WIN ? 'orion-standin-helper.cmd' : 'orion-standin-helper');
+if (WIN) {
+  writeFileSync(bin, '@echo off\r\ncall orion-standin-helper.cmd %*\r\n');
+  writeFileSync(helper, '@echo off\r\nnode "%~dp0agent.mjs" %*\r\n');
+} else {
+  writeFileSync(bin, '#!/bin/sh\nexec orion-standin-helper "$@"\n');
+  writeFileSync(helper, '#!/bin/sh\nexec node "$(dirname "$0")/agent.mjs" "$@"\n');
+  chmodSync(bin, 0o755);
+  chmodSync(helper, 0o755);
+}
 
 const schedule = (...args) => {
-  const r = spawnSync(process.execPath, [join(folder, 'status', 'schedule.mjs'), ...args], { encoding: 'utf8' });
-  return { status: r.status, out: `${r.stdout}${r.stderr}`.trim() };
+  // A scheduler command that hangs must fail this run, not hold a machine for hours.
+  const r = spawnSync(process.execPath, [join(folder, 'status', 'schedule.mjs'), ...args], { encoding: 'utf8', timeout: 60_000 });
+  return { status: r.error ? 1 : r.status, out: `${r.stdout ?? ''}${r.stderr ?? ''}${r.error ? `\n${r.error.message}` : ''}`.trim() };
 };
-const seen = () => readdirSync(markers).sort();
-function waitForMarker(known, seconds, what) {
+const seen = () => readdirSync(markers).filter((f) => f.endsWith('.json')).sort();
+/** The first marker that was not there before and was written for this kind of agent software. */
+function waitForMarker(known, seconds, what, firstArg) {
   for (let i = 0; i < seconds * 2; i++) {
-    const fresh = seen().filter((f) => !known.includes(f));
-    if (fresh.length > 0) return JSON.parse(readFileSync(join(markers, fresh[0]), 'utf8'));
+    for (const f of seen().filter((name) => !known.includes(name))) {
+      const marker = JSON.parse(readFileSync(join(markers, f), 'utf8'));
+      // One left over from the other pass (a late firing) is not this pass's answer.
+      if (marker.argv[0] === firstArg) return marker;
+      known.push(f);
+    }
     sleep(500);
   }
   const log = join(folder, 'status', 'shifts', 'probe.log');
@@ -91,8 +114,9 @@ try {
     const expected = unattendedRunner(surface, { tools }).args.map((a) => (a === PROMPT_SLOT ? prompt : a));
 
     // On Linux the clock itself is part of the proof: wire for two minutes from
-    // now. Elsewhere any time will do, because run fires through the scheduler.
-    const at = process.platform === 'linux' ? inMinutes(2) : '03:17';
+    // now. Elsewhere run fires through the scheduler, so pick a time half a day
+    // away: the clock must not fire a second copy while this is being checked.
+    const at = process.platform === 'linux' ? inMinutes(2) : inMinutes(12 * 60);
     let r = schedule('wire', '--agent', 'probe', '--surface', surface, '--at', at, '--bin', bin);
     assert.equal(r.status, 0, `wire failed:\n${r.out}`);
     assert.match(r.out, /Nothing is switched on yet/);
@@ -103,9 +127,10 @@ try {
     assert.equal(r.status, 1, `run before on should refuse:\n${r.out}`);
     assert.match(r.out, /not switched on/);
 
+    // Set before the call: an on that fails halfway can still have left a job behind.
+    switchedOn = true;
     r = schedule('on', '--agent', 'probe');
     assert.equal(r.status, 0, `on failed:\n${r.out}`);
-    switchedOn = true;
     say('on: ok');
 
     // wire refuses to rewrite the file a live schedule runs.
@@ -116,15 +141,17 @@ try {
     let known = seen();
     r = schedule('run', '--agent', 'probe');
     assert.equal(r.status, 0, `run failed:\n${r.out}`);
-    let got = waitForMarker(known, 90, 'run');
+    let got = waitForMarker(known, 90, 'run', expected[0]);
     assert.deepEqual(got.argv, expected, 'the stand-in was not handed the arguments intact');
     assert.equal(realpathSync(got.cwd), folder, 'the stand-in was not started in the harness folder');
     say(`run: ok (the stand-in got ${got.argv.length} arguments intact, in the harness folder)`);
 
     if (process.platform === 'linux') {
       known = seen();
-      got = waitForMarker(known, 200, 'the clock');
+      got = waitForMarker(known, 200, 'the clock', expected[0]);
       assert.deepEqual(got.argv, expected);
+      // cron is the one path that starts outside the harness folder.
+      assert.equal(realpathSync(got.cwd), folder, 'cron did not start the stand-in in the harness folder');
       say('clock: ok (cron fired the schedule on its own)');
     }
 
@@ -141,7 +168,18 @@ try {
   failed = true;
   console.error(`\nFAILED: ${err.message}`);
 } finally {
-  if (switchedOn) schedule('off', '--agent', 'probe');
-  rmSync(base, { recursive: true, force: true });
+  if (switchedOn) {
+    const r = schedule('off', '--agent', 'probe');
+    if (r.status !== 0) {
+      failed = true;
+      console.error(`\nCLEAN-UP FAILED: the schedule may still be on this machine. Remove it by hand.\n${r.out}`);
+    }
+  }
+  // A wake-up that is still closing its log must not turn a pass into a crash.
+  try {
+    rmSync(base, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+  } catch (err) {
+    console.error(`Could not remove ${base}: ${err.message}`);
+  }
 }
 process.exit(failed ? 1 : 0);

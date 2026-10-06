@@ -21,6 +21,7 @@ permissions:
 jobs:
   unit:
     name: unit (${{ matrix.os }})
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -41,6 +42,8 @@ jobs:
 
   scheduler:
     name: scheduler (${{ matrix.os }})
+    # A scheduler command that hangs must not hold a machine for hours.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -55,6 +58,6 @@ jobs:
       - name: Make sure cron is running (Linux)
         if: runner.os == 'Linux'
         run: |
-          command -v crontab >/dev/null || sudo apt-get install -y cron
+          command -v crontab >/dev/null || { sudo apt-get update && sudo apt-get install -y cron; }
           sudo service cron start
       - run: node tests/integration/scheduler.mjs

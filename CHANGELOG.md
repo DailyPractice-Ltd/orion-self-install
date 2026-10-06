@@ -17,6 +17,24 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.2.2 — 2026-10-06
+
+**The scheduler route is now proven on Windows and Linux too, and one Windows wording slip is fixed.**
+
+- **Windows and Linux are no longer untested.** 1.2.0 said the route that uses your
+  computer's own scheduler had only been run on a Mac. It is now run on real Windows,
+  Linux and Mac machines every time this template changes: a stand-in for your agent
+  software is scheduled, fired through Task Scheduler, cron or launchd, checked, and
+  removed. On Linux the test also waits for the clock to fire it.
+- **Fixed on Windows:** the notebook said where it had written a note using
+  backslashes, which did not match how every instruction in this folder spells that
+  path. It now says it the same way on every machine. The note itself was always
+  written to the right place.
+
+Still not shown end to end: Codex doing a real job from a scheduled start. The
+wake-up starts it correctly; the one full run we tried was stopped by an account
+usage limit, not by anything in this folder.
+
 ## 1.2.1 — 2026-10-06
 
 A skill travels as a whole folder, not one file.

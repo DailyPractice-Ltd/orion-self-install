@@ -852,3 +852,22 @@ test('tripwire: the 1.1.0 headline is the disclosure, in one sentence, on one li
   }
   assert.equal(headline.split('. ').length, 1, 'one sentence');
 });
+
+test('memory: every path it says is spelled with forward slashes, on every machine', (t) => {
+  // On Windows a path comes back with backslashes. What the assistant reads
+  // here has to match what docs/memory.md and its own commands spell.
+  const h = makeHarness(t);
+  // The notebook script takes the folder it is run from as the harness.
+  const memory = (...args) => spawnSync(process.execPath, [join(h.dir, 'status', 'memory.mjs'), ...args], { encoding: 'utf8', cwd: h.dir }).stdout;
+  const said = [
+    memory('init'),
+    memory('note', '--to', 'agents/Neo/log.md', '--line', 'one line'),
+    memory('file', '--path', 'agents/Neo/facts/pricing.md', '--content', 'the fact'),
+    memory('file', '--path', 'agents/Neo/facts/pricing.md', '--content', 'again'),
+    memory('check'),
+  ];
+  assert.match(said[1], /Noted in agents\/Neo\/log\.md\./);
+  assert.match(said[2], /Saved agents\/Neo\/facts\/pricing\.md\./);
+  assert.match(said[3], /agents\/Neo\/facts\/pricing\.md already exists/);
+  for (const line of said) assert.equal(line.includes('\\'), false, `a backslash in: ${line}`);
+});

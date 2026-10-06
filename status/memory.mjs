@@ -30,6 +30,13 @@ import { memoryConfigured, memoryBlock, MEMORY_GIT_REMOTE_RE, CREDENTIAL_RES } f
 
 const HARNESS_ROOT = process.cwd();
 
+/**
+ * A path as this script says it: always with forward slashes. On Windows a
+ * path comes back with backslashes, and then what the assistant reads here
+ * would not match what docs/memory.md and its own commands spell.
+ */
+const shown = (p) => p.split(path.sep).join('/');
+
 function readStatus() {
   try {
     return JSON.parse(fs.readFileSync(path.join(HARNESS_ROOT, 'status', 'status.json'), 'utf8'));
@@ -156,7 +163,7 @@ if (command === 'init') {
   }
   fs.mkdirSync(root, { recursive: true });
   const made = ensureScaffold(root);
-  console.log(`Memory ready at ${path.relative(HARNESS_ROOT, root) || '.'} (${made} scaffold file${made === 1 ? '' : 's'} created, backend: ${block.backend}).`);
+  console.log(`Memory ready at ${shown(path.relative(HARNESS_ROOT, root)) || '.'} (${made} scaffold file${made === 1 ? '' : 's'} created, backend: ${block.backend}).`);
   process.exit(0);
 }
 
@@ -205,7 +212,7 @@ if (command === 'note') {
   if (cred) { console.log(`Not written: ${cred}.`); process.exit(0); }
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.appendFileSync(target, line.endsWith('\n') ? line : line + '\n');
-  console.log(`Noted in ${path.relative(root, target)}.`);
+  console.log(`Noted in ${shown(path.relative(root, target))}.`);
   process.exit(0);
 }
 
@@ -215,12 +222,12 @@ if (command === 'file') {
   if (!rel || !content) { console.log('Usage: node status/memory.mjs file --path <path inside memory, .md> --content "<the fact>" [--force]'); process.exit(0); }
   const target = resolveInside(root, rel);
   if (!target) { console.log('A fact file lives inside the memory folder, as .md — that path is neither.'); process.exit(0); }
-  if (fs.existsSync(target) && flags.force !== true) { console.log(`${path.relative(root, target)} already exists — memory never silently overwrites; pass --force only when replacing it is the point.`); process.exit(0); }
+  if (fs.existsSync(target) && flags.force !== true) { console.log(`${shown(path.relative(root, target))} already exists — memory never silently overwrites; pass --force only when replacing it is the point.`); process.exit(0); }
   const cred = credentialProblem(content);
   if (cred) { console.log(`Not written: ${cred}.`); process.exit(0); }
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, content.endsWith('\n') ? content : content + '\n');
-  console.log(`Saved ${path.relative(root, target)}.`);
+  console.log(`Saved ${shown(path.relative(root, target))}.`);
   process.exit(0);
 }
 
@@ -238,6 +245,6 @@ if (command === 'check') {
   if (block.backend === 'git') {
     syncState = gitBackendReady(root) ? `git backend, remote ${block.remote}` : 'git backend but NOT a clone — run init';
   }
-  console.log(`Memory: ${count} note${count === 1 ? '' : 's'} at ${path.relative(HARNESS_ROOT, root) || '.'} — ${syncState}.`);
+  console.log(`Memory: ${count} note${count === 1 ? '' : 's'} at ${shown(path.relative(HARNESS_ROOT, root)) || '.'} — ${syncState}.`);
   process.exit(0);
 }

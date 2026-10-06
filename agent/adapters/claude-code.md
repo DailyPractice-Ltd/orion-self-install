@@ -45,8 +45,9 @@ claude -p "{prompt}" --permission-mode dontAsk --allowedTools "{the job sheet's 
 - `--permission-mode dontAsk` with the job sheet's own `tools:` line means the agent
   may use what the client approved at hire and is refused anything else without a
   question. Nobody is there to answer one. The script adds what every report needs
-  when the job sheet does not already cover it: `Read`, and running
-  `status/done.mjs`, `status/memory.mjs` and `status/radio.mjs`.
+  when the job sheet does not already cover it: `Read`, `echo`, and running
+  `status/done.mjs`, `status/memory.mjs` and `status/radio.mjs`. Writing a file
+  stays refused unless the job sheet allows it.
 
 The one source for this command is `unattendedRunner('claude-code')` in
 `status/shapes.mjs`.

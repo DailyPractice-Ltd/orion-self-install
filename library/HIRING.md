@@ -308,7 +308,7 @@ not the runtime. Both facts are fine, and stated.
      `node status/schedule.mjs off --agent {name}` switches it off again.
      What the wake-up does: goes to this folder and starts the client's software with
      the same prompt as rung A. On Claude Code it allows the tools on the agent's
-     job sheet (its `tools:` line) plus the three commands every report needs, and
+     job sheet (its `tools:` line) plus the few commands every report needs, and
      refuses anything else without asking, because nobody is there to ask. On Codex it runs in the workspace sandbox with
      the network allowed, because the report has to reach the radio. The commands
      themselves live in one place, `unattendedRunner` in `status/shapes.mjs`.
@@ -316,10 +316,12 @@ not the runtime. Both facts are fine, and stated.
      watching, a command that is not installed, a job sheet with no `tools:` line),
      do not improvise a task: that is a scheduler failure, below. A schedule finer
      than a time of day (every 30 minutes, say) is beyond this rung: use A.
-     Where this stands: proven on a Mac with Claude Code. On Codex the wake-up starts
-     correctly, sandbox and network included. Windows entries are built by the same
-     command and have not yet been run on a client machine. Step 7's wake-up check
-     is the proof for this machine, whichever it is.
+     Where this stands: the wake-up itself is proven on a Mac with Claude Code. Run
+     the way a scheduler runs it, it starts the software, does the job and reports.
+     On Codex it starts correctly, sandbox and network included. Switching on
+     through launchd, Task Scheduler and cron, and the Windows files, are tested
+     against stand-ins and have not yet been run on a client machine. So step 7's
+     wake-up check is not a formality here: it is the proof for this machine.
    - **C — handoff-triggered** (Q4 said "when something happens"): no timer of its
      own. Append one line to the *upstream* agent's file — "When your shift ends, run
      the {name} shift the same way" — plus a changelog line there. That edit is a

@@ -21,7 +21,7 @@ import { tmpdir } from 'node:os';
 import { unattendedRunner, PROMPT_SLOT } from '../status/shapes.mjs';
 import {
   shiftPrompt, jobSheetTools, allowedTools, SHIFT_TOOLS, shQuote, cmdQuote, buildShellWakeUp, buildPlist,
-  plan, steps, apply, SCHTASKS_TR_MAX,
+  plan, steps, apply, isOn, folderTag, SCHTASKS_TR_MAX,
 } from '../status/schedule.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -94,6 +94,10 @@ test('a shift is always allowed to read its job and run its report, and nothing 
   assert.equal(allowedTools(['Read', 'Bash']), 'Read,Bash');
   assert.equal(allowedTools(['Read']), ['Read', ...SHIFT_TOOLS.slice(1)].join(','));
   for (const script of ['done', 'memory', 'radio']) assert.ok(SHIFT_TOOLS.includes(`Bash(node status/${script}.mjs *)`));
+  // Found by running real shifts: a command ended with ; echo "exit $?" is refused whole without this.
+  assert.ok(SHIFT_TOOLS.includes('Bash(echo *)'));
+  // Nothing here lets a shift write a file its job sheet did not allow.
+  assert.equal(SHIFT_TOOLS.some((tool) => /^(Write|Edit|Bash)$/.test(tool)), false);
 });
 
 // ── A real wake-up file, through a real shell ────────────────────────────────
@@ -150,7 +154,11 @@ test('Mac: a wake-up file, a launchd entry that is valid XML, and a record', () 
   assert.ok(wakeUp.text.includes(`cd '/Users/jane/Orion & Jane'\\''s' || exit 1`));
   assert.ok(wakeUp.text.includes(`exec '/opt/homebrew/bin/codex' 'exec'`));
   assert.ok(wakeUp.text.trimEnd().endsWith('< /dev/null'));
-  assert.ok(plist.path.endsWith('/status/shifts/world.dailypractice.orion.prospecting.plist'));
+  const tag = folderTag("/Users/jane/Orion & Jane's");
+  assert.match(tag, /^[0-9a-f]{8}$/);
+  assert.equal(p.record.label, `world.dailypractice.orion.prospecting.${tag}`);
+  assert.ok(plist.path.endsWith(`/status/shifts/world.dailypractice.orion.prospecting.${tag}.plist`));
+  assert.ok(plist.text.includes(`<string>world.dailypractice.orion.prospecting.${tag}</string>`));
   // The ampersand and the apostrophe in the folder name are escaped for XML,
   // and no shell quoting leaks into the entry.
   assert.ok(plist.text.includes('Orion &amp; Jane&apos;s/status/shifts/prospecting.sh</string>'));
@@ -176,7 +184,7 @@ test('Mac: the launchd entry passes the system\'s own check', { skip: process.pl
   const base = mkdtempSync(join(tmpdir(), 'orion-plist-'));
   try {
     const file = join(base, 'entry.plist');
-    writeFileSync(file, buildPlist({ name: 'probe', wakeUpPath: "/tmp/a & b's/probe.sh", logPath: '/tmp/x.log', folder: "/tmp/a & b's", days: [], hour: 7, minute: 0 }));
+    writeFileSync(file, buildPlist({ label: 'world.dailypractice.orion.probe.0a1b2c3d', wakeUpPath: "/tmp/a & b's/probe.sh", logPath: '/tmp/x.log', folder: "/tmp/a & b's", days: [], hour: 7, minute: 0 }));
     const lint = spawnSync('plutil', ['-lint', file], { encoding: 'utf8' });
     assert.equal(lint.status, 0, lint.stdout + lint.stderr);
   } finally {
@@ -204,7 +212,10 @@ test('Windows: a command file that survives spaces, another drive and accented n
   assert.ok(lines.includes('cd /d "D:\\Work\\Orion" || exit /b 1'));
   // The path has a space in it and stays one word. `call`, because it is a command file itself.
   assert.ok(wakeUp.text.includes('call "C:\\Users\\Zoë Smith\\AppData\\Roaming\\npm\\claude.cmd" "-p" "Open D:\\Work\\Orion and run'));
-  assert.ok(wakeUp.text.trimEnd().endsWith('< NUL'));
+  // What it prints is kept, or a failed start leaves nothing to read.
+  assert.ok(wakeUp.text.trimEnd().endsWith('< NUL >> "D:\\Work\\Orion\\status\\shifts\\prospecting.log" 2>&1'));
+  assert.equal(p.record.task, `Orion prospecting shift (${folderTag('D:\\Work\\Orion')})`);
+  assert.match(p.notes.join(' '), /only while it is plugged in/);
 });
 
 test('Windows: what a command file cannot carry, or Windows will not accept, is refused', () => {
@@ -222,7 +233,20 @@ test('Windows: what a command file cannot carry, or Windows will not accept, is 
 test('Linux: one crontab line, with a log', () => {
   const p = plan({ os: 'linux', folder: '/home/jane/orion', name: 'dream', surface: 'codex', at: '02:00', days: ['sun'], bin: '/usr/bin/codex', sheetTools: null });
   assert.deepEqual(p.problems, []);
-  assert.equal(p.record.cron, `0 2 * * 0 '/home/jane/orion/status/shifts/dream.sh' >> '/home/jane/orion/status/shifts/dream.log' 2>&1`);
+  const marker = `# orion-shift:dream:${folderTag('/home/jane/orion')}`;
+  assert.equal(p.record.marker, marker);
+  assert.equal(p.record.cron, `0 2 * * 0 '/home/jane/orion/status/shifts/dream.sh' >> '/home/jane/orion/status/shifts/dream.log' 2>&1 ${marker}`);
+  // cron reads a percent sign as a line break.
+  const percent = plan({ os: 'linux', folder: '/home/jane/100% orion', name: 'dream', surface: 'codex', at: '02:00', days: [], bin: '/usr/bin/codex', sheetTools: null });
+  assert.equal(percent.files, undefined);
+  assert.match(percent.problems[0], /character % cannot be written safely/);
+});
+
+test('two harness folders on one machine never share a schedule name', () => {
+  const a = mac({ folder: '/Users/jane/Neo' }).record;
+  const b = mac({ folder: '/Users/jane/PA' }).record;
+  assert.notEqual(a.label, b.label);
+  assert.notEqual(windows({ folder: 'D:\\Neo' }).record.task, windows({ folder: 'D:\\PA' }).record.task);
 });
 
 test('what it cannot do is said plainly and nothing is planned', () => {
@@ -238,35 +262,45 @@ test('what it cannot do is said plainly and nothing is planned', () => {
 
 // ── Switching on, firing once, switching off ─────────────────────────────────
 
-test('Mac: on replaces whatever was loaded, run fires through launchd, off removes it', () => {
+test('Mac: on replaces what was loaded and looks that it stuck; off looks that it is gone', () => {
   const { record } = mac();
   const where = { home: '/Users/jane', uid: 501 };
-  const installed = '/Users/jane/Library/LaunchAgents/world.dailypractice.orion.prospecting.plist';
+  const service = `gui/501/${record.label}`;
+  const installed = `/Users/jane/Library/LaunchAgents/${record.label}.plist`;
   assert.deepEqual(steps('on', record, where), [
     { mkdir: '/Users/jane/Library/LaunchAgents' },
-    // Unloaded first, or a changed time never takes effect.
-    { exec: ['launchctl', ['unload', installed]], mayFail: true },
+    // Taken out first, or a changed time never takes effect.
+    { exec: ['launchctl', ['bootout', service]], mayFail: true },
     { copy: [record.plist, installed] },
-    { exec: ['launchctl', ['load', '-w', installed]] },
+    { exec: ['launchctl', ['enable', service]], mayFail: true },
+    { exec: ['launchctl', ['bootstrap', 'gui/501', installed]] },
+    { exec: ['launchctl', ['print', service]], failure: 'launchd took the schedule and then did not keep it.' },
   ]);
-  assert.deepEqual(steps('run', record, where), [{ exec: ['launchctl', ['kickstart', 'gui/501/world.dailypractice.orion.prospecting']] }]);
-  assert.deepEqual(steps('off', record, where), [{ exec: ['launchctl', ['unload', '-w', installed]], mayFail: true }, { remove: installed }]);
+  const run = steps('run', record, where);
+  assert.deepEqual(run.map((s) => s.exec), [['launchctl', ['print', service]], ['launchctl', ['kickstart', service]]]);
+  const off = steps('off', record, where);
+  assert.deepEqual(off[1], { remove: installed });
+  assert.deepEqual(off[2].gone, ['launchctl', ['print', service]]);
 });
 
 test('Windows: the task is created without a shell, and its command is only the file\'s path', () => {
   const { record } = windows();
-  const [create] = steps('on', record, { home: 'C:\\Users\\Zoë Smith', uid: 0 });
+  const [create, check] = steps('on', record, {});
   assert.deepEqual(create.exec, ['schtasks', [
-    '/Create', '/F', '/TN', 'Orion prospecting shift', '/SC', 'WEEKLY', '/D', 'MON,TUE', '/ST', '07:00',
+    '/Create', '/F', '/TN', record.task, '/SC', 'WEEKLY', '/D', 'MON,TUE', '/ST', '07:00',
     '/TR', '"D:\\Work\\Orion\\status\\shifts\\prospecting.cmd"',
   ]]);
+  assert.deepEqual(check.exec, ['schtasks', ['/Query', '/TN', record.task]]);
   assert.deepEqual(steps('on', windows({ days: [] }).record, {})[0].exec[1].slice(4, 6), ['/SC', 'DAILY']);
-  assert.deepEqual(steps('run', record, {})[0].exec, ['schtasks', ['/Run', '/TN', 'Orion prospecting shift']]);
-  assert.deepEqual(steps('off', record, {})[0].exec, ['schtasks', ['/Delete', '/F', '/TN', 'Orion prospecting shift']]);
+  assert.deepEqual(steps('run', record, {}).at(-1).exec, ['schtasks', ['/Run', '/TN', record.task]]);
+  assert.deepEqual(steps('off', record, {})[0].exec, ['schtasks', ['/Delete', '/F', '/TN', record.task]]);
 });
 
+const linux = (folder = '/home/jane/orion') => plan({ os: 'linux', folder, name: 'dream', surface: 'codex', at: '02:00', days: [], bin: '/usr/bin/codex', sheetTools: null }).record;
+
 test('Linux: switching on twice leaves one line, and off leaves every other line alone', () => {
-  const { record } = plan({ os: 'linux', folder: '/home/jane/orion', name: 'dream', surface: 'codex', at: '02:00', days: [], bin: '/usr/bin/codex', sheetTools: null });
+  // A folder with an apostrophe: the line is found by its marker, never by the path.
+  const record = linux("/home/o'brien/orion");
   let crontab = '30 6 * * * /usr/bin/backup\n';
   const fake = (command, args, opts) => {
     assert.equal(command, 'crontab');
@@ -277,21 +311,84 @@ test('Linux: switching on twice leaves one line, and off leaves every other line
   assert.equal(apply(steps('on', record, {}), { run: fake }), null);
   assert.equal(apply(steps('on', record, {}), { run: fake }), null);
   assert.equal(crontab, `30 6 * * * /usr/bin/backup\n${record.cron}\n`);
+  assert.equal(isOn(record, { run: fake }), true);
   assert.equal(apply(steps('off', record, {}), { run: fake }), null);
   assert.equal(crontab, '30 6 * * * /usr/bin/backup\n');
-  // cron has no run-now: the wake-up is started the way cron would, and left to finish.
-  const started = [];
-  assert.equal(apply(steps('run', record, { home: '/home/jane' }), { start: (c, a, o) => { started.push([c, a, o]); return { unref() {} }; } }), null);
-  assert.deepEqual(started[0].slice(0, 2), ['env', ['-i', 'HOME=/home/jane', 'PATH=/usr/bin:/bin', '/bin/bash', '-l', record.wake_up]]);
-  assert.equal(started[0][2].detached, true);
+  assert.equal(isOn(record, { run: fake }), false);
 });
 
-test('a scheduler that says no is reported in its own words, and one that may fail is not', () => {
-  const { record } = windows();
-  const refuses = () => ({ status: 1, stderr: 'ERROR: Access is denied.\r\n' });
-  assert.equal(apply(steps('on', record, {}), { run: refuses }), 'schtasks /Create did not work: ERROR: Access is denied.');
-  // Deleting a task that is not there is not a failure of "off".
-  assert.equal(apply(steps('off', record, {}), { run: refuses }), null);
+test('Linux: a crontab that cannot be read is never written over', () => {
+  const record = linux();
+  let wrote = false;
+  const broken = (command, args) => {
+    if (args[0] === '-l') return { status: 1, stderr: 'crontab: cannot open spool: Permission denied' };
+    wrote = true;
+    return { status: 0 };
+  };
+  assert.match(apply(steps('on', record, {}), { run: broken }), /could not be read, so it was left exactly as it is/);
+  assert.equal(wrote, false);
+  // A user who has no crontab yet is the one failure that means "empty".
+  let written = null;
+  const fresh = (command, args, opts) => {
+    if (args[0] === '-l') return { status: 1, stderr: 'no crontab for jane' };
+    written = opts.input;
+    return { status: 0 };
+  };
+  assert.equal(apply(steps('on', record, {}), { run: fresh }), null);
+  assert.equal(written, `${record.cron}\n`);
+});
+
+test('Linux: run refuses when the schedule is not on, and otherwise starts the wake-up with its output kept', () => {
+  const base = mkdtempSync(join(tmpdir(), 'orion-run-'));
+  try {
+    const record = { ...linux(), log: join(base, 'dream.log') };
+    const off = () => ({ status: 0, stdout: '30 6 * * * /usr/bin/backup\n' });
+    assert.match(apply(steps('run', record, { home: '/home/jane' }), { run: off }), /not switched on/);
+    const on = () => ({ status: 0, stdout: `${record.cron}\n` });
+    const started = [];
+    const start = (c, a, o) => { started.push([c, a, o]); return { unref() {} }; };
+    assert.equal(apply(steps('run', record, { home: '/home/jane' }), { run: on, start }), null);
+    assert.deepEqual(started[0].slice(0, 2), ['env', ['-i', 'HOME=/home/jane', 'PATH=/usr/bin:/bin', '/bin/bash', '-l', record.wake_up]]);
+    assert.equal(started[0][2].detached, true);
+    assert.ok(existsSync(record.log));
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('a scheduler that says yes and does nothing, or will not let go, is reported', () => {
+  const { record } = mac();
+  const where = { home: mkdtempSync(join(tmpdir(), 'orion-home-')), uid: 501 };
+  try {
+    writeFileSync(join(where.home, 'entry.plist'), 'x');
+    const here = { ...record, plist: join(where.home, 'entry.plist') };
+    // launchd answers every command with success and keeps nothing.
+    const forgets = (command, args) => ({ status: args[0] === 'print' ? 113 : 0 });
+    assert.equal(apply(steps('on', here, where), { run: forgets }), 'launchd took the schedule and then did not keep it.');
+    // And one that keeps it loaded although it was asked to let go.
+    const clings = () => ({ status: 0 });
+    assert.match(apply(steps('off', here, where), { run: clings }), /still has the schedule loaded/);
+    assert.equal(apply(steps('off', here, where), { run: forgets }), null);
+    assert.match(apply(steps('run', here, where), { run: forgets }), /not switched on/);
+  } finally {
+    rmSync(where.home, { recursive: true, force: true });
+  }
+  const win = windows().record;
+  const refuses = (command, args) => (args[0] === '/Query' ? { status: 0 } : { status: 1, stderr: 'ERROR: Access is denied.\r\n' });
+  assert.equal(apply(steps('on', win, {}), { run: refuses }), 'schtasks /Create did not work: ERROR: Access is denied.');
+  // The delete was refused and the task is still there: that is not "off".
+  assert.match(apply(steps('off', win, {}), { run: refuses }), /would not delete the task, so it will still run/);
+  // Deleting a task that was never there is fine.
+  assert.equal(apply(steps('off', win, {}), { run: () => ({ status: 1, stderr: 'ERROR: The system cannot find the file specified.' }) }), null);
+});
+
+test('whether a schedule is on is asked of the scheduler itself', () => {
+  const calls = [];
+  const yes = (command, args) => { calls.push([command, ...args]); return { status: 0 }; };
+  assert.equal(isOn(mac().record, { uid: 501, run: yes }), true);
+  assert.equal(isOn(windows().record, { run: yes }), true);
+  assert.equal(isOn(mac().record, { uid: 501, run: () => ({ status: 113 }) }), false);
+  assert.deepEqual(calls.map((c) => c.slice(0, 2)), [['launchctl', 'print'], ['schtasks', '/Query']]);
 });
 
 // ── The command itself, in a folder of its own ───────────────────────────────
@@ -333,7 +430,11 @@ test('wire refuses, and writes nothing, when it cannot build an honest wake-up',
       [['wire', '--agent', 'nobody', '--surface', 'codex', '--at', '07:00'], /no job sheet/],
       [['wire', '--agent', 'probe', '--surface', 'cursor', '--at', '07:00'], /cannot be started with nobody watching/],
       [['wire', '--agent', 'probe', '--surface', 'codex', '--at', '25:00', '--bin', process.execPath], /HH:MM/],
-      [['wire', '--agent', 'probe', '--surface', 'codex', '--at', '07:00', '--bin', join(base, 'not-there')], /no file at/],
+      [['wire', '--agent', 'probe', '--surface', 'codex', '--at', '07:00', '--bin', join(base, 'not-there')], /--bin needs the full path/],
+      [['wire', '--agent', 'probe', '--surface', 'codex', '--at', '07:00', '--bin', 'codex'], /--bin needs the full path/],
+      [['wire', '--agent', 'probe', '--surface', 'codex', '--at', '07:00', '--bin', base], /--bin needs the full path/],
+      // A flag is never taken as another flag's value.
+      [['wire', '--agent', 'probe', '--bin', '--surface', 'codex'], /--bin is not understood/],
       [['wire', '--agent', 'probe', '--at', '07:00', '--line', 'x'], /Not something schedule.mjs wire takes/],
       [['on', '--agent', 'probe', '--at', '07:00'], /Not something schedule.mjs on takes/],
       // Nothing can be switched on, fired or switched off before it is written.
@@ -354,15 +455,29 @@ test('wire refuses, and writes nothing, when it cannot build an honest wake-up',
   }
 });
 
-test('a wake-up written on another kind of machine is not switched on here', () => {
+test('a record that does not belong to this folder on this machine switches nothing on', () => {
   const { base, run } = scratchHarness();
   try {
-    mkdirSync(join(base, 'status', 'shifts'), { recursive: true });
+    const shifts = join(base, 'status', 'shifts');
+    mkdirSync(shifts, { recursive: true });
     const elsewhere = process.platform === 'win32' ? 'darwin' : 'win32';
-    writeFileSync(join(base, 'status', 'shifts', 'probe.json'), JSON.stringify({ agent: 'probe', os: elsewhere, at: '07:00', days: [] }));
-    const r = run('on', '--agent', 'probe');
-    assert.equal(r.status, 1);
-    assert.match(r.stdout, /different kind of machine/);
+    const records = [
+      // Written on another kind of machine.
+      JSON.stringify({ agent: 'probe', os: elsewhere, at: '07:00', days: [], wake_up: join(shifts, 'probe.sh') }),
+      // The folder was moved: the paths inside point at the old place.
+      JSON.stringify({ agent: 'probe', os: process.platform, at: '07:00', days: [], wake_up: '/somewhere/else/status/shifts/probe.sh' }),
+      // Cut short.
+      '{"agent": "probe", "os":',
+    ];
+    for (const text of records) {
+      writeFileSync(join(shifts, 'probe.json'), text);
+      for (const command of ['on', 'run', 'off']) {
+        const r = run(command, '--agent', 'probe');
+        assert.equal(r.status, 1, `${command} should refuse: ${text.slice(0, 40)}`);
+        assert.match(r.stdout, /does not match this folder on this machine/);
+        assert.equal(r.stderr, '');
+      }
+    }
   } finally {
     rmSync(base, { recursive: true, force: true });
   }

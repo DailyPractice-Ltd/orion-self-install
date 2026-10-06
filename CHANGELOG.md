@@ -48,11 +48,12 @@ and Daily Practice never hears from it.
 Nothing changes for an agent whose schedule already fires. If one of yours has never
 fired on its own, your assistant offers to check its schedule at your next session.
 
-Where this stands: the computer's-scheduler route is proven on a Mac with Claude
-Code. On Codex the wake-up starts correctly, sandbox and network included. The
-Windows files are built by the same command and have not yet been run on a client's
-machine. Either way your assistant checks that the first scheduled run really
-happens before it calls the schedule proven.
+Where this stands: the wake-up itself is proven on a Mac with Claude Code. Run the
+way a scheduler runs it, it starts the software, does the job and reports. On Codex
+it starts correctly, sandbox and network included. Switching on through the Mac,
+Windows and Linux schedulers is tested against stand-ins and has not yet been run on
+a client's machine. That is why your assistant fires the schedule once and watches
+it land before it calls anything wired.
 
 For whoever maintains this: how each software is started lives in one place,
 `unattendedRunner` in `status/shapes.mjs`. `status/schedule.mjs` writes the files.

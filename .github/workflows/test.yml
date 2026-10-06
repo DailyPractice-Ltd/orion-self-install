@@ -1,0 +1,60 @@
+name: Test
+
+# Every push to main and every pull request, on the three kinds of machine a
+# client can have:
+#   unit       the test suite (node --test).
+#   scheduler  status/schedule.mjs against the machine's REAL scheduler: launchd
+#              on a Mac, Task Scheduler on Windows, cron on Linux. It wires a
+#              stand-in agent, switches the schedule on, fires it, checks what
+#              the stand-in was handed, and switches it off again. This is the
+#              only place the Windows and Linux paths are actually run.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: unit (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Our files are compared byte for byte in places. Keep Windows from
+      # rewriting line endings on the way in.
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v5
+        with:
+          # update/pristine.json is checked against everything ever shipped.
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node --test
+
+  scheduler:
+    name: scheduler (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Make sure cron is running (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          command -v crontab >/dev/null || sudo apt-get install -y cron
+          sudo service cron start
+      - run: node tests/integration/scheduler.mjs

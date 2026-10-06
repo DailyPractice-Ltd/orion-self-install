@@ -17,6 +17,22 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.2.1 — 2026-10-06
+
+A skill travels as a whole folder, not one file.
+
+- **Sending a skill sends all of it.** A skill is a folder: the SKILL.md plus its
+  reference and template files. "Send this skill to Daily Practice" now carries the
+  whole folder, so what a curator reads is what you actually run. Before, only the
+  SKILL.md went and the rest was silently left behind.
+- **Receiving a skill lands all of it.** A skill Daily Practice offers you arrives as
+  its whole folder, written under `.claude/skills/<name>/`. A skill you already have
+  is never touched.
+- **Text only, by design.** Only text files cross the radio: markdown, text, JSON,
+  CSV, YAML. A script or binary in a skill folder stays on the machine it came from,
+  and the preview names it, so nothing that can run ever arrives over the radio.
+- Older harnesses and an older library keep working: the single SKILL.md still
+  travels alongside the folder.
 ## 1.2.0 — 2026-10-06
 
 **A hired agent's schedule starts the software you actually use.**

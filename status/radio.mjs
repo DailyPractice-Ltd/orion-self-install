@@ -25,8 +25,10 @@
  *
  *   node status/radio.mjs contribute --slug <slug> --yes
  *       Offer a skill this machine runs back up to the library (POST /contributions).
- *       Sends .claude/skills/<slug>/SKILL.md for a curator to read; nothing is
- *       published by sending it. Same rule as send and reply: their yes first.
+ *       Sends the whole skill folder, text files only (SKILL.md plus references,
+ *       templates), for a curator to read; scripts and binaries never travel.
+ *       Nothing is published by sending it. Same rule as send and reply: their
+ *       yes first.
  *
  *   node status/radio.mjs signal --type <type> [--tag <tag>] [--count <n>] [--routine <name>]
  *                                [--asset <slug> --outcome <o> [--surface <s>] [--asset-kind <k>]]
@@ -71,11 +73,12 @@
  * Dependency-free: node:fs and global fetch only. No package.json, no npm install.
  */
 
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, lstatSync, renameSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   radioOn as radioIsOn, parseInstallDirective, isWorkTag, workTagMenu, labelProblem, countProblem,
+  packSkillFolder, skillBundleProblem, SKILL_ENTRY_FILE,
 } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -392,18 +395,33 @@ if (command === 'library') {
   if (!res.ok) { console.log(`The library answered ${res.status} — nothing written, try next session.`); process.exit(0); }
 
   const asset = await res.json().catch(() => null);
-  const content = typeof asset?.content === 'string' ? asset.content : '';
+  // A skill arrives as its whole folder when the library has one; an older
+  // library sends just the SKILL.md. Either way the other end is data: every
+  // path is checked here before a single byte is written.
+  const bundle = Array.isArray(asset?.files) && asset.files.length > 0 ? asset.files : null;
+  if (bundle) {
+    const problem = skillBundleProblem(bundle);
+    if (problem) {
+      console.log(`"${slug}" arrived in a shape this harness will not write (${problem}). Nothing written. Tell Daily Practice.`);
+      process.exit(0);
+    }
+  }
+  const content = bundle
+    ? bundle.find((f) => f.path === SKILL_ENTRY_FILE).content
+    : (typeof asset?.content === 'string' ? asset.content : '');
   if (!content.trim()) {
     console.log(`"${slug}" arrived empty — nothing written. Tell Daily Practice.`);
     process.exit(0);
   }
+  const toWrite = bundle || [{ path: SKILL_ENTRY_FILE, content }];
+  const incoming = toWrite.map((f) => f.path);
 
   const dir = join(__dirname, '..', '.claude', 'skills', slug);
-  const file = join(dir, 'SKILL.md');
 
   // Their skill, their machine. A skill they have already taught or edited is
-  // never overwritten by something arriving over the radio.
-  if (existsSync(file)) {
+  // never overwritten by something arriving over the radio — the whole folder
+  // is theirs, so an existing folder means hands off.
+  if (existsSync(dir)) {
     console.log(`You already have a skill called "${slug}". Nothing was touched.`);
     console.log('If you want the Daily Practice version instead, rename or delete yours first.');
     process.exit(0);
@@ -417,10 +435,10 @@ if (command === 'library') {
       console.log(`Needs: ${asset.tools_required.join(', ')}`);
     }
     console.log('');
-    console.log('It would be written to:');
-    console.log(`  .claude/skills/${slug}/SKILL.md`);
+    console.log(`It would be written to .claude/skills/${slug}/ as ${incoming.length} file${incoming.length === 1 ? '' : 's'}:`);
+    for (const p of incoming) console.log(`  ${p}`);
     console.log('');
-    console.log('The first lines of it:');
+    console.log('The first lines of SKILL.md:');
     for (const line of content.split('\n').slice(0, 12)) console.log(`  ${line}`);
     console.log('');
     console.log('--- for the assistant, not to be read aloud ---');
@@ -429,9 +447,24 @@ if (command === 'library') {
     process.exit(0);
   }
 
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(file, content, 'utf8');
-  console.log(`Written: .claude/skills/${slug}/SKILL.md`);
+  // All or nothing: the folder is built beside its final name and moved into
+  // place only once every file has landed, so a failure half-way never leaves
+  // a broken skill that the "already have it" rule would then protect forever.
+  const staging = join(dirname(dir), `.${slug}.installing-${process.pid}`);
+  try {
+    mkdirSync(staging, { recursive: true });
+    for (const f of toWrite) {
+      const target = join(staging, ...f.path.split('/'));
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, f.content, 'utf8');
+    }
+    renameSync(staging, dir);
+  } catch (err) {
+    rmSync(staging, { recursive: true, force: true });
+    console.log(`Could not write "${slug}" (${err?.code || err?.message || 'unknown'}). Nothing was changed on this machine.`);
+    process.exit(0);
+  }
+  console.log(`Written: ${incoming.length} file${incoming.length === 1 ? '' : 's'} to .claude/skills/${slug}/`);
 
   // The shelf is how Daily Practice knows who is affected when this improves.
   const report = await call('POST', '/assets', {
@@ -461,30 +494,40 @@ if (command === 'contribute') {
     process.exit(1);
   }
 
-  const file = join(__dirname, '..', '.claude', 'skills', slug, 'SKILL.md');
-  if (!existsSync(file)) {
+  const dir = join(__dirname, '..', '.claude', 'skills', slug);
+  if (!existsSync(join(dir, SKILL_ENTRY_FILE))) {
     console.log(`No skill called "${slug}" on this machine (looked for .claude/skills/${slug}/SKILL.md).`);
     process.exit(0);
   }
-  const content = readFileSync(file, 'utf8');
+  // The whole folder travels: SKILL.md plus its references and templates, text
+  // files only. Scripts and binaries stay behind, and the person is told so.
+  const { files, skipped } = packSkillFolder(dir, { readdirSync, lstatSync, readFileSync });
+  const entry = files.find((f) => f.path === SKILL_ENTRY_FILE);
+  const content = entry ? entry.content : '';
   if (!content.trim()) {
     console.log(`"${slug}" is empty — nothing to offer.`);
     process.exit(0);
   }
-  // The library door takes at most 200000 characters. A skill larger than that
-  // is not refused quietly — the person is told, and nothing is sent.
-  const MAX = 200000;
-  if (content.length > MAX) {
-    console.log(`"${slug}" is ${content.length} characters; the library takes at most ${MAX}. Nothing sent.`);
-    console.log('A skill this large usually means more than one file — tell Daily Practice and we will sort the shape.');
+  const problem = skillBundleProblem(files);
+  if (problem) {
+    console.log(`"${slug}" cannot be sent as it is (${problem}). Nothing sent.`);
+    console.log('Tell Daily Practice and we will sort the shape.');
     process.exit(0);
   }
+  const total = files.reduce((n, f) => n + f.content.length, 0);
 
   if (flags.yes === undefined) {
-    console.log(`You would offer "${slug}" to the Daily Practice library — ${content.length} characters.`);
+    console.log(`You would offer "${slug}" to the Daily Practice library — ${files.length} file${files.length === 1 ? '' : 's'}, ${total} characters.`);
     console.log('A curator reads it and decides; nothing is published by sending it.');
     console.log('');
-    console.log('The first lines of what would be sent:');
+    console.log('What would be sent:');
+    for (const f of files) console.log(`  ${f.path}`);
+    if (skipped.length > 0) {
+      console.log('Staying behind (not a text file, so the radio never carries it):');
+      for (const s of skipped) console.log(`  ${s}`);
+    }
+    console.log('');
+    console.log('The first lines of SKILL.md:');
     for (const line of content.split('\n').slice(0, 12)) console.log(`  ${line}`);
     console.log('');
     console.log('--- for the assistant, not to be read aloud ---');
@@ -497,7 +540,10 @@ if (command === 'contribute') {
     harness_id: sharing.harness_id,
     slug,
     kind: 'skill',
+    // The SKILL.md on its own, for a library that only knows one file; and the
+    // whole folder, for one that knows a skill is a folder.
     content,
+    files,
   });
   if (res.status === 401) reportAuthProblem();
   if (res.status === 404 || res.status === 405) {
@@ -505,7 +551,7 @@ if (command === 'contribute') {
     process.exit(0);
   }
   console.log(res.ok
-    ? `Offered "${slug}" to the Daily Practice library. A curator will look at it; nothing is published yet.`
+    ? `Offered "${slug}" to the Daily Practice library (${files.length} file${files.length === 1 ? '' : 's'}). A curator will look at it; nothing is published yet.`
     : `The offer answered ${res.status} — not retried; nothing was lost locally.`);
   process.exit(0);
 }

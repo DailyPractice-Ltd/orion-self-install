@@ -54,30 +54,28 @@ A hired agent can work on a schedule with nobody watching (`library/HIRING.md`, 
 
 - **The Codex app's automations (rung A).** When the client works in the Codex app,
   create an automation there with the shift prompt HIRING.md gives you and the
-  schedule from the job sheet. Nothing else to install.
-- **The OS scheduler (rung B)**, when there is only the CLI: launchd on macOS,
-  schtasks on Windows. The command the scheduler runs is:
+  schedule from the job sheet. Nothing else to install. An automation runs under
+  the same sandbox as a session, so make the one-time `~/.codex/config.toml` fix
+  above first, or its report cannot reach the radio.
+- **The computer's own scheduler (rung B)**, when there is only the command line.
+  `node status/schedule.mjs wire` writes the wake-up. What it starts is:
 
 ```
-cd {folder} && codex exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"
+codex exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"
 ```
 
-- `codex exec` is the form of Codex that runs without a person. The `cd {folder}`
-  puts it in this harness folder. `{prompt}` is the shift prompt, quoted once for the
-  shell you are writing for.
+- `codex exec` is the form of Codex that runs without a person.
 - `--skip-git-repo-check` lets it run in a folder that was downloaded, not cloned.
 - **`network_access=true` is not optional.** The sandbox blocks the network unless
   told otherwise. Without it the shift still does its work and writes its line to
   `status/shift-log.md`, but its report cannot reach the radio, so "(radio
   unreachable)" lands under the line and Daily Practice never hears the shift ran.
-  Setting it on the command line works even if the one-time `~/.codex/config.toml`
-  fix above was never made. An automation in the Codex app relies on that config
-  fix instead, so make it first.
-- Write `codex` as its full path (`command -v codex`) in the launchd or schtasks
-  entry: schedulers run with a bare PATH.
+  Setting it on the command line works even if the config fix was never made.
+- An old Codex command can be refused by the service ("requires a newer version of
+  Codex"). The wake-up then starts and stops at once. Update Codex, and step 7's
+  wake-up check will show it working.
 
 The one source for the command is `unattendedRunner('codex')` in `status/shapes.mjs`.
-HIRING.md's ladder reads it from there.
 
 ## Known quirks
 

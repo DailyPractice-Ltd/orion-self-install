@@ -215,7 +215,7 @@ test('library --install shows the skill and writes nothing without --yes', () =>
   assert.equal(code, 0, err);
   assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), ['GET /api/bridge/library/meeting-sizing']);
   assert.match(out, /Meeting sizing/);
-  assert.match(out, /\.claude\/skills\/meeting-sizing\/SKILL\.md/);
+  assert.match(out, /written to \.claude\/skills\/meeting-sizing\/ as 1 file:[\s\S]*SKILL\.md/);
   assert.match(out, /library --install meeting-sizing --yes/);
   assert.equal(written, null, 'nothing is written before the yes');
 });
@@ -224,7 +224,7 @@ test('library --install --yes writes the skill and tells the shelf', () => {
   const { code, out, err, calls, written } = runRadio(['library', '--install', 'meeting-sizing', '--yes']);
   assert.equal(code, 0, err);
   assert.equal(written, SKILL.content);
-  assert.match(out, /Written: \.claude\/skills\/meeting-sizing\/SKILL\.md/);
+  assert.match(out, /Written: 1 file to \.claude\/skills\/meeting-sizing\//);
   const report = calls.find((c) => c.method === 'POST' && c.path === '/api/bridge/assets');
   assert.ok(report, 'the shelf is told');
   assert.equal(report.body.slug, 'meeting-sizing');

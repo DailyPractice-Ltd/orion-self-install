@@ -365,8 +365,9 @@ one:
    own plain words what they are offering, and run it again with `--yes` only on their
    word. It sends that skill's `SKILL.md` for a Daily Practice curator to read;
    nothing is published by sending it, and nothing leaves the machine without their
-   yes. (A skill is more than one file — a `reference.md`, a script — only its
-   `SKILL.md` travels this way for now; say so if the skill has other files.)
+   yes. The whole skill folder travels: `SKILL.md` plus its reference and template
+   files. Only text files go; a script or binary in the folder stays behind, and the
+   preview names what stays so you can tell the client.
 
 4. If the radio is on and you can run scripts, report it to the shelf:
    `node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>` —

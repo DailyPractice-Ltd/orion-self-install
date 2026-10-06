@@ -339,3 +339,89 @@ export function unattendedRunner(surface, { tools } = {}) {
       };
   }
 }
+
+// ── Skill bundles: a skill is a folder, and the whole folder travels ────────
+//
+// A skill is more than its SKILL.md: references, templates, examples. The radio
+// carries the whole folder as a bundle of TEXT files, and nothing else. No
+// script, no binary, ever crosses — that one rule is what makes carrying skills
+// safe without a sandbox or signing, so it is enforced on both ends. The server
+// in dailypractice-mono applies the same constants and rules; keep them equal.
+
+export const SKILL_TEXT_EXTENSIONS = ['.md', '.txt', '.json', '.csv', '.yaml', '.yml'];
+export const SKILL_FILE_MAX = 200000;      // characters per file (the library's long-standing cap)
+export const SKILL_FILES_MAX = 40;
+export const SKILL_BUNDLE_MAX = 1000000;   // characters across the whole bundle
+export const SKILL_BUNDLE_BYTES_MAX = 3500000; // UTF-8 bytes; stays under the bridge's 4.5 MB request limit
+export const SKILL_ENTRY_FILE = 'SKILL.md';
+
+/**
+ * Why a path is not allowed inside a skill bundle, or null when it is fine.
+ * Relative, forward slashes, no dot segments, no hidden files, text only.
+ * Applied to what we pack AND to what a server hands us: the other end is data.
+ */
+export function skillPathProblem(p) {
+  if (typeof p !== 'string' || p.length === 0 || p.length > 200) return 'empty or too long';
+  if (p.includes('\\') || p.includes('\0')) return 'bad character';
+  if (p.startsWith('/') || /^[A-Za-z]:/.test(p)) return 'absolute path';
+  const parts = p.split('/');
+  if (parts.some((s) => s === '' || s === '.' || s === '..')) return 'dot segment';
+  if (parts.some((s) => s.startsWith('.'))) return 'hidden file';
+  const dot = p.lastIndexOf('.');
+  const ext = dot > p.lastIndexOf('/') ? p.slice(dot).toLowerCase() : '';
+  if (!SKILL_TEXT_EXTENSIONS.includes(ext)) return 'not a text file';
+  return null;
+}
+
+/** Why a bundle ({ path, content }[]) cannot travel, or null when it can. */
+export function skillBundleProblem(files) {
+  if (!Array.isArray(files) || files.length === 0) return 'no files';
+  if (files.length > SKILL_FILES_MAX) return `more than ${SKILL_FILES_MAX} files`;
+  const seen = new Set();
+  let total = 0;
+  let bytes = 0;
+  for (const f of files) {
+    const why = skillPathProblem(f?.path);
+    if (why) return `${String(f?.path)}: ${why}`;
+    // "Text" is more than an extension: a NUL byte means a binary wearing a
+    // .md name (or a UTF-16 file). It would be refused on arrival; say so here.
+    if (typeof f.content !== 'string' || f.content.includes('\0')) return `${f.path}: not text`;
+    if (f.content.length > SKILL_FILE_MAX) return `${f.path}: over ${SKILL_FILE_MAX} characters`;
+    if (seen.has(f.path)) return `${f.path}: listed twice`;
+    seen.add(f.path);
+    total += f.content.length;
+    bytes += Buffer.byteLength(f.content, 'utf8');
+  }
+  if (!seen.has(SKILL_ENTRY_FILE)) return `no ${SKILL_ENTRY_FILE}`;
+  if (total > SKILL_BUNDLE_MAX) return `bundle over ${SKILL_BUNDLE_MAX} characters`;
+  if (bytes > SKILL_BUNDLE_BYTES_MAX) return `bundle over ${SKILL_BUNDLE_BYTES_MAX} bytes`;
+  return null;
+}
+
+/**
+ * Walk a skill folder and collect its text files as a bundle, in a stable order.
+ * Everything else is skipped and listed, so the person can see what stayed
+ * behind. Symlinks are never followed. `fs` is injected (readdirSync, lstatSync,
+ * readFileSync) to keep this file dependency-free and the walk testable.
+ */
+export function packSkillFolder(dir, fs) {
+  const files = [];
+  const skipped = [];
+  const walk = (rel) => {
+    const here = rel ? `${dir}/${rel}` : dir;
+    for (const name of fs.readdirSync(here).sort()) {
+      const relPath = rel ? `${rel}/${name}` : name;
+      const st = fs.lstatSync(`${dir}/${relPath}`);
+      if (st.isSymbolicLink()) { skipped.push(relPath); continue; }
+      if (st.isDirectory()) {
+        if (name.startsWith('.') || name === 'node_modules' || name === '__pycache__') { skipped.push(`${relPath}/`); continue; }
+        walk(relPath);
+        continue;
+      }
+      if (skillPathProblem(relPath)) { skipped.push(relPath); continue; }
+      files.push({ path: relPath, content: fs.readFileSync(`${dir}/${relPath}`, 'utf8') });
+    }
+  };
+  walk('');
+  return { files, skipped };
+}

@@ -47,6 +47,37 @@ network approval for the radio command once and retry once). If it is still bloc
 AGENTS.md's unreachable rule stands: one plain sentence, never silence, never a retry
 loop.
 
+## Scheduled work: how a hired agent's schedule fires here
+
+A hired agent can work on a schedule with nobody watching (`library/HIRING.md`, step 6,
+"Wire the schedule"). Two ways, in this order:
+
+- **The Codex app's automations (rung A).** When the client works in the Codex app,
+  create an automation there with the shift prompt HIRING.md gives you and the
+  schedule from the job sheet. Nothing else to install. An automation runs under
+  the same sandbox as a session, so make the one-time `~/.codex/config.toml` fix
+  above first, or its report cannot reach the radio.
+- **The computer's own scheduler (rung B)**, when there is only the command line.
+  `node status/schedule.mjs wire` writes the wake-up and
+  `node status/schedule.mjs on` switches it on. What it starts is:
+
+```
+codex exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"
+```
+
+- `codex exec` is the form of Codex that runs without a person.
+- `--skip-git-repo-check` lets it run in a folder that was downloaded, not cloned.
+- **`network_access=true` is not optional.** The sandbox blocks the network unless
+  told otherwise. Without it the shift still does its work and writes its line to
+  `status/shift-log.md`, but its report cannot reach the radio, so "(radio
+  unreachable)" lands under the line and Daily Practice never hears the shift ran.
+  Setting it on the command line works even if the config fix was never made.
+- An old Codex command can be refused by the service ("requires a newer version of
+  Codex"). The wake-up then starts and stops at once. Update Codex, and step 7's
+  wake-up check will show it working.
+
+The one source for the command is `unattendedRunner('codex')` in `status/shapes.mjs`.
+
 ## Known quirks
 
 - Codex reads `AGENTS.md` natively at session start — that is why this repository's

@@ -281,23 +281,47 @@ not the runtime. Both facts are fine, and stated.
    clear it at step 9.
 6. **Wire the schedule, only if Q4 chose one.** An on-call agent has nothing to wire:
    go straight to step 7. Otherwise show the client the exact task first. A scheduled
-   task is a machine change and gets its own yes. The ladder:
-   - **A — native scheduled task on THIS machine** (proven on install #3). The task's
-     prompt, exactly:
-     `Open {absolute folder path} and run the {name} shift: read
-     .claude/agents/{name}.md, do the job section, then the report section with
-     --shift. Stage everything; ask no questions.`
-     (The prompt deliberately contains no quote characters, so it embeds safely in
-     the OS-scheduler command lines below.)
+   task is a machine change and gets its own yes. The wake-up has to start the agent
+   software this client actually runs. That is the software you are running in right
+   now, whatever was recorded on day one. The ladder:
+   - **A — a scheduled task inside the client's own agent software, on THIS machine.**
+     Claude Code has scheduled tasks (proven on install #3). The Codex app has
+     automations (proven on the WorkWeek installs). Software with neither goes to B.
+     The task's prompt, exactly:
+     `Open {absolute folder path} and run the {name} shift: first open the
+     agent/adapters file for the software you are running in, so you know how to
+     reach the radio here; then read .claude/agents/{name}.md, do the job section,
+     then the report section with --shift. Stage everything; ask no questions.`
+     (The prompt deliberately contains no quote characters.)
      Cloud routines: refuse in one sentence — they run on a fresh copy fetched from
      the internet and cannot see this folder or the radio.
-   - **B — OS scheduler**, when the surface has no native tasks or A fails. Windows:
-     `schtasks /Create /TN "Orion {name} shift" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 07:00 /TR "cmd /c cd /d {folder} && claude -p \"{the same prompt}\""`
-     macOS: write `~/Library/LaunchAgents/world.dailypractice.orion.{name}.plist`
-     (ProgramArguments: `zsh -lc 'cd {folder} && claude -p "{the same prompt}"'`,
-     StartCalendarInterval from Q4), then `launchctl load` it. The agent writes and
-     loads it; the client types nothing. If the plain `claude` name fails in a
-     scheduler, use its full path.
+   - **B — the computer's own scheduler**, when the software has no scheduled tasks
+     of its own or A fails. Never write this entry by hand. One command builds it:
+     `node status/schedule.mjs wire --agent {name} --surface {claude-code | codex} --at {HH:MM} --days {mon,tue,wed,thu,fri}`
+     (leave `--days` out for every day). It writes a small wake-up file for this
+     agent under `status/shifts/`, and on a Mac the launchd entry beside it. It
+     changes nothing outside this folder and switches nothing on. Tell the client
+     what it printed: what will start, and when. On their yes, switch it on:
+     `node status/schedule.mjs on --agent {name}`
+     That is the machine change. The script talks to the scheduler itself (launchd,
+     Task Scheduler, cron), so it does not matter which shell you are typing into.
+     `node status/schedule.mjs off --agent {name}` switches it off again.
+     What the wake-up does: goes to this folder and starts the client's software with
+     the same prompt as rung A. On Claude Code it allows the tools on the agent's
+     job sheet (its `tools:` line) plus the few commands every report needs, and
+     refuses anything else without asking, because nobody is there to ask. On Codex it runs in the workspace sandbox with
+     the network allowed, because the report has to reach the radio. The commands
+     themselves live in one place, `unattendedRunner` in `status/shapes.mjs`.
+     If the command says it cannot (software that cannot be started with nobody
+     watching, a command that is not installed, a job sheet with no `tools:` line),
+     do not improvise a task: that is a scheduler failure, below. A schedule finer
+     than a time of day (every 30 minutes, say) is beyond this rung: use A.
+     Where this stands: the wake-up itself is proven on a Mac with Claude Code. Run
+     the way a scheduler runs it, it starts the software, does the job and reports.
+     On Codex it starts correctly, sandbox and network included. Switching on
+     through launchd, Task Scheduler and cron, and the Windows files, are tested
+     against stand-ins and have not yet been run on a client machine. So step 7's
+     wake-up check is not a formality here: it is the proof for this machine.
    - **C — handoff-triggered** (Q4 said "when something happens"): no timer of its
      own. Append one line to the *upstream* agent's file — "When your shift ends, run
      the {name} shift the same way" — plus a changelog line there. That edit is a
@@ -316,8 +340,9 @@ not the runtime. Both facts are fine, and stated.
    `status: hired` in the agent file, and change the roster row from `Probation` to
    `Hired`.
    *The wake-up (only when there is a schedule)*: trigger it once **through the
-   wake-up itself**: the scheduled task's run-now (or `launchctl kickstart`), or for
-   a handoff hire, the upstream's shift, watching the chain fire. Confirm a new line
+   wake-up itself**: the scheduled task's run-now (on rung B,
+   `node status/schedule.mjs run --agent {name}`), or for a handoff hire, the
+   upstream's shift, watching the chain fire. Confirm a new line
    lands in `status/shift-log.md`. Then, immediately: **edit the marker from `auto:`
    to `auto-test:` on every line that run wrote**. For a handoff hire that is two
    lines or more: the upstream agent's own line as well as the new agent's, because
@@ -432,7 +457,7 @@ them live.
 add `schedule_proven: false`, wire it by step 6, run step 7's wake-up check, and
 show the roster's schedule cell as "(not yet proven)". The agent stays `Hired`
 throughout: it already did its job on real work. Taking a schedule away is the
-reverse: remove the scheduled task, set `schedule: on-call`, drop the
+reverse: remove the scheduled task (on rung B, `node status/schedule.mjs off --agent {name}`), set `schedule: on-call`, drop the
 `schedule_proven:` line, and the roster cell reads `on call`.
 
 **When a promotion should be a new hire instead** — would you give this to the same
@@ -533,7 +558,8 @@ have (their machine profile records it, where you can read one), and the hard ru
 once its first real run passes, and not before. A schedule that is not wired, or not
 proven, is shown as exactly that, never as proven.** No pretending.
 
-**Scheduler failure** after A and B both fail (locked-down IT, permissions): the
+**Scheduler failure** after A and B both fail (locked-down IT, permissions, or agent
+software with no way to start it unattended): the
 schedule stops honestly, and the hire does not. Carry on to step 7. Once the first
 run passes, the agent is hired, and it works when the client asks. The roster says so
 in plain sight: `Hired`, with the schedule cell `{when} (not yet wired)`. In words:

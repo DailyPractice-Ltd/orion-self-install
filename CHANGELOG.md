@@ -17,6 +17,49 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.2.0 — 2026-10-06
+
+**A hired agent's schedule starts the software you actually use.**
+
+When you gave an agent a schedule, the instructions for waking it were written for
+Claude Code. On a machine that runs Codex, following them to the letter wires a task
+that can never start: the agent works while someone sits with it, never on its own,
+and Daily Practice never hears from it.
+
+- **The wake-up is chosen for your machine.** In Claude Code your assistant creates a
+  scheduled task. In the Codex app it creates an automation. Where there is only a
+  command line, it uses your computer's own scheduler.
+- **Your computer's scheduler is set up by one command, not by hand.**
+  `node status/schedule.mjs wire` writes a small wake-up file for the agent inside
+  your Orion folder. Your assistant tells you what it will start and when, and
+  switches it on only on your yes. Nothing outside the folder is changed before
+  that, and one command switches it off again.
+- **An agent that runs on its own may use only what you approved.** On Claude Code a
+  scheduled run is allowed the tools on that agent's job sheet, plus the commands it
+  needs to report, and is refused anything else without a question, because nobody
+  is there to answer one.
+- **A scheduled Codex run can reach the radio.** It is sandboxed, and until now
+  nothing told it to allow the one network call a report needs, so its work was done
+  and never reported.
+- **Software that cannot start on its own is said so, plainly.** In Cursor and
+  Copilot an agent is still hired and still works when you ask. Its schedule reads
+  "not yet wired" instead of pretending.
+
+Nothing changes for an agent whose schedule already fires. If one of yours has never
+fired on its own, your assistant offers to check its schedule at your next session.
+
+Where this stands: the wake-up itself is proven on a Mac with Claude Code. Run the
+way a scheduler runs it, it starts the software, does the job and reports. On Codex
+it starts correctly, sandbox and network included. Switching on through the Mac,
+Windows and Linux schedulers is tested against stand-ins and has not yet been run on
+a client's machine. That is why your assistant fires the schedule once and watches
+it land before it calls anything wired.
+
+For whoever maintains this: how each software is started lives in one place,
+`unattendedRunner` in `status/shapes.mjs`. `status/schedule.mjs` writes the files.
+`tests/unattended-runner.test.mjs` covers both and holds `library/HIRING.md` and the
+adapters to them.
+
 ## 1.1.4 — 2026-10-05
 
 **Every harness, whatever version it is on, now updates without a question and keeps what you changed.**

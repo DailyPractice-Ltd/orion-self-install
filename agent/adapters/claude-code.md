@@ -29,6 +29,33 @@ a human through by hand.
 - Edit the knowledge-base files directly as the client talks, rather than asking them to
   paste text into a file themselves.
 
+## Scheduled work: how a hired agent's schedule fires here
+
+A hired agent can work on a schedule with nobody watching (`library/HIRING.md`, step 6,
+"Wire the schedule"). Claude Code can use its own scheduled tasks (rung A) or the
+computer's own scheduler (rung B). For rung B, `node status/schedule.mjs wire` writes
+the wake-up and `node status/schedule.mjs on` switches it on. What it starts is:
+
+```
+claude -p "{prompt}" --permission-mode dontAsk --allowedTools "{the job sheet's tools, plus the report's}"
+```
+
+- The prompt comes straight after `-p`. `--allowedTools` takes every word after it as
+  a tool name, so a prompt placed last is swallowed and the run stops.
+- `--permission-mode dontAsk` with the job sheet's own `tools:` line means the agent
+  may use what the client approved at hire and is refused anything else without a
+  question. Nobody is there to answer one. The script adds what every report needs
+  when the job sheet does not already cover it: `Read`, `echo`, and running
+  `status/done.mjs`, `status/memory.mjs` and `status/radio.mjs`. Writing a file
+  stays refused unless the job sheet allows it.
+
+The one source for this command is `unattendedRunner('claude-code')` in
+`status/shapes.mjs`.
+
+Cursor and Copilot's agent mode use this adapter in a session, but neither can be
+started with nobody watching. Do not wire a schedule there. The agent is hired and
+works when asked, and its schedule reads "not yet wired" (HIRING.md, Part D).
+
 ## What you still do exactly like the other adapters
 
 - The conversation itself — knowledge-base capture, tone-check, CRM-choice discussion — is

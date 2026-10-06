@@ -276,3 +276,54 @@ export function parseInstallDirective(body) {
   if (version.length === 0 || version.length > 50) return null;
   return { slug, version };
 }
+
+/**
+ * How this machine's agent software is started with nobody watching, so an OS
+ * scheduler (launchd, schtasks) can wake a hired agent for its shift.
+ *
+ * The wake-up has to start the SAME agent software the client runs. It used to
+ * be written as `claude -p` whatever the machine had, so on a Codex-only
+ * machine the task could never start and no shift ever ran. Claude Code and
+ * Codex are the two surfaces with a proven command. Every other surface gets
+ * `schedulable: false`, and library/HIRING.md stops the schedule honestly
+ * instead of wiring a task that will never fire.
+ *
+ * This is the OS-scheduler rung only (HIRING.md step 6, rung B). A scheduled
+ * task that lives inside the agent software itself (Claude Code's scheduled
+ * tasks, the Codex app's automations) needs no command at all.
+ *
+ * The binary and its flags come back as separate parts with no quote
+ * characters in them, never as a ready-quoted command. Whoever writes the
+ * scheduler entry resolves `bin` to a full path (schedulers run with a bare
+ * PATH), adds the flags, and quotes the shift prompt exactly once, for the
+ * shell it is writing for. A string with quotes already baked in cannot be
+ * quoted safely for a second shell, which is how the Windows entry once broke.
+ * The working directory comes from the scheduler's own `cd {folder}`.
+ */
+export function unattendedRunner(chosenSurface) {
+  switch (chosenSurface) {
+    case 'claude-code':
+      return { schedulable: true, bin: 'claude', flags: ['-p'] };
+    case 'codex':
+      // `codex exec` is the form that runs without a person.
+      // --skip-git-repo-check lets it run in a folder that was downloaded, not
+      // cloned. The workspace-write sandbox blocks the network unless told
+      // otherwise, and a shift's report has to reach the radio, so network
+      // access is switched on here rather than left to a config file that may
+      // never have been edited.
+      return {
+        schedulable: true,
+        bin: 'codex',
+        flags: ['exec', '--skip-git-repo-check', '--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=true'],
+      };
+    default:
+      // cursor, copilot-vscode, claude-desktop, chatgpt-app, website-chat, or
+      // nothing recorded yet.
+      return {
+        schedulable: false,
+        bin: null,
+        flags: null,
+        note: 'No proven way to start this agent software with nobody watching. The agent is hired and works when asked; its schedule stays "not yet wired" (library/HIRING.md, Part D).',
+      };
+  }
+}

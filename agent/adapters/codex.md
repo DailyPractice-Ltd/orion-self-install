@@ -47,6 +47,38 @@ network approval for the radio command once and retry once). If it is still bloc
 AGENTS.md's unreachable rule stands: one plain sentence, never silence, never a retry
 loop.
 
+## Scheduled work: how a hired agent's schedule fires here
+
+A hired agent can work on a schedule with nobody watching (`library/HIRING.md`, step 6,
+"Wire the schedule"). Two ways, in this order:
+
+- **The Codex app's automations (rung A).** When the client works in the Codex app,
+  create an automation there with the shift prompt HIRING.md gives you and the
+  schedule from the job sheet. Nothing else to install.
+- **The OS scheduler (rung B)**, when there is only the CLI: launchd on macOS,
+  schtasks on Windows. The command the scheduler runs is:
+
+```
+cd {folder} && codex exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"
+```
+
+- `codex exec` is the form of Codex that runs without a person. The `cd {folder}`
+  puts it in this harness folder. `{prompt}` is the shift prompt, quoted once for the
+  shell you are writing for.
+- `--skip-git-repo-check` lets it run in a folder that was downloaded, not cloned.
+- **`network_access=true` is not optional.** The sandbox blocks the network unless
+  told otherwise. Without it the shift still does its work and writes its line to
+  `status/shift-log.md`, but its report cannot reach the radio, so "(radio
+  unreachable)" lands under the line and Daily Practice never hears the shift ran.
+  Setting it on the command line works even if the one-time `~/.codex/config.toml`
+  fix above was never made. An automation in the Codex app relies on that config
+  fix instead, so make it first.
+- Write `codex` as its full path (`command -v codex`) in the launchd or schtasks
+  entry: schedulers run with a bare PATH.
+
+The one source for the command is `unattendedRunner('codex')` in `status/shapes.mjs`.
+HIRING.md's ladder reads it from there.
+
 ## Known quirks
 
 - Codex reads `AGENTS.md` natively at session start — that is why this repository's

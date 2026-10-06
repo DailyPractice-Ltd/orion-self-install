@@ -29,6 +29,25 @@ a human through by hand.
 - Edit the knowledge-base files directly as the client talks, rather than asking them to
   paste text into a file themselves.
 
+## Scheduled work: how a hired agent's schedule fires here
+
+A hired agent can work on a schedule with nobody watching (`library/HIRING.md`, step 6,
+"Wire the schedule"). Claude Code can use its own scheduled tasks (rung A) or the OS
+scheduler (rung B). The command the OS scheduler runs is:
+
+```
+claude -p "{prompt}"
+```
+
+with this folder as the working directory (`cd {folder}` in the scheduler entry).
+`{prompt}` is the shift prompt HIRING.md gives you. Write `claude` as its full path
+(`command -v claude`) in the entry: schedulers run with a bare PATH. The one source
+for this command is `unattendedRunner('claude-code')` in `status/shapes.mjs`.
+
+Cursor and Copilot's agent mode use this adapter in a session, but neither has a proven
+way to start with nobody watching. Do not wire a schedule there. The agent is hired and
+works when asked, and its schedule reads "not yet wired" (HIRING.md, Part D).
+
 ## What you still do exactly like the other adapters
 
 - The conversation itself — knowledge-base capture, tone-check, CRM-choice discussion — is

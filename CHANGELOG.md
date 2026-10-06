@@ -17,6 +17,32 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.2.0 — 2026-10-06
+
+**A hired agent's schedule starts the software you actually use.**
+
+When you gave an agent a schedule, the instructions for waking it were written for
+Claude Code. On a machine that runs Codex, following them to the letter wires a task
+that can never start: the agent works while someone sits with it, never on its own,
+and Daily Practice never hears from it.
+
+- **The wake-up is chosen for your machine.** Your assistant now reads which agent
+  software you use before it wires anything. In Claude Code it creates a scheduled
+  task. In the Codex app it creates an automation. Where only a command line exists
+  it uses your computer's own scheduler with the right command for your software.
+- **A scheduled Codex run can reach the radio.** It is sandboxed, and until now
+  nothing told it to allow the one network call a report needs, so its work was done
+  and never reported.
+- **Software that cannot start on its own is said so, plainly.** In Cursor, Copilot
+  and chat apps an agent is still hired and still works when you ask. Its schedule
+  reads "not yet wired" instead of pretending.
+
+Nothing changes for an agent whose schedule already fires. If one of yours has never
+fired on its own, your assistant offers to check its schedule at your next session.
+
+For whoever maintains this: the command lives in one place, `unattendedRunner` in
+`status/shapes.mjs`, covered by `tests/unattended-runner.test.mjs`.
+
 ## 1.1.3 — 2026-10-05
 
 **The notebook switches itself on after an update.**

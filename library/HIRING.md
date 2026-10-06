@@ -281,23 +281,46 @@ not the runtime. Both facts are fine, and stated.
    clear it at step 9.
 6. **Wire the schedule, only if Q4 chose one.** An on-call agent has nothing to wire:
    go straight to step 7. Otherwise show the client the exact task first. A scheduled
-   task is a machine change and gets its own yes. The ladder:
-   - **A — native scheduled task on THIS machine** (proven on install #3). The task's
-     prompt, exactly:
-     `Open {absolute folder path} and run the {name} shift: read
+   task is a machine change and gets its own yes. The wake-up has to start the agent
+   software this client actually runs, so read `machine_profile.chosen_surface` in
+   `status/status.json` before you choose a rung. The ladder:
+   - **A — a scheduled task inside the client's own agent software, on THIS machine.**
+     Claude Code has scheduled tasks (proven on install #3). The Codex app has
+     automations (proven on the WorkWeek installs). A surface with neither goes to B.
+     The task's prompt, exactly:
+     `Open {absolute folder path} and run the {name} shift: first read
+     machine_profile in status/status.json and open the agent/adapters file for
+     your surface, so you know how to reach the radio here; then read
      .claude/agents/{name}.md, do the job section, then the report section with
      --shift. Stage everything; ask no questions.`
      (The prompt deliberately contains no quote characters, so it embeds safely in
      the OS-scheduler command lines below.)
      Cloud routines: refuse in one sentence — they run on a fresh copy fetched from
      the internet and cannot see this folder or the radio.
-   - **B — OS scheduler**, when the surface has no native tasks or A fails. Windows:
-     `schtasks /Create /TN "Orion {name} shift" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 07:00 /TR "cmd /c cd /d {folder} && claude -p \"{the same prompt}\""`
+   - **B — OS scheduler**, when the surface has no scheduled tasks of its own or A
+     fails. The command that runs the shift is the one for this machine's
+     `chosen_surface`, never a tool you assume is there.
+     `unattendedRunner(chosen_surface)` in `status/shapes.mjs` is the one source. It
+     gives a binary and its flags:
+
+     | `chosen_surface` | `{bin}` | `{flags}` |
+     |---|---|---|
+     | `claude-code` | `claude` | `-p` |
+     | `codex` | `codex` | `exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_write.network_access=true` |
+     | anything else | none | No proven way to start it with nobody watching. Do not wire a task: go to Part D, "Scheduler failure" |
+
+     Write `{bin}` as its full path (`command -v claude`, `command -v codex`): launchd
+     and schtasks run with a bare PATH, so a plain name often fails. The folder comes
+     from the `cd {folder}` in the wrapper, not from a flag. Quote the prompt once,
+     for the shell you are writing for.
      macOS: write `~/Library/LaunchAgents/world.dailypractice.orion.{name}.plist`
-     (ProgramArguments: `zsh -lc 'cd {folder} && claude -p "{the same prompt}"'`,
-     StartCalendarInterval from Q4), then `launchctl load` it. The agent writes and
-     loads it; the client types nothing. If the plain `claude` name fails in a
-     scheduler, use its full path.
+     (ProgramArguments: `zsh -lc 'cd {folder} && {bin} {flags} "{the same prompt}"'`,
+     StartCalendarInterval from Q4), then `launchctl load` it.
+     Windows:
+     `schtasks /Create /TN "Orion {name} shift" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 07:00 /TR "cmd /c cd /d {folder} && {bin} {flags} \"{the same prompt}\""`
+     The quotes around the prompt are escaped there because the whole `/TR` value
+     already sits inside double quotes. The agent writes and loads the task; the
+     client types nothing.
    - **C — handoff-triggered** (Q4 said "when something happens"): no timer of its
      own. Append one line to the *upstream* agent's file — "When your shift ends, run
      the {name} shift the same way" — plus a changelog line there. That edit is a
@@ -533,7 +556,8 @@ have (their machine profile records it, where you can read one), and the hard ru
 once its first real run passes, and not before. A schedule that is not wired, or not
 proven, is shown as exactly that, never as proven.** No pretending.
 
-**Scheduler failure** after A and B both fail (locked-down IT, permissions): the
+**Scheduler failure** after A and B both fail (locked-down IT, permissions, or agent
+software with no way to start it unattended): the
 schedule stops honestly, and the hire does not. Carry on to step 7. Once the first
 run passes, the agent is hired, and it works when the client asks. The roster says so
 in plain sight: `Hired`, with the schedule cell `{when} (not yet wired)`. In words:

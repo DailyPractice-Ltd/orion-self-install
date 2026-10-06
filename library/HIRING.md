@@ -300,13 +300,16 @@ not the runtime. Both facts are fine, and stated.
      `node status/schedule.mjs wire --agent {name} --surface {claude-code | codex} --at {HH:MM} --days {mon,tue,wed,thu,fri}`
      (leave `--days` out for every day). It writes a small wake-up file for this
      agent under `status/shifts/`, and on a Mac the launchd entry beside it. It
-     changes nothing outside this folder and switches nothing on. It prints the one
-     command that switches the schedule on, and the one that switches it off. Show
-     the client the first, and run it on their yes.
+     changes nothing outside this folder and switches nothing on. Tell the client
+     what it printed: what will start, and when. On their yes, switch it on:
+     `node status/schedule.mjs on --agent {name}`
+     That is the machine change. The script talks to the scheduler itself (launchd,
+     Task Scheduler, cron), so it does not matter which shell you are typing into.
+     `node status/schedule.mjs off --agent {name}` switches it off again.
      What the wake-up does: goes to this folder and starts the client's software with
-     the same prompt as rung A. On Claude Code it allows exactly the tools on the
-     agent's job sheet (its `tools:` line) and refuses anything else without asking,
-     because nobody is there to ask. On Codex it runs in the workspace sandbox with
+     the same prompt as rung A. On Claude Code it allows the tools on the agent's
+     job sheet (its `tools:` line) plus the three commands every report needs, and
+     refuses anything else without asking, because nobody is there to ask. On Codex it runs in the workspace sandbox with
      the network allowed, because the report has to reach the radio. The commands
      themselves live in one place, `unattendedRunner` in `status/shapes.mjs`.
      If the command says it cannot (software that cannot be started with nobody
@@ -335,8 +338,9 @@ not the runtime. Both facts are fine, and stated.
    `status: hired` in the agent file, and change the roster row from `Probation` to
    `Hired`.
    *The wake-up (only when there is a schedule)*: trigger it once **through the
-   wake-up itself**: the scheduled task's run-now (or `launchctl kickstart`), or for
-   a handoff hire, the upstream's shift, watching the chain fire. Confirm a new line
+   wake-up itself**: the scheduled task's run-now (on rung B,
+   `node status/schedule.mjs run --agent {name}`), or for a handoff hire, the
+   upstream's shift, watching the chain fire. Confirm a new line
    lands in `status/shift-log.md`. Then, immediately: **edit the marker from `auto:`
    to `auto-test:` on every line that run wrote**. For a handoff hire that is two
    lines or more: the upstream agent's own line as well as the new agent's, because
@@ -451,7 +455,7 @@ them live.
 add `schedule_proven: false`, wire it by step 6, run step 7's wake-up check, and
 show the roster's schedule cell as "(not yet proven)". The agent stays `Hired`
 throughout: it already did its job on real work. Taking a schedule away is the
-reverse: remove the scheduled task, set `schedule: on-call`, drop the
+reverse: remove the scheduled task (on rung B, `node status/schedule.mjs off --agent {name}`), set `schedule: on-call`, drop the
 `schedule_proven:` line, and the roster cell reads `on call`.
 
 **When a promotion should be a new hire instead** — would you give this to the same

@@ -58,7 +58,8 @@ A hired agent can work on a schedule with nobody watching (`library/HIRING.md`, 
   the same sandbox as a session, so make the one-time `~/.codex/config.toml` fix
   above first, or its report cannot reach the radio.
 - **The computer's own scheduler (rung B)**, when there is only the command line.
-  `node status/schedule.mjs wire` writes the wake-up. What it starts is:
+  `node status/schedule.mjs wire` writes the wake-up and
+  `node status/schedule.mjs on` switches it on. What it starts is:
 
 ```
 codex exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"

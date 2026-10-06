@@ -34,17 +34,19 @@ a human through by hand.
 A hired agent can work on a schedule with nobody watching (`library/HIRING.md`, step 6,
 "Wire the schedule"). Claude Code can use its own scheduled tasks (rung A) or the
 computer's own scheduler (rung B). For rung B, `node status/schedule.mjs wire` writes
-the wake-up. What it starts is:
+the wake-up and `node status/schedule.mjs on` switches it on. What it starts is:
 
 ```
-claude -p "{prompt}" --permission-mode dontAsk --allowedTools "{the tools on the job sheet}"
+claude -p "{prompt}" --permission-mode dontAsk --allowedTools "{the job sheet's tools, plus the report's}"
 ```
 
 - The prompt comes straight after `-p`. `--allowedTools` takes every word after it as
   a tool name, so a prompt placed last is swallowed and the run stops.
 - `--permission-mode dontAsk` with the job sheet's own `tools:` line means the agent
-  may use exactly what the client approved at hire and is refused anything else
-  without a question. Nobody is there to answer one.
+  may use what the client approved at hire and is refused anything else without a
+  question. Nobody is there to answer one. The script adds what every report needs
+  when the job sheet does not already cover it: `Read`, and running
+  `status/done.mjs`, `status/memory.mjs` and `status/radio.mjs`.
 
 The one source for this command is `unattendedRunner('claude-code')` in
 `status/shapes.mjs`.

@@ -1,16 +1,34 @@
 #!/usr/bin/env node
 /**
- * Build the wake-up for a hired agent's schedule, on this machine's own scheduler.
+ * A hired agent's schedule, on this machine's own scheduler.
  *
  *   node status/schedule.mjs wire --agent <roster name> --surface <claude-code|codex>
  *                                 --at <HH:MM> [--days <mon,tue,wed,thu,fri>] [--bin <full path>]
+ *   node status/schedule.mjs on   --agent <roster name>
+ *   node status/schedule.mjs run  --agent <roster name>
+ *   node status/schedule.mjs off  --agent <roster name>
  *
  * What it is for: library/HIRING.md step 6, rung B. When the client's agent
  * software has no scheduled tasks of its own, the computer's scheduler has to
  * start that software at the right time, in this folder, with nobody watching.
- * Writing that entry by hand means nesting quotes inside quotes for two shells
- * and an XML file, and it used to assume Claude Code was the software. This
- * script writes it instead, for the software named in --surface.
+ * Writing that by hand means nesting quotes inside quotes for two shells and an
+ * XML file, and it used to assume Claude Code was the software. This script
+ * does it instead, for the software named in --surface, and it talks to the
+ * scheduler itself, so nothing depends on which shell the assistant happens to
+ * be typing into.
+ *
+ * wire   Writes the wake-up, inside this folder only, under status/shifts/:
+ *          <name>.sh  (Mac, Linux) or <name>.cmd (Windows): go to this folder
+ *                     and start the software with the shift prompt.
+ *          world.dailypractice.orion.<name>.plist (Mac): the launchd entry.
+ *          <name>.json: what was asked for, so on, run and off need only a name.
+ *        It changes nothing outside this folder and switches nothing on.
+ * on     Switches the schedule on. This is the change to the client's machine:
+ *        tell them what wire printed and run this only on their yes. Safe to
+ *        run again after a new wire: it replaces what was there.
+ * run    Fires the schedule once, now, through the scheduler itself. This is
+ *        the wake-up check of HIRING.md step 7.
+ * off    Switches the schedule off. The files stay, so on brings it back.
  *
  *   --agent    The roster name of the hired agent. Its job sheet must exist at
  *              .claude/agents/<name>.md.
@@ -25,20 +43,11 @@
  *              the agent software (rung A).
  *   --bin      The full path of the software's command, when it is not on PATH.
  *
- * What it writes, and where. Only inside this folder, under status/shifts/:
- *   <name>.sh  (Mac, Linux)   the wake-up: go to this folder, start the software
- *   <name>.cmd (Windows)      with the shift prompt.
- *   world.dailypractice.orion.<name>.plist (Mac only)   the launchd entry that
- *                             runs the wake-up at the chosen time.
- * It changes nothing outside this folder and switches nothing on. It prints the
- * one command that switches the schedule on, and the one that switches it off.
- * A scheduled task is a change to the client's machine: show them the first
- * command and run it only on their yes.
- *
- * On Claude Code the wake-up allows exactly the tools on the agent's job sheet
- * (its `tools:` line) and nothing else, and never stops to ask: there is nobody
- * to ask. On Codex it runs in the workspace sandbox with the network allowed,
- * because the shift's report has to reach the radio.
+ * On Claude Code the wake-up allows the tools on the agent's job sheet (its
+ * `tools:` line), plus the three commands every shift needs to read its job
+ * and report, and nothing else. It never stops to ask: there is nobody to ask.
+ * On Codex it runs in the workspace sandbox with the network allowed, because
+ * the shift's report has to reach the radio.
  *
  * Anything it cannot do is one plain explanation and exit 1, with nothing
  * written. Then library/HIRING.md, Part D, "Scheduler failure" is the lane:
@@ -47,13 +56,17 @@
  * Dependency-free: node built-ins and status/shapes.mjs only.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync, statSync, realpathSync } from 'node:fs';
+import {
+  readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync, statSync, realpathSync, copyFileSync, rmSync,
+} from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, delimiter, win32, posix } from 'node:path';
+import { homedir } from 'node:os';
 import { labelProblem, unattendedRunner, PROMPT_SLOT } from './shapes.mjs';
 
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-/** Windows refuses a /TR value longer than this. */
+/** Windows refuses a scheduled task whose command is longer than this. */
 export const SCHTASKS_TR_MAX = 261;
 
 // ── The pieces, as plain functions (tests call these directly) ───────────────
@@ -67,25 +80,69 @@ export function shiftPrompt({ folder, name }) {
   return `Open ${folder} and run the ${name} shift: first open the agent/adapters file for the software you are running in, so you know how to reach the radio here; then read .claude/agents/${name}.md, do the job section, then the report section with --shift. Stage everything; ask no questions.`;
 }
 
-/** The `tools:` line of a job sheet, as one comma-separated value with no stray spaces. Null when there is none. */
-export function jobSheetTools(jobSheet) {
-  const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(jobSheet);
-  if (!front) return null;
-  const line = /^tools:[ \t]*(.+)$/m.exec(front[1]);
-  if (!line) return null;
-  // Split on the commas between tools, not the ones inside Bash(a, b).
+/** Split on the commas between tools, not the ones inside Bash(a, b). */
+function splitTools(text) {
   const tools = [];
   let depth = 0;
   let current = '';
-  for (const ch of line[1].trim().replace(/^\[|\]$/g, '')) {
+  for (const ch of text) {
     if (ch === '(') depth++;
     if (ch === ')') depth = Math.max(0, depth - 1);
-    if (ch === ',' && depth === 0) { tools.push(current.trim()); current = ''; continue; }
+    if (ch === ',' && depth === 0) { tools.push(current); current = ''; continue; }
     current += ch;
   }
-  tools.push(current.trim());
-  const kept = tools.map((t) => t.replace(/^["']|["']$/g, '')).filter(Boolean);
-  return kept.length > 0 ? kept.join(',') : null;
+  tools.push(current);
+  return tools;
+}
+
+/**
+ * The tools a job sheet allows, as a list. Reads `tools: A, B`, `tools: [A, B]`
+ * and the form with one `- A` per line. A trailing `# note` is not a tool.
+ * Null when the sheet has no tools at all.
+ */
+export function jobSheetTools(jobSheet) {
+  const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(jobSheet);
+  if (!front) return null;
+  const lines = front[1].split(/\r?\n/);
+  const at = lines.findIndex((l) => /^tools:/.test(l));
+  if (at === -1) return null;
+  const clean = (t) => t.replace(/\s+#.*$/, '').trim().replace(/^["']|["']$/g, '').trim();
+  const inline = lines[at].slice('tools:'.length).replace(/\s+#.*$/, '').trim();
+  let tools;
+  if (inline) {
+    tools = splitTools(inline.replace(/^\[|\]$/g, ''));
+  } else {
+    tools = [];
+    for (const line of lines.slice(at + 1)) {
+      const item = /^\s+-\s+(.*)$/.exec(line);
+      if (!item) break;
+      tools.push(item[1]);
+    }
+  }
+  const kept = tools.map(clean).filter(Boolean);
+  return kept.length > 0 ? kept : null;
+}
+
+/** What every shift needs whatever its job: read its job sheet, and run the three scripts its report uses. */
+export const SHIFT_TOOLS = Object.freeze([
+  'Read',
+  'Bash(node status/done.mjs *)',
+  'Bash(node status/memory.mjs *)',
+  'Bash(node status/radio.mjs *)',
+]);
+
+/**
+ * The job sheet's tools plus whatever of SHIFT_TOOLS it does not already
+ * cover, as the one comma-separated value Claude Code takes. A sheet that
+ * allows all of Bash already covers the three scripts.
+ */
+export function allowedTools(sheetTools) {
+  const all = [...sheetTools];
+  for (const tool of SHIFT_TOOLS) {
+    const base = tool.split('(')[0];
+    if (!all.includes(tool) && !all.includes(base)) all.push(tool);
+  }
+  return all.join(',');
 }
 
 /** One argument, safe inside a POSIX shell script: single quotes, with any single quote inside closed, escaped and reopened. */
@@ -93,20 +150,29 @@ export function shQuote(text) {
   return `'${String(text).replace(/'/g, `'\\''`)}'`;
 }
 
-/** One argument, safe inside a Windows batch file: double quotes, with % doubled. A double quote cannot be carried at all. */
+/**
+ * One argument, safe inside a Windows command file: double quotes. Three
+ * characters cannot be carried there without being changed on the way (a
+ * double quote ends the argument, a percent sign is read as a variable, and a
+ * caret is doubled by `call`), so they are refused rather than mangled.
+ */
 export function cmdQuote(text) {
   const value = String(text);
-  if (value.includes('"')) throw new Error('a double quote cannot be written into a Windows command file');
-  return `"${value.replace(/%/g, '%%')}"`;
+  const bad = ['"', '%', '^'].find((ch) => value.includes(ch));
+  if (bad) throw new Error(`the character ${bad} cannot be written safely into a Windows command file (found in: ${value.slice(0, 80)})`);
+  return `"${value}"`;
 }
 
 /** The wake-up file for a Mac or Linux machine. */
-export function buildShellWakeUp({ os, folder, bin, args, name }) {
+export function buildShellWakeUp({ os, folder, bin, args, name, pathDirs = [] }) {
   return [
     os === 'darwin' ? '#!/bin/zsh -l' : '#!/bin/bash -l',
     `# The wake-up for the ${name} agent's schedule. Written by status/schedule.mjs.`,
     '# It goes to this folder and starts the agent software with the shift prompt.',
-    '# To stop the schedule, use the "off" command status/schedule.mjs printed.',
+    `# Switch the schedule off with:  node status/schedule.mjs off --agent ${name}`,
+    // A scheduler starts with a bare PATH and reads no .zshrc, so node (and
+    // an agent command that is itself a node script) would not be found.
+    ...(pathDirs.length > 0 ? [`export PATH=${pathDirs.map(shQuote).join(':')}:"$PATH"`] : []),
     `cd ${shQuote(folder)} || exit 1`,
     // Nobody is there to type, so nothing is waiting on the keyboard.
     `exec ${[bin, ...args].map(shQuote).join(' ')} < /dev/null`,
@@ -114,14 +180,19 @@ export function buildShellWakeUp({ os, folder, bin, args, name }) {
   ].join('\n');
 }
 
-/** The wake-up file for a Windows machine. */
-export function buildCmdWakeUp({ folder, bin, args, name }) {
+/** The wake-up file for a Windows machine. Throws when a path holds a character a command file cannot carry. */
+export function buildCmdWakeUp({ folder, bin, args, name, pathDirs = [] }) {
+  for (const dir of pathDirs) cmdQuote(dir);
   return [
     '@echo off',
+    // The file is written as UTF-8. Without this, a name like Zoë is misread.
+    'chcp 65001 >NUL',
     `rem The wake-up for the ${name} agent's schedule. Written by status/schedule.mjs.`,
     'rem It goes to this folder and starts the agent software with the shift prompt.',
+    `rem Switch the schedule off with:  node status/schedule.mjs off --agent ${name}`,
+    ...(pathDirs.length > 0 ? [`set "PATH=${pathDirs.join(';')};%PATH%"`] : []),
     `cd /d ${cmdQuote(folder)} || exit /b 1`,
-    // `call`, because the software's command is often a batch file itself.
+    // `call`, because the software's command is often a command file itself.
     `call ${[bin, ...args].map(cmdQuote).join(' ')} < NUL`,
     '',
   ].join('\r\n');
@@ -131,11 +202,14 @@ const xml = (text) => String(text)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
-/** launchd counts Sunday as 0 and Monday as 1. */
-const LAUNCHD_WEEKDAY = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+/** launchd and cron both count Sunday as 0 and Monday as 1. */
+const WEEKDAY_NUMBER = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 
 export function launchdLabel(name) {
   return `world.dailypractice.orion.${name}`;
+}
+export function windowsTaskName(name) {
+  return `Orion ${name} shift`;
 }
 
 /** The launchd entry: run the wake-up file at the chosen time. Every string is escaped for XML. */
@@ -149,7 +223,7 @@ export function buildPlist({ name, wakeUpPath, logPath, folder, days, hour, minu
     `      <integer>${minute}</integer>`,
     '    </dict>',
   ];
-  const slots = days.length === 0 ? when(null) : days.flatMap((d) => when(LAUNCHD_WEEKDAY[d]));
+  const slots = days.length === 0 ? when(null) : days.flatMap((d) => when(WEEKDAY_NUMBER[d]));
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
@@ -179,23 +253,10 @@ export function buildPlist({ name, wakeUpPath, logPath, folder, days, hour, minu
   ].join('\n');
 }
 
-/** The Windows task: its /TR value is only the quoted path of the wake-up file, so it stays short. */
-export function buildSchtasks({ name, wakeUpPath, days, at }) {
-  const tr = `\\"${wakeUpPath}\\"`;
-  // What Windows counts is the value itself: the path and its two quotes.
-  const trLength = wakeUpPath.length + 2;
-  const when = days.length === 0 ? '/SC DAILY' : `/SC WEEKLY /D ${days.map((d) => d.toUpperCase()).join(',')}`;
-  return {
-    trLength,
-    on: `schtasks /Create /F /TN "Orion ${name} shift" ${when} /ST ${at} /TR "${tr}"`,
-    off: `schtasks /Delete /F /TN "Orion ${name} shift"`,
-  };
-}
-
-/** One crontab line for a Linux machine. cron counts Sunday as 0. */
-export function buildCronLine({ wakeUpPath, days, hour, minute }) {
-  const dow = days.length === 0 ? '*' : days.map((d) => LAUNCHD_WEEKDAY[d]).join(',');
-  return `${minute} ${hour} * * ${dow} ${shQuote(wakeUpPath)}`;
+/** One crontab line for a Linux machine, with the wake-up's own output kept in a log beside it. */
+export function buildCronLine({ wakeUpPath, logPath, days, hour, minute }) {
+  const dow = days.length === 0 ? '*' : days.map((d) => WEEKDAY_NUMBER[d]).join(',');
+  return `${minute} ${hour} * * ${dow} ${shQuote(wakeUpPath)} >> ${shQuote(logPath)} 2>&1`;
 }
 
 /** Look for a command on PATH the way a shell would. Null when it is not there. */
@@ -212,11 +273,21 @@ export function findOnPath(bin, { env = process.env, platform = process.platform
   return null;
 }
 
+/** Folders on a Mac that the system guards: the first scheduled run there brings up a question. */
+function guardedMacFolder(folder, home) {
+  if (!home) return null;
+  const guarded = { Documents: 'Documents', Desktop: 'Desktop', Downloads: 'Downloads', 'Library/Mobile Documents': 'iCloud Drive' };
+  for (const [dir, words] of Object.entries(guarded)) {
+    if (folder === posix.join(home, dir) || folder.startsWith(`${posix.join(home, dir)}/`)) return words;
+  }
+  return null;
+}
+
 /**
- * Everything the script would write and print, worked out without touching the
- * disk. Returns { problems } when it cannot, or the files and the two commands.
+ * Everything wire would write, worked out without touching the disk. Returns
+ * { problems } when it cannot, or the files, the record, and any notes.
  */
-export function plan({ os, folder, name, surface, at, days, bin, tools }) {
+export function plan({ os, folder, name, surface, at, days, bin, sheetTools, nodeDir = null, home = null }) {
   const problems = [];
   const path = os === 'win32' ? win32 : posix;
 
@@ -229,11 +300,12 @@ export function plan({ os, folder, name, surface, at, days, bin, tools }) {
   const badDays = days.filter((d) => !DAYS.includes(d));
   if (badDays.length > 0) problems.push(`--days takes ${DAYS.join(',')}. Not understood: ${badDays.join(', ')}.`);
 
-  // Claude Code is given the job sheet's own tools and nothing else. Without
-  // that list there is nothing it may do, and nobody to ask.
-  if (surface === 'claude-code' && !tools) {
-    problems.push(`The job sheet .claude/agents/${name}.md has no tools: line. An agent that runs with nobody watching is allowed exactly the tools on its job sheet, so add that line first.`);
+  // Claude Code is allowed the job sheet's tools and the report's three
+  // commands. A sheet with no tools at all is not a finished job sheet.
+  if (surface === 'claude-code' && !sheetTools) {
+    problems.push(`The job sheet .claude/agents/${name}.md has no tools: line. An agent that runs with nobody watching is allowed what its job sheet names, so add that line first.`);
   }
+  const tools = sheetTools ? allowedTools(sheetTools) : undefined;
   const runner = unattendedRunner(surface, { tools });
   if (!runner.schedulable) {
     problems.push(surface
@@ -252,53 +324,128 @@ export function plan({ os, folder, name, surface, at, days, bin, tools }) {
   const shifts = path.join(folder, 'status', 'shifts');
   const prompt = shiftPrompt({ folder, name });
   const args = runner.args.map((arg) => (arg === PROMPT_SLOT ? prompt : arg));
+  // Where node and the agent command live, so the wake-up can find both.
+  const pathDirs = [...new Set([nodeDir, path.dirname(bin)].filter(Boolean))];
+  const wakeUpPath = path.join(shifts, os === 'win32' ? `${name}.cmd` : `${name}.sh`);
+  const logPath = path.join(shifts, `${name}.log`);
   const files = [];
-  let on;
-  let off;
+  const notes = [];
+  const record = { agent: name, surface, os, at: atPadded, days: ordered, wake_up: wakeUpPath, log: logPath };
 
   if (os === 'win32') {
-    const wakeUpPath = path.join(shifts, `${name}.cmd`);
     let text;
     try {
-      text = buildCmdWakeUp({ folder, bin, args, name });
+      text = buildCmdWakeUp({ folder, bin, args, name, pathDirs });
     } catch (err) {
-      return { problems: [`This cannot be written for Windows: ${err.message}.`] };
+      return { problems: [`This cannot be written for Windows: ${err.message}. Rename or move what holds that character, then run this again.`] };
     }
-    const task = buildSchtasks({ name, wakeUpPath, days: ordered, at: atPadded });
-    if (task.trLength > SCHTASKS_TR_MAX) {
-      return { problems: [`Windows will not take a scheduled task whose command is longer than ${SCHTASKS_TR_MAX} characters, and this folder's path makes it ${task.trLength}. Move the harness folder somewhere with a shorter path, then run this again.`] };
+    // What Windows counts is the task's command: the path and its two quotes.
+    if (wakeUpPath.length + 2 > SCHTASKS_TR_MAX) {
+      return { problems: [`Windows will not take a scheduled task whose command is longer than ${SCHTASKS_TR_MAX} characters, and this folder's path makes it ${wakeUpPath.length + 2}. Move the harness folder somewhere with a shorter path, then run this again.`] };
     }
     files.push({ path: wakeUpPath, text });
-    on = task.on;
-    off = task.off;
+    record.task = windowsTaskName(name);
   } else {
-    const wakeUpPath = path.join(shifts, `${name}.sh`);
-    files.push({ path: wakeUpPath, text: buildShellWakeUp({ os, folder, bin, args, name }), executable: true });
+    files.push({ path: wakeUpPath, text: buildShellWakeUp({ os, folder, bin, args, name, pathDirs }), executable: true });
     if (os === 'darwin') {
-      const label = launchdLabel(name);
-      const plistPath = path.join(shifts, `${label}.plist`);
-      const installed = `~/Library/LaunchAgents/${label}.plist`;
-      files.push({
-        path: plistPath,
-        text: buildPlist({ name, wakeUpPath, logPath: path.join(shifts, `${name}.log`), folder, days: ordered, hour, minute }),
-      });
-      on = `mkdir -p ~/Library/LaunchAgents && cp ${shQuote(plistPath)} ${installed} && launchctl load -w ${installed}`;
-      off = `launchctl unload -w ${installed}; rm -f ${installed}`;
+      record.label = launchdLabel(name);
+      record.plist = path.join(shifts, `${record.label}.plist`);
+      files.push({ path: record.plist, text: buildPlist({ name, wakeUpPath, logPath, folder, days: ordered, hour, minute }) });
+      const guarded = guardedMacFolder(folder, home);
+      if (guarded) {
+        notes.push(`This folder is in ${guarded}, which macOS guards. The first time the schedule fires, macOS asks once whether zsh may open files there. The answer has to be yes, or the wake-up cannot start. Running  node status/schedule.mjs run --agent ${name}  straight after switching on brings that question up while the client is at the keyboard.`);
+      }
     } else {
-      const line = buildCronLine({ wakeUpPath, days: ordered, hour, minute });
-      on = `(crontab -l 2>/dev/null; echo ${shQuote(line)}) | crontab -`;
-      off = `crontab -l | grep -v -F ${shQuote(wakeUpPath)} | crontab -`;
+      record.cron = buildCronLine({ wakeUpPath, logPath, days: ordered, hour, minute });
     }
   }
+  files.push({ path: path.join(shifts, `${name}.json`), text: `${JSON.stringify(record, null, 2)}\n` });
   return {
-    problems: [], files, on, off, at: atPadded, days: ordered,
+    problems: [], files, notes, record,
     command: [bin, ...runner.args.map((arg) => (arg === PROMPT_SLOT ? '"<the shift prompt>"' : arg))],
   };
 }
 
+/**
+ * What switching on, off or firing once means on each kind of machine, as a
+ * list of steps. Nothing here touches the machine: apply() does. Commands are
+ * given as a name and separate arguments and are never passed through a shell,
+ * so no shell's quoting rules can change them.
+ */
+export function steps(action, record, { home, uid }) {
+  const { os, agent } = record;
+  if (os === 'darwin') {
+    const label = record.label || launchdLabel(agent);
+    const installed = posix.join(home, 'Library', 'LaunchAgents', `${label}.plist`);
+    if (action === 'on') {
+      return [
+        { mkdir: posix.dirname(installed) },
+        // Whatever is loaded under this name goes first, or launchd keeps the old times.
+        { exec: ['launchctl', ['unload', installed]], mayFail: true },
+        { copy: [record.plist, installed] },
+        { exec: ['launchctl', ['load', '-w', installed]] },
+      ];
+    }
+    if (action === 'off') return [{ exec: ['launchctl', ['unload', '-w', installed]], mayFail: true }, { remove: installed }];
+    return [{ exec: ['launchctl', ['kickstart', `gui/${uid}/${label}`]] }];
+  }
+  if (os === 'win32') {
+    const task = record.task || windowsTaskName(agent);
+    if (action === 'on') {
+      const when = record.days.length === 0 ? ['/SC', 'DAILY'] : ['/SC', 'WEEKLY', '/D', record.days.map((d) => d.toUpperCase()).join(',')];
+      // The task's command is only the wake-up file's path, in its own quotes.
+      return [{ exec: ['schtasks', ['/Create', '/F', '/TN', task, ...when, '/ST', record.at, '/TR', `"${record.wake_up}"`]] }];
+    }
+    if (action === 'off') return [{ exec: ['schtasks', ['/Delete', '/F', '/TN', task]], mayFail: true }];
+    return [{ exec: ['schtasks', ['/Run', '/TN', task]] }];
+  }
+  // Linux: one line in the user's crontab, found again by the wake-up's path.
+  if (action === 'on') return [{ crontab: { drop: record.wake_up, add: record.cron } }];
+  if (action === 'off') return [{ crontab: { drop: record.wake_up, add: null } }];
+  // cron has no run-now. Start the wake-up the way cron would: a bare environment.
+  return [{ exec: ['env', ['-i', `HOME=${home}`, 'PATH=/usr/bin:/bin', '/bin/bash', '-l', record.wake_up]], background: true }];
+}
+
+/** Carry the steps out. Returns null on success, or one plain sentence saying what failed. */
+export function apply(list, { run = spawnSync, start = spawn } = {}) {
+  for (const step of list) {
+    try {
+      if (step.mkdir) mkdirSync(step.mkdir, { recursive: true });
+      else if (step.copy) copyFileSync(step.copy[0], step.copy[1]);
+      else if (step.remove) rmSync(step.remove, { force: true });
+      else if (step.crontab) {
+        const current = run('crontab', ['-l'], { encoding: 'utf8' });
+        const kept = (current.status === 0 ? String(current.stdout) : '')
+          .split('\n').filter((line) => line.trim() && !line.includes(step.crontab.drop));
+        if (step.crontab.add) kept.push(step.crontab.add);
+        const written = run('crontab', ['-'], { input: kept.length > 0 ? `${kept.join('\n')}\n` : '', encoding: 'utf8' });
+        if (written.status !== 0) return `crontab would not take the change: ${String(written.stderr || '').trim() || 'no reason given'}`;
+      } else if (step.exec) {
+        const [command, args] = step.exec;
+        if (step.background) {
+          // A shift can run for minutes, so it is started and left to finish
+          // on its own. The shift log is where it shows.
+          start(command, args, { detached: true, stdio: 'ignore' }).unref?.();
+          continue;
+        }
+        const done = run(command, args, { encoding: 'utf8' });
+        if (!step.mayFail && (done.error || done.status !== 0)) {
+          return `${command} ${args[0]} did not work: ${String(done.stderr || done.stdout || done.error?.message || '').trim() || 'no reason given'}`;
+        }
+      }
+    } catch (err) {
+      if (!step.mayFail) return err.message;
+    }
+  }
+  return null;
+}
+
 // ── The command ─────────────────────────────────────────────────────────────
 
-const USAGE = 'Usage: node status/schedule.mjs wire --agent <roster name> --surface <claude-code|codex> --at <HH:MM> [--days <mon,tue,wed,thu,fri>] [--bin <full path>]';
+const USAGE = [
+  'Usage: node status/schedule.mjs wire --agent <roster name> --surface <claude-code|codex> --at <HH:MM> [--days <mon,tue,wed,thu,fri>] [--bin <full path>]',
+  '       node status/schedule.mjs on | run | off --agent <roster name>',
+].join('\n');
 
 function main(argv) {
   const [command, ...rest] = argv;
@@ -307,7 +454,7 @@ function main(argv) {
     console.log('Details in the header of this file, and in library/HIRING.md step 6.');
     return 0;
   }
-  if (command !== 'wire') {
+  if (!['wire', 'on', 'run', 'off'].includes(command)) {
     console.log(`"${command}" is not something schedule.mjs does.`);
     console.log(USAGE);
     return 1;
@@ -316,36 +463,71 @@ function main(argv) {
   for (let i = 0; i < rest.length; i++) {
     const arg = rest[i];
     if (!arg.startsWith('--') || i + 1 >= rest.length) {
-      console.log(`${arg} is not understood. Nothing was written.`);
+      console.log(`${arg} is not understood. Nothing was done.`);
       console.log(USAGE);
       return 1;
     }
     flags[arg.slice(2)] = rest[++i];
   }
-  const unknown = Object.keys(flags).filter((k) => !['agent', 'surface', 'at', 'days', 'bin'].includes(k));
+  const taken = command === 'wire' ? ['agent', 'surface', 'at', 'days', 'bin'] : ['agent'];
+  const unknown = Object.keys(flags).filter((k) => !taken.includes(k));
   if (unknown.length > 0) {
-    console.log(`Not something schedule.mjs takes: ${unknown.map((k) => `--${k}`).join(', ')}. Nothing was written.`);
+    console.log(`Not something schedule.mjs ${command} takes: ${unknown.map((k) => `--${k}`).join(', ')}. Nothing was done.`);
     console.log(USAGE);
     return 1;
   }
 
   const folder = join(dirname(fileURLToPath(import.meta.url)), '..');
   const name = String(flags.agent ?? '');
+  const nameTrouble = labelProblem(name, 'agent');
+  if (nameTrouble) {
+    console.log(`--agent: ${nameTrouble}`);
+    console.log(USAGE);
+    return 1;
+  }
+
+  if (command !== 'wire') {
+    const recordPath = join(folder, 'status', 'shifts', `${name}.json`);
+    if (!existsSync(recordPath)) {
+      console.log(`There is no wake-up for ${name} in status/shifts/ yet. Run  node status/schedule.mjs wire --agent ${name} ...  first.`);
+      return 1;
+    }
+    const record = JSON.parse(readFileSync(recordPath, 'utf8'));
+    if (record.os !== process.platform) {
+      console.log(`The wake-up for ${name} was written on a different kind of machine (${record.os}). Run wire again here.`);
+      return 1;
+    }
+    const failed = apply(steps(command, record, { home: homedir(), uid: process.getuid?.() ?? 0 }));
+    if (failed) {
+      console.log(`That did not work for ${name}: ${failed}`);
+      console.log('The agent is still hired and still works when asked: library/HIRING.md, Part D, "Scheduler failure".');
+      return 1;
+    }
+    const when = `${record.at}, ${record.days.length === 0 ? 'every day' : record.days.join(', ')}`;
+    if (command === 'on') console.log(`The schedule for ${name} is on: ${when}, by this machine's clock. Now check it really fires:  node status/schedule.mjs run --agent ${name}`);
+    else if (command === 'off') console.log(`The schedule for ${name} is off. Its files are still in status/shifts/, so  node status/schedule.mjs on --agent ${name}  brings it back.`);
+    else console.log(`Fired once, now. A new line for ${name} should land in status/shift-log.md within a few minutes. What the wake-up itself printed is in status/shifts/${name}.log.`);
+    return 0;
+  }
+
   const sheetPath = join(folder, '.claude', 'agents', `${name}.md`);
-  if (!labelProblem(name, 'agent') && !existsSync(sheetPath)) {
+  if (!existsSync(sheetPath)) {
     console.log(`There is no job sheet at .claude/agents/${name}.md, so there is no agent to schedule. Nothing was written.`);
     return 1;
   }
-  const tools = existsSync(sheetPath) ? jobSheetTools(readFileSync(sheetPath, 'utf8')) : null;
-  const wanted = unattendedRunner(flags.surface, { tools });
-  const bin = flags.bin || (wanted.schedulable ? findOnPath(wanted.bin) : null);
+  const sheetTools = jobSheetTools(readFileSync(sheetPath, 'utf8'));
+  const wanted = unattendedRunner(flags.surface);
   if (flags.bin && !existsSync(flags.bin)) {
     console.log(`--bin: there is no file at ${flags.bin}. Nothing was written.`);
     return 1;
   }
+  const bin = flags.bin || (wanted.schedulable ? findOnPath(wanted.bin) : null);
   const days = flags.days ? String(flags.days).toLowerCase().split(',').map((d) => d.trim()).filter(Boolean) : [];
 
-  const result = plan({ os: process.platform, folder, name, surface: flags.surface, at: flags.at, days, bin, tools });
+  const result = plan({
+    os: process.platform, folder, name, surface: flags.surface, at: flags.at, days, bin, sheetTools,
+    nodeDir: dirname(process.execPath), home: homedir(),
+  });
   if (result.problems.length > 0) {
     for (const problem of result.problems) console.log(problem);
     console.log('Nothing was written. The schedule is not wired: library/HIRING.md, Part D, "Scheduler failure".');
@@ -358,12 +540,13 @@ function main(argv) {
     if (file.executable) chmodSync(file.path, 0o755);
     console.log(`Written: ${file.path}`);
   }
+  const { record } = result;
   console.log(`The ${name} agent will be started with: ${result.command.join(' ')}`);
-  console.log(`When: ${result.at}, ${result.days.length === 0 ? 'every day' : result.days.join(', ')}, by this machine's clock.`);
-  console.log('Nothing is switched on yet. This is a change to the machine, so show the client this command and run it on their yes:');
-  console.log(`  ${result.on}`);
-  console.log('To switch the schedule off again:');
-  console.log(`  ${result.off}`);
+  console.log(`When: ${record.at}, ${record.days.length === 0 ? 'every day' : record.days.join(', ')}, by this machine's clock.`);
+  for (const note of result.notes) console.log(note);
+  console.log('Nothing is switched on yet. Switching on is a change to the machine, so tell the client what it does and run this on their yes:');
+  console.log(`  node status/schedule.mjs on --agent ${name}`);
+  console.log(`To switch it off again:  node status/schedule.mjs off --agent ${name}`);
   return 0;
 }
 

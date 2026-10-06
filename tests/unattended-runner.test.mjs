@@ -1,12 +1,13 @@
 /**
- * The wake-up for a hired agent's schedule on the computer's own scheduler
- * (library/HIRING.md step 6, rung B): status/shapes.mjs says how each agent
- * software is started with nobody watching, and status/schedule.mjs writes the
- * files. The wake-up used to be written by hand as `claude -p` whatever the
- * machine ran, so a Codex machine was handed a task that could never start.
+ * A hired agent's schedule on the computer's own scheduler (library/HIRING.md
+ * step 6, rung B): status/shapes.mjs says how each agent software is started
+ * with nobody watching, and status/schedule.mjs writes the wake-up and talks to
+ * the scheduler. The wake-up used to be written by hand as `claude -p` whatever
+ * the machine ran, so a Codex machine was handed a task that could never start.
  *
  * These tests call the real builders, run a real wake-up file through a real
- * shell, and hold HIRING.md and the adapters to what the code does.
+ * shell, and hold HIRING.md and the adapters to what the code does. Nothing
+ * here switches anything on: the scheduler is always a stand-in.
  *
  *   node --test
  */
@@ -19,8 +20,8 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { unattendedRunner, PROMPT_SLOT } from '../status/shapes.mjs';
 import {
-  shiftPrompt, jobSheetTools, shQuote, cmdQuote, buildShellWakeUp, buildPlist, buildSchtasks, plan,
-  SCHTASKS_TR_MAX,
+  shiftPrompt, jobSheetTools, allowedTools, SHIFT_TOOLS, shQuote, cmdQuote, buildShellWakeUp, buildPlist,
+  plan, steps, apply, SCHTASKS_TR_MAX,
 } from '../status/schedule.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -64,7 +65,7 @@ test('software that cannot start on its own is never given a command', () => {
 
 test('the shift prompt has no quote characters and is the one HIRING.md gives for rung A', () => {
   const prompt = shiftPrompt({ folder: '{absolute folder path}', name: '{name}' });
-  assert.equal(/['"`]/.test(prompt), false, 'the shift prompt has a quote character in it');
+  assert.equal(/['"`%^]/.test(prompt), false, 'the shift prompt has a character a command file cannot carry');
   const hiring = read('library/HIRING.md');
   const at = hiring.indexOf('`Open {absolute folder path} and run the {name} shift:');
   assert.ok(at !== -1, 'the shift prompt is missing from HIRING.md');
@@ -72,14 +73,27 @@ test('the shift prompt has no quote characters and is the one HIRING.md gives fo
   assert.equal(oneLine(inHiring), prompt, 'HIRING.md and status/schedule.mjs give different shift prompts');
 });
 
-test('the tools line of a job sheet is read as one clean list', () => {
+test('the tools on a job sheet are read in every shape people write them', () => {
   const sheet = (tools) => `---\nname: x\n${tools}\nstatus: hired\n---\n\n# X\n`;
-  assert.equal(jobSheetTools(sheet('tools: Read, Write, Edit, Bash')), 'Read,Write,Edit,Bash');
-  assert.equal(jobSheetTools(sheet('tools: [Read, "Bash(node status/*)"]')), 'Read,Bash(node status/*)');
+  assert.deepEqual(jobSheetTools(sheet('tools: Read, Write, Edit, Bash')), ['Read', 'Write', 'Edit', 'Bash']);
+  assert.deepEqual(jobSheetTools(sheet('tools: [Read, "Bash(node status/*)"]')), ['Read', 'Bash(node status/*)']);
   // A comma inside the brackets of one tool does not split it.
-  assert.equal(jobSheetTools(sheet('tools: Read, Bash(git log, git diff), mcp__gmail__search_threads')), 'Read,Bash(git log, git diff),mcp__gmail__search_threads');
+  assert.deepEqual(jobSheetTools(sheet('tools: Read, Bash(git log, git diff), mcp__gmail__search_threads')), ['Read', 'Bash(git log, git diff)', 'mcp__gmail__search_threads']);
+  // One per line, and a note after a tool is not part of its name.
+  assert.deepEqual(jobSheetTools(sheet('tools:\n  - Read\n  - Bash  # runs the report')), ['Read', 'Bash']);
+  assert.deepEqual(jobSheetTools(sheet('tools: Read, Bash # reads only')), ['Read', 'Bash']);
   assert.equal(jobSheetTools(sheet('description: no tools here')), null);
+  assert.equal(jobSheetTools(sheet('tools:')), null);
   assert.equal(jobSheetTools('# no front matter\ntools: Read'), null);
+});
+
+test('a shift is always allowed to read its job and run its report, and nothing is added twice', () => {
+  // A least-privilege sheet that names neither Read nor Bash still reports.
+  assert.equal(allowedTools(['Grep', 'mcp__hubspot__search']), ['Grep', 'mcp__hubspot__search', ...SHIFT_TOOLS].join(','));
+  // A sheet that allows all of Bash already covers the three scripts.
+  assert.equal(allowedTools(['Read', 'Bash']), 'Read,Bash');
+  assert.equal(allowedTools(['Read']), ['Read', ...SHIFT_TOOLS.slice(1)].join(','));
+  for (const script of ['done', 'memory', 'radio']) assert.ok(SHIFT_TOOLS.includes(`Bash(node status/${script}.mjs *)`));
 });
 
 // ── A real wake-up file, through a real shell ────────────────────────────────
@@ -91,44 +105,51 @@ test('a wake-up file hands every argument over intact, awkward folder name inclu
     mkdirSync(folder, { recursive: true });
     // Stands in for the agent software: writes down exactly what it was given.
     const fake = join(base, 'fake agent.sh');
-    writeFileSync(fake, '#!/bin/sh\nprintf "%s\\n" "$PWD" > "$(dirname "$0")/pwd.txt"\nfor a in "$@"; do printf "%s\\n" "$a"; done > "$(dirname "$0")/args.txt"\n');
+    writeFileSync(fake, '#!/bin/sh\nprintf "%s\\n" "$PWD" > "$(dirname "$0")/pwd.txt"\nprintf "%s\\n" "$PATH" > "$(dirname "$0")/path.txt"\nfor a in "$@"; do printf "%s\\n" "$a"; done > "$(dirname "$0")/args.txt"\n');
     chmodSync(fake, 0o755);
     const prompt = shiftPrompt({ folder, name: 'probe' });
-    const args = unattendedRunner('claude-code', { tools: 'Read,Bash(node status/*)' }).args.map((a) => (a === PROMPT_SLOT ? prompt : a));
+    const args = unattendedRunner('claude-code', { tools: allowedTools(['Grep']) }).args.map((a) => (a === PROMPT_SLOT ? prompt : a));
     const wakeUp = join(base, 'probe.sh');
-    writeFileSync(wakeUp, buildShellWakeUp({ os: 'linux', folder, bin: fake, args, name: 'probe' }));
-    const run = spawnSync('/bin/sh', [wakeUp], { encoding: 'utf8' });
+    writeFileSync(wakeUp, buildShellWakeUp({ os: 'linux', folder, bin: fake, args, name: 'probe', pathDirs: ["/opt/node's bin", '/opt/agent'] }));
+    // A scheduler's own environment: almost nothing in it.
+    const run = spawnSync('/bin/sh', [wakeUp], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin' } });
     assert.equal(run.status, 0, run.stderr);
     assert.deepEqual(readFileSync(join(base, 'args.txt'), 'utf8').trimEnd().split('\n'), args);
     assert.ok(readFileSync(join(base, 'pwd.txt'), 'utf8').trim().endsWith("Jane's harness & co"));
+    // node and the agent command are findable although the scheduler's PATH has neither.
+    assert.equal(readFileSync(join(base, 'path.txt'), 'utf8').trim(), "/opt/node's bin:/opt/agent:/usr/bin:/bin");
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
 });
 
-test('quoting: a single quote survives a shell file, a double quote is refused for Windows', () => {
+test('quoting: a single quote survives a shell file; what a Windows file cannot carry is refused', () => {
   assert.equal(shQuote("it's"), `'it'\\''s'`);
-  assert.equal(cmdQuote('50% done'), '"50%% done"');
-  assert.throws(() => cmdQuote('say "hi"'));
+  assert.equal(cmdQuote('C:\\Users\\Jane Smith\\x.cmd'), '"C:\\Users\\Jane Smith\\x.cmd"');
+  for (const bad of ['say "hi"', '100% done', 'a^b']) assert.throws(() => cmdQuote(bad), /cannot be written safely/);
 });
 
-// ── What gets written on each kind of machine ────────────────────────────────
+// ── What wire writes on each kind of machine ─────────────────────────────────
 
 const mac = (over = {}) => plan({
   os: 'darwin', folder: "/Users/jane/Orion & Jane's", name: 'prospecting', surface: 'codex',
-  at: '7:05', days: ['fri', 'mon'], bin: '/opt/homebrew/bin/codex', tools: null, ...over,
+  at: '7:05', days: ['fri', 'mon'], bin: '/opt/homebrew/bin/codex', sheetTools: null,
+  nodeDir: '/Users/jane/.nvm/versions/node/v22/bin', home: '/Users/jane', ...over,
 });
 
-test('Mac: a wake-up file and a launchd entry that is valid XML', () => {
+test('Mac: a wake-up file, a launchd entry that is valid XML, and a record', () => {
   const p = mac();
   assert.deepEqual(p.problems, []);
-  assert.equal(p.at, '07:05');
-  assert.deepEqual(p.days, ['mon', 'fri']);
-  const [wakeUp, plist] = p.files;
+  assert.equal(p.record.at, '07:05');
+  assert.deepEqual(p.record.days, ['mon', 'fri']);
+  const [wakeUp, plist, record] = p.files;
   assert.ok(wakeUp.path.endsWith('/status/shifts/prospecting.sh'));
   assert.equal(wakeUp.executable, true);
+  // node installed through a version manager is found: its folder is put on PATH.
+  assert.ok(wakeUp.text.includes(`export PATH='/Users/jane/.nvm/versions/node/v22/bin':'/opt/homebrew/bin':"$PATH"`));
   assert.ok(wakeUp.text.includes(`cd '/Users/jane/Orion & Jane'\\''s' || exit 1`));
   assert.ok(wakeUp.text.includes(`exec '/opt/homebrew/bin/codex' 'exec'`));
+  assert.ok(wakeUp.text.trimEnd().endsWith('< /dev/null'));
   assert.ok(plist.path.endsWith('/status/shifts/world.dailypractice.orion.prospecting.plist'));
   // The ampersand and the apostrophe in the folder name are escaped for XML,
   // and no shell quoting leaks into the entry.
@@ -136,8 +157,19 @@ test('Mac: a wake-up file and a launchd entry that is valid XML', () => {
   assert.equal(/<string>[^<]*&(?!amp;|apos;|lt;|gt;|quot;)/.test(plist.text), false, 'a raw ampersand is left in the plist');
   // launchd counts Monday as 1 and Friday as 5.
   assert.deepEqual([...plist.text.matchAll(/<key>Weekday<\/key>\s*<integer>(\d)<\/integer>/g)].map((m) => m[1]), ['1', '5']);
-  assert.ok(p.on.includes('launchctl load -w ~/Library/LaunchAgents/world.dailypractice.orion.prospecting.plist'));
-  assert.ok(p.off.includes('launchctl unload -w'));
+  assert.ok(record.path.endsWith('/status/shifts/prospecting.json'));
+  assert.deepEqual(JSON.parse(record.text), p.record);
+  assert.deepEqual(p.notes, []);
+});
+
+test('Mac: a folder macOS guards gets one plain warning, not a refusal', () => {
+  for (const folder of ['/Users/jane/Documents/Orion', '/Users/jane/Desktop', '/Users/jane/Library/Mobile Documents/com~apple~CloudDocs/Orion']) {
+    const p = mac({ folder });
+    assert.deepEqual(p.problems, []);
+    assert.equal(p.notes.length, 1);
+    assert.match(p.notes[0], /macOS asks once whether zsh may open files there/);
+  }
+  assert.deepEqual(mac({ folder: '/Users/jane/DocumentsOther/Orion' }).notes, []);
 });
 
 test('Mac: the launchd entry passes the system\'s own check', { skip: process.platform !== 'darwin' }, () => {
@@ -152,41 +184,45 @@ test('Mac: the launchd entry passes the system\'s own check', { skip: process.pl
   }
 });
 
-test('Windows: a command file, and a task whose command is only that file\'s path', () => {
-  const p = plan({
-    os: 'win32', folder: 'D:\\Work\\Orion 100%', name: 'prospecting', surface: 'claude-code',
-    at: '07:00', days: ['mon', 'tue'], bin: 'C:\\Users\\Jane Smith\\AppData\\Roaming\\npm\\claude.cmd', tools: 'Read,Bash',
-  });
+const windows = (over = {}) => plan({
+  os: 'win32', folder: 'D:\\Work\\Orion', name: 'prospecting', surface: 'claude-code',
+  at: '07:00', days: ['mon', 'tue'], bin: 'C:\\Users\\Zoë Smith\\AppData\\Roaming\\npm\\claude.cmd', sheetTools: ['Read', 'Bash'],
+  nodeDir: 'C:\\Program Files\\nodejs', ...over,
+});
+
+test('Windows: a command file that survives spaces, another drive and accented names', () => {
+  const p = windows();
   assert.deepEqual(p.problems, []);
   const [wakeUp] = p.files;
   assert.ok(wakeUp.path.endsWith('\\status\\shifts\\prospecting.cmd'));
-  // /d, or a folder on another drive is never entered. % doubled, or it is read as a variable.
-  assert.ok(wakeUp.text.includes('cd /d "D:\\Work\\Orion 100%%" || exit /b 1'));
-  // The path has a space in it and stays one word. `call`, because it is a batch file itself.
-  assert.ok(wakeUp.text.includes('call "C:\\Users\\Jane Smith\\AppData\\Roaming\\npm\\claude.cmd" "-p" "Open D:\\Work\\Orion 100%% and run'));
-  assert.equal(p.on, 'schtasks /Create /F /TN "Orion prospecting shift" /SC WEEKLY /D MON,TUE /ST 07:00 /TR "\\"D:\\Work\\Orion 100%\\status\\shifts\\prospecting.cmd\\""');
-  assert.equal(p.off, 'schtasks /Delete /F /TN "Orion prospecting shift"');
+  const lines = wakeUp.text.split('\r\n');
+  assert.equal(lines[0], '@echo off');
+  // The file is UTF-8, and says so before any path is read.
+  assert.equal(lines[1], 'chcp 65001 >NUL');
+  assert.ok(lines.includes('set "PATH=C:\\Program Files\\nodejs;C:\\Users\\Zoë Smith\\AppData\\Roaming\\npm;%PATH%"'));
+  // /d, or a folder on another drive is never entered.
+  assert.ok(lines.includes('cd /d "D:\\Work\\Orion" || exit /b 1'));
+  // The path has a space in it and stays one word. `call`, because it is a command file itself.
+  assert.ok(wakeUp.text.includes('call "C:\\Users\\Zoë Smith\\AppData\\Roaming\\npm\\claude.cmd" "-p" "Open D:\\Work\\Orion and run'));
+  assert.ok(wakeUp.text.trimEnd().endsWith('< NUL'));
 });
 
-test('Windows: the task command stays inside the length Windows accepts, whatever the prompt', () => {
-  const task = buildSchtasks({ name: 'prospecting', wakeUpPath: 'C:\\Orion\\status\\shifts\\prospecting.cmd', days: [], at: '07:00' });
-  assert.ok(task.trLength <= SCHTASKS_TR_MAX);
-  assert.ok(task.on.includes('/SC DAILY'));
-  // The shift prompt alone is longer than the limit: it must never be in /TR.
+test('Windows: what a command file cannot carry, or Windows will not accept, is refused', () => {
+  // A percent sign would be read as a variable, twice over under `call`.
+  const percent = windows({ folder: 'D:\\Work\\Orion 100%' });
+  assert.equal(percent.files, undefined);
+  assert.match(percent.problems[0], /character % cannot be written safely/);
+  // The task's command is only the file's path, and even that has a limit.
   assert.ok(shiftPrompt({ folder: 'C:\\Orion', name: 'prospecting' }).length > SCHTASKS_TR_MAX);
-  assert.equal(task.on.includes('run the prospecting shift'), false);
-  const deep = plan({
-    os: 'win32', folder: `C:\\${'very-long-folder-name\\'.repeat(12)}Orion`, name: 'prospecting', surface: 'codex',
-    at: '07:00', days: [], bin: 'C:\\codex.exe', tools: null,
-  });
+  const deep = windows({ folder: `C:\\${'very-long-folder-name\\'.repeat(12)}Orion` });
   assert.equal(deep.files, undefined);
   assert.match(deep.problems[0], /shorter path/);
 });
 
-test('Linux: one crontab line', () => {
-  const p = plan({ os: 'linux', folder: '/home/jane/orion', name: 'dream', surface: 'codex', at: '02:00', days: [], bin: '/usr/bin/codex', tools: null });
+test('Linux: one crontab line, with a log', () => {
+  const p = plan({ os: 'linux', folder: '/home/jane/orion', name: 'dream', surface: 'codex', at: '02:00', days: ['sun'], bin: '/usr/bin/codex', sheetTools: null });
   assert.deepEqual(p.problems, []);
-  assert.ok(p.on.includes(`0 2 * * * '\\''/home/jane/orion/status/shifts/dream.sh'\\''`));
+  assert.equal(p.record.cron, `0 2 * * 0 '/home/jane/orion/status/shifts/dream.sh' >> '/home/jane/orion/status/shifts/dream.log' 2>&1`);
 });
 
 test('what it cannot do is said plainly and nothing is planned', () => {
@@ -195,9 +231,67 @@ test('what it cannot do is said plainly and nothing is planned', () => {
   assert.match(mac({ surface: 'cursor' }).problems.join(' '), /cannot be started with nobody watching/);
   assert.match(mac({ surface: undefined }).problems.join(' '), /--surface is missing/);
   assert.match(mac({ bin: null }).problems.join(' '), /Could not find the codex command/);
-  // Claude Code with no tools line: there is nothing it may do, and nobody to ask.
-  assert.match(mac({ surface: 'claude-code', bin: '/usr/local/bin/claude', tools: null }).problems.join(' '), /no tools: line/);
+  // Claude Code with no tools line: the job sheet is not finished.
+  assert.match(mac({ surface: 'claude-code', bin: '/usr/local/bin/claude', sheetTools: null }).problems.join(' '), /no tools: line/);
   for (const bad of [mac({ at: '7am' }), mac({ surface: 'cursor' }), mac({ bin: null })]) assert.equal(bad.files, undefined);
+});
+
+// ── Switching on, firing once, switching off ─────────────────────────────────
+
+test('Mac: on replaces whatever was loaded, run fires through launchd, off removes it', () => {
+  const { record } = mac();
+  const where = { home: '/Users/jane', uid: 501 };
+  const installed = '/Users/jane/Library/LaunchAgents/world.dailypractice.orion.prospecting.plist';
+  assert.deepEqual(steps('on', record, where), [
+    { mkdir: '/Users/jane/Library/LaunchAgents' },
+    // Unloaded first, or a changed time never takes effect.
+    { exec: ['launchctl', ['unload', installed]], mayFail: true },
+    { copy: [record.plist, installed] },
+    { exec: ['launchctl', ['load', '-w', installed]] },
+  ]);
+  assert.deepEqual(steps('run', record, where), [{ exec: ['launchctl', ['kickstart', 'gui/501/world.dailypractice.orion.prospecting']] }]);
+  assert.deepEqual(steps('off', record, where), [{ exec: ['launchctl', ['unload', '-w', installed]], mayFail: true }, { remove: installed }]);
+});
+
+test('Windows: the task is created without a shell, and its command is only the file\'s path', () => {
+  const { record } = windows();
+  const [create] = steps('on', record, { home: 'C:\\Users\\Zoë Smith', uid: 0 });
+  assert.deepEqual(create.exec, ['schtasks', [
+    '/Create', '/F', '/TN', 'Orion prospecting shift', '/SC', 'WEEKLY', '/D', 'MON,TUE', '/ST', '07:00',
+    '/TR', '"D:\\Work\\Orion\\status\\shifts\\prospecting.cmd"',
+  ]]);
+  assert.deepEqual(steps('on', windows({ days: [] }).record, {})[0].exec[1].slice(4, 6), ['/SC', 'DAILY']);
+  assert.deepEqual(steps('run', record, {})[0].exec, ['schtasks', ['/Run', '/TN', 'Orion prospecting shift']]);
+  assert.deepEqual(steps('off', record, {})[0].exec, ['schtasks', ['/Delete', '/F', '/TN', 'Orion prospecting shift']]);
+});
+
+test('Linux: switching on twice leaves one line, and off leaves every other line alone', () => {
+  const { record } = plan({ os: 'linux', folder: '/home/jane/orion', name: 'dream', surface: 'codex', at: '02:00', days: [], bin: '/usr/bin/codex', sheetTools: null });
+  let crontab = '30 6 * * * /usr/bin/backup\n';
+  const fake = (command, args, opts) => {
+    assert.equal(command, 'crontab');
+    if (args[0] === '-l') return { status: 0, stdout: crontab };
+    crontab = opts.input;
+    return { status: 0 };
+  };
+  assert.equal(apply(steps('on', record, {}), { run: fake }), null);
+  assert.equal(apply(steps('on', record, {}), { run: fake }), null);
+  assert.equal(crontab, `30 6 * * * /usr/bin/backup\n${record.cron}\n`);
+  assert.equal(apply(steps('off', record, {}), { run: fake }), null);
+  assert.equal(crontab, '30 6 * * * /usr/bin/backup\n');
+  // cron has no run-now: the wake-up is started the way cron would, and left to finish.
+  const started = [];
+  assert.equal(apply(steps('run', record, { home: '/home/jane' }), { start: (c, a, o) => { started.push([c, a, o]); return { unref() {} }; } }), null);
+  assert.deepEqual(started[0].slice(0, 2), ['env', ['-i', 'HOME=/home/jane', 'PATH=/usr/bin:/bin', '/bin/bash', '-l', record.wake_up]]);
+  assert.equal(started[0][2].detached, true);
+});
+
+test('a scheduler that says no is reported in its own words, and one that may fail is not', () => {
+  const { record } = windows();
+  const refuses = () => ({ status: 1, stderr: 'ERROR: Access is denied.\r\n' });
+  assert.equal(apply(steps('on', record, {}), { run: refuses }), 'schtasks /Create did not work: ERROR: Access is denied.');
+  // Deleting a task that is not there is not a failure of "off".
+  assert.equal(apply(steps('off', record, {}), { run: refuses }), null);
 });
 
 // ── The command itself, in a folder of its own ───────────────────────────────
@@ -207,7 +301,7 @@ function scratchHarness() {
   mkdirSync(join(base, 'status'), { recursive: true });
   mkdirSync(join(base, '.claude', 'agents'), { recursive: true });
   for (const f of ['schedule.mjs', 'shapes.mjs']) copyFileSync(join(ROOT, 'status', f), join(base, 'status', f));
-  writeFileSync(join(base, '.claude', 'agents', 'probe.md'), '---\nname: probe\ntools: Read, Bash\nstatus: hired\n---\n\n# Probe\n');
+  writeFileSync(join(base, '.claude', 'agents', 'probe.md'), '---\nname: probe\ntools: Read\nstatus: hired\n---\n\n# Probe\n');
   const run = (...args) => spawnSync(process.execPath, [join(base, 'status', 'schedule.mjs'), ...args], { encoding: 'utf8' });
   return { base, run };
 }
@@ -219,10 +313,14 @@ test('wire writes only inside status/shifts/ and switches nothing on', () => {
     const r = run('wire', '--agent', 'probe', '--surface', 'claude-code', '--at', '07:00', '--days', 'mon,wed', '--bin', process.execPath);
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /Nothing is switched on yet/);
-    assert.match(r.stdout, /--permission-mode dontAsk --allowedTools Read,Bash/);
-    const wakeUp = join(base, 'status', 'shifts', process.platform === 'win32' ? 'probe.cmd' : 'probe.sh');
-    assert.ok(existsSync(wakeUp));
+    assert.match(r.stdout, /node status\/schedule\.mjs on --agent probe/);
+    // The job sheet said Read. The report's three commands were added.
+    assert.ok(r.stdout.includes(`--allowedTools ${['Read', ...SHIFT_TOOLS.slice(1)].join(',')}`));
+    const shifts = join(base, 'status', 'shifts');
+    const wakeUp = join(shifts, process.platform === 'win32' ? 'probe.cmd' : 'probe.sh');
     assert.ok(readFileSync(wakeUp, 'utf8').includes('run the probe shift'));
+    const record = JSON.parse(readFileSync(join(shifts, 'probe.json'), 'utf8'));
+    assert.deepEqual([record.agent, record.at, record.days, record.os], ['probe', '07:00', ['mon', 'wed'], process.platform]);
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
@@ -236,7 +334,13 @@ test('wire refuses, and writes nothing, when it cannot build an honest wake-up',
       [['wire', '--agent', 'probe', '--surface', 'cursor', '--at', '07:00'], /cannot be started with nobody watching/],
       [['wire', '--agent', 'probe', '--surface', 'codex', '--at', '25:00', '--bin', process.execPath], /HH:MM/],
       [['wire', '--agent', 'probe', '--surface', 'codex', '--at', '07:00', '--bin', join(base, 'not-there')], /no file at/],
-      [['wire', '--agent', 'probe', '--at', '07:00', '--line', 'x'], /Not something schedule.mjs takes/],
+      [['wire', '--agent', 'probe', '--at', '07:00', '--line', 'x'], /Not something schedule.mjs wire takes/],
+      [['on', '--agent', 'probe', '--at', '07:00'], /Not something schedule.mjs on takes/],
+      // Nothing can be switched on, fired or switched off before it is written.
+      [['on', '--agent', 'probe'], /no wake-up for probe/],
+      [['run', '--agent', 'probe'], /no wake-up for probe/],
+      [['off', '--agent', 'probe'], /no wake-up for probe/],
+      [['on', '--agent', '../probe'], /--agent:/],
       [['unwire'], /not something schedule.mjs does/],
     ];
     for (const [args, expected] of cases) {
@@ -250,25 +354,40 @@ test('wire refuses, and writes nothing, when it cannot build an honest wake-up',
   }
 });
 
+test('a wake-up written on another kind of machine is not switched on here', () => {
+  const { base, run } = scratchHarness();
+  try {
+    mkdirSync(join(base, 'status', 'shifts'), { recursive: true });
+    const elsewhere = process.platform === 'win32' ? 'darwin' : 'win32';
+    writeFileSync(join(base, 'status', 'shifts', 'probe.json'), JSON.stringify({ agent: 'probe', os: elsewhere, at: '07:00', days: [] }));
+    const r = run('on', '--agent', 'probe');
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /different kind of machine/);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 // ── The words match the code ─────────────────────────────────────────────────
 
 test('HIRING.md sends rung B to the script and no longer writes a command by hand', () => {
   const hiring = read('library/HIRING.md');
-  assert.ok(hiring.includes('node status/schedule.mjs wire --agent {name}'), 'HIRING.md does not name the command');
+  for (const command of ['wire --agent {name}', 'on --agent {name}', 'run --agent {name}', 'off --agent {name}']) {
+    assert.ok(hiring.includes(`node status/schedule.mjs ${command}`), `HIRING.md does not name: schedule.mjs ${command}`);
+  }
   assert.equal(/claude -p/.test(hiring), false, 'HIRING.md still writes claude -p by hand');
-  assert.equal(/schtasks \/Create/.test(hiring), false, 'HIRING.md still writes a schtasks entry by hand');
+  assert.equal(/schtasks|launchctl/.test(hiring), false, 'HIRING.md still talks to a scheduler by hand');
 });
 
 test('each adapter shows the command the code starts', () => {
-  const show = (surface, opts, prompt, tools) => {
-    const r = unattendedRunner(surface, opts);
-    return [r.bin, ...r.args.map((a) => (a === PROMPT_SLOT ? prompt : a === opts?.tools ? tools : a))].join(' ');
-  };
-  assert.ok(read('agent/adapters/codex.md').includes(show('codex', undefined, '"{prompt}"')), 'agent/adapters/codex.md differs from unattendedRunner');
+  const codex = unattendedRunner('codex');
   assert.ok(
-    read('agent/adapters/claude-code.md').includes(show('claude-code', { tools: 'T' }, '"{prompt}"', '"{the tools on the job sheet}"')),
-    'agent/adapters/claude-code.md differs from unattendedRunner',
+    read('agent/adapters/codex.md').includes([codex.bin, ...codex.args.map((a) => (a === PROMPT_SLOT ? '"{prompt}"' : a))].join(' ')),
+    'agent/adapters/codex.md differs from unattendedRunner',
   );
+  const claude = unattendedRunner('claude-code', { tools: 'T' });
+  const shown = [claude.bin, ...claude.args.map((a) => (a === PROMPT_SLOT ? '"{prompt}"' : a === 'T' ? '"{the job sheet\'s tools, plus the report\'s}"' : a))].join(' ');
+  assert.ok(read('agent/adapters/claude-code.md').includes(shown), 'agent/adapters/claude-code.md differs from unattendedRunner');
 });
 
 test('the script travels with updates, and what it writes is left alone by them', () => {

@@ -31,12 +31,13 @@ and Daily Practice never hears from it.
   command line, it uses your computer's own scheduler.
 - **Your computer's scheduler is set up by one command, not by hand.**
   `node status/schedule.mjs wire` writes a small wake-up file for the agent inside
-  your Orion folder and prints the one command that switches the schedule on. Your
-  assistant shows you that command and runs it only on your yes. Nothing outside the
-  folder is changed before that.
+  your Orion folder. Your assistant tells you what it will start and when, and
+  switches it on only on your yes. Nothing outside the folder is changed before
+  that, and one command switches it off again.
 - **An agent that runs on its own may use only what you approved.** On Claude Code a
-  scheduled run is allowed exactly the tools on that agent's job sheet and is refused
-  anything else without a question, because nobody is there to answer one.
+  scheduled run is allowed the tools on that agent's job sheet, plus the commands it
+  needs to report, and is refused anything else without a question, because nobody
+  is there to answer one.
 - **A scheduled Codex run can reach the radio.** It is sandboxed, and until now
   nothing told it to allow the one network call a report needs, so its work was done
   and never reported.

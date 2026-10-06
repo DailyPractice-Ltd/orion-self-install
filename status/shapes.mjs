@@ -387,12 +387,13 @@ export function skillBundleProblem(files) {
     // .md name (or a UTF-16 file). It would be refused on arrival; say so here.
     if (typeof f.content !== 'string' || f.content.includes('\0')) return `${f.path}: not text`;
     if (f.content.length > SKILL_FILE_MAX) return `${f.path}: over ${SKILL_FILE_MAX} characters`;
-    if (seen.has(f.path)) return `${f.path}: listed twice`;
-    seen.add(f.path);
+    // Case-insensitively: on a Mac or Windows disk two spellings are one file.
+    if (seen.has(f.path.toLowerCase())) return `${f.path}: listed twice`;
+    seen.add(f.path.toLowerCase());
     total += f.content.length;
     bytes += Buffer.byteLength(f.content, 'utf8');
   }
-  if (!seen.has(SKILL_ENTRY_FILE)) return `no ${SKILL_ENTRY_FILE}`;
+  if (!seen.has(SKILL_ENTRY_FILE.toLowerCase())) return `no ${SKILL_ENTRY_FILE}`;
   if (total > SKILL_BUNDLE_MAX) return `bundle over ${SKILL_BUNDLE_MAX} characters`;
   if (bytes > SKILL_BUNDLE_BYTES_MAX) return `bundle over ${SKILL_BUNDLE_BYTES_MAX} bytes`;
   return null;
@@ -407,11 +408,16 @@ export function skillBundleProblem(files) {
 export function packSkillFolder(dir, fs) {
   const files = [];
   const skipped = [];
+  // Anything that cannot be read is skipped and named, never thrown: the radio
+  // answers in one plain line, not a stack trace.
   const walk = (rel) => {
     const here = rel ? `${dir}/${rel}` : dir;
-    for (const name of fs.readdirSync(here).sort()) {
+    let names;
+    try { names = fs.readdirSync(here).sort(); } catch { skipped.push(`${rel || '.'}/ (could not be read)`); return; }
+    for (const name of names) {
       const relPath = rel ? `${rel}/${name}` : name;
-      const st = fs.lstatSync(`${dir}/${relPath}`);
+      let st;
+      try { st = fs.lstatSync(`${dir}/${relPath}`); } catch { skipped.push(`${relPath} (could not be read)`); continue; }
       if (st.isSymbolicLink()) { skipped.push(relPath); continue; }
       if (st.isDirectory()) {
         if (name.startsWith('.') || name === 'node_modules' || name === '__pycache__') { skipped.push(`${relPath}/`); continue; }
@@ -419,7 +425,9 @@ export function packSkillFolder(dir, fs) {
         continue;
       }
       if (skillPathProblem(relPath)) { skipped.push(relPath); continue; }
-      files.push({ path: relPath, content: fs.readFileSync(`${dir}/${relPath}`, 'utf8') });
+      try {
+        files.push({ path: relPath, content: fs.readFileSync(`${dir}/${relPath}`, 'utf8') });
+      } catch { skipped.push(`${relPath} (could not be read)`); }
     }
   };
   walk('');

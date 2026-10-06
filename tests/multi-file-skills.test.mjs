@@ -50,6 +50,7 @@ test('skillBundleProblem: caps, duplicates, and the entry file', () => {
   assert.equal(skillBundleProblem([{ path: 'SKILL.md', content: '# s' }]), null);
   assert.match(skillBundleProblem([{ path: 'references/x.md', content: 'x' }]), /no SKILL\.md/);
   assert.match(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'SKILL.md', content: '#' }]), /twice/);
+  assert.match(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'a/B.md', content: '1' }, { path: 'a/b.md', content: '2' }]), /twice/, 'case-only duplicates collide on a Mac');
   assert.match(skillBundleProblem([{ path: 'SKILL.md', content: 'x'.repeat(SKILL_FILE_MAX + 1) }]), /over/);
   const tooMany = Array.from({ length: SKILL_FILES_MAX + 1 }, (_, i) => ({ path: `f${i}.md`, content: 'x' }));
   assert.match(skillBundleProblem(tooMany), /more than/);
@@ -219,6 +220,23 @@ test('library --install: a bundle with an unsafe path is refused and nothing is 
   assert.match(out, /will not write/);
   assert.equal(trees['meeting-confirmation'], undefined);
   assert.ok(!calls.some((c) => c.path === '/api/bridge/assets'));
+});
+
+test('library --install: a write that fails half-way leaves nothing behind', () => {
+  // 'a.md' is written as a file, then 'a.md/b.md' needs 'a.md' to be a folder:
+  // the second write fails, and the whole install must roll back.
+  const clash = { status: 200, body: { ...BUNDLE_REPLY.body, files: [
+    { path: 'SKILL.md', content: '# x' },
+    { path: 'a.md', content: 'file' },
+    { path: 'a.md/b.md', content: 'needs a folder' },
+  ] } };
+  const { code, out, err, trees, calls } = runRadio(['library', '--install', 'meeting-confirmation', '--yes'], { reply: clash });
+  assert.equal(code, 0, err);
+  assert.match(out, /Could not write/);
+  assert.doesNotMatch(out, /Written/);
+  assert.equal(trees['meeting-confirmation'], undefined, 'no half folder left behind');
+  assert.ok(!Object.keys(trees).some((k) => k.includes('installing')), 'no staging folder left behind');
+  assert.ok(!calls.some((c) => c.path === '/api/bridge/assets'), 'the shelf is not told');
 });
 
 test('library --install: a bundle carrying a script is refused', () => {

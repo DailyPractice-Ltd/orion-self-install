@@ -73,7 +73,7 @@
  * Dependency-free: node:fs and global fetch only. No package.json, no npm install.
  */
 
-import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, lstatSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, lstatSync, renameSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
@@ -413,7 +413,8 @@ if (command === 'library') {
     console.log(`"${slug}" arrived empty — nothing written. Tell Daily Practice.`);
     process.exit(0);
   }
-  const incoming = bundle ? bundle.map((f) => f.path) : [SKILL_ENTRY_FILE];
+  const toWrite = bundle || [{ path: SKILL_ENTRY_FILE, content }];
+  const incoming = toWrite.map((f) => f.path);
 
   const dir = join(__dirname, '..', '.claude', 'skills', slug);
 
@@ -446,11 +447,22 @@ if (command === 'library') {
     process.exit(0);
   }
 
-  mkdirSync(dir, { recursive: true });
-  for (const f of (bundle || [{ path: SKILL_ENTRY_FILE, content }])) {
-    const target = join(dir, ...f.path.split('/'));
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, f.content, 'utf8');
+  // All or nothing: the folder is built beside its final name and moved into
+  // place only once every file has landed, so a failure half-way never leaves
+  // a broken skill that the "already have it" rule would then protect forever.
+  const staging = join(dirname(dir), `.${slug}.installing-${process.pid}`);
+  try {
+    mkdirSync(staging, { recursive: true });
+    for (const f of toWrite) {
+      const target = join(staging, ...f.path.split('/'));
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, f.content, 'utf8');
+    }
+    renameSync(staging, dir);
+  } catch (err) {
+    rmSync(staging, { recursive: true, force: true });
+    console.log(`Could not write "${slug}" (${err?.code || err?.message || 'unknown'}). Nothing was changed on this machine.`);
+    process.exit(0);
   }
   console.log(`Written: ${incoming.length} file${incoming.length === 1 ? '' : 's'} to .claude/skills/${slug}/`);
 

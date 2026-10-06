@@ -60,6 +60,24 @@ For whoever maintains this: how each software is started lives in one place,
 `tests/unattended-runner.test.mjs` covers both and holds `library/HIRING.md` and the
 adapters to them.
 
+## 1.1.4 — 2026-10-05
+
+**Every harness, whatever version it is on, now updates without a question and keeps what you changed.**
+
+Two gaps the last releases left, closed:
+
+- **Older harnesses still asked.** A harness older than 1.0.0 follows the update
+  instructions already in its folder, and those still told the assistant to stop and
+  ask. The update list that every version fetches now opens with a note sending the
+  assistant to the current instructions first. The first update from an older harness
+  now runs the way everyone else's does: no question, your changes kept.
+- **Some versions had nothing to compare against.** To tell your changes from our
+  files, 1.1.2 compared each file with our copy at your version. Versions 0.6.0 to
+  0.6.6 were never tagged, so for those there was no copy to fetch. The update now
+  carries a list of every copy of every file we have ever shipped and checks your
+  file against that list. A file on the list is ours and is refreshed. A file not on
+  it is yours and is kept.
+
 ## 1.1.3 — 2026-10-05
 
 **The notebook switches itself on after an update.**

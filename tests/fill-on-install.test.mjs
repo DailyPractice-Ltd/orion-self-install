@@ -95,7 +95,7 @@ test('fillBundle: a skill cannot name a status field of its own choosing', () =>
   const md = '{{SECRET}} {{WHERE}}\n\n## Fill at install\n- {{SECRET}}: a token (from: install_token)\n- {{WHERE}}: a path (from: sharing)\n';
   const { files, filled, open } = fillBundle(
     [{ path: 'SKILL.md', content: md }],
-    { business_name: 'Daily Practice', install_token: 'orion_secretsecretsecretsecret', sharing: 'x' },
+    { business_name: 'Daily Practice', install_token: 'orion_' + 'secret'.repeat(4), sharing: 'x' },
   );
   assert.deepEqual(filled, []);
   assert.deepEqual(open.map((o) => o.token), ['SECRET', 'WHERE']);

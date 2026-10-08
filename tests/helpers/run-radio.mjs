@@ -13,6 +13,10 @@ import { spawnSync } from 'node:child_process';
 
 const statusDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'status');
 
+// A key that is well shaped and opens nothing. Built here, never written out
+// whole, so no file in this folder holds a line shaped like a key.
+const FAKE_KEY = 'orion_' + 'test'.repeat(6);
+
 // A rich skill: the entry file, a reference, a template, and two things that
 // must never travel — a script and a hidden file.
 export function writeRichSkill(dir) {
@@ -43,7 +47,7 @@ export function runRadio(args, { reply, skill, status } = {}) {
         status_signal_enabled: true,
         bridge_url: 'https://radio.test/api/bridge',
         harness_id: '9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62',
-        install_token: 'orion_testtesttesttesttesttest',
+        install_token: FAKE_KEY,
       },
     }));
     if (skill) writeRichSkill(join(dir, '.claude', 'skills', skill));

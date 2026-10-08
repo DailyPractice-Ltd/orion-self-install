@@ -13,6 +13,10 @@
  * tag menu (WORK_TAGS) and the label rule for what ran (isLabel). status/done.mjs
  * and status/radio.mjs both read them from here, so they cannot disagree either.
  *
+ * Since 1.3.0 it also says where the radio key may be (radioKey), what a cloud
+ * run is (isCloudRun), and whether the folder has a home (homeOn). Every script
+ * asks here, so no two of them can answer those differently.
+ *
  * Dependency-free: no imports at all. A sibling .mjs is not a dependency —
  * `import './shapes.mjs'` needs no package.json and no install, so the
  * zero-install promise in README.md is untouched.
@@ -76,6 +80,36 @@ export function pairingCodeProblem(input) {
  */
 export function isCloudRun(env = process.env) {
   return env?.CLAUDE_CODE_REMOTE === 'true' || env?.ORION_CLOUD === '1';
+}
+
+/**
+ * Whether this script has to be started again with Node's proxy support on.
+ *
+ * Found by running it, 8 Oct 2026. On a Claude Code cloud machine every outside
+ * address is reached through a proxy the machine names in HTTPS_PROXY, and a
+ * name like www.dailypractice.world does not even resolve on the machine
+ * itself. Node's fetch ignores that variable unless NODE_USE_ENV_PROXY=1 was set
+ * before Node started, so a plain call fails with ENOTFOUND while curl beside it
+ * gets through. The radio key is attached by that same proxy, so the call has to
+ * go that way. Node learned the variable in 22.21 and 24.0. Only a cloud run
+ * does this: a person's own machine keeps reaching the radio as it always has.
+ */
+export function wantsEnvProxy(env = process.env, nodeVersion = process.versions.node) {
+  if (!isCloudRun(env) || env?.NODE_USE_ENV_PROXY === '1') return false;
+  if (!(env?.HTTPS_PROXY || env?.https_proxy)) return false;
+  const [major, minor] = String(nodeVersion).split('.').map(Number);
+  return major >= 24 || (major === 22 && minor >= 21);
+}
+
+/** The environment a script hands itself when it starts again with proxy support on. */
+export function envProxyEnv(env = process.env) {
+  return {
+    ...env,
+    NODE_USE_ENV_PROXY: '1',
+    // Node calls that support experimental and says so on every call. Quiet that
+    // one line: a shift's output is read by its agent.
+    NODE_OPTIONS: `${env?.NODE_OPTIONS || ''} --disable-warning=UNDICI-EHPA`.trim(),
+  };
 }
 
 /**
@@ -198,6 +232,17 @@ const MEMORY_DEFAULTS = Object.freeze({ enabled: true, backend: 'folder', remote
 
 export function memoryBlock(status) {
   return { ...MEMORY_DEFAULTS, ...(status?.memory ?? {}) };
+}
+
+/**
+ * The same repository over https, for a machine with no ssh key of its own. A
+ * laptop reaches a notebook at git@github.com:owner/notebook.git. A cloud run
+ * is given that repository over https and nothing else. Null when the address
+ * is not the git@host:path kind.
+ */
+export function httpsTwin(remote) {
+  const m = /^git@([A-Za-z0-9.-]+):([A-Za-z0-9._/-]+?)(?:\.git)?$/.exec(String(remote ?? ''));
+  return m ? `https://${m[1]}/${m[2]}.git` : null;
 }
 
 export function memoryConfigured(status) {

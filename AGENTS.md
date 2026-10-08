@@ -92,11 +92,16 @@ available, and that promise is made to every reader in `README.md` — keep it.
      `status.json` freely — when you print the file back for a client on a paste-only
      surface, or read it aloud, replace the token with `····` plus its last four
      characters. It is a live credential; a transcript is a place it would live forever.
+     A folder that has been given a home (`status/home.mjs`) keeps its key in
+     `status/radio.key` instead, and the same rule holds for that file: never print
+     it, never quote it, never copy it anywhere.
 2. **Check the radio — every session start, when it is on.** (Say "radio", never
    "mailbox" — once the client's email is connected, "mailbox" means their inbox and
    you will search the wrong thing.) "On" means `sharing.status_signal_enabled` is
-   `true` AND `bridge_url`, `harness_id`, `install_token` are all set. If you can run
-   scripts, run `node status/radio.mjs check`. An empty radio needs no mention at all.
+   `true` AND `bridge_url` and `harness_id` are set AND the radio has its key:
+   `install_token` in that file, or `status/radio.key` when the folder has a home. If
+   you can run scripts, run `node status/radio.mjs check`: it works out by itself
+   whether the radio is on. An empty radio needs no mention at all.
 
    **If a message is waiting, deliver it as a message, not as a report.** Someone at
    Daily Practice wrote it to this client. Say who it is from and what they said, in

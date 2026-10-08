@@ -23,6 +23,14 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { parseInstallDirective, LIBRARY_INSTALL_DIRECTIVE_PREFIX } from '../status/shapes.mjs';
+import { plainEnv } from './helpers/env.mjs';
+
+/**
+ * A key that is well shaped and opens nothing. Built here, never written out
+ * whole, so no file in this folder holds a line shaped like a key (the rule
+ * status/home.mjs applies before it saves a folder anywhere).
+ */
+const FAKE_KEY = 'orion_' + 'test'.repeat(6);
 
 const here = dirname(fileURLToPath(import.meta.url));
 const statusDir = join(here, '..', 'status');
@@ -95,7 +103,7 @@ function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, s
         status_signal_enabled: true,
         bridge_url: 'https://radio.test/api/bridge',
         harness_id: '9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62',
-        install_token: 'orion_testtesttesttesttesttest',
+        install_token: FAKE_KEY,
         ...sharing,
       },
     }));
@@ -125,7 +133,7 @@ function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, s
     const r = spawnSync(
       process.execPath,
       ['--import', pathToFileURL(mock).href, join(dir, 'status', 'radio.mjs'), ...args],
-      { encoding: 'utf8' },
+      { encoding: 'utf8', env: plainEnv() },
     );
     const status = JSON.parse(readFileSync(join(dir, 'status', 'status.json'), 'utf8'));
     const calls = existsSync(log)
@@ -168,7 +176,7 @@ test('check tells the client about an offer in words and prints the exact instal
   assert.ok(fence > 0);
   assert.ok(out.indexOf('library --install') > fence);
   assert.equal(status.sharing.radio_seen_through, at, 'the message read out is remembered');
-  assert.equal(status.sharing.install_token, 'orion_testtesttesttesttesttest', 'the rest of the file survives');
+  assert.equal(status.sharing.install_token, FAKE_KEY, 'the rest of the file survives');
 });
 
 test('a plain message is still read as written, with no install command', () => {

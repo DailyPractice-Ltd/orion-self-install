@@ -81,14 +81,23 @@
 import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, lstatSync, renameSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import {
-  radioOn as radioIsOn, radioKey, readRadioKeyFile, keyHeader,
+  radioOn as radioIsOn, radioKey, readRadioKeyFile, keyHeader, wantsEnvProxy, envProxyEnv, isCloudRun,
   parseInstallDirective, isWorkTag, workTagMenu, labelProblem, countProblem,
   packSkillFolder, skillBundleProblem, SKILL_ENTRY_FILE,
 } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status.json');
+
+// A cloud machine reaches the radio only through its proxy, and Node has to be
+// started knowing that (status/shapes.mjs, wantsEnvProxy). So this script starts
+// itself once more with that switched on, and hands back whatever that run says.
+if (wantsEnvProxy()) {
+  const again = spawnSync(process.execPath, [...process.execArgv, ...process.argv.slice(1)], { stdio: 'inherit', env: envProxyEnv() });
+  process.exit(again.status ?? 0);
+}
 
 const SIGNAL_TYPES = [
   'install_checkpoint',
@@ -173,18 +182,15 @@ async function call(method, path, body) {
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(10000),
     });
-    // A cloud machine's network answers for the radio when the address is not on
-    // its list of allowed sites. That is not the radio refusing anything, so say
-    // what it is and where it is fixed.
-    if (res.status === 403 && res.headers.get('x-deny-reason') === 'host_not_allowed') {
-      console.log(`This machine's network is not allowed to reach the radio's address (${new URL(base).host}).`);
-      console.log('Add that address to the cloud environment this run uses, then run again. Nothing is lost locally.');
-      resultLine('refused 403');
-      process.exit(0);
-    }
     return res;
   } catch (err) {
     console.log(`The radio address didn't answer (${err?.cause?.code || err.code || err.message}) — not retried, nothing lost locally.`);
+    if (isCloudRun()) {
+      // A cloud machine may only reach the addresses its environment allows, and
+      // a refusal looks exactly like no answer at all.
+      console.log(`On a cloud run this usually means the cloud environment may not reach ${new URL(base).host}.`);
+      console.log('A secret for that address, added to the environment, both allows it and carries the key.');
+    }
     resultLine('unreachable');
     process.exit(0);
   }

@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { memoryConfigured, memoryBlock, MEMORY_GIT_REMOTE_RE, CREDENTIAL_RES } from './shapes.mjs';
+import { memoryConfigured, memoryBlock, MEMORY_GIT_REMOTE_RE, CREDENTIAL_RES, httpsTwin, isCloudRun } from './shapes.mjs';
 
 const HARNESS_ROOT = process.cwd();
 
@@ -129,22 +129,42 @@ if (!memoryConfigured(status)) offLine('the memory block in status.json is off o
 const block = memoryBlock(status);
 const root = memoryRoot(status);
 
-if (command === 'init') {
-  if (block.backend === 'git' && !fs.existsSync(path.join(root, '.git'))) {
-    if (!MEMORY_GIT_REMOTE_RE.test(block.remote || '')) offLine('git backend but no usable remote');
-    const tmp = root + '.clone-tmp';
+/**
+ * Fetch the notebook's repository into the memory folder. Returns null when it
+ * worked, or one plain reason when it did not (and then nothing was written).
+ *
+ * The address in status.json is the one the owner's own machine uses, often the
+ * ssh kind. A cloud run has no ssh key: it is given the repository over https.
+ * So both spellings of the same repository are tried, https first on a cloud
+ * run, and the one that answers becomes the clone's address from then on.
+ */
+function cloneNotebook() {
+  const tmp = root + '.clone-tmp';
+  const twin = httpsTwin(block.remote);
+  const addresses = twin
+    ? (isCloudRun() ? [twin, block.remote] : [block.remote, twin])
+    : [block.remote];
+  let reason = 'git failed';
+  let cloned = false;
+  for (const address of addresses) {
     fs.rmSync(tmp, { recursive: true, force: true });
-    const r = git(HARNESS_ROOT, ['clone', block.remote, tmp]);
-    if (r.status !== 0) {
-      fs.rmSync(tmp, { recursive: true, force: true });
-      console.log(`Couldn't clone the memory repo (${(r.stderr || '').trim().split('\n')[0] || 'git failed'}) — nothing written.`);
-      process.exit(0);
-    }
-    // A memory folder usually already exists (the template ships memory/README.md,
-    // or the folder backend ran first). Joining absorbs it: every local note moves
-    // into the clone; where local and repo copies differ, the local one wins and
-    // becomes a change the next sync commits — history keeps both. Nothing is lost.
-    if (fs.existsSync(root)) {
+    const r = git(HARNESS_ROOT, ['clone', '--quiet', address, tmp]);
+    if (r.status === 0) { cloned = true; break; }
+    reason = (r.stderr || '').trim().split('\n')[0] || reason;
+  }
+  if (!cloned) {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    return reason;
+  }
+  // A memory folder usually already exists (the template ships memory/README.md,
+  // or the folder backend ran first). Joining absorbs it: every local note moves
+  // into the clone; where local and repo copies differ, the local one wins and
+  // becomes a change the next sync commits — history keeps both. Nothing is lost.
+  // Not on a cloud run: what sits in that folder there is a copy that came with
+  // the harness, never a note someone wrote on that machine, so the notebook's
+  // own repository is taken exactly as it is.
+  if (fs.existsSync(root)) {
+    if (!isCloudRun()) {
       (function absorb(dir) {
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
           if (entry.name === '.git') continue;
@@ -157,14 +177,36 @@ if (command === 'init') {
           }
         }
       })(root);
-      fs.rmSync(root, { recursive: true, force: true });
     }
-    fs.renameSync(tmp, root);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+  fs.renameSync(tmp, root);
+  return null;
+}
+
+if (command === 'init') {
+  if (block.backend === 'git' && !fs.existsSync(path.join(root, '.git'))) {
+    if (!MEMORY_GIT_REMOTE_RE.test(block.remote || '')) offLine('git backend but no usable remote');
+    const problem = cloneNotebook();
+    if (problem) {
+      console.log(`Couldn't clone the memory repo (${problem}) — nothing written.`);
+      process.exit(0);
+    }
   }
   fs.mkdirSync(root, { recursive: true });
   const made = ensureScaffold(root);
   console.log(`Memory ready at ${shown(path.relative(HARNESS_ROOT, root)) || '.'} (${made} scaffold file${made === 1 ? '' : 's'} created, backend: ${block.backend}).`);
   process.exit(0);
+}
+
+// A cloud run starts from a fresh copy of the folder every time, so the
+// notebook's clone is never there yet. Setting it up is not a choice anyone has
+// to make again: status.json already says where the notebook lives. Fetch it
+// quietly, and carry on to whatever was asked.
+if (block.backend === 'git' && !gitBackendReady(root) && isCloudRun() &&
+    MEMORY_GIT_REMOTE_RE.test(block.remote || '')) {
+  const problem = cloneNotebook();
+  if (problem) offLine(`the notebook's repository could not be fetched on this cloud run: ${problem}`);
 }
 
 if (!fs.existsSync(root)) {

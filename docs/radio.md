@@ -172,7 +172,9 @@ if you're going solo, there's no code to wait for, and the radio just stays off.
 
 That code is the only thing you ever type, and typing it is the whole setup: your
 machine sends it to Daily Practice, gets your key back, and stores that key in your own
-`status/status.json` and nowhere else. **The key does not exist until your machine asks
+`status/status.json` and nowhere else. (If your folder has been given a home of its own,
+a private repository that you control, the key is kept in `status/radio.key` instead,
+a file that is never saved to that home.) **The key does not exist until your machine asks
 for it** — so there is never a moment when whoever gave you the code is holding your
 key, or could paste it into a chat by mistake. The code works **once**, expires after
 **15 minutes**, and is worthless to anyone who sees it after that.

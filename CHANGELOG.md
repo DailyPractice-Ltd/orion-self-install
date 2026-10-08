@@ -17,6 +17,31 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.3.0 — 2026-10-08
+
+**Groundwork for work that runs away from your own machine. Nothing changes for you unless you ask for it.**
+
+- **The radio key no longer has to live in your bookmark file.** Until now the key
+  that tells Daily Practice which harness is calling sat in `status/status.json`.
+  That is why that one file could never be saved anywhere but your machine. The radio
+  now also looks for the key in `status/radio.key`, and in the machine's own settings.
+  If your key is where it has always been, it is found there exactly as before.
+- **New, and switched off: a home for your folder.** `status/home.mjs` can keep your
+  whole folder in a private repository that you own, so it is backed up and a second
+  machine can pick up where the first one stopped. Before it saves anything it moves
+  the key out of the bookmark file. It never saves the key, and it holds back any file
+  with a line in it that is shaped like a key, and tells you which. Daily Practice has
+  no part in that repository and cannot read it. This update switches nothing on.
+- **A shift can run in the cloud**, on a fresh copy of the folder, with the key kept
+  outside that machine altogether. We are proving this on Daily Practice's own harness
+  first. It is not offered as a way to schedule your team yet, and `library/HIRING.md`
+  still says so.
+- **Fixed:** a notebook kept in a repository of its own is now fetched over https when
+  a machine has no ssh key.
+
+What the radio shares has not changed: a tag, a count, a time, and the name of the
+skill or agent that ran. Never the content.
+
 ## 1.2.2 — 2026-10-06
 
 **The scheduler route is now proven on Windows and Linux too, and one Windows wording slip is fixed.**

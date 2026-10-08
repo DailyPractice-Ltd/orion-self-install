@@ -334,7 +334,7 @@ if (homeOn(status)) {
   const what = shift
     ? `shift: ${agent}, ${tag}, count ${count}`
     : `task: ${tag}, count ${count}`;
-  const home = runSibling('home.mjs', ['sync', '--message', what], 180000);
+  const home = runSibling('home.mjs', ['sync', '--message', what], 420000);
   if (home.out) console.log(home.out);
   else console.log('The folder could not be saved to its home this time. Nothing is lost on this machine.');
 }

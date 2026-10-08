@@ -15,11 +15,18 @@ checklist is resolved at the bottom.
 - Auth: `Authorization: Bearer <sharing.install_token>` on every request. The token IS
   the harness identity server-side (SHA-256 hash-stored, revocable). 401 means the
   token is wrong or revoked — the client reports it plainly and does nothing else.
+  Since 1.3.0 the client looks for the token in three places and uses the first that
+  holds a well-shaped one: `ORION_INSTALL_TOKEN` in the machine's environment,
+  `status/radio.key`, then `sharing.install_token` (`radioKey` in `status/shapes.mjs`).
+  A cloud run that finds none sends no `Authorization` header at all: its environment
+  attaches the token after the request has left the machine. The server sees the same
+  header either way, and nothing server-side changed.
 - `harness_id` in a body is a cross-check only: the server derives identity from the
   token and answers **403** if a body `harness_id` doesn't match it. Nothing is ever
   written on any auth failure.
 - Radio-on gate before any call: `sharing.status_signal_enabled` AND `bridge_url` AND
-  `harness_id` AND `install_token`. Anything less → silent local no-op, exit 0.
+  `harness_id` AND a token from one of the places above (or a cloud run, where it is
+  attached outside the machine). Anything less → silent local no-op, exit 0.
 - Failures never retry automatically and never block local work.
 - No PII in any payload: no message content, no KB content, no prospect data — ever.
   The server enforces a best-effort tripwire (PII-shaped key names and email-shaped

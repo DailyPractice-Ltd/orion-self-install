@@ -18,9 +18,18 @@
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { radioOn, radioKey, readRadioKeyFile, keyHeader } from './shapes.mjs';
+import { spawnSync } from 'node:child_process';
+import { radioOn, radioKey, readRadioKeyFile, keyHeader, wantsEnvProxy, envProxyEnv } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// A cloud machine reaches the radio only through its proxy (status/shapes.mjs,
+// wantsEnvProxy): start once more with that switched on.
+if (wantsEnvProxy()) {
+  const again = spawnSync(process.execPath, [...process.execArgv, ...process.argv.slice(1)], { stdio: 'inherit', env: envProxyEnv() });
+  process.exit(again.status ?? 0);
+}
+
 const STATUS_PATH = join(__dirname, 'status.json');
 const TEMPLATE_PATH = join(__dirname, 'status.schema-template.json');
 

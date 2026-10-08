@@ -20,6 +20,14 @@ import {
   skillPathProblem, skillBundleProblem, packSkillFolder,
   SKILL_FILES_MAX, SKILL_FILE_MAX,
 } from '../status/shapes.mjs';
+import { plainEnv } from './helpers/env.mjs';
+
+/**
+ * A key that is well shaped and opens nothing. Built here, never written out
+ * whole, so no file in this folder holds a line shaped like a key (the rule
+ * status/home.mjs applies before it saves a folder anywhere).
+ */
+const FAKE_KEY = 'orion_' + 'test'.repeat(6);
 
 const here = dirname(fileURLToPath(import.meta.url));
 const statusDir = join(here, '..', 'status');
@@ -91,7 +99,7 @@ function runRadio(args, { reply, skill } = {}) {
         status_signal_enabled: true,
         bridge_url: 'https://radio.test/api/bridge',
         harness_id: '9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62',
-        install_token: 'orion_testtesttesttesttesttest',
+        install_token: FAKE_KEY,
       },
     }));
     if (skill) writeRichSkill(join(dir, '.claude', 'skills', skill));
@@ -109,7 +117,7 @@ function runRadio(args, { reply, skill } = {}) {
         return new Response(JSON.stringify(reply.body), { status: reply.status, headers: { 'content-type': 'application/json' } });
       };
     `);
-    const r = spawnSync(process.execPath, ['--import', pathToFileURL(mock).href, join(dir, 'status', 'radio.mjs'), ...args], { encoding: 'utf8' });
+    const r = spawnSync(process.execPath, ['--import', pathToFileURL(mock).href, join(dir, 'status', 'radio.mjs'), ...args], { encoding: 'utf8', env: plainEnv() });
     const calls = existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
     const trees = {};
     const skillsRoot = join(dir, '.claude', 'skills');

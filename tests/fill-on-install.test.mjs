@@ -66,6 +66,11 @@ test('fillBundle: what the harness knows goes into every file; only listed token
 
   // The skill's own working text is never filled: it is not on the list.
   assert.match(byPath['SKILL.md'], /Hi \{\{first_name\}\}/);
+  const upper = fillBundle(
+    [{ path: 'SKILL.md', content: 'From {{CLIENT_BUSINESS}} to {{TEAM_MEMBERS}} about {{DEAL_NAME}}.\n\n## Fill at install\n- {{CLIENT_BUSINESS}}: your business name (from: business_name)\n' }],
+    { business_name: 'Daily Practice' },
+  ).files[0].content;
+  assert.match(upper, /^From Daily Practice to \{\{TEAM_MEMBERS\}\} about \{\{DEAL_NAME\}\}\.$/m, 'an unlisted token in capitals is left alone too');
   assert.match(byPath['SKILL.md'], /- \{\{company\}\} is the prospect's company, never Daily Practice\./);
 
   assert.deepEqual(filled.map((f) => [f.token, f.value]), [['CLIENT_BUSINESS', 'Daily Practice'], ['AGENT_NAME', 'Neo']]);
@@ -128,7 +133,7 @@ test('fillBundle: a value that is not one plain line is not written', () => {
   }
 });
 
-test('fillBundle: filling is never the reason a skill cannot land', () => {
+test('fillBundle: a fill that would push a file over its size cap is not made; the skill lands as it arrived', () => {
   const md = `${'{{CLIENT_BUSINESS}} '.repeat(9000)}\n\n## Fill at install\n- {{CLIENT_BUSINESS}}: your business name (from: business_name)\n`;
   assert.ok(md.length < SKILL_FILE_MAX);
   const arrived = [{ path: 'SKILL.md', content: md }];
@@ -136,6 +141,119 @@ test('fillBundle: filling is never the reason a skill cannot land', () => {
   assert.equal(files, arrived, 'over the cap once filled, so it lands as it arrived');
   assert.deepEqual(filled, []);
   assert.deepEqual(open.map((o) => o.token), ['CLIENT_BUSINESS']);
+});
+
+test('fillBundle: Windows line endings survive a fill, line for line', () => {
+  const md = 'For {{CLIENT_BUSINESS}}.\r\n\r\n## Fill at install\r\n- {{CLIENT_BUSINESS}}: your business name (from: business_name)\r\n\r\nEnd.\r\n';
+  const out = fillBundle([{ path: 'SKILL.md', content: md }], { business_name: 'Daily Practice' }).files[0].content;
+  assert.equal(out, 'For Daily Practice.\r\n\r\n## Fill at install\r\n- CLIENT_BUSINESS: Daily Practice\r\n\r\nEnd.\r\n');
+});
+
+test('parseFillManifest: the list ends where it ends; a later list is not part of it', () => {
+  const md = [
+    '## Fill at install',
+    'These are filled as the skill lands.',
+    '',
+    '- {{CLIENT_BUSINESS}}: your business name (from: business_name)',
+    '',
+    '- {{PIPELINE_STAGES}}: your CRM pipeline stage names, in order',
+    '',
+    '---',
+    '**Blanks filled on every use**',
+    '- {{FIRST_NAME}}: the prospect\'s first name (from: business_name)',
+    '',
+  ].join('\n');
+  assert.deepEqual(parseFillManifest(md).map((m) => m.token), ['CLIENT_BUSINESS', 'PIPELINE_STAGES']);
+  const { files } = fillBundle([{ path: 'SKILL.md', content: `Hi {{FIRST_NAME}}.\n\n${md}` }], { business_name: 'Daily Practice' });
+  assert.match(files[0].content, /^Hi \{\{FIRST_NAME\}\}\.$/m, 'a blank filled on every use is never filled at install');
+});
+
+test('parseFillManifest: a heading inside a code block is an example, not the list', () => {
+  const md = 'How to write one:\n\n```\n## Fill at install\n- {{EXAMPLE}}: an example (from: business_name)\n```\n\nUse {{EXAMPLE}} like so.\n';
+  assert.deepEqual(parseFillManifest(md), []);
+  const arrived = [{ path: 'SKILL.md', content: md }];
+  assert.equal(fillBundle(arrived, { business_name: 'Daily Practice' }).files, arrived);
+});
+
+test('parseFillManifest: near spellings of the heading and the hint still read', () => {
+  for (const md of [
+    '### Fill at install\n- {{CLIENT_BUSINESS}}: your business name (from: business_name)\n',
+    '## Fill at install:\n- {{CLIENT_BUSINESS}}: your business name (From: Business_Name).\n',
+    '## FILL AT INSTALL\n* {{CLIENT_BUSINESS}}:your business name   (from:business_name)\n',
+  ]) {
+    assert.deepEqual(parseFillManifest(md), [{ token: 'CLIENT_BUSINESS', question: 'your business name', from: 'business_name' }], md);
+  }
+});
+
+test('parseFillManifest: a line a server pads to a great length cannot stall the radio', () => {
+  const pad = ' '.repeat(190000);
+  const md = `## Fill at install\n- {{A}}: x${pad}y\n- {{CLIENT_BUSINESS}}: your business name (from: business_name)${pad}\n`;
+  const started = Date.now();
+  const found = parseFillManifest(md);
+  assert.ok(Date.now() - started < 2000, 'read in well under two seconds');
+  assert.deepEqual(found.map((m) => m.token), ['CLIENT_BUSINESS'], 'the padded line is not a fill line; a trailing pad is only white space');
+});
+
+test('fillBundle: a list that names a token twice, or too many of them, is not used at all', () => {
+  const twice = '{{CLIENT_BUSINESS}}\n\n## Fill at install\n- {{CLIENT_BUSINESS}}: your business name (from: business_name)\n- {{CLIENT_BUSINESS}}: again\n';
+  const a = fillBundle([{ path: 'SKILL.md', content: twice }], { business_name: 'Daily Practice' });
+  assert.match(a.problem, /listed twice/);
+  assert.equal(a.files[0].content, twice, 'nothing is filled from a list that cannot be trusted');
+
+  const many = `## Fill at install\n${Array.from({ length: 21 }, (_, i) => `- {{T${i}}}: thing ${i}`).join('\n')}\n`;
+  assert.match(fillBundle([{ path: 'SKILL.md', content: many }], {}).problem, /more than 20/);
+});
+
+test('fillBundle: in YAML and CSV a name is only written where it is safe as it stands', () => {
+  const skill = (name) => fillBundle([
+    { path: 'SKILL.md', content: '---\nname: outreach\ndescription: Outreach for {{CLIENT_BUSINESS}}\n---\n\nBody for {{CLIENT_BUSINESS}}.\n\n## Fill at install\n- {{CLIENT_BUSINESS}}: your business name (from: business_name)\n' },
+  ], { business_name: name });
+
+  // A plain name is fine anywhere, the frontmatter included.
+  const plain = skill('Smith & Sons (Pty) Ltd');
+  assert.match(plain.files[0].content, /^description: Outreach for Smith & Sons \(Pty\) Ltd$/m);
+  assert.deepEqual(plain.open, []);
+
+  // A colon, a comma, a quote or a hash would change what the YAML means: asked, not written.
+  for (const name of ['Acme: Plumbing & Heating', 'Smith, Jones & Co', 'Studio #9', 'O\'Brien "Best" Co']) {
+    const r = skill(name);
+    assert.deepEqual(r.filled, [], name);
+    assert.deepEqual(r.open.map((o) => o.token), ['CLIENT_BUSINESS'], name);
+    assert.match(r.files[0].content, /Body for \{\{CLIENT_BUSINESS\}\}\./, 'left whole for the assistant, not half filled');
+  }
+
+  // The same names are fine in prose, where no file format reads them.
+  const prose = fillBundle([
+    { path: 'SKILL.md', content: 'For {{CLIENT_BUSINESS}}.\n\n## Fill at install\n- {{CLIENT_BUSINESS}}: your business name (from: business_name)\n' },
+    { path: 'references/list.csv', content: 'name,stage\nexample,lead\n' },
+    { path: 'agents/openai.yaml', content: 'interface:\n  display_name: Outreach\n' },
+  ], { business_name: 'Acme: Plumbing, Heating & "More"' });
+  assert.match(prose.files[0].content, /^For Acme: Plumbing, Heating & "More"\.$/m);
+
+  // And a token sitting in a .csv or .yaml file follows the same rule as the frontmatter.
+  for (const path of ['references/list.csv', 'agents/openai.yaml']) {
+    const r = fillBundle([
+      { path: 'SKILL.md', content: '## Fill at install\n- {{CLIENT_BUSINESS}}: your business name (from: business_name)\n' },
+      { path, content: 'owner: {{CLIENT_BUSINESS}}\n' },
+    ], { business_name: 'Smith, Jones & Co' });
+    assert.deepEqual(r.filled, [], path);
+  }
+});
+
+test('fillBundle: a hint this harness does not honour is taken off the line as it lands', () => {
+  const md = 'Key {{SECRET}} for {{CLIENT_BUSINESS}}.\n\n## Fill at install\n- {{CLIENT_BUSINESS}}: your business name (from: business_name)\n- {{SECRET}}: a token (from: install_token)\n';
+  const withName = fillBundle([{ path: 'SKILL.md', content: md }], { business_name: 'Daily Practice' });
+  assert.match(withName.files[0].content, /^- \{\{SECRET\}\}: a token$/m);
+  const without = fillBundle([{ path: 'SKILL.md', content: md }], {});
+  assert.match(without.files[0].content, /^- \{\{SECRET\}\}: a token$/m, 'even when nothing else is filled');
+  assert.ok(!without.files[0].content.includes('install_token'));
+  assert.match(without.files[0].content, /^- \{\{CLIENT_BUSINESS\}\}: your business name \(from: business_name\)$/m, 'a hint it does honour stays');
+});
+
+test('fillBundle: a question that names the business is asked with the name in it', () => {
+  const md = '## Fill at install\n- {{CLIENT_BUSINESS}}: your business name (from: business_name)\n- {{PIPELINE_STAGES}}: the stage names {{CLIENT_BUSINESS}} uses in its CRM\n';
+  const { open } = fillBundle([{ path: 'SKILL.md', content: md }], { business_name: 'Daily Practice' });
+  assert.deepEqual(open, [{ token: 'PIPELINE_STAGES', question: 'the stage names Daily Practice uses in its CRM' }]);
 });
 
 // ── The real radio.mjs ──────────────────────────────────────────────────────
@@ -216,4 +334,15 @@ test('library --install: a bundle whose entry file is not spelled SKILL.md is re
   assert.equal(err, '', 'no stack trace');
   assert.match(out, /will not write \(no SKILL\.md\)\. Nothing written\./);
   assert.equal(trees['call-planner-control-tower'], undefined);
+});
+
+test('library --install: a skill whose fill list cannot be used is refused, and nothing is written', () => {
+  const twice = SKILL_MD.replace('- {{PIPELINE_STAGES}}: your CRM pipeline stage names, in order', '- {{CLIENT_BUSINESS}}: listed again');
+  assert.notEqual(twice, SKILL_MD);
+  const reply = { status: 200, body: { ...REPLY.body, content: twice, files: [{ path: 'SKILL.md', content: twice }] } };
+  const { code, out, err, trees, calls } = runRadio([...INSTALL, '--yes'], { reply, status: KNOWN });
+  assert.equal(code, 0, err);
+  assert.match(out, /will not write \(\{\{CLIENT_BUSINESS\}\} is listed twice under "Fill at install"\)\. Nothing written\./);
+  assert.equal(trees['call-planner-control-tower'], undefined);
+  assert.ok(!calls.some((c) => c.path === '/api/bridge/assets'), 'no shelf report on a refusal');
 });

@@ -449,6 +449,10 @@ export function packSkillFolder(dir, fs) {
 // exactly as written. A line ending "(from: <field>)" is filled from
 // status.json with no question; every other line is asked by the assistant,
 // one question at a time, after the skill has landed.
+//
+// The list is the run of such lines straight after the heading. It ends at the
+// first line that is something else, so a later list in the same skill is never
+// mistaken for it. A heading inside a code block is an example, not the list.
 
 // What a skill may ask to be filled from. A skill is data from somewhere else:
 // it names one of these or nothing, never a field of its own choosing, so no
@@ -456,37 +460,67 @@ export function packSkillFolder(dir, fs) {
 export const FILL_FROM_FIELDS = Object.freeze(['business_name', 'agent_name']);
 export const FILL_TOKENS_MAX = 20;
 export const FILL_VALUE_MAX = 200;
+// A fill line is short. A longer one is not read as one, which also keeps every
+// pattern below working on a bounded string whatever a server sends.
+const FILL_LINE_MAX = 400;
 
-const FILL_HEADING_RE = /^##\s+fill at install\s*$/i;
-const FILL_LINE_RE = /^\s*[-*]\s+\{\{([A-Z][A-Z0-9_]{0,63})\}\}\s*:\s*(.*)$/;
-const FILL_FROM_RE = /\s*\(from:\s*([A-Za-z][A-Za-z0-9_]*)\s*\)\s*$/;
+const FILL_HEADING_RE = /^#{2,4}\s+fill at install\s*:?$/i;
+const FILL_LINE_RE = /^[-*]\s+\{\{([A-Z][A-Z0-9_]{0,63})\}\}\s*:(.*)$/;
+const FENCE_RE = /^(```|~~~)/;
+const BREAK_RE = /^(#{1,6}\s|-{3,}$|\*{3,}$|_{3,}$)/;
+// A name that can be written into YAML or CSV as it stands: letters, digits,
+// spaces and a few marks that mean nothing there. Anything else is still fine
+// in prose, so it only matters where a token sits in one of those files.
+const STRUCTURE_SAFE_RE = /^[\p{L}\p{N}][\p{L}\p{N} .&()\/+-]*$/u;
 
-/** Where the fill list sits in a SKILL.md, line by line. Null when there is none. */
+/** "question (from: field)" -> { question, from }. Plain string work, no backtracking. */
+function splitFrom(rest) {
+  const text = rest.trim().replace(/\.$/, '');
+  if (text.endsWith(')')) {
+    const at = text.toLowerCase().lastIndexOf('(from:');
+    const name = at === -1 ? '' : text.slice(at + 6, -1).trim();
+    if (/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name)) return { question: text.slice(0, at), from: name.toLowerCase() };
+  }
+  return { question: rest, from: null };
+}
+
+/**
+ * Where the fill list sits in a SKILL.md, line by line. Null when there is none.
+ * `problem` says why a list cannot be used (a token twice, too many of them).
+ */
 function fillSection(skillMd) {
   if (typeof skillMd !== 'string') return null;
   const lines = skillMd.split('\n');
-  const start = lines.findIndex((l) => FILL_HEADING_RE.test(l.replace(/\r$/, '')));
+  let start = -1;
+  let fenced = false;
+  for (let i = 0; i < lines.length && start === -1; i++) {
+    const t = lines[i].trim();
+    if (FENCE_RE.test(t)) fenced = !fenced;
+    else if (!fenced && t.length <= FILL_LINE_MAX && FILL_HEADING_RE.test(t)) start = i;
+  }
   if (start === -1) return null;
+
   const entries = [];
   const seen = new Set();
   for (let i = start + 1; i < lines.length; i++) {
-    const line = lines[i].replace(/\r$/, '');
-    if (/^#{1,6}\s/.test(line)) break;
-    const m = FILL_LINE_RE.exec(line);
-    if (!m || seen.has(m[1]) || entries.length >= FILL_TOKENS_MAX) continue;
+    const t = lines[i].trim();
+    if (t === '') continue;
+    const m = t.length <= FILL_LINE_MAX ? FILL_LINE_RE.exec(t) : null;
+    if (!m) {
+      // A sentence may introduce the list; once the list has begun, anything
+      // that is not part of it ends it.
+      if (entries.length > 0 || BREAK_RE.test(t) || FENCE_RE.test(t)) break;
+      continue;
+    }
+    if (seen.has(m[1])) return { lines, entries, problem: `{{${m[1]}}} is listed twice under "Fill at install"` };
+    if (entries.length >= FILL_TOKENS_MAX) return { lines, entries, problem: `more than ${FILL_TOKENS_MAX} things listed under "Fill at install"` };
     seen.add(m[1]);
-    const fromMatch = FILL_FROM_RE.exec(m[2]);
+    const { question, from } = splitFrom(m[2]);
     // The question is printed for a person to read: one plain line, no control characters.
-    const question = (fromMatch ? m[2].slice(0, fromMatch.index) : m[2])
-      .replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, FILL_VALUE_MAX);
-    entries.push({
-      token: m[1],
-      question: question || m[1].toLowerCase().replace(/_/g, ' '),
-      from: fromMatch ? fromMatch[1].toLowerCase() : null,
-      line: i,
-    });
+    const plain = question.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, FILL_VALUE_MAX);
+    entries.push({ token: m[1], question: plain || m[1].toLowerCase().replace(/_/g, ' '), from, line: i });
   }
-  return { lines, entries };
+  return { lines, entries, problem: null };
 }
 
 /**
@@ -507,34 +541,51 @@ function fillValue(v) {
   return value;
 }
 
+/** How many leading lines of a SKILL.md are its frontmatter block (0 when it has none). */
+function frontmatterEnd(lines) {
+  if (lines.length === 0 || lines[0].trim() !== '---') return 0;
+  const end = lines.findIndex((l, i) => i > 0 && l.trim() === '---');
+  return end === -1 ? 0 : end + 1;
+}
+
 /**
  * Fill what this harness already knows into a skill bundle ({ path, content }[]).
  * `known` is { business_name, agent_name } from status.json. Returns the files
  * to write, what was filled, and what is still open for the assistant to ask:
- *   { files, filled: [{ token, question, value }], open: [{ token, question }] }
+ *   { files, filled: [{ token, question, value }], open: [{ token, question }], problem }
  *
  * A skill that declares nothing comes back as the very same array, untouched.
  * A filled token's own line in the list becomes the record ("- TOKEN: value"),
- * so nothing filled is left in braces; an open token's line stays as it is.
+ * so nothing filled is left in braces; an open token's line stays to be asked.
+ * `problem` is set, and nothing is filled, when the list itself cannot be used.
  */
 export function fillBundle(files, known = {}) {
+  const asArrived = { files, filled: [], open: [], problem: null };
   const entry = Array.isArray(files) ? files.find((f) => f?.path === SKILL_ENTRY_FILE) : null;
   const section = entry ? fillSection(entry.content) : null;
-  if (!section || section.entries.length === 0) return { files, filled: [], open: [] };
+  if (!section) return asArrived;
+  if (section.problem) return { ...asArrived, problem: section.problem };
+  if (section.entries.length === 0) return asArrived;
+
+  // In YAML or CSV (and a SKILL.md's own frontmatter is YAML) a colon, a comma
+  // or a quote in a name changes what the file means. A token that sits there
+  // is filled only with a name that is safe there; otherwise it is asked, and
+  // the assistant writes it in with the quoting that file needs.
+  const fmEnd = frontmatterEnd(section.lines);
+  const inStructure = (token) => {
+    const braces = `{{${token}}}`;
+    return section.lines.slice(0, fmEnd).some((l) => l.includes(braces))
+      || files.some((f) => /\.(ya?ml|csv)$/i.test(f.path) && f.content.includes(braces));
+  };
 
   const filled = [];
   const open = [];
   for (const e of section.entries) {
-    const value = e.from && FILL_FROM_FIELDS.includes(e.from) ? fillValue(known?.[e.from]) : null;
-    if (value === null) open.push({ token: e.token, question: e.question });
-    else filled.push({ token: e.token, question: e.question, value, line: e.line });
+    let value = e.from && FILL_FROM_FIELDS.includes(e.from) ? fillValue(known?.[e.from]) : null;
+    if (value !== null && !STRUCTURE_SAFE_RE.test(value) && inStructure(e.token)) value = null;
+    if (value === null) open.push(e);
+    else filled.push({ ...e, value });
   }
-  const allOpen = () => ({
-    files,
-    filled: [],
-    open: section.entries.map(({ token, question }) => ({ token, question })),
-  });
-  if (filled.length === 0) return allOpen();
 
   // Split and join, never a regex replacement: a business name is written as
   // it is, "$&" and all. Inside a .json file it is escaped so the file still parses.
@@ -542,21 +593,38 @@ export function fillBundle(files, known = {}) {
     (acc, f) => acc.split(`{{${f.token}}}`).join(json ? JSON.stringify(f.value).slice(1, -1) : f.value),
     text,
   );
+  const openList = open.map((o) => ({ token: o.token, question: put(o.question, false) }));
+  const allOpen = { ...asArrived, open: section.entries.map(({ token, question }) => ({ token, question })) };
+
+  // A line's own "(from: ...)" is the installer's business. One this harness
+  // does not honour is taken off the line as it lands, so nothing on disk
+  // suggests a status field to whoever fills the answer in afterwards.
+  const stripped = new Map(open.filter((o) => o.from && !FILL_FROM_FIELDS.includes(o.from)).map((o) => [o.line, o]));
+  if (filled.length === 0 && stripped.size === 0) return allOpen;
+
   const recordAt = new Map(filled.map((f) => [f.line, f]));
   const out = files.map((f) => {
     if (f.path !== SKILL_ENTRY_FILE) {
       return { ...f, content: put(f.content, f.path.toLowerCase().endsWith('.json')) };
     }
     const lines = section.lines.map((line, i) => {
+      const cr = line.endsWith('\r') ? '\r' : '';
       const rec = recordAt.get(i);
-      if (!rec) return put(line, false);
-      return `- ${rec.token}: ${rec.value}${line.endsWith('\r') ? '\r' : ''}`;
+      if (rec) return `- ${rec.token}: ${rec.value}${cr}`;
+      const bare = stripped.get(i);
+      if (bare) return `- {{${bare.token}}}: ${put(bare.question, false)}${cr}`;
+      return put(line, false);
     });
     return { ...f, content: lines.join('\n') };
   });
 
   // Filling must never be the reason a skill cannot land. If the filled bundle
   // breaks a cap the arriving one kept, it lands as it arrived and all is asked.
-  if (!skillBundleProblem(files) && skillBundleProblem(out)) return allOpen();
-  return { files: out, filled: filled.map(({ token, question, value }) => ({ token, question, value })), open };
+  if (!skillBundleProblem(files) && skillBundleProblem(out)) return allOpen;
+  return {
+    files: out,
+    filled: filled.map(({ token, question, value }) => ({ token, question, value })),
+    open: openList,
+    problem: null,
+  };
 }

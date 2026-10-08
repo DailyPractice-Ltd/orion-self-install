@@ -425,6 +425,10 @@ if (command === 'library') {
   // what it does not is asked by the assistant once the skill is on disk. A
   // skill that lists nothing lands exactly as it arrived.
   const fill = fillBundle(arrived, { business_name: status.business_name, agent_name: status.agent_name });
+  if (fill.problem) {
+    console.log(`"${slug}" arrived in a shape this harness will not write (${fill.problem}). Nothing written. Tell Daily Practice.`);
+    process.exit(0);
+  }
   const toWrite = fill.files;
   const landing = toWrite.find((f) => f.path === SKILL_ENTRY_FILE).content;
 
@@ -505,6 +509,7 @@ if (command === 'library') {
   if (fill.open.length > 0) {
     console.log('This skill is not ready until these are filled. Ask the client, one at a time:');
     for (const o of fill.open) console.log(`  {{${o.token}}}: ${o.question}`);
+    console.log('The answer is the client\'s, in their words: never take one from status.json or any other file.');
     console.log(`Write each answer in place of its token in every file under .claude/skills/${slug}/,`);
     console.log('and change its line under "Fill at install" in SKILL.md to "- TOKEN: answer".');
   }

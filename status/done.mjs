@@ -22,7 +22,7 @@
  *             handoff) started it, not a person. Needs --agent.
  *   --line    One line about what was done. It stays on this machine.
  *
- * It does two things, in this order.
+ * It does three things, in this order.
  *
  * 1. The local record, when --line is given. It never skips: radio on or off,
  *    memory on or off. One dated line, appended to a plain file in status/.
@@ -46,6 +46,12 @@
  *    that was not a yes): one more line is appended under the local one, saying
  *    so, which is what makes an unreported piece of work findable later.
  *
+ * 3. The folder's home, only when it has one (status/home.mjs): what this work
+ *    changed in the folder is saved to the owner's own private repository, and
+ *    whatever is new there is brought in. Nothing here goes to Daily Practice.
+ *    On a cloud run this step is what keeps the work, because that machine is
+ *    thrown away when the run ends. No home: nothing happens, nothing is said.
+ *
  * A skill named here always reports as "it ran" (outcome run_completed). This
  * script has no way to send any other outcome.
  *
@@ -67,7 +73,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   isWorkTag, workTagMenu, labelProblem, countProblem, looksLikeCredential, LINE_MAX,
-  radioOn, memoryOn,
+  radioOn, readRadioKeyFile, memoryOn, homeOn,
 } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -278,7 +284,7 @@ if (localLine !== null && memoryOn(status) && (agent || ownName)) {
 // ── 2. The radio half: labels only ──────────────────────────────────────────
 // The line is never passed below. Off means off: nothing sent, nothing said.
 
-if (radioOn(status)) {
+if (radioOn(status, { keyFile: readRadioKeyFile(__dirname, { readFileSync }) })) {
   const args = [
     'signal',
     '--type', shift ? 'routine_completed' : 'task_completed',
@@ -318,4 +324,19 @@ if (radioOn(status)) {
   }
 }
 
-// A valid report ends here, with exit code 0, whatever the radio did.
+// ── 3. The folder's home, when it has one ───────────────────────────────────
+// Last, so the line above and any "(radio unreachable)" marker under it are
+// already written. On a cloud run this is the step that keeps the work at all:
+// that machine is thrown away when the run ends. Labels only in the message,
+// the same ones the radio carried. Home trouble never fails a report.
+
+if (homeOn(status)) {
+  const what = shift
+    ? `shift: ${agent}, ${tag}, count ${count}`
+    : `task: ${tag}, count ${count}`;
+  const home = runSibling('home.mjs', ['sync', '--message', what], 180000);
+  if (home.out) console.log(home.out);
+  else console.log('The folder could not be saved to its home this time. Nothing is lost on this machine.');
+}
+
+// A valid report ends here, with exit code 0, whatever the radio or the home did.

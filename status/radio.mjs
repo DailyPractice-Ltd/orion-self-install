@@ -65,10 +65,15 @@
  *       custom) and --purpose (≤140 chars, about the agent, never a person/company/
  *       number) — the labels that let the role bank become evidence-based.
  *
- * Radio-on means ALL of: sharing.status_signal_enabled is true, and bridge_url,
- * harness_id, install_token are set (the welcome pack). Anything less → every command
- * prints one plain line, sends nothing, and exits 0. Network trouble never retries and
- * never blocks local work — same posture as emit-status.mjs since feature 001.
+ * Radio-on means ALL of: sharing.status_signal_enabled is true, bridge_url and
+ * harness_id are set (the welcome pack), and there is a key. Anything less → every
+ * command prints one plain line, sends nothing, and exits 0. Network trouble never
+ * retries and never blocks local work — same posture as emit-status.mjs since feature 001.
+ *
+ * The key is looked for in this order (status/shapes.mjs, radioKey): the machine's
+ * environment (ORION_INSTALL_TOKEN), then status/radio.key, then sharing.install_token
+ * in status.json. A cloud run that finds none sends its calls without one, because
+ * there the environment adds the key after the call has left the machine.
  *
  * Dependency-free: node:fs and global fetch only. No package.json, no npm install.
  */
@@ -77,7 +82,8 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, lstatS
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  radioOn as radioIsOn, parseInstallDirective, isWorkTag, workTagMenu, labelProblem, countProblem,
+  radioOn as radioIsOn, radioKey, readRadioKeyFile, keyHeader,
+  parseInstallDirective, isWorkTag, workTagMenu, labelProblem, countProblem,
   packSkillFolder, skillBundleProblem, SKILL_ENTRY_FILE,
 } from './shapes.mjs';
 
@@ -136,7 +142,9 @@ const sharing = status.sharing || {};
 // Shape, not mere presence (status/shapes.mjs). A settings file poisoned by a
 // misaligned scripted run — a stray "y" where the address belongs — used to
 // pass this gate and then fail every single call.
-const radioOn = radioIsOn(status);
+const keyPlaces = { keyFile: readRadioKeyFile(__dirname, { readFileSync }) };
+const key = radioKey(status, keyPlaces);
+const radioOn = radioIsOn(status, keyPlaces);
 
 if (!radioOn) {
   console.log('Radio is off (or not configured) — nothing sent, nothing checked. Local work is unaffected.');
@@ -152,7 +160,7 @@ const base = String(sharing.bridge_url).replace(/\/+$/, '');
 // never anything about the client's work.
 const headers = {
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${sharing.install_token}`,
+  ...keyHeader(key),
   ...(status.template_version ? { 'x-orion-template-version': String(status.template_version) } : {}),
 };
 
@@ -165,6 +173,15 @@ async function call(method, path, body) {
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(10000),
     });
+    // A cloud machine's network answers for the radio when the address is not on
+    // its list of allowed sites. That is not the radio refusing anything, so say
+    // what it is and where it is fixed.
+    if (res.status === 403 && res.headers.get('x-deny-reason') === 'host_not_allowed') {
+      console.log(`This machine's network is not allowed to reach the radio's address (${new URL(base).host}).`);
+      console.log('Add that address to the cloud environment this run uses, then run again. Nothing is lost locally.');
+      resultLine('refused 403');
+      process.exit(0);
+    }
     return res;
   } catch (err) {
     console.log(`The radio address didn't answer (${err?.cause?.code || err.code || err.message}) — not retried, nothing lost locally.`);
@@ -187,8 +204,16 @@ function resultLine(outcome) {
 }
 
 function reportAuthProblem() {
-  console.log('The radio answered "that key isn\'t valid" (401). The key may have been revoked —');
-  console.log('ask support@dailypractice.world for a fresh pairing code. Nothing else is affected.');
+  if (key.source === 'attached') {
+    // No key on this machine, by design: the cloud environment was meant to add
+    // it. A 401 here means it did not, or the one it holds is out of date.
+    console.log('The radio answered "no valid key" (401). This is a cloud run, so the key is meant to');
+    console.log(`be added by the cloud environment, as a secret for ${new URL(base).host}. It is missing there,`);
+    console.log('or out of date. Nothing else is affected.');
+  } else {
+    console.log('The radio answered "that key isn\'t valid" (401). The key may have been revoked —');
+    console.log('ask support@dailypractice.world for a fresh pairing code. Nothing else is affected.');
+  }
   resultLine('refused 401');
   process.exit(0);
 }

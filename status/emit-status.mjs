@@ -18,7 +18,7 @@
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { radioOn } from './shapes.mjs';
+import { radioOn, radioKey, readRadioKeyFile, keyHeader } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status.json');
@@ -67,13 +67,14 @@ console.log(`status/status.json updated — harness_status: ${status.harness_sta
 // status/shapes.mjs; specs/002-production-line/contracts/bridge-radio.md).
 // Anything less is a silent local save.
 const sharing = status.sharing;
-if (radioOn(status)) {
+const keyPlaces = { keyFile: readRadioKeyFile(__dirname, { readFileSync }) };
+if (radioOn(status, keyPlaces)) {
   try {
     const res = await fetch(String(sharing.bridge_url).replace(/\/+$/, '') + '/signals', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sharing.install_token}`,
+        ...keyHeader(radioKey(status, keyPlaces)),
       },
       body: JSON.stringify({
         harness_id: sharing.harness_id,

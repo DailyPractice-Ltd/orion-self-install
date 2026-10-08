@@ -20,8 +20,11 @@
  *
  *   node status/radio.mjs library --install <slug> --yes
  *       Collect a skill Daily Practice has put on the radio (GET /library/<slug>),
- *       write it to .claude/skills/<slug>/SKILL.md, and report it to the shelf.
- *       Never overwrites a skill already there. Their yes first, always.
+ *       write its folder to .claude/skills/<slug>/, and report it to the shelf.
+ *       What the skill lists under "Fill at install" is filled from status.json
+ *       as it lands (the business name, the agent's name); the rest is printed
+ *       for the assistant to ask. Never overwrites a skill already there. Their
+ *       yes first, always.
  *
  *   node status/radio.mjs contribute --slug <slug> --yes
  *       Offer a skill this machine runs back up to the library (POST /contributions).
@@ -78,7 +81,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   radioOn as radioIsOn, parseInstallDirective, isWorkTag, workTagMenu, labelProblem, countProblem,
-  packSkillFolder, skillBundleProblem, SKILL_ENTRY_FILE,
+  packSkillFolder, skillBundleProblem, fillBundle, SKILL_ENTRY_FILE,
 } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -400,7 +403,8 @@ if (command === 'library') {
   // path is checked here before a single byte is written.
   const bundle = Array.isArray(asset?.files) && asset.files.length > 0 ? asset.files : null;
   if (bundle) {
-    const problem = skillBundleProblem(bundle);
+    const problem = skillBundleProblem(bundle)
+      || (bundle.some((f) => f.path === SKILL_ENTRY_FILE) ? null : `no ${SKILL_ENTRY_FILE}`);
     if (problem) {
       console.log(`"${slug}" arrived in a shape this harness will not write (${problem}). Nothing written. Tell Daily Practice.`);
       process.exit(0);
@@ -413,8 +417,20 @@ if (command === 'library') {
     console.log(`"${slug}" arrived empty — nothing written. Tell Daily Practice.`);
     process.exit(0);
   }
-  const toWrite = bundle || [{ path: SKILL_ENTRY_FILE, content }];
-  const incoming = toWrite.map((f) => f.path);
+  const arrived = bundle || [{ path: SKILL_ENTRY_FILE, content }];
+  const incoming = arrived.map((f) => f.path);
+
+  // A library skill is written for any business, and lists in its own SKILL.md
+  // what gets filled as it lands. What this harness already knows goes in here;
+  // what it does not is asked by the assistant once the skill is on disk. A
+  // skill that lists nothing lands exactly as it arrived.
+  const fill = fillBundle(arrived, { business_name: status.business_name, agent_name: status.agent_name });
+  if (fill.problem) {
+    console.log(`"${slug}" arrived in a shape this harness will not write (${fill.problem}). Nothing written. Tell Daily Practice.`);
+    process.exit(0);
+  }
+  const toWrite = fill.files;
+  const landing = toWrite.find((f) => f.path === SKILL_ENTRY_FILE).content;
 
   const dir = join(__dirname, '..', '.claude', 'skills', slug);
 
@@ -438,8 +454,18 @@ if (command === 'library') {
     console.log(`It would be written to .claude/skills/${slug}/ as ${incoming.length} file${incoming.length === 1 ? '' : 's'}:`);
     for (const p of incoming) console.log(`  ${p}`);
     console.log('');
+    if (fill.filled.length > 0) {
+      console.log('Filled in as it lands, so it reads as yours:');
+      for (const f of fill.filled) console.log(`  ${f.question}: ${f.value}`);
+      console.log('');
+    }
+    if (fill.open.length > 0) {
+      console.log('Your AI will ask you, before the skill is used:');
+      for (const o of fill.open) console.log(`  ${o.question}`);
+      console.log('');
+    }
     console.log('The first lines of SKILL.md:');
-    for (const line of content.split('\n').slice(0, 12)) console.log(`  ${line}`);
+    for (const line of landing.split('\n').slice(0, 12)) console.log(`  ${line}`);
     console.log('');
     console.log('--- for the assistant, not to be read aloud ---');
     console.log('Show the client what this is, in your own plain words. On their yes:');
@@ -465,6 +491,7 @@ if (command === 'library') {
     process.exit(0);
   }
   console.log(`Written: ${incoming.length} file${incoming.length === 1 ? '' : 's'} to .claude/skills/${slug}/`);
+  for (const f of fill.filled) console.log(`Filled in: ${f.question} (${f.value})`);
 
   // The shelf is how Daily Practice knows who is affected when this improves.
   const report = await call('POST', '/assets', {
@@ -479,6 +506,13 @@ if (command === 'library') {
     : 'Written locally; the shelf report did not go through, which changes nothing here.');
   console.log('');
   console.log('--- for the assistant, not to be read aloud ---');
+  if (fill.open.length > 0) {
+    console.log('This skill is not ready until these are filled. Ask the client, one at a time:');
+    for (const o of fill.open) console.log(`  {{${o.token}}}: ${o.question}`);
+    console.log('The answer is the client\'s, in their words: never take one from status.json or any other file.');
+    console.log(`Write each answer in place of its token in every file under .claude/skills/${slug}/,`);
+    console.log('and change its line under "Fill at install" in SKILL.md to "- TOKEN: answer".');
+  }
   console.log('Record it under packages in status/status.json, then try it on something real');
   console.log('before telling the client it works.');
   process.exit(0);

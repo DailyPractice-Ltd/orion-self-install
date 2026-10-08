@@ -433,3 +433,130 @@ export function packSkillFolder(dir, fs) {
   walk('');
   return { files, skipped };
 }
+
+// ── Fill at install: a library skill becomes this business's as it lands ────
+//
+// A library skill is written for any business, so where the business is named
+// it carries a token instead. The skill itself says which tokens get filled, in
+// a plain list in its SKILL.md:
+//
+//   ## Fill at install
+//   - {{CLIENT_BUSINESS}}: your business name (from: business_name)
+//   - {{PIPELINE_STAGES}}: your CRM pipeline stage names, in order
+//
+// Only a token on that list is ever touched. Anything else in double braces is
+// the skill's own working text (a message template's {{first_name}}) and stays
+// exactly as written. A line ending "(from: <field>)" is filled from
+// status.json with no question; every other line is asked by the assistant,
+// one question at a time, after the skill has landed.
+
+// What a skill may ask to be filled from. A skill is data from somewhere else:
+// it names one of these or nothing, never a field of its own choosing, so no
+// skill can pull a token or a path out of status.json into a file.
+export const FILL_FROM_FIELDS = Object.freeze(['business_name', 'agent_name']);
+export const FILL_TOKENS_MAX = 20;
+export const FILL_VALUE_MAX = 200;
+
+const FILL_HEADING_RE = /^##\s+fill at install\s*$/i;
+const FILL_LINE_RE = /^\s*[-*]\s+\{\{([A-Z][A-Z0-9_]{0,63})\}\}\s*:\s*(.*)$/;
+const FILL_FROM_RE = /\s*\(from:\s*([A-Za-z][A-Za-z0-9_]*)\s*\)\s*$/;
+
+/** Where the fill list sits in a SKILL.md, line by line. Null when there is none. */
+function fillSection(skillMd) {
+  if (typeof skillMd !== 'string') return null;
+  const lines = skillMd.split('\n');
+  const start = lines.findIndex((l) => FILL_HEADING_RE.test(l.replace(/\r$/, '')));
+  if (start === -1) return null;
+  const entries = [];
+  const seen = new Set();
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i].replace(/\r$/, '');
+    if (/^#{1,6}\s/.test(line)) break;
+    const m = FILL_LINE_RE.exec(line);
+    if (!m || seen.has(m[1]) || entries.length >= FILL_TOKENS_MAX) continue;
+    seen.add(m[1]);
+    const fromMatch = FILL_FROM_RE.exec(m[2]);
+    // The question is printed for a person to read: one plain line, no control characters.
+    const question = (fromMatch ? m[2].slice(0, fromMatch.index) : m[2])
+      .replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, FILL_VALUE_MAX);
+    entries.push({
+      token: m[1],
+      question: question || m[1].toLowerCase().replace(/_/g, ' '),
+      from: fromMatch ? fromMatch[1].toLowerCase() : null,
+      line: i,
+    });
+  }
+  return { lines, entries };
+}
+
+/**
+ * The tokens a skill declares for filling: [{ token, question, from }], in the
+ * order the skill lists them. Empty when the skill declares none.
+ */
+export function parseFillManifest(skillMd) {
+  const section = fillSection(skillMd);
+  return section ? section.entries.map(({ token, question, from }) => ({ token, question, from })) : [];
+}
+
+/** A value fit to write into a skill: one plain line, or null when it is not. */
+function fillValue(v) {
+  if (typeof v !== 'string') return null;
+  const value = v.trim();
+  if (!value || value.length > FILL_VALUE_MAX) return null;
+  if (/[\u0000-\u001f\u007f]/.test(value) || value.includes('{{')) return null;
+  return value;
+}
+
+/**
+ * Fill what this harness already knows into a skill bundle ({ path, content }[]).
+ * `known` is { business_name, agent_name } from status.json. Returns the files
+ * to write, what was filled, and what is still open for the assistant to ask:
+ *   { files, filled: [{ token, question, value }], open: [{ token, question }] }
+ *
+ * A skill that declares nothing comes back as the very same array, untouched.
+ * A filled token's own line in the list becomes the record ("- TOKEN: value"),
+ * so nothing filled is left in braces; an open token's line stays as it is.
+ */
+export function fillBundle(files, known = {}) {
+  const entry = Array.isArray(files) ? files.find((f) => f?.path === SKILL_ENTRY_FILE) : null;
+  const section = entry ? fillSection(entry.content) : null;
+  if (!section || section.entries.length === 0) return { files, filled: [], open: [] };
+
+  const filled = [];
+  const open = [];
+  for (const e of section.entries) {
+    const value = e.from && FILL_FROM_FIELDS.includes(e.from) ? fillValue(known?.[e.from]) : null;
+    if (value === null) open.push({ token: e.token, question: e.question });
+    else filled.push({ token: e.token, question: e.question, value, line: e.line });
+  }
+  const allOpen = () => ({
+    files,
+    filled: [],
+    open: section.entries.map(({ token, question }) => ({ token, question })),
+  });
+  if (filled.length === 0) return allOpen();
+
+  // Split and join, never a regex replacement: a business name is written as
+  // it is, "$&" and all. Inside a .json file it is escaped so the file still parses.
+  const put = (text, json) => filled.reduce(
+    (acc, f) => acc.split(`{{${f.token}}}`).join(json ? JSON.stringify(f.value).slice(1, -1) : f.value),
+    text,
+  );
+  const recordAt = new Map(filled.map((f) => [f.line, f]));
+  const out = files.map((f) => {
+    if (f.path !== SKILL_ENTRY_FILE) {
+      return { ...f, content: put(f.content, f.path.toLowerCase().endsWith('.json')) };
+    }
+    const lines = section.lines.map((line, i) => {
+      const rec = recordAt.get(i);
+      if (!rec) return put(line, false);
+      return `- ${rec.token}: ${rec.value}${line.endsWith('\r') ? '\r' : ''}`;
+    });
+    return { ...f, content: lines.join('\n') };
+  });
+
+  // Filling must never be the reason a skill cannot land. If the filled bundle
+  // breaks a cap the arriving one kept, it lands as it arrived and all is asked.
+  if (!skillBundleProblem(files) && skillBundleProblem(out)) return allOpen();
+  return { files: out, filled: filled.map(({ token, question, value }) => ({ token, question, value })), open };
+}

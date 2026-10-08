@@ -17,6 +17,26 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.2.3 — 2026-10-08
+
+A skill from the library becomes yours as it lands.
+
+- **Your business name is filled in for you.** A library skill is written for any
+  business and leaves a gap where the business name goes. When you accept one over the
+  radio, your harness now fills that gap from what it already has on record, in every
+  file of the skill. You see what will be filled in before you say yes. Before, a
+  skill arrived exactly as written and the gaps were left for you to find.
+- **What it does not know, your AI asks.** If a skill needs something your harness has
+  no record of, such as your CRM's stage names, your AI asks you one question at a
+  time and writes your answer in.
+- **Only what the skill lists is touched.** A skill says what gets filled, under "Fill
+  at install" in its SKILL.md. Everything else arrives exactly as written, including
+  the blanks in a message template that are filled each time it is used.
+- A skill that lists nothing lands byte for byte, as before. Nothing new is sent to
+  Daily Practice: the filling happens on your machine.
+- Fixed: a skill arriving with its main file misnamed is now refused in one plain
+  line, where before the radio could stop with an error.
+
 ## 1.2.2 — 2026-10-06
 
 **The scheduler route is now proven on Windows and Linux too, and one Windows wording slip is fixed.**

@@ -8,34 +8,16 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  mkdtempSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync, existsSync, symlinkSync,
-  readdirSync, lstatSync,
-} from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, readdirSync, lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { spawnSync } from 'node:child_process';
+import { join } from 'node:path';
 import {
   skillPathProblem, skillBundleProblem, packSkillFolder,
   SKILL_FILES_MAX, SKILL_FILE_MAX,
 } from '../status/shapes.mjs';
+import { runRadio, writeRichSkill } from './helpers/run-radio.mjs';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const statusDir = join(here, '..', 'status');
 const fs = { readdirSync, lstatSync, readFileSync };
-
-// A rich skill: the entry file, a reference, a template, and two things that
-// must never travel — a script and a hidden file.
-function writeRichSkill(dir) {
-  mkdirSync(join(dir, 'references'), { recursive: true });
-  mkdirSync(join(dir, 'templates'), { recursive: true });
-  writeFileSync(join(dir, 'SKILL.md'), '---\nname: meeting-confirmation\n---\n\nConfirm meetings the right way.\n');
-  writeFileSync(join(dir, 'references', 'boundary.md'), '# Execution boundary\n');
-  writeFileSync(join(dir, 'templates', 'confirm.json'), '{"subject":"Confirming {{date}}"}');
-  writeFileSync(join(dir, 'check.mjs'), 'console.log("validator")');
-  writeFileSync(join(dir, '.DS_Store'), 'junk');
-}
 
 test('skillPathProblem: text files inside the folder only', () => {
   assert.equal(skillPathProblem('SKILL.md'), null);
@@ -74,65 +56,6 @@ test('packSkillFolder: collects the text files, skips scripts, hidden files and 
     rmSync(dir, { recursive: true, force: true });
   }
 });
-
-/**
- * Run the real radio.mjs in a scratch harness with fetch answering from memory.
- * Returns what it printed, every bridge call, and the skill trees it left on
- * disk (captured before the scratch harness is removed).
- */
-function runRadio(args, { reply, skill } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'orion-radio-'));
-  try {
-    mkdirSync(join(dir, 'status'));
-    for (const f of ['radio.mjs', 'shapes.mjs']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
-    writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
-      template_version: '1.2.1',
-      sharing: {
-        status_signal_enabled: true,
-        bridge_url: 'https://radio.test/api/bridge',
-        harness_id: '9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62',
-        install_token: 'orion_testtesttesttesttesttest',
-      },
-    }));
-    if (skill) writeRichSkill(join(dir, '.claude', 'skills', skill));
-    const log = join(dir, 'fetch.log');
-    const mock = join(dir, 'fetch.mjs');
-    writeFileSync(mock, `
-      import { appendFileSync } from 'node:fs';
-      const reply = ${JSON.stringify(reply ?? { status: 201, body: { contribution_id: 'c1', replay: false } })};
-      globalThis.fetch = async (url, init = {}) => {
-        const u = new URL(url);
-        appendFileSync(${JSON.stringify(log)}, JSON.stringify({
-          method: init.method || 'GET', path: u.pathname, body: init.body ? JSON.parse(init.body) : null,
-        }) + '\\n');
-        if (u.pathname === '/api/bridge/assets') return new Response('{"asset_id":"a1","replay":false}', { status: 201, headers: { 'content-type': 'application/json' } });
-        return new Response(JSON.stringify(reply.body), { status: reply.status, headers: { 'content-type': 'application/json' } });
-      };
-    `);
-    const r = spawnSync(process.execPath, ['--import', pathToFileURL(mock).href, join(dir, 'status', 'radio.mjs'), ...args], { encoding: 'utf8' });
-    const calls = existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
-    const trees = {};
-    const skillsRoot = join(dir, '.claude', 'skills');
-    if (existsSync(skillsRoot)) {
-      for (const slug of readdirSync(skillsRoot)) {
-        const root = join(skillsRoot, slug);
-        const files = {};
-        const walk = (rel) => {
-          for (const n of readdirSync(join(root, rel)).sort()) {
-            const p = rel ? `${rel}/${n}` : n;
-            if (lstatSync(join(root, p)).isDirectory()) walk(p);
-            else files[p] = readFileSync(join(root, p), 'utf8');
-          }
-        };
-        walk('');
-        trees[slug] = files;
-      }
-    }
-    return { code: r.status, out: r.stdout, err: r.stderr, calls, trees };
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
 
 test('contribute: preview lists the files and sends nothing', () => {
   const { code, out, err, calls } = runRadio(['contribute', '--slug', 'meeting-confirmation'], { skill: 'meeting-confirmation' });

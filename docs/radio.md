@@ -128,6 +128,13 @@ Sometimes the message is an offer: a skill from the Daily Practice library. Your
 tells you which skill it is, what it needs and where it would go. Nothing is written
 until you say yes.
 
+A library skill is written for any business, so it leaves a gap where the business
+name goes. As it lands, your harness fills that gap with your business name, from what
+it already has on record. If the skill needs something your harness does not know,
+such as your CRM's stage names, your AI asks you, one question at a time, and writes
+your answer in. You see what will be filled in before you say yes. Nothing about you
+is sent anywhere to do this: it happens on your machine.
+
 Each message is read to you once. Your harness remembers what you have already heard,
 so nothing is repeated at the next session.
 

@@ -352,9 +352,19 @@ one:
    `node status/radio.mjs library --install <slug>`. With no `--yes` that command only
    shows what the skill is, what it needs, and where it would go. Tell the client that
    in your own plain words, and run it again with `--yes` only if they want it. It
-   writes `.claude/skills/<slug>/SKILL.md`, never overwrites a skill they already
-   have, and reports the shelf itself. Then smoke-test it on something real before
-   saying it works.
+   writes the skill's folder under `.claude/skills/<slug>/`, never overwrites a skill
+   they already have, and reports the shelf itself. Then smoke-test it on something
+   real before saying it works.
+
+   A library skill is written for any business. Where the business is named it carries
+   a token such as `{{CLIENT_BUSINESS}}`, and its `SKILL.md` lists under **Fill at
+   install** which tokens get filled. The install fills what `status/status.json`
+   already knows (the business name, the agent's name) and says so. Anything it could
+   not fill it prints under its fence: ask the client those, one question at a time,
+   write each answer in place of its token in every file of that skill's folder, and
+   change its line in the list to `- TOKEN: answer`. Fill only the tokens on that
+   list. Anything else in double braces is the skill's own working text (a message
+   template's blanks) and stays exactly as written.
 
 3c. **When the client wants to send a skill up to Daily Practice or the library** —
    "send this skill to Daily Practice", "send it to the library", "push this to the

@@ -33,7 +33,7 @@
  * specs/002-production-line/contracts/status-additions.schema.json and bridge-radio.md.
  */
 
-import { readFileSync, writeFileSync, existsSync, copyFileSync, statSync, readdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, copyFileSync, statSync, readdirSync, rmSync, chmodSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
@@ -508,7 +508,9 @@ async function main() {
     if (status.sharing.radio_choice === 'accepted') {
       if (!radioConfigured(status, keyPlaces())) {
         await pairingStep(status);
-      } else if (!(await radioStillWorks(status))) {
+      } else if (radioKey(status, keyPlaces()).source !== 'attached' && !(await radioStillWorks(status))) {
+        // (A cloud run holds no key to check: its environment attaches one, and
+        // pairing on a machine that is about to be thrown away helps nobody.)
         // A revoked key still looks well-formed, so only the radio itself can
         // tell us. Rotations become self-healing instead of a support ticket.
         say('');
@@ -627,6 +629,8 @@ async function pairingStep(status) {
   const keyApart = homeOn(status);
   if (keyApart) {
     writeFileSync(KEY_PATH, String(pack.install_token) + '\n', { mode: 0o600 });
+    // The mode above only counts for a new file. Tighten one that was already there.
+    try { chmodSync(KEY_PATH, 0o600); } catch { /* a disk with no modes */ }
     status.sharing.install_token = null;
   } else {
     status.sharing.install_token = pack.install_token;

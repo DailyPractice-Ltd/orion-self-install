@@ -135,7 +135,8 @@ function git(args, { input, timeout = GIT_TIMEOUT_MS } = {}) {
 /** The first line git said about a failure, for one plain sentence. Never a stack of them. */
 function firstLine(text) {
   const line = String(text || '').split('\n').map((l) => l.trim()).find((l) => l && !/^hint:/i.test(l));
-  return (line || 'git gave no reason').replace(/^(fatal|error|remote):\s*/i, '').slice(0, 160);
+  // An address may carry a name and a password in front of its host. Never repeat those.
+  return (line || 'git gave no reason').replace(/^(fatal|error|remote):\s*/i, '').replace(/\/\/[^@/\s]*@/g, '//').slice(0, 160);
 }
 
 const sameDir = (a, b) => {
@@ -181,11 +182,24 @@ function keyInStatus(status) {
 function moveKeyOut(status) {
   const token = String(status.sharing.install_token).trim();
   fs.writeFileSync(KEY_PATH, token + '\n', { mode: 0o600 });
+  // The mode above only counts when the file is new. One that was already there
+  // keeps whatever it had, so say it again.
+  try { fs.chmodSync(KEY_PATH, 0o600); } catch { /* a disk with no modes: nothing to tighten */ }
   if (fs.readFileSync(KEY_PATH, 'utf8').trim() !== token) {
     throw new Error('the key file did not read back as written');
   }
   status.sharing.install_token = null;
   writeStatus(status);
+}
+
+/** The key already in status/radio.key, or '' when there is none or it is not shaped like one. */
+function keyInFile() {
+  try {
+    const text = fs.readFileSync(KEY_PATH, 'utf8').trim();
+    return INSTALL_TOKEN_RE.test(text) ? text : '';
+  } catch {
+    return '';
+  }
 }
 
 // ── The ignore rules and the append-only logs ───────────────────────────────
@@ -202,7 +216,7 @@ const NEVER_SAVED = [
   '.claude/worktrees/',             // working copies an app made, each a repository of its own
 ];
 /** The template's own two notebook lines: everything in memory/ stays out, bar its README. */
-const NOTEBOOK_RULES = ['memory/*', '!memory/README.md', 'memory/'];
+const NOTEBOOK_RULES = ['memory/*', '!memory/README.md'];
 const APPEND_ONLY = [
   'status/shift-log.md',
   'status/work-log.md',
@@ -228,11 +242,12 @@ const sameRule = (a, b) => a.trim().replace(/^\//, '') === b;
 function wantedIgnore(status) {
   const memory = memoryBlock(status);
   const ownRepository = memory.enabled === true && memory.backend === 'git';
-  // In a plain folder the notebook travels: every notebook rule goes. With a
-  // repository of its own it stays out whole, README included, because that
-  // README belongs to the notebook's repository and a second copy here would
-  // only go stale.
-  const drop = ['status/status.json', ...NOTEBOOK_RULES.filter((rule) => !(ownRepository && rule === 'memory/'))];
+  // The template's two notebook lines go either way. In a plain folder the
+  // notebook then travels. With a repository of its own it stays out whole,
+  // README included: that README belongs to the notebook's repository and a
+  // second copy here would only go stale. A `memory/` line the owner wrote
+  // themselves is theirs and is never removed.
+  const drop = ['status/status.json', ...NOTEBOOK_RULES];
   const need = [...NEVER_SAVED, ...(ownRepository ? ['memory/'] : [])];
 
   const kept = readLines('.gitignore').filter((line) => !drop.some((rule) => sameRule(line, rule)));
@@ -458,6 +473,14 @@ if (command === 'prepare') {
       run: () => fs.writeFileSync(path.join(ROOT, '.gitignore'), ignore),
     });
   }
+  const notebook = memoryBlock(status);
+  if (notebook.enabled === true && notebook.backend === 'git' && repo.state === 'own' &&
+      git(['ls-files', '--', 'memory']).out.trim() !== '') {
+    steps.push({
+      what: 'Stop following the files in memory/: that notebook has a repository of its own, and a second copy here would only go stale.',
+      run: () => { git(['rm', '-r', '--cached', '--quiet', '--', 'memory']); },
+    });
+  }
   const attributes = wantedAttributes();
   if (attributes !== fileText('.gitattributes')) {
     steps.push({
@@ -534,8 +557,10 @@ function holdBack() {
     held.push({ file: KEY_REL, why: 'it is the radio key, and the key is never saved' });
   }
 
-  const added = new Set(git(['diff', '--cached', '--name-only', '-z', '--diff-filter=A']).out.split('\0').filter(Boolean));
-  const changed = git(['diff', '--cached', '--name-only', '-z', '--diff-filter=AM']).out.split('\0').filter(Boolean);
+  // --no-renames: a file that was moved and edited in one go must read as a new
+  // file here, or its lines would never be looked at.
+  const added = new Set(git(['diff', '--cached', '--no-renames', '--name-only', '-z', '--diff-filter=A']).out.split('\0').filter(Boolean));
+  const changed = git(['diff', '--cached', '--no-renames', '--name-only', '-z', '--diff-filter=AM']).out.split('\0').filter(Boolean);
 
   // A repository inside this one would be saved as a bare pointer to it, which
   // is no use to anyone. Leave it out.
@@ -552,7 +577,7 @@ function holdBack() {
   // that was already in the home is not judged again every time.
   for (const file of changed) {
     if (links.includes(file) || file === KEY_REL) continue;
-    const diff = git(['diff', '--cached', '--no-color', '--no-ext-diff', '-U0', '--', file]).out;
+    const diff = git(['diff', '--cached', '--no-renames', '--no-color', '--no-ext-diff', '-U0', '--', file]).out;
     let lineNo = 0;
     let hit = 0;
     for (const line of diff.split('\n')) {
@@ -598,6 +623,14 @@ if (command === 'sync') {
     say('The home is switched on, but this folder has no address for it. Run: node status/home.mjs check');
     process.exit(0);
   }
+  // A save of ours that was cut off half-way (a machine going to sleep, a time
+  // limit) leaves its own mark. That one is ours to undo, and undoing it puts
+  // the folder back exactly as it was before that save began.
+  const ourMark = path.resolve(ROOT, git(['rev-parse', '--git-path', 'orion-home-sync']).out.trim() || '.git/orion-home-sync');
+  if (fs.existsSync(ourMark)) {
+    git(['rebase', '--abort']);
+    fs.rmSync(ourMark, { force: true });
+  }
   // Someone's own git work, half done. Not ours to finish or to undo.
   for (const mark of ['rebase-merge', 'rebase-apply', 'MERGE_HEAD', 'CHERRY_PICK_HEAD']) {
     const where = git(['rev-parse', '--git-path', mark]).out.trim();
@@ -612,7 +645,14 @@ if (command === 'sync') {
 
   // A key that found its way back into status.json (a fresh pairing, say) is
   // moved out before anything is saved.
-  if (keyInStatus(status)) {
+  const already = keyInFile();
+  if (keyInStatus(status) && already && already !== String(status.sharing.install_token).trim()) {
+    // Two different keys, and no way to tell here which is the live one. The
+    // key file is where a folder with a home keeps its key, so that one stays.
+    status.sharing.install_token = null;
+    writeStatus(status);
+    say(`status/status.json held a second radio key. It was taken out, and the key in ${KEY_REL} was kept. If the radio answers "that key isn't valid", pair again: node start.mjs`);
+  } else if (keyInStatus(status)) {
     try {
       moveKeyOut(status);
       say(`The radio key was inside status/status.json. It is now in ${KEY_REL}, which is never saved.`);
@@ -698,10 +738,13 @@ if (command === 'sync') {
     if (theirs) {
       if (!git(['merge-base', '--is-ancestor', 'FETCH_HEAD', 'HEAD']).ok) {
         const newer = Number(git(['rev-list', '--count', 'HEAD..FETCH_HEAD']).out.trim()) || 0;
+        fs.writeFileSync(ourMark, 'a save by status/home.mjs is bringing in what is new\n');
         const rebase = git([...ident, 'rebase', '--autostash', 'FETCH_HEAD']);
+        if (rebase.ok) fs.rmSync(ourMark, { force: true });
         if (!rebase.ok) {
           const files = git(['diff', '--name-only', '--diff-filter=U']).out.split('\n').filter(Boolean);
           git(['rebase', '--abort']);
+          fs.rmSync(ourMark, { force: true });
           clash = files.length > 0 ? files.slice(0, 5).join(', ') : firstLine(rebase.err || rebase.out);
           break;
         }

@@ -570,13 +570,63 @@ test('the key file is taken out of a save even when its ignore rule has been del
 test('a key that found its way back into status.json is moved out before anything is saved', (t) => {
   const { local, home } = homed(t);
   const status = local.status();
-  status.sharing.install_token = OTHER_KEY; // what an older wizard would write on a fresh pairing
+  status.sharing.install_token = OTHER_KEY; // a key put back by hand, with the key file gone
   local.write('status/status.json', JSON.stringify(status, null, 2) + '\n');
+  rmSync(join(local.dir, 'status', 'radio.key'));
   const r = local.run('status/home.mjs', ['sync']);
   assert.match(r.out, /The radio key was inside status\/status\.json\. It is now in status\/radio\.key, which is never saved\./);
   assert.equal(local.read('status/radio.key'), `${OTHER_KEY}\n`);
   assert.equal(JSON.parse(inHome(local.base, home, 'status/status.json')).sharing.install_token, null);
   assert.equal(git(local.base, home, ['log', '--all', '--format=%h', '-S', OTHER_KEY]).out, '');
+});
+
+test('a file that is moved and given a key in the same save is still held back', (t) => {
+  const { local, home } = homed(t, { files: { 'docs/notes.md': 'one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\n' } });
+  const text = local.read('docs/notes.md');
+  rmSync(join(local.dir, 'docs', 'notes.md'));
+  local.write('docs/handover.md', `${text}the key is ${OTHER_KEY}\n`);
+  const r = local.run('status/home.mjs', ['sync']);
+  assert.match(r.out, /Held back, not saved: docs\/handover\.md \(line 9 is shaped like a key\)/);
+  assert.ok(!homeFiles(local.base, home).includes('docs/handover.md'));
+  assert.equal(git(local.base, home, ['log', '--all', '--format=%h', '-S', OTHER_KEY]).out, '');
+});
+
+test('a second, different key in status.json is taken out and the key file is kept', (t) => {
+  const { local, home } = homed(t);
+  const status = local.status();
+  status.sharing.install_token = OTHER_KEY; // a stale copy of the file written back whole
+  local.write('status/status.json', JSON.stringify(status, null, 2) + '\n');
+  const r = local.run('status/home.mjs', ['sync']);
+  assert.match(r.out, /status\/status\.json held a second radio key\. It was taken out, and the key in status\/radio\.key was kept\./);
+  assert.ok(!r.out.includes(OTHER_KEY) && !r.out.includes(FAKE_KEY));
+  assert.equal(local.read('status/radio.key'), `${FAKE_KEY}\n`);
+  assert.equal(local.status().sharing.install_token, null);
+  assert.equal(git(local.base, home, ['log', '--all', '--format=%h', '-S', OTHER_KEY]).out, '');
+});
+
+test('a save that was cut off half-way is undone by the next one, which then saves', (t) => {
+  const { local, home } = homed(t, { files: { 'status/queue.json': '{ "next": 1 }\n' } });
+  const other = freshCopy(local, home, 'other');
+  other.write('status/queue.json', '{ "next": 2 }\n');
+  other.run('status/home.mjs', ['sync'], CLOUD);
+  // Leave this machine exactly as a killed save would: a rebase stopped on a
+  // clash, with the save's own mark beside it.
+  local.write('status/queue.json', '{ "next": 3 }\n');
+  local.git(['add', '-A']);
+  assert.ok(local.git(['commit', '-q', '-m', 'mine']).ok);
+  local.git(['fetch', '-q', 'origin', 'main']);
+  assert.equal(local.git(['rebase', 'FETCH_HEAD']).ok, false);
+  writeFileSync(join(local.dir, '.git', 'orion-home-sync'), 'cut off\n');
+
+  const r = local.run('status/home.mjs', ['sync']);
+  assert.doesNotMatch(r.out, /someone started/);
+  assert.match(r.out, /Not saved to the folder's home: the home has changes that clash/);
+  assert.equal(existsSync(join(local.dir, '.git', 'rebase-merge')), false);
+  assert.equal(existsSync(join(local.dir, '.git', 'orion-home-sync')), false);
+  assert.equal(local.read('status/queue.json'), '{ "next": 3 }\n');
+  // A rebase somebody else started is still left strictly alone.
+  assert.equal(local.git(['rebase', 'FETCH_HEAD']).ok, false);
+  assert.match(local.run('status/home.mjs', ['sync']).out, /in the middle of a git step that someone started/);
 });
 
 test('a repository sitting inside the folder is left out, with or without a commit in it', (t) => {

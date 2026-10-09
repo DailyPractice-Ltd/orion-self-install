@@ -559,8 +559,9 @@ function holdBack() {
 
   // --no-renames: a file that was moved and edited in one go must read as a new
   // file here, or its lines would never be looked at.
-  const added = new Set(git(['diff', '--cached', '--no-renames', '--name-only', '-z', '--diff-filter=A']).out.split('\0').filter(Boolean));
-  const changed = git(['diff', '--cached', '--no-renames', '--name-only', '-z', '--diff-filter=AM']).out.split('\0').filter(Boolean);
+  const WHAT = ['diff', '--cached', '--no-renames'];
+  const names = (filter) => git([...WHAT, '--name-only', '-z', `--diff-filter=${filter}`]).out.split('\0').filter(Boolean);
+  const added = new Set(names('A'));
 
   // A repository inside this one would be saved as a bare pointer to it, which
   // is no use to anyone. Leave it out.
@@ -574,24 +575,34 @@ function holdBack() {
   }
 
   // New lines shaped like a key. Only what this save adds is read, so a file
-  // that was already in the home is not judged again every time.
-  for (const file of changed) {
-    if (links.includes(file) || file === KEY_REL) continue;
-    const diff = git(['diff', '--cached', '--no-renames', '--no-color', '--no-ext-diff', '-U0', '--', file]).out;
+  // that was already in the home is not judged again every time. git is asked
+  // once for the whole save, and its answer is cut into one piece per file:
+  // the pieces come in the same order as the names. A first save can be
+  // hundreds of files, and one question each would be hundreds of git runs.
+  // If the pieces and the names ever fail to line up, each file is asked about
+  // on its own instead, which is slower and cannot be wrong.
+  const changed = names('AM');
+  const PATCH = [...WHAT, '--no-color', '--no-ext-diff', '-U0', '--diff-filter=AM'];
+  const whole = git(PATCH);
+  let pieces = whole.ok ? whole.out.split(/^(?=diff --git )/m).filter(Boolean) : [];
+  if (pieces.length !== changed.length) pieces = changed.map((file) => git([...PATCH, '--', file]).out);
+  changed.forEach((file, i) => {
+    if (links.includes(file) || file === KEY_REL) return;
     let lineNo = 0;
     let hit = 0;
-    for (const line of diff.split('\n')) {
+    for (const line of pieces[i].split('\n')) {
       const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)/.exec(line);
       if (hunk) { lineNo = Number(hunk[1]); continue; }
-      if (line.startsWith('+++') || !line.startsWith('+')) continue;
-      if (lineNo > 0 && looksLikeKey(line.slice(1))) { hit = lineNo; break; }
+      // Before the first hunk a line starting with + is the file's own header.
+      if (lineNo === 0 || !line.startsWith('+')) continue;
+      if (looksLikeKey(line.slice(1))) { hit = lineNo; break; }
       lineNo++;
     }
-    if (!hit) continue;
+    if (!hit) return;
     if (added.has(file)) git(['rm', '--cached', '--quiet', '--', file]);
     else git(['reset', '--quiet', 'HEAD', '--', file]);
     held.push({ file, why: `line ${hit} is shaped like a key` });
-  }
+  });
   return held;
 }
 

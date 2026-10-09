@@ -591,6 +591,22 @@ test('a file that is moved and given a key in the same save is still held back',
   assert.equal(git(local.base, home, ['log', '--all', '--format=%h', '-S', OTHER_KEY]).out, '');
 });
 
+test('many files in one save are each judged on their own lines, whatever they are called', (t) => {
+  const { local, home } = homed(t);
+  for (let i = 0; i < 40; i++) local.write(`docs/batch/note ${i}.md`, `note ${i}\n`);
+  local.write('docs/batch/note 7.md', `note 7\n++ ${OTHER_KEY}\n`); // a line that itself starts with ++
+  // A name git has to put in quotes when it prints it. Windows cannot hold one.
+  if (process.platform !== 'win32') local.write('docs/batch/caf\u00e9 "plan".md', 'fine\n');
+  local.write('docs/batch/pixel.bin', Buffer.from([0, 1, 2, 0, 255]));
+  const r = local.run('status/home.mjs', ['sync']);
+  const heldBack = r.out.split('\n').filter((l) => l.startsWith('Held back'));
+  assert.deepEqual(heldBack, ['Held back, not saved: docs/batch/note 7.md (line 2 is shaped like a key). Take the key out and it is saved next time.']);
+  const files = homeFiles(local.base, home);
+  assert.equal(files.filter((f) => f.startsWith('docs/batch/note ')).length, 39);
+  assert.ok(files.includes('docs/batch/pixel.bin'));
+  assert.equal(git(local.base, home, ['log', '--all', '--format=%h', '-S', OTHER_KEY]).out, '');
+});
+
 test('a second, different key in status.json is taken out and the key file is kept', (t) => {
   const { local, home } = homed(t);
   const status = local.status();

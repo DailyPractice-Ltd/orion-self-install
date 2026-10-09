@@ -17,6 +17,18 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.2.4 — 2026-10-09
+
+One rule tightened, so both ends of the radio agree.
+
+- **A skill's main file is `SKILL.md`, spelled exactly that way.** The check a skill
+  passes before it is sent or written used to let `skill.md` through as if it were
+  `SKILL.md`. 1.2.3 caught that as a skill arrived. Now the check itself says no, so
+  the rule is the same everywhere it is used, and Daily Practice's library applies
+  the identical rule on its side.
+- Nothing changes for a skill that is named correctly. Two files whose names differ
+  only in capitals are still refused as one file listed twice.
+
 ## 1.2.3 — 2026-10-08
 
 A skill from the library becomes yours as it lands.

@@ -393,7 +393,9 @@ export function skillBundleProblem(files) {
     total += f.content.length;
     bytes += Buffer.byteLength(f.content, 'utf8');
   }
-  if (!seen.has(SKILL_ENTRY_FILE.toLowerCase())) return `no ${SKILL_ENTRY_FILE}`;
+  // By its exact spelling: the entry file is looked up that way, and "skill.md"
+  // is not the entry file on a case-sensitive disk.
+  if (!files.some((f) => f.path === SKILL_ENTRY_FILE)) return `no ${SKILL_ENTRY_FILE}`;
   if (total > SKILL_BUNDLE_MAX) return `bundle over ${SKILL_BUNDLE_MAX} characters`;
   if (bytes > SKILL_BUNDLE_BYTES_MAX) return `bundle over ${SKILL_BUNDLE_BYTES_MAX} bytes`;
   return null;

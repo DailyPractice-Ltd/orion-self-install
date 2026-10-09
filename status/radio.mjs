@@ -403,8 +403,7 @@ if (command === 'library') {
   // path is checked here before a single byte is written.
   const bundle = Array.isArray(asset?.files) && asset.files.length > 0 ? asset.files : null;
   if (bundle) {
-    const problem = skillBundleProblem(bundle)
-      || (bundle.some((f) => f.path === SKILL_ENTRY_FILE) ? null : `no ${SKILL_ENTRY_FILE}`);
+    const problem = skillBundleProblem(bundle);
     if (problem) {
       console.log(`"${slug}" arrived in a shape this harness will not write (${problem}). Nothing written. Tell Daily Practice.`);
       process.exit(0);
@@ -536,16 +535,17 @@ if (command === 'contribute') {
   // The whole folder travels: SKILL.md plus its references and templates, text
   // files only. Scripts and binaries stay behind, and the person is told so.
   const { files, skipped } = packSkillFolder(dir, { readdirSync, lstatSync, readFileSync });
-  const entry = files.find((f) => f.path === SKILL_ENTRY_FILE);
-  const content = entry ? entry.content : '';
-  if (!content.trim()) {
-    console.log(`"${slug}" is empty — nothing to offer.`);
-    process.exit(0);
-  }
+  // The shape first: a folder whose file is named "skill.md" passes the look
+  // above on a Mac, and it has no SKILL.md, which is not the same as empty.
   const problem = skillBundleProblem(files);
   if (problem) {
     console.log(`"${slug}" cannot be sent as it is (${problem}). Nothing sent.`);
     console.log('Tell Daily Practice and we will sort the shape.');
+    process.exit(0);
+  }
+  const content = files.find((f) => f.path === SKILL_ENTRY_FILE).content;
+  if (!content.trim()) {
+    console.log(`"${slug}" is empty — nothing to offer.`);
     process.exit(0);
   }
   const total = files.reduce((n, f) => n + f.content.length, 0);
@@ -557,7 +557,7 @@ if (command === 'contribute') {
     console.log('What would be sent:');
     for (const f of files) console.log(`  ${f.path}`);
     if (skipped.length > 0) {
-      console.log('Staying behind (not a text file, so the radio never carries it):');
+      console.log('Staying behind (the radio carries plain text files only, in names every computer can write):');
       for (const s of skipped) console.log(`  ${s}`);
     }
     console.log('');

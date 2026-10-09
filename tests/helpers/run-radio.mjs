@@ -33,9 +33,12 @@ export function writeRichSkill(dir) {
  * Run the real radio.mjs in a scratch harness with fetch answering from memory.
  * Returns what it printed, every bridge call, and the skill trees it left on
  * disk (captured before the scratch harness is removed). `status` adds fields to
- * the scratch status.json (a business name, say).
+ * the scratch status.json (a business name, say). `prepare(dir)` sets the scratch
+ * harness up further before the radio runs. `failWrite` names a bundle path whose
+ * write fails as a full disk would, so a half-finished install can be tested on
+ * every kind of machine.
  */
-export function runRadio(args, { reply, skill, status } = {}) {
+export function runRadio(args, { reply, skill, status, prepare, failWrite } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'orion-radio-'));
   try {
     mkdirSync(join(dir, 'status'));
@@ -51,10 +54,23 @@ export function runRadio(args, { reply, skill, status } = {}) {
       },
     }));
     if (skill) writeRichSkill(join(dir, '.claude', 'skills', skill));
+    if (prepare) prepare(dir);
     const log = join(dir, 'fetch.log');
     const mock = join(dir, 'fetch.mjs');
     writeFileSync(mock, `
-      import { appendFileSync } from 'node:fs';
+      import fs, { appendFileSync } from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const failWrite = ${JSON.stringify(failWrite ?? null)};
+      if (failWrite) {
+        const write = fs.writeFileSync;
+        fs.writeFileSync = (target, ...rest) => {
+          if (String(target).replace(/\\\\/g, '/').endsWith('/' + failWrite)) {
+            throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' });
+          }
+          return write(target, ...rest);
+        };
+        syncBuiltinESMExports();
+      }
       const reply = ${JSON.stringify(reply ?? { status: 201, body: { contribution_id: 'c1', replay: false } })};
       globalThis.fetch = async (url, init = {}) => {
         const u = new URL(url);

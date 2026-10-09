@@ -17,6 +17,29 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.2.5 — 2026-10-09
+
+A skill that travels can be written on any computer.
+
+- **File names that only some computers can write are refused.** A skill is a folder
+  of text files, and it may be packed on a Mac and opened on Windows. A name with any
+  of `: ? * < > | "` in it, or a file or folder name ending in a space or a dot, cannot
+  be written on Windows, and a colon there makes a hidden file instead of one you can
+  see. When you offer a skill, a file like that now stays behind and the preview names
+  it, so you can rename it and offer again. A skill arriving from the library is held
+  to the same rule before anything is written.
+- **One name cannot be both a file and a folder.** A skill that listed `notes.md` and
+  also `notes.md/more.md` could never be written on any computer. It used to fail part
+  way through. Now it is refused up front, with the name spelled out.
+- **An accent typed two ways is one name.** The é in `café.md` can be stored as one
+  character or as an e followed by an accent. A Mac treats both as the same file, so
+  one would quietly replace the other. They are now refused as one file listed twice.
+- **A skill whose main file is named `skill.md` is told so.** On a Mac, offering it
+  used to say the skill was empty. It now says there is no `SKILL.md`.
+- Nothing changes for a skill with ordinary names. Daily Practice's library applies
+  the identical rule on its side, and both sides now run the same list of test cases,
+  so the two cannot drift apart.
+
 ## 1.2.4 — 2026-10-09
 
 One rule tightened, so both ends of the radio agree.

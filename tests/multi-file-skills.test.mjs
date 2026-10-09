@@ -8,7 +8,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, readdirSync, lstatSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync, readdirSync, lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -19,33 +20,52 @@ import { runRadio, writeRichSkill } from './helpers/run-radio.mjs';
 
 const fs = { readdirSync, lstatSync, readFileSync };
 
-test('skillPathProblem: text files inside the folder only', () => {
+// The rule, as cases. dailypractice-mono holds a copy of this file and runs it
+// against its own mirror of the rule (apps/enablement/lib/library/bundle.ts), so
+// the two ends cannot drift apart without a test failing on one of them.
+const CASES_FILE = new URL('./skill-bundle-cases.json', import.meta.url);
+const CASES_FINGERPRINT = 'ceb5d5189c69678f5a47a75bcf20eb40ead3ea8db75bcb7b3865654464efa275';
+
+test('skillBundleProblem: every shared case, the same ones the library runs', () => {
+  const { cases } = JSON.parse(readFileSync(CASES_FILE, 'utf8'));
+  assert.ok(cases.length > 0);
+  for (const c of cases) {
+    const got = skillBundleProblem(c.files);
+    if (c.problem === null) assert.equal(got, null, c.name);
+    else assert.match(String(got), new RegExp(c.problem), c.name);
+  }
+});
+
+test('the shared cases are the copy dailypractice-mono holds', () => {
+  // Spacing and line endings do not count, only what the file says.
+  const said = JSON.stringify(JSON.parse(readFileSync(CASES_FILE, 'utf8')));
+  assert.equal(
+    createHash('sha256').update(said).digest('hex'),
+    CASES_FINGERPRINT,
+    'tests/skill-bundle-cases.json changed. Make the same change in dailypractice-mono '
+      + 'apps/enablement/tests/unit/skill-bundle-cases.json, then put the new fingerprint in both suites.',
+  );
+});
+
+test('skillPathProblem: text files inside the folder only, in names every disk can write', () => {
   assert.equal(skillPathProblem('SKILL.md'), null);
   assert.equal(skillPathProblem('references/boundary.md'), null);
   assert.equal(skillPathProblem('templates/confirm.json'), null);
+  assert.equal(skillPathProblem('call list (v2)/first call.md'), null);
   for (const bad of ['check.mjs', 'run.py', 'go.sh', 'a.png', '../x.md', '/etc/x.md', 'C:\\x.md', 'a/../b.md', '.hidden.md', 'a//b.md', '', 'noext']) {
+    assert.ok(skillPathProblem(bad), `should refuse ${JSON.stringify(bad)}`);
+  }
+  // Windows: a colon writes a hidden stream instead of the file, the rest
+  // cannot be written at all, and a trailing space or dot is dropped.
+  for (const bad of ['refs/x.md:notes.md', 'what?.md', 'a*.md', 'a<b.md', 'a>b.md', 'a|b.md', 'say "hi".md', 'refs /x.md', 'refs./x.md', 'x.md ', 'x.md.']) {
     assert.ok(skillPathProblem(bad), `should refuse ${JSON.stringify(bad)}`);
   }
 });
 
-test('skillBundleProblem: caps, duplicates, and the entry file', () => {
-  assert.equal(skillBundleProblem([{ path: 'SKILL.md', content: '# s' }]), null);
-  assert.match(skillBundleProblem([{ path: 'references/x.md', content: 'x' }]), /no SKILL\.md/);
-  assert.match(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'SKILL.md', content: '#' }]), /twice/);
-  assert.match(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'a/B.md', content: '1' }, { path: 'a/b.md', content: '2' }]), /twice/, 'case-only duplicates collide on a Mac');
+test('skillBundleProblem: the caps', () => {
   assert.match(skillBundleProblem([{ path: 'SKILL.md', content: 'x'.repeat(SKILL_FILE_MAX + 1) }]), /over/);
   const tooMany = Array.from({ length: SKILL_FILES_MAX + 1 }, (_, i) => ({ path: `f${i}.md`, content: 'x' }));
   assert.match(skillBundleProblem(tooMany), /more than/);
-  assert.match(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'check.mjs', content: 'x' }]), /not a text file/);
-  assert.match(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'templates/t.json', content: 'a\0b' }]), /not text/, 'a NUL byte is not text');
-  assert.ok(skillBundleProblem([]));
-});
-
-test('skillBundleProblem: SKILL.md is required by its exact spelling', () => {
-  assert.match(skillBundleProblem([{ path: 'skill.md', content: '# x' }]), /no SKILL\.md/);
-  assert.match(skillBundleProblem([{ path: 'Skill.md', content: '# x' }, { path: 'references/x.md', content: 'x' }]), /no SKILL\.md/);
-  assert.equal(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'references/x.md', content: 'x' }]), null);
-  assert.match(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'skill.md', content: '#' }]), /twice/, 'two spellings are still one file listed twice');
 });
 
 test('packSkillFolder: collects the text files, skips scripts, hidden files and symlinks', () => {
@@ -153,8 +173,18 @@ test('library --install: a bundle with an unsafe path is refused and nothing is 
 });
 
 test('library --install: a write that fails half-way leaves nothing behind', () => {
-  // 'a.md' is written as a file, then 'a.md/b.md' needs 'a.md' to be a folder:
-  // the second write fails, and the whole install must roll back.
+  // The disk fills after SKILL.md has landed: the whole install must roll back.
+  const { code, out, err, trees, calls } = runRadio(['library', '--install', 'meeting-confirmation', '--yes'], { reply: BUNDLE_REPLY, failWrite: 'references/boundary.md' });
+  assert.equal(code, 0, err);
+  assert.match(out, /Could not write "meeting-confirmation" \(ENOSPC\)/);
+  assert.doesNotMatch(out, /Written/);
+  assert.equal(trees['meeting-confirmation'], undefined, 'no half folder left behind');
+  assert.ok(!Object.keys(trees).some((k) => k.includes('installing')), 'no staging folder left behind');
+  assert.ok(!calls.some((c) => c.path === '/api/bridge/assets'), 'the shelf is not told');
+});
+
+test('library --install: a name that is both a file and a folder is refused before anything is written', () => {
+  // No disk can hold 'a.md' as a file and as the folder of 'a.md/b.md'.
   const clash = { status: 200, body: { ...BUNDLE_REPLY.body, files: [
     { path: 'SKILL.md', content: '# x' },
     { path: 'a.md', content: 'file' },
@@ -162,11 +192,52 @@ test('library --install: a write that fails half-way leaves nothing behind', () 
   ] } };
   const { code, out, err, trees, calls } = runRadio(['library', '--install', 'meeting-confirmation', '--yes'], { reply: clash });
   assert.equal(code, 0, err);
-  assert.match(out, /Could not write/);
-  assert.doesNotMatch(out, /Written/);
-  assert.equal(trees['meeting-confirmation'], undefined, 'no half folder left behind');
-  assert.ok(!Object.keys(trees).some((k) => k.includes('installing')), 'no staging folder left behind');
-  assert.ok(!calls.some((c) => c.path === '/api/bridge/assets'), 'the shelf is not told');
+  assert.match(out, /will not write \(a\.md: both a file and a folder\)\. Nothing written\./);
+  assert.equal(trees['meeting-confirmation'], undefined);
+  assert.ok(!Object.keys(trees).some((k) => k.includes('installing')), 'not even a staging folder');
+  assert.ok(!calls.some((c) => c.path === '/api/bridge/assets'));
+});
+
+test('library --install: a name Windows cannot write is refused on every machine', () => {
+  const windows = { status: 200, body: { ...BUNDLE_REPLY.body, files: [
+    { path: 'SKILL.md', content: '# x' },
+    { path: 'references/x.md:notes.md', content: 'on Windows this is a hidden stream, not a file' },
+  ] } };
+  const { code, out, err, trees, calls } = runRadio(['library', '--install', 'meeting-confirmation', '--yes'], { reply: windows });
+  assert.equal(code, 0, err);
+  assert.match(out, /will not write \(references\/x\.md:notes\.md: bad character\)/);
+  assert.equal(trees['meeting-confirmation'], undefined);
+  assert.ok(!calls.some((c) => c.path === '/api/bridge/assets'));
+});
+
+test('contribute: a folder whose file is named "skill.md" is not called empty', () => {
+  // On a Mac or Windows disk "skill.md" answers to SKILL.md, so the folder is
+  // found; what it lacks is a SKILL.md, and that is what the person is told.
+  // On a disk that tells the two apart the skill is simply not found.
+  const { code, out, err, calls } = runRadio(['contribute', '--slug', 'meeting-confirmation', '--yes'], {
+    prepare: (dir) => {
+      const skill = join(dir, '.claude', 'skills', 'meeting-confirmation');
+      mkdirSync(skill, { recursive: true });
+      writeFileSync(join(skill, 'skill.md'), '# Confirm meetings the right way\n');
+    },
+  });
+  assert.equal(code, 0, err);
+  assert.doesNotMatch(out, /is empty/);
+  assert.match(out, /cannot be sent as it is \(no SKILL\.md\)|No skill called "meeting-confirmation"/);
+  assert.deepEqual(calls, [], 'nothing is sent');
+});
+
+test('contribute: a SKILL.md with nothing in it is still called empty', () => {
+  const { code, out, err, calls } = runRadio(['contribute', '--slug', 'meeting-confirmation', '--yes'], {
+    prepare: (dir) => {
+      const skill = join(dir, '.claude', 'skills', 'meeting-confirmation');
+      mkdirSync(skill, { recursive: true });
+      writeFileSync(join(skill, 'SKILL.md'), '  \n');
+    },
+  });
+  assert.equal(code, 0, err);
+  assert.match(out, /is empty/);
+  assert.deepEqual(calls, [], 'nothing is sent');
 });
 
 test('library --install: a bundle carrying a script is refused', () => {

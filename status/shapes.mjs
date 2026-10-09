@@ -357,16 +357,22 @@ export const SKILL_ENTRY_FILE = 'SKILL.md';
 
 /**
  * Why a path is not allowed inside a skill bundle, or null when it is fine.
- * Relative, forward slashes, no dot segments, no hidden files, text only.
+ * Relative, forward slashes, no dot segments, no hidden files, text only, and
+ * a name every disk can write: a skill packed on a Mac lands on Windows too.
  * Applied to what we pack AND to what a server hands us: the other end is data.
  */
 export function skillPathProblem(p) {
   if (typeof p !== 'string' || p.length === 0 || p.length > 200) return 'empty or too long';
   if (p.includes('\\') || p.includes('\0')) return 'bad character';
   if (p.startsWith('/') || /^[A-Za-z]:/.test(p)) return 'absolute path';
+  // Windows reads these specially. A colon writes a hidden stream beside the
+  // file instead of the file; the rest cannot be written there at all.
+  if (/[:?*<>|"]/.test(p)) return 'bad character';
   const parts = p.split('/');
   if (parts.some((s) => s === '' || s === '.' || s === '..')) return 'dot segment';
   if (parts.some((s) => s.startsWith('.'))) return 'hidden file';
+  // Windows drops a trailing space or dot, so the name written is not the name sent.
+  if (parts.some((s) => s.endsWith(' ') || s.endsWith('.'))) return 'ends in a space or dot';
   const dot = p.lastIndexOf('.');
   const ext = dot > p.lastIndexOf('/') ? p.slice(dot).toLowerCase() : '';
   if (!SKILL_TEXT_EXTENSIONS.includes(ext)) return 'not a text file';
@@ -377,7 +383,8 @@ export function skillPathProblem(p) {
 export function skillBundleProblem(files) {
   if (!Array.isArray(files) || files.length === 0) return 'no files';
   if (files.length > SKILL_FILES_MAX) return `more than ${SKILL_FILES_MAX} files`;
-  const seen = new Set();
+  const seen = new Set();    // every file, as a disk compares names
+  const folders = new Set(); // every folder those files sit in, the same way
   let total = 0;
   let bytes = 0;
   for (const f of files) {
@@ -387,9 +394,20 @@ export function skillBundleProblem(files) {
     // .md name (or a UTF-16 file). It would be refused on arrival; say so here.
     if (typeof f.content !== 'string' || f.content.includes('\0')) return `${f.path}: not text`;
     if (f.content.length > SKILL_FILE_MAX) return `${f.path}: over ${SKILL_FILE_MAX} characters`;
-    // Case-insensitively: on a Mac or Windows disk two spellings are one file.
-    if (seen.has(f.path.toLowerCase())) return `${f.path}: listed twice`;
-    seen.add(f.path.toLowerCase());
+    // As a disk compares names: on a Mac or Windows disk two spellings are one
+    // file, and on a Mac an accent typed as one character or as two is one file.
+    const key = f.path.normalize('NFC').toLowerCase();
+    if (seen.has(key)) return `${f.path}: listed twice`;
+    // A name is a file or a folder, never both: no disk could write the bundle.
+    const parts = f.path.split('/');
+    for (let i = 1; i < parts.length; i += 1) {
+      const folder = parts.slice(0, i).join('/');
+      const folderKey = folder.normalize('NFC').toLowerCase();
+      if (seen.has(folderKey)) return `${folder}: both a file and a folder`;
+      folders.add(folderKey);
+    }
+    if (folders.has(key)) return `${f.path}: both a file and a folder`;
+    seen.add(key);
     total += f.content.length;
     bytes += Buffer.byteLength(f.content, 'utf8');
   }

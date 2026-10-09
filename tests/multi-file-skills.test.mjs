@@ -8,9 +8,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, readdirSync, lstatSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync, readdirSync, lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   skillPathProblem, skillBundleProblem, packSkillFolder,
   SKILL_FILES_MAX, SKILL_FILE_MAX,
@@ -46,6 +47,18 @@ test('skillBundleProblem: SKILL.md is required by its exact spelling', () => {
   assert.match(skillBundleProblem([{ path: 'Skill.md', content: '# x' }, { path: 'references/x.md', content: 'x' }]), /no SKILL\.md/);
   assert.equal(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'references/x.md', content: 'x' }]), null);
   assert.match(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'skill.md', content: '#' }]), /twice/, 'two spellings are still one file listed twice');
+});
+
+// The same cases run in dailypractice-mono against the library's copy of the rules.
+test('the cases both ends of the radio run', () => {
+  const cases = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'skill-bundle-cases.json'), 'utf8'));
+  const check = (got, want, what) => (want === null
+    ? assert.equal(got, null, what)
+    : assert.ok(typeof got === 'string' && got.includes(want), `${what}: got ${got}, want ${want}`));
+  for (const c of cases.paths) check(skillPathProblem(c.path), c.problem, `path ${JSON.stringify(c.path)}`);
+  for (const c of cases.bundles) {
+    check(skillBundleProblem(c.paths.map((p) => ({ path: p, content: 'x' }))), c.problem, `bundle ${JSON.stringify(c.paths)}`);
+  }
 });
 
 test('packSkillFolder: collects the text files, skips scripts, hidden files and symlinks', () => {
@@ -84,6 +97,17 @@ test('contribute --yes: the whole folder goes, text only, SKILL.md mirrored in c
   assert.equal(post.body.content, post.body.files[0].content, 'content is the SKILL.md, for an older server');
   assert.equal(post.body.kind, 'skill');
   assert.match(out, /Offered "meeting-confirmation"[^\n]*3 files/);
+});
+
+test('contribute: a main file under another spelling is a naming problem, never an empty skill', () => {
+  const writeSkill = (dir) => { mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'skill.md'), '# lower-case\n'); };
+  const { code, out, err, calls } = runRadio(['contribute', '--slug', 'meeting-confirmation', '--yes'], { skill: 'meeting-confirmation', writeSkill });
+  assert.equal(code, 0, err);
+  // A Mac or Windows disk finds the folder and the rule names the file; on
+  // Linux there is no SKILL.md to find. Either way the line says SKILL.md.
+  assert.match(out, /SKILL\.md/);
+  assert.doesNotMatch(out, /is empty/);
+  assert.deepEqual(calls, [], 'nothing is sent');
 });
 
 const BUNDLE_REPLY = {
@@ -153,14 +177,20 @@ test('library --install: a bundle with an unsafe path is refused and nothing is 
 });
 
 test('library --install: a write that fails half-way leaves nothing behind', () => {
-  // 'a.md' is written as a file, then 'a.md/b.md' needs 'a.md' to be a folder:
-  // the second write fails, and the whole install must roll back.
-  const clash = { status: 200, body: { ...BUNDLE_REPLY.body, files: [
-    { path: 'SKILL.md', content: '# x' },
-    { path: 'a.md', content: 'file' },
-    { path: 'a.md/b.md', content: 'needs a folder' },
-  ] } };
-  const { code, out, err, trees, calls } = runRadio(['library', '--install', 'meeting-confirmation', '--yes'], { reply: clash });
+  // The rules refuse every bundle no disk could hold, so the disk itself fails
+  // here: SKILL.md lands, the second file does not, and the whole install must
+  // roll back.
+  const preload = `
+    import fs from 'node:fs';
+    import { syncBuiltinESMExports } from 'node:module';
+    const write = fs.writeFileSync;
+    fs.writeFileSync = (p, ...rest) => {
+      if (String(p).endsWith('boundary.md')) throw Object.assign(new Error('disk full'), { code: 'ENOSPC' });
+      return write(p, ...rest);
+    };
+    syncBuiltinESMExports();
+  `;
+  const { code, out, err, trees, calls } = runRadio(['library', '--install', 'meeting-confirmation', '--yes'], { reply: BUNDLE_REPLY, preload });
   assert.equal(code, 0, err);
   assert.match(out, /Could not write/);
   assert.doesNotMatch(out, /Written/);

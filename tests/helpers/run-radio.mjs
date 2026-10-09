@@ -33,9 +33,12 @@ export function writeRichSkill(dir) {
  * Run the real radio.mjs in a scratch harness with fetch answering from memory.
  * Returns what it printed, every bridge call, and the skill trees it left on
  * disk (captured before the scratch harness is removed). `status` adds fields to
- * the scratch status.json (a business name, say).
+ * the scratch status.json (a business name, say). `writeSkill` writes the
+ * `skill` folder when the rich one is not what the test needs. `preload` is
+ * module source run in the radio's process before it starts (a disk that fails,
+ * say).
  */
-export function runRadio(args, { reply, skill, status } = {}) {
+export function runRadio(args, { reply, skill, writeSkill = writeRichSkill, status, preload = '' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'orion-radio-'));
   try {
     mkdirSync(join(dir, 'status'));
@@ -50,7 +53,7 @@ export function runRadio(args, { reply, skill, status } = {}) {
         install_token: FAKE_KEY,
       },
     }));
-    if (skill) writeRichSkill(join(dir, '.claude', 'skills', skill));
+    if (skill) writeSkill(join(dir, '.claude', 'skills', skill));
     const log = join(dir, 'fetch.log');
     const mock = join(dir, 'fetch.mjs');
     writeFileSync(mock, `
@@ -64,6 +67,7 @@ export function runRadio(args, { reply, skill, status } = {}) {
         if (u.pathname === '/api/bridge/assets') return new Response('{"asset_id":"a1","replay":false}', { status: 201, headers: { 'content-type': 'application/json' } });
         return new Response(JSON.stringify(reply.body), { status: reply.status, headers: { 'content-type': 'application/json' } });
       };
+      ${preload}
     `);
     const r = spawnSync(process.execPath, ['--import', pathToFileURL(mock).href, join(dir, 'status', 'radio.mjs'), ...args], { encoding: 'utf8' });
     const calls = existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];

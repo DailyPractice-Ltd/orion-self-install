@@ -41,6 +41,7 @@ Write each section for the client who will read it there.
 
 What the radio shares has not changed: a tag, a count, a time, and the name of the
 skill or agent that ran. Never the content.
+
 ## 1.2.5 — 2026-10-09
 
 A skill that cannot be written on every machine is turned away before it travels.

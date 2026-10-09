@@ -139,20 +139,19 @@ function firstLine(text) {
   return (line || 'git gave no reason').replace(/^(fatal|error|remote):\s*/i, '').replace(/\/\/[^@/\s]*@/g, '//').slice(0, 160);
 }
 
-const sameDir = (a, b) => {
-  try {
-    return path.relative(fs.realpathSync(a), fs.realpathSync(b)) === '';
-  } catch {
-    return false;
-  }
-};
-
-/** 'own': this folder is a repository. 'inside': it sits in someone else's. 'none': no repository. */
+/**
+ * 'own': this folder is a repository. 'inside': it sits in someone else's. 'none': no repository.
+ *
+ * git is asked where this folder sits inside its repository, and "nowhere, it
+ * is the top" is the answer wanted. Comparing two spellings of the folder's
+ * path instead went wrong on Windows, where one folder has a long name and a
+ * short one (RUNNER~1) and git and Node each picked a different one.
+ */
 function repoState() {
-  const top = git(['rev-parse', '--show-toplevel']);
-  if (!top.ok) return { state: 'none' };
-  const where = top.out.trim();
-  return sameDir(where, ROOT) ? { state: 'own' } : { state: 'inside', where };
+  const inside = git(['rev-parse', '--show-prefix']);
+  if (!inside.ok) return { state: 'none' };
+  if (inside.out.trim() === '') return { state: 'own' };
+  return { state: 'inside', where: git(['rev-parse', '--show-toplevel']).out.trim() };
 }
 
 function readStatus() {

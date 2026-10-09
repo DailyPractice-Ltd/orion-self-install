@@ -403,8 +403,7 @@ if (command === 'library') {
   // path is checked here before a single byte is written.
   const bundle = Array.isArray(asset?.files) && asset.files.length > 0 ? asset.files : null;
   if (bundle) {
-    const problem = skillBundleProblem(bundle)
-      || (bundle.some((f) => f.path === SKILL_ENTRY_FILE) ? null : `no ${SKILL_ENTRY_FILE}`);
+    const problem = skillBundleProblem(bundle);
     if (problem) {
       console.log(`"${slug}" arrived in a shape this harness will not write (${problem}). Nothing written. Tell Daily Practice.`);
       process.exit(0);
@@ -536,16 +535,18 @@ if (command === 'contribute') {
   // The whole folder travels: SKILL.md plus its references and templates, text
   // files only. Scripts and binaries stay behind, and the person is told so.
   const { files, skipped } = packSkillFolder(dir, { readdirSync, lstatSync, readFileSync });
-  const entry = files.find((f) => f.path === SKILL_ENTRY_FILE);
-  const content = entry ? entry.content : '';
-  if (!content.trim()) {
-    console.log(`"${slug}" is empty — nothing to offer.`);
-    process.exit(0);
-  }
+  // The shape first: a main file under another spelling is a naming problem,
+  // and must not be reported as an empty skill.
   const problem = skillBundleProblem(files);
   if (problem) {
     console.log(`"${slug}" cannot be sent as it is (${problem}). Nothing sent.`);
     console.log('Tell Daily Practice and we will sort the shape.');
+    process.exit(0);
+  }
+  const entry = files.find((f) => f.path === SKILL_ENTRY_FILE);
+  const content = entry ? entry.content : '';
+  if (!content.trim()) {
+    console.log(`"${slug}" is empty — nothing to offer.`);
     process.exit(0);
   }
   const total = files.reduce((n, f) => n + f.content.length, 0);

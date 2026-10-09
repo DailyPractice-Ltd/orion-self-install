@@ -364,20 +364,31 @@ export function skillPathProblem(p) {
   if (typeof p !== 'string' || p.length === 0 || p.length > 200) return 'empty or too long';
   if (p.includes('\\') || p.includes('\0')) return 'bad character';
   if (p.startsWith('/') || /^[A-Za-z]:/.test(p)) return 'absolute path';
+  // What Windows will not write as a plain file. A colon there is a hidden
+  // stream on another file; the rest fail the install on that one machine.
+  if (/[:*?"<>|]/.test(p)) return 'bad character';
   const parts = p.split('/');
   if (parts.some((s) => s === '' || s === '.' || s === '..')) return 'dot segment';
   if (parts.some((s) => s.startsWith('.'))) return 'hidden file';
+  if (parts.some((s) => s.endsWith(' ') || s.endsWith('.'))) return 'trailing space or dot';
   const dot = p.lastIndexOf('.');
   const ext = dot > p.lastIndexOf('/') ? p.slice(dot).toLowerCase() : '';
   if (!SKILL_TEXT_EXTENSIONS.includes(ext)) return 'not a text file';
   return null;
 }
 
-/** Why a bundle ({ path, content }[]) cannot travel, or null when it can. */
+/**
+ * Why a bundle ({ path, content }[]) cannot travel, or null when it can. These
+ * rules and skillPathProblem's are also written down as cases both ends run, in
+ * tests/fixtures/skill-bundle-cases.json: change a rule here and that file
+ * changes with it, in both repos.
+ */
 export function skillBundleProblem(files) {
   if (!Array.isArray(files) || files.length === 0) return 'no files';
   if (files.length > SKILL_FILES_MAX) return `more than ${SKILL_FILES_MAX} files`;
   const seen = new Set();
+  const folders = new Set();
+  let hasEntry = false;
   let total = 0;
   let bytes = 0;
   for (const f of files) {
@@ -387,15 +398,22 @@ export function skillBundleProblem(files) {
     // .md name (or a UTF-16 file). It would be refused on arrival; say so here.
     if (typeof f.content !== 'string' || f.content.includes('\0')) return `${f.path}: not text`;
     if (f.content.length > SKILL_FILE_MAX) return `${f.path}: over ${SKILL_FILE_MAX} characters`;
-    // Case-insensitively: on a Mac or Windows disk two spellings are one file.
-    if (seen.has(f.path.toLowerCase())) return `${f.path}: listed twice`;
-    seen.add(f.path.toLowerCase());
+    // Case-insensitively, and however an accent is encoded: on a Mac or
+    // Windows disk two spellings are one file.
+    const key = f.path.normalize('NFC').toLowerCase();
+    if (seen.has(key)) return `${f.path}: listed twice`;
+    // A name is a file or a folder, never both: no disk can hold such a bundle.
+    const above = key.split('/').slice(0, -1).map((_, i, a) => a.slice(0, i + 1).join('/'));
+    if (folders.has(key) || above.some((d) => seen.has(d))) return `${f.path}: both a file and a folder`;
+    seen.add(key);
+    for (const d of above) folders.add(d);
+    // By its exact spelling: the entry file is looked up that way, and "skill.md"
+    // is not the entry file on a case-sensitive disk.
+    if (f.path === SKILL_ENTRY_FILE) hasEntry = true;
     total += f.content.length;
     bytes += Buffer.byteLength(f.content, 'utf8');
   }
-  // By its exact spelling: the entry file is looked up that way, and "skill.md"
-  // is not the entry file on a case-sensitive disk.
-  if (!files.some((f) => f.path === SKILL_ENTRY_FILE)) return `no ${SKILL_ENTRY_FILE}`;
+  if (!hasEntry) return `no ${SKILL_ENTRY_FILE}`;
   if (total > SKILL_BUNDLE_MAX) return `bundle over ${SKILL_BUNDLE_MAX} characters`;
   if (bytes > SKILL_BUNDLE_BYTES_MAX) return `bundle over ${SKILL_BUNDLE_BYTES_MAX} bytes`;
   return null;

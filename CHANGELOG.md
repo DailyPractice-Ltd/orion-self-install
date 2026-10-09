@@ -17,7 +17,7 @@ Write each section for the client who will read it there.
 ---
 
 
-## 1.3.0 — 2026-10-08
+## 1.3.0 — 2026-10-09
 
 **Groundwork for work that runs away from your own machine. Nothing changes for you unless you ask for it.**
 
@@ -41,6 +41,56 @@ Write each section for the client who will read it there.
 
 What the radio shares has not changed: a tag, a count, a time, and the name of the
 skill or agent that ran. Never the content.
+## 1.2.5 — 2026-10-09
+
+A skill that cannot be written on every machine is turned away before it travels.
+
+- **A name is a file or a folder, never both.** A skill that listed `x.md` and also
+  `x.md/y.md` used to pass the check and then fail as it was written. It is now
+  refused up front, in one plain line.
+- **Names every machine can write.** A file name with a colon, a question mark, a
+  star, a quote, an angle bracket or a bar, or a name that ends in a space or a dot,
+  cannot be written on Windows. When you offer a skill, such a file stays behind and
+  is listed with the others that stayed. A skill arriving with one is refused.
+- **One file is one file, however its accent is typed.** Two names that differ only
+  in how an accented letter is stored are one file on a Mac. They are now refused as
+  one file listed twice, the same as two names that differ only in capitals.
+- Fixed: offering a skill whose main file is named `skill.md`, on a Mac or Windows,
+  said the skill was empty. It now says what is wrong: there is no `SKILL.md`.
+- Nothing changes for a skill with ordinary file names. Daily Practice's library
+  applies the identical rules, and both ends now run the same list of test cases.
+
+## 1.2.4 — 2026-10-09
+
+One rule tightened, so both ends of the radio agree.
+
+- **A skill's main file is `SKILL.md`, spelled exactly that way.** The check a skill
+  passes before it is sent or written used to let `skill.md` through as if it were
+  `SKILL.md`. 1.2.3 caught that as a skill arrived. Now the check itself says no, so
+  the rule is the same everywhere it is used, and Daily Practice's library applies
+  the identical rule on its side.
+- Nothing changes for a skill that is named correctly. Two files whose names differ
+  only in capitals are still refused as one file listed twice.
+
+## 1.2.3 — 2026-10-08
+
+A skill from the library becomes yours as it lands.
+
+- **Your business name is filled in for you.** A library skill is written for any
+  business and leaves a gap where the business name goes. When you accept one over the
+  radio, your harness now fills that gap from what it already has on record, in every
+  file of the skill. You see what will be filled in before you say yes. Before, a
+  skill arrived exactly as written and the gaps were left for you to find.
+- **What it does not know, your AI asks.** If a skill needs something your harness has
+  no record of, such as your CRM's stage names, your AI asks you one question at a
+  time and writes your answer in.
+- **Only what the skill lists is touched.** A skill says what gets filled, under "Fill
+  at install" in its SKILL.md. Everything else arrives exactly as written, including
+  the blanks in a message template that are filled each time it is used.
+- A skill that lists nothing lands byte for byte, as before. Nothing new is sent to
+  Daily Practice: the filling happens on your machine.
+- Fixed: a skill arriving with its main file misnamed is now refused in one plain
+  line, where before the radio could stop with an error.
 
 ## 1.2.2 — 2026-10-06
 

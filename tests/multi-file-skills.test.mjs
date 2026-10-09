@@ -8,42 +8,17 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  mkdtempSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync, existsSync, symlinkSync,
-  readdirSync, lstatSync,
-} from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync, readdirSync, lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { spawnSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   skillPathProblem, skillBundleProblem, packSkillFolder,
   SKILL_FILES_MAX, SKILL_FILE_MAX,
 } from '../status/shapes.mjs';
-import { plainEnv } from './helpers/env.mjs';
+import { runRadio, writeRichSkill } from './helpers/run-radio.mjs';
 
-/**
- * A key that is well shaped and opens nothing. Built here, never written out
- * whole, so no file in this folder holds a line shaped like a key (the rule
- * status/home.mjs applies before it saves a folder anywhere).
- */
-const FAKE_KEY = 'orion_' + 'test'.repeat(6);
-
-const here = dirname(fileURLToPath(import.meta.url));
-const statusDir = join(here, '..', 'status');
 const fs = { readdirSync, lstatSync, readFileSync };
-
-// A rich skill: the entry file, a reference, a template, and two things that
-// must never travel — a script and a hidden file.
-function writeRichSkill(dir) {
-  mkdirSync(join(dir, 'references'), { recursive: true });
-  mkdirSync(join(dir, 'templates'), { recursive: true });
-  writeFileSync(join(dir, 'SKILL.md'), '---\nname: meeting-confirmation\n---\n\nConfirm meetings the right way.\n');
-  writeFileSync(join(dir, 'references', 'boundary.md'), '# Execution boundary\n');
-  writeFileSync(join(dir, 'templates', 'confirm.json'), '{"subject":"Confirming {{date}}"}');
-  writeFileSync(join(dir, 'check.mjs'), 'console.log("validator")');
-  writeFileSync(join(dir, '.DS_Store'), 'junk');
-}
 
 test('skillPathProblem: text files inside the folder only', () => {
   assert.equal(skillPathProblem('SKILL.md'), null);
@@ -67,6 +42,25 @@ test('skillBundleProblem: caps, duplicates, and the entry file', () => {
   assert.ok(skillBundleProblem([]));
 });
 
+test('skillBundleProblem: SKILL.md is required by its exact spelling', () => {
+  assert.match(skillBundleProblem([{ path: 'skill.md', content: '# x' }]), /no SKILL\.md/);
+  assert.match(skillBundleProblem([{ path: 'Skill.md', content: '# x' }, { path: 'references/x.md', content: 'x' }]), /no SKILL\.md/);
+  assert.equal(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'references/x.md', content: 'x' }]), null);
+  assert.match(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'skill.md', content: '#' }]), /twice/, 'two spellings are still one file listed twice');
+});
+
+// The same cases run in dailypractice-mono against the library's copy of the rules.
+test('the cases both ends of the radio run', () => {
+  const cases = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'skill-bundle-cases.json'), 'utf8'));
+  const check = (got, want, what) => (want === null
+    ? assert.equal(got, null, what)
+    : assert.ok(typeof got === 'string' && got.includes(want), `${what}: got ${got}, want ${want}`));
+  for (const c of cases.paths) check(skillPathProblem(c.path), c.problem, `path ${JSON.stringify(c.path)}`);
+  for (const c of cases.bundles) {
+    check(skillBundleProblem(c.paths.map((p) => ({ path: p, content: 'x' }))), c.problem, `bundle ${JSON.stringify(c.paths)}`);
+  }
+});
+
 test('packSkillFolder: collects the text files, skips scripts, hidden files and symlinks', () => {
   const dir = mkdtempSync(join(tmpdir(), 'skill-'));
   try {
@@ -82,65 +76,6 @@ test('packSkillFolder: collects the text files, skips scripts, hidden files and 
     rmSync(dir, { recursive: true, force: true });
   }
 });
-
-/**
- * Run the real radio.mjs in a scratch harness with fetch answering from memory.
- * Returns what it printed, every bridge call, and the skill trees it left on
- * disk (captured before the scratch harness is removed).
- */
-function runRadio(args, { reply, skill } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'orion-radio-'));
-  try {
-    mkdirSync(join(dir, 'status'));
-    for (const f of ['radio.mjs', 'shapes.mjs']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
-    writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
-      template_version: '1.2.1',
-      sharing: {
-        status_signal_enabled: true,
-        bridge_url: 'https://radio.test/api/bridge',
-        harness_id: '9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62',
-        install_token: FAKE_KEY,
-      },
-    }));
-    if (skill) writeRichSkill(join(dir, '.claude', 'skills', skill));
-    const log = join(dir, 'fetch.log');
-    const mock = join(dir, 'fetch.mjs');
-    writeFileSync(mock, `
-      import { appendFileSync } from 'node:fs';
-      const reply = ${JSON.stringify(reply ?? { status: 201, body: { contribution_id: 'c1', replay: false } })};
-      globalThis.fetch = async (url, init = {}) => {
-        const u = new URL(url);
-        appendFileSync(${JSON.stringify(log)}, JSON.stringify({
-          method: init.method || 'GET', path: u.pathname, body: init.body ? JSON.parse(init.body) : null,
-        }) + '\\n');
-        if (u.pathname === '/api/bridge/assets') return new Response('{"asset_id":"a1","replay":false}', { status: 201, headers: { 'content-type': 'application/json' } });
-        return new Response(JSON.stringify(reply.body), { status: reply.status, headers: { 'content-type': 'application/json' } });
-      };
-    `);
-    const r = spawnSync(process.execPath, ['--import', pathToFileURL(mock).href, join(dir, 'status', 'radio.mjs'), ...args], { encoding: 'utf8', env: plainEnv() });
-    const calls = existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
-    const trees = {};
-    const skillsRoot = join(dir, '.claude', 'skills');
-    if (existsSync(skillsRoot)) {
-      for (const slug of readdirSync(skillsRoot)) {
-        const root = join(skillsRoot, slug);
-        const files = {};
-        const walk = (rel) => {
-          for (const n of readdirSync(join(root, rel)).sort()) {
-            const p = rel ? `${rel}/${n}` : n;
-            if (lstatSync(join(root, p)).isDirectory()) walk(p);
-            else files[p] = readFileSync(join(root, p), 'utf8');
-          }
-        };
-        walk('');
-        trees[slug] = files;
-      }
-    }
-    return { code: r.status, out: r.stdout, err: r.stderr, calls, trees };
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
 
 test('contribute: preview lists the files and sends nothing', () => {
   const { code, out, err, calls } = runRadio(['contribute', '--slug', 'meeting-confirmation'], { skill: 'meeting-confirmation' });
@@ -162,6 +97,17 @@ test('contribute --yes: the whole folder goes, text only, SKILL.md mirrored in c
   assert.equal(post.body.content, post.body.files[0].content, 'content is the SKILL.md, for an older server');
   assert.equal(post.body.kind, 'skill');
   assert.match(out, /Offered "meeting-confirmation"[^\n]*3 files/);
+});
+
+test('contribute: a main file under another spelling is a naming problem, never an empty skill', () => {
+  const writeSkill = (dir) => { mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'skill.md'), '# lower-case\n'); };
+  const { code, out, err, calls } = runRadio(['contribute', '--slug', 'meeting-confirmation', '--yes'], { skill: 'meeting-confirmation', writeSkill });
+  assert.equal(code, 0, err);
+  // A Mac or Windows disk finds the folder and the rule names the file; on
+  // Linux there is no SKILL.md to find. Either way the line says SKILL.md.
+  assert.match(out, /SKILL\.md/);
+  assert.doesNotMatch(out, /is empty/);
+  assert.deepEqual(calls, [], 'nothing is sent');
 });
 
 const BUNDLE_REPLY = {
@@ -231,14 +177,20 @@ test('library --install: a bundle with an unsafe path is refused and nothing is 
 });
 
 test('library --install: a write that fails half-way leaves nothing behind', () => {
-  // 'a.md' is written as a file, then 'a.md/b.md' needs 'a.md' to be a folder:
-  // the second write fails, and the whole install must roll back.
-  const clash = { status: 200, body: { ...BUNDLE_REPLY.body, files: [
-    { path: 'SKILL.md', content: '# x' },
-    { path: 'a.md', content: 'file' },
-    { path: 'a.md/b.md', content: 'needs a folder' },
-  ] } };
-  const { code, out, err, trees, calls } = runRadio(['library', '--install', 'meeting-confirmation', '--yes'], { reply: clash });
+  // The rules refuse every bundle no disk could hold, so the disk itself fails
+  // here: SKILL.md lands, the second file does not, and the whole install must
+  // roll back.
+  const preload = `
+    import fs from 'node:fs';
+    import { syncBuiltinESMExports } from 'node:module';
+    const write = fs.writeFileSync;
+    fs.writeFileSync = (p, ...rest) => {
+      if (String(p).endsWith('boundary.md')) throw Object.assign(new Error('disk full'), { code: 'ENOSPC' });
+      return write(p, ...rest);
+    };
+    syncBuiltinESMExports();
+  `;
+  const { code, out, err, trees, calls } = runRadio(['library', '--install', 'meeting-confirmation', '--yes'], { reply: BUNDLE_REPLY, preload });
   assert.equal(code, 0, err);
   assert.match(out, /Could not write/);
   assert.doesNotMatch(out, /Written/);

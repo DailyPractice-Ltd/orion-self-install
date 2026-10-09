@@ -41,6 +41,13 @@ test('skillBundleProblem: caps, duplicates, and the entry file', () => {
   assert.ok(skillBundleProblem([]));
 });
 
+test('skillBundleProblem: SKILL.md is required by its exact spelling', () => {
+  assert.match(skillBundleProblem([{ path: 'skill.md', content: '# x' }]), /no SKILL\.md/);
+  assert.match(skillBundleProblem([{ path: 'Skill.md', content: '# x' }, { path: 'references/x.md', content: 'x' }]), /no SKILL\.md/);
+  assert.equal(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'references/x.md', content: 'x' }]), null);
+  assert.match(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'skill.md', content: '#' }]), /twice/, 'two spellings are still one file listed twice');
+});
+
 test('packSkillFolder: collects the text files, skips scripts, hidden files and symlinks', () => {
   const dir = mkdtempSync(join(tmpdir(), 'skill-'));
   try {

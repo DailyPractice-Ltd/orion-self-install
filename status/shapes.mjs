@@ -13,6 +13,10 @@
  * tag menu (WORK_TAGS) and the label rule for what ran (isLabel). status/done.mjs
  * and status/radio.mjs both read them from here, so they cannot disagree either.
  *
+ * Since 1.3.0 it also says where the radio key may be (radioKey), what a cloud
+ * run is (isCloudRun), and whether the folder has a home (homeOn). Every script
+ * asks here, so no two of them can answer those differently.
+ *
  * Dependency-free: no imports at all. A sibling .mjs is not a dependency —
  * `import './shapes.mjs'` needs no package.json and no install, so the
  * zero-install promise in README.md is untouched.
@@ -67,20 +71,140 @@ export function pairingCodeProblem(input) {
 }
 
 /**
+ * A cloud run: the work is happening on a machine that is handed a fresh copy
+ * of this folder and thrown away afterwards. Claude Code's cloud sessions say so
+ * themselves (CLAUDE_CODE_REMOTE). Any other cloud can say it with ORION_CLOUD=1.
+ * Two things follow from it, and both read this one answer: the radio key may be
+ * attached outside the machine (radioKey below), and work that cannot reach the
+ * folder's home is parked on a branch instead of being lost (status/home.mjs).
+ */
+export function isCloudRun(env = process.env) {
+  return env?.CLAUDE_CODE_REMOTE === 'true' || env?.ORION_CLOUD === '1';
+}
+
+/**
+ * Whether this script has to be started again with Node's proxy support on.
+ *
+ * Found by running it, 8 Oct 2026. On a Claude Code cloud machine every outside
+ * address is reached through a proxy the machine names in HTTPS_PROXY, and a
+ * name like www.dailypractice.world does not even resolve on the machine
+ * itself. Node's fetch ignores that variable unless NODE_USE_ENV_PROXY=1 was set
+ * before Node started, so a plain call fails with ENOTFOUND while curl beside it
+ * gets through. The radio key is attached by that same proxy, so the call has to
+ * go that way. Node learned the variable in 22.21 and 24.0. Only a cloud run
+ * does this: a person's own machine keeps reaching the radio as it always has.
+ */
+export function wantsEnvProxy(env = process.env, nodeVersion = process.versions.node) {
+  if (!isCloudRun(env) || env?.NODE_USE_ENV_PROXY === '1') return false;
+  if (!(env?.HTTPS_PROXY || env?.https_proxy)) return false;
+  const [major, minor] = String(nodeVersion).split('.').map(Number);
+  return major >= 24 || (major === 22 && minor >= 21);
+}
+
+/** The environment a script hands itself when it starts again with proxy support on. */
+export function envProxyEnv(env = process.env) {
+  return {
+    ...env,
+    NODE_USE_ENV_PROXY: '1',
+    // Node calls that support experimental and says so on every call. Quiet that
+    // one line: a shift's output is read by its agent.
+    NODE_OPTIONS: `${env?.NODE_OPTIONS || ''} --disable-warning=UNDICI-EHPA`.trim(),
+  };
+}
+
+/**
+ * Where the radio key is. The key (the install token) is what proves which
+ * harness is calling. Until 1.3.0 it had one place, sharing.install_token in
+ * status/status.json, which is why that file could never be saved anywhere but
+ * this machine. Now there are four places, and the first one that holds a
+ * well-shaped key wins:
+ *
+ *   environment  ORION_INSTALL_TOKEN, set on the machine. For a cloud that hands
+ *                secrets over as environment variables.
+ *   key-file     status/radio.key: one line, git-ignored. Where status/home.mjs
+ *                moves the key when the folder gets a home, so status.json can
+ *                be saved there without it.
+ *   status-file  sharing.install_token in status.json. Where pairing has always
+ *                written it. Every harness already in the field keeps working.
+ *   attached     Nowhere on this machine. A cloud run with no key of its own
+ *                sends its calls without one, and the environment adds the key
+ *                after the call has left the machine (on Claude Code, a network
+ *                secret for the radio's address). The key never enters the run.
+ *
+ * `keyFile` is the text of status/radio.key, read by the caller (readRadioKeyFile
+ * below), so this file stays free of imports. A value that is not shaped like a
+ * key counts as absent, the same rule as everywhere else here.
+ */
+export const RADIO_KEY_ENV = 'ORION_INSTALL_TOKEN';
+export const RADIO_KEY_FILE = 'radio.key';
+
+export function radioKey(status, { env = process.env, keyFile = '' } = {}) {
+  const candidates = [
+    ['environment', env?.[RADIO_KEY_ENV]],
+    ['key-file', keyFile],
+    ['status-file', status?.sharing?.install_token],
+  ];
+  for (const [source, value] of candidates) {
+    const token = typeof value === 'string' ? value.trim() : '';
+    if (INSTALL_TOKEN_RE.test(token)) return { token, source };
+  }
+  return { token: null, source: isCloudRun(env) ? 'attached' : null };
+}
+
+/** The text of status/radio.key, or '' when there is none. `fs` is injected, as in packSkillFolder. */
+export function readRadioKeyFile(statusDir, fs) {
+  try {
+    return fs.readFileSync(`${statusDir}/${RADIO_KEY_FILE}`, 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+/** The header that carries the key. None when the key is attached outside this machine. */
+export function keyHeader(key) {
+  return key?.token ? { Authorization: `Bearer ${key.token}` } : {};
+}
+
+/**
  * Shape, not mere presence. Anything that doesn't match counts as unconfigured,
  * which is what re-opens the pairing step on the next run instead of leaving a
- * poisoned value in place forever.
+ * poisoned value in place forever. `where` is what radioKey takes: pass the key
+ * file's text, or a harness whose key has moved there reads as unconfigured.
  */
-export function radioConfigured(status) {
+export function radioConfigured(status, where) {
   const s = status?.sharing ?? {};
   return RADIO_URL_RE.test(s.bridge_url || '') &&
     HARNESS_ID_RE.test(s.harness_id || '') &&
-    INSTALL_TOKEN_RE.test(s.install_token || '');
+    radioKey(status, where).source !== null;
 }
 
 /** On means: the client said yes, AND the settings are actually usable. */
-export function radioOn(status) {
-  return status?.sharing?.status_signal_enabled === true && radioConfigured(status);
+export function radioOn(status, where) {
+  return status?.sharing?.status_signal_enabled === true && radioConfigured(status, where);
+}
+
+/**
+ * The home block: whether this folder lives in a private repository its owner
+ * controls, and on which branch (status/home.mjs is the script, and its header
+ * is the contract). Off unless status/home.mjs prepare switched it on, so a
+ * harness that never asked for a home never touches git.
+ */
+const HOME_DEFAULTS = Object.freeze({ enabled: false, branch: 'main' });
+const HOME_BRANCH_RE = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$/;
+
+export function homeBlock(status) {
+  return { ...HOME_DEFAULTS, ...(status?.home ?? {}) };
+}
+
+/** A branch name git will take, with nothing in it a shell or a ref could trip on. */
+export function isHomeBranch(value) {
+  return typeof value === 'string' && HOME_BRANCH_RE.test(value) &&
+    !value.includes('..') && !value.includes('//') && !/[/.]$/.test(value) && !value.endsWith('.lock');
+}
+
+export function homeOn(status) {
+  const h = homeBlock(status);
+  return h.enabled === true && isHomeBranch(h.branch);
 }
 
 /**
@@ -108,6 +232,17 @@ const MEMORY_DEFAULTS = Object.freeze({ enabled: true, backend: 'folder', remote
 
 export function memoryBlock(status) {
   return { ...MEMORY_DEFAULTS, ...(status?.memory ?? {}) };
+}
+
+/**
+ * The same repository over https, for a machine with no ssh key of its own. A
+ * laptop reaches a notebook at git@github.com:owner/notebook.git. A cloud run
+ * is given that repository over https and nothing else. Null when the address
+ * is not the git@host:path kind.
+ */
+export function httpsTwin(remote) {
+  const m = /^git@([A-Za-z0-9.-]+):([A-Za-z0-9._/-]+?)(?:\.git)?$/.exec(String(remote ?? ''));
+  return m ? `https://${m[1]}/${m[2]}.git` : null;
 }
 
 export function memoryConfigured(status) {
@@ -236,15 +371,42 @@ export function countProblem(text, { allowZero = false } = {}) {
  * refuses a line that matches before it is written anywhere, because the same
  * line goes to the local logs that other agents read.
  */
-export const CREDENTIAL_RES = Object.freeze([
+const UNMISTAKABLE_KEY_RES = [
   /orion_[A-Za-z0-9_-]{20,}/,            // an install token
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,  // a key file
   /\bsk-[A-Za-z0-9_-]{16,}/,             // API-key shapes
+];
+
+export const CREDENTIAL_RES = Object.freeze([
+  ...UNMISTAKABLE_KEY_RES,
   /\b(password|passwd|api[_-]?key|client[_-]?secret)\s*[:=]\s*\S/i,
 ]);
 
 export function looksLikeCredential(text) {
   return CREDENTIAL_RES.some((re) => re.test(String(text)));
+}
+
+/**
+ * Shapes that are a key and nothing else. status/home.mjs holds a file back from
+ * the folder's home when a line it is about to save matches one. This list is
+ * wider than the three above because a whole business folder is going to a
+ * repository, and it leaves out the loose "password: ..." rule on purpose: that
+ * one catches honest sentences, and a save that runs with nobody there must not
+ * drop a file over a sentence.
+ */
+export const KEY_SHAPE_RES = Object.freeze([
+  ...UNMISTAKABLE_KEY_RES,
+  /\bgh[pousr]_[A-Za-z0-9]{30,}/,        // GitHub tokens
+  /\bgithub_pat_[A-Za-z0-9_]{30,}/,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/,      // Slack
+  /\bAIza[0-9A-Za-z_-]{30,}/,            // Google API keys
+  /\bAKIA[0-9A-Z]{16}\b/,                // AWS access key ids
+  /\b[rs]k_live_[A-Za-z0-9]{16,}/,       // Stripe live keys
+  /\bpat-[a-z]{2}\d-[0-9a-f-]{30,}/,     // HubSpot private-app tokens
+]);
+
+export function looksLikeKey(text) {
+  return KEY_SHAPE_RES.some((re) => re.test(String(text)));
 }
 
 /** One line means one short line: the shift-log contract's own limit. */

@@ -68,10 +68,15 @@
  *       custom) and --purpose (≤140 chars, about the agent, never a person/company/
  *       number) — the labels that let the role bank become evidence-based.
  *
- * Radio-on means ALL of: sharing.status_signal_enabled is true, and bridge_url,
- * harness_id, install_token are set (the welcome pack). Anything less → every command
- * prints one plain line, sends nothing, and exits 0. Network trouble never retries and
- * never blocks local work — same posture as emit-status.mjs since feature 001.
+ * Radio-on means ALL of: sharing.status_signal_enabled is true, bridge_url and
+ * harness_id are set (the welcome pack), and there is a key. Anything less → every
+ * command prints one plain line, sends nothing, and exits 0. Network trouble never
+ * retries and never blocks local work — same posture as emit-status.mjs since feature 001.
+ *
+ * The key is looked for in this order (status/shapes.mjs, radioKey): the machine's
+ * environment (ORION_INSTALL_TOKEN), then status/radio.key, then sharing.install_token
+ * in status.json. A cloud run that finds none sends its calls without one, because
+ * there the environment adds the key after the call has left the machine.
  *
  * Dependency-free: node:fs and global fetch only. No package.json, no npm install.
  */
@@ -79,13 +84,23 @@
 import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, lstatSync, renameSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import {
-  radioOn as radioIsOn, parseInstallDirective, isWorkTag, workTagMenu, labelProblem, countProblem,
+  radioOn as radioIsOn, radioKey, readRadioKeyFile, keyHeader, wantsEnvProxy, envProxyEnv, isCloudRun,
+  parseInstallDirective, isWorkTag, workTagMenu, labelProblem, countProblem,
   packSkillFolder, skillBundleProblem, fillBundle, SKILL_ENTRY_FILE,
 } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status.json');
+
+// A cloud machine reaches the radio only through its proxy, and Node has to be
+// started knowing that (status/shapes.mjs, wantsEnvProxy). So this script starts
+// itself once more with that switched on, and hands back whatever that run says.
+if (wantsEnvProxy()) {
+  const again = spawnSync(process.execPath, [...process.execArgv, ...process.argv.slice(1)], { stdio: 'inherit', env: envProxyEnv() });
+  process.exit(again.status ?? 0);
+}
 
 const SIGNAL_TYPES = [
   'install_checkpoint',
@@ -139,7 +154,9 @@ const sharing = status.sharing || {};
 // Shape, not mere presence (status/shapes.mjs). A settings file poisoned by a
 // misaligned scripted run — a stray "y" where the address belongs — used to
 // pass this gate and then fail every single call.
-const radioOn = radioIsOn(status);
+const keyPlaces = { keyFile: readRadioKeyFile(__dirname, { readFileSync }) };
+const key = radioKey(status, keyPlaces);
+const radioOn = radioIsOn(status, keyPlaces);
 
 if (!radioOn) {
   console.log('Radio is off (or not configured) — nothing sent, nothing checked. Local work is unaffected.');
@@ -155,7 +172,7 @@ const base = String(sharing.bridge_url).replace(/\/+$/, '');
 // never anything about the client's work.
 const headers = {
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${sharing.install_token}`,
+  ...keyHeader(key),
   ...(status.template_version ? { 'x-orion-template-version': String(status.template_version) } : {}),
 };
 
@@ -171,6 +188,12 @@ async function call(method, path, body) {
     return res;
   } catch (err) {
     console.log(`The radio address didn't answer (${err?.cause?.code || err.code || err.message}) — not retried, nothing lost locally.`);
+    if (isCloudRun()) {
+      // A cloud machine may only reach the addresses its environment allows, and
+      // a refusal looks exactly like no answer at all.
+      console.log(`On a cloud run this usually means the cloud environment may not reach ${new URL(base).host}.`);
+      console.log('A secret for that address, added to the environment, both allows it and carries the key.');
+    }
     resultLine('unreachable');
     process.exit(0);
   }
@@ -190,8 +213,16 @@ function resultLine(outcome) {
 }
 
 function reportAuthProblem() {
-  console.log('The radio answered "that key isn\'t valid" (401). The key may have been revoked —');
-  console.log('ask support@dailypractice.world for a fresh pairing code. Nothing else is affected.');
+  if (key.source === 'attached') {
+    // No key on this machine, by design: the cloud environment was meant to add
+    // it. A 401 here means it did not, or the one it holds is out of date.
+    console.log('The radio answered "no valid key" (401). This is a cloud run, so the key is meant to');
+    console.log(`be added by the cloud environment, as a secret for ${new URL(base).host}. It is missing there,`);
+    console.log('or out of date. Nothing else is affected.');
+  } else {
+    console.log('The radio answered "that key isn\'t valid" (401). The key may have been revoked —');
+    console.log('ask support@dailypractice.world for a fresh pairing code. Nothing else is affected.');
+  }
   resultLine('refused 401');
   process.exit(0);
 }

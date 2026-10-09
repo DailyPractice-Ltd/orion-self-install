@@ -30,10 +30,18 @@ import {
   WORK_TAGS, WORK_TAG_RE, isWorkTag, workTagMenu, isLabel, labelProblem, LABEL_MAX,
   countProblem, looksLikeCredential, LINE_MAX,
 } from '../status/shapes.mjs';
+import { plainEnv } from './helpers/env.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..');
 const statusDir = join(repo, 'status');
+
+/**
+ * A key that is well shaped and opens nothing. Built here, never written out
+ * whole, so no file in this folder holds a line shaped like a key (the rule
+ * status/home.mjs applies before it saves a folder anywhere).
+ */
+const FAKE_KEY = 'orion_' + 'test'.repeat(6);
 
 const HARNESS_ID = '9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62';
 /** The three fields every signal has always carried, as the scratch harness holds them. */
@@ -67,7 +75,7 @@ function makeHarness(t, { sharing = {}, status = {}, unreachable = false, refuse
         status_signal_enabled: true,
         bridge_url: 'https://radio.test/api/bridge',
         harness_id: HARNESS_ID,
-        install_token: 'orion_testtesttesttesttesttest',
+        install_token: FAKE_KEY,
         ...sharing,
       },
     }));
@@ -107,7 +115,7 @@ function makeHarness(t, { sharing = {}, status = {}, unreachable = false, refuse
       const r = spawnSync(process.execPath, [join(dir, 'status', script), ...args], {
         encoding: 'utf8',
         cwd: tmpdir(),
-        env: { ...process.env, NODE_OPTIONS: `--import=${pathToFileURL(mock).href}` },
+        env: plainEnv({ NODE_OPTIONS: `--import=${pathToFileURL(mock).href}` }),
       });
       return { code: r.status, out: r.stdout, err: r.stderr };
     },
@@ -658,7 +666,8 @@ test('done: memory off, radio off: a task a person asked for still leaves its li
 
 test('done: a line that looks like a credential is refused before anything is written', (t) => {
   const h = makeHarness(t);
-  for (const line of ['api_key=sk-abcdefghijklmnopqrstuv rotated', 'password: hunter2 reset', 'token orion_abcdefghijklmnopqrstuvwx']) {
+  // Each key shape is joined here rather than written out whole (see FAKE_KEY).
+  for (const line of ['api_key=' + 'sk-' + 'abcdefghijklmnopqrstuv rotated', 'password: hunter2 reset', 'token ' + 'orion_' + 'abcdefghijklmnopqrstuvwx']) {
     const { code, out } = h.run('done.mjs', ['--tag', 'ops', '--agent', 'sdr', '--shift', '--line', line]);
     assert.equal(code, 1, line);
     assert.match(out, /looks like it holds a credential/);

@@ -33,7 +33,7 @@
  * specs/002-production-line/contracts/status-additions.schema.json and bridge-radio.md.
  */
 
-import { readFileSync, writeFileSync, existsSync, copyFileSync, statSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, copyFileSync, statSync, readdirSync, rmSync, chmodSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
@@ -45,11 +45,24 @@ import {
   normalizePairingCode,
   pairingCodeProblem,
   radioConfigured,
+  radioKey,
+  readRadioKeyFile,
+  keyHeader,
+  homeOn,
+  RADIO_KEY_FILE,
 } from './status/shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status', 'status.json');
 const TEMPLATE_PATH = join(__dirname, 'status', 'status.schema-template.json');
+const KEY_PATH = join(__dirname, 'status', RADIO_KEY_FILE);
+
+/**
+ * Where the radio key may be besides the bookmark file (status/shapes.mjs,
+ * radioKey). A folder that has a home keeps its key in status/radio.key, so
+ * every check here has to look there too.
+ */
+const keyPlaces = () => ({ keyFile: readRadioKeyFile(join(__dirname, 'status'), { readFileSync }) });
 
 /** How long we'll wait on the radio before giving up and carrying on. */
 const NETWORK_TIMEOUT_MS = 10000;
@@ -225,7 +238,12 @@ function migrate(status) {
     delete status.checklist.n8n_wf01_imported;
     delete status.checklist.n8n_wf02_imported;
   }
-  status.schema_version = '1.6.0';
+  // 1.7.0 adds the home block (status/home.mjs): whether this folder lives in a
+  // private repository its owner controls. Off until they ask for one.
+  if (!status.home || typeof status.home !== 'object') {
+    status.home = { enabled: false, branch: 'main' };
+  }
+  status.schema_version = '1.7.0';
   return status;
 }
 
@@ -347,6 +365,7 @@ async function main() {
     status.sharing.harness_id = null;
     status.sharing.install_token = null;
     status.sharing.paired_at = null;
+    rmSync(KEY_PATH, { force: true });
     save(status);
     say('');
     say('  ✓ Radio settings cleared. Nothing else about your install was touched —');
@@ -487,9 +506,11 @@ async function main() {
       ? '  ✓ You chose to keep check-ins off — unchanged, and not asking again.'
       : '  ✓ Check-ins are on (chosen earlier — not asking again).');
     if (status.sharing.radio_choice === 'accepted') {
-      if (!radioConfigured(status)) {
+      if (!radioConfigured(status, keyPlaces())) {
         await pairingStep(status);
-      } else if (!(await radioStillWorks(status))) {
+      } else if (radioKey(status, keyPlaces()).source !== 'attached' && !(await radioStillWorks(status))) {
+        // (A cloud run holds no key to check: its environment attaches one, and
+        // pairing on a machine that is about to be thrown away helps nobody.)
         // A revoked key still looks well-formed, so only the radio itself can
         // tell us. Rotations become self-healing instead of a support ticket.
         say('');
@@ -603,11 +624,23 @@ async function pairingStep(status) {
 
   status.sharing.bridge_url = String(pack.bridge_url || base).replace(/\/+$/, '');
   status.sharing.harness_id = pack.harness_id;
-  status.sharing.install_token = pack.install_token;
+  // A folder with a home saves its bookmark file there, so the key must not be
+  // in it: it goes to status/radio.key, which never leaves this machine.
+  const keyApart = homeOn(status);
+  if (keyApart) {
+    writeFileSync(KEY_PATH, String(pack.install_token) + '\n', { mode: 0o600 });
+    // The mode above only counts for a new file. Tighten one that was already there.
+    try { chmodSync(KEY_PATH, 0o600); } catch { /* a disk with no modes */ }
+    status.sharing.install_token = null;
+  } else {
+    status.sharing.install_token = pack.install_token;
+  }
   status.sharing.paired_at = new Date().toISOString();
   save(status);
 
-  say(`  ✓ Paired — your key is saved in your own bookmark file (ends ····${String(pack.install_token).slice(-4)}).`);
+  say(keyApart
+    ? `  ✓ Paired. Your key is saved on this machine only, in status/${RADIO_KEY_FILE} (ends ····${String(pack.install_token).slice(-4)}).`
+    : `  ✓ Paired — your key is saved in your own bookmark file (ends ····${String(pack.install_token).slice(-4)}).`);
   say('    That code is now used up; it can never be used again, by anyone.');
   say('    Sending the first check-in…');
 
@@ -624,7 +657,7 @@ async function sendFirstSignal(status) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${status.sharing.install_token}`,
+        ...keyHeader(radioKey(status, keyPlaces())),
       },
       body: JSON.stringify({
         harness_id: status.sharing.harness_id,
@@ -665,7 +698,7 @@ async function sendFirstSignal(status) {
 async function radioStillWorks(status) {
   try {
     const res = await fetch(status.sharing.bridge_url + '/nudges', {
-      headers: { 'Authorization': `Bearer ${status.sharing.install_token}` },
+      headers: keyHeader(radioKey(status, keyPlaces())),
       signal: AbortSignal.timeout(4000),
     });
     return res.status !== 401;

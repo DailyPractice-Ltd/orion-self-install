@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { plainEnv } from './env.mjs';
 
 const statusDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'status');
 
@@ -69,7 +70,7 @@ export function runRadio(args, { reply, skill, writeSkill = writeRichSkill, stat
       };
       ${preload}
     `);
-    const r = spawnSync(process.execPath, ['--import', pathToFileURL(mock).href, join(dir, 'status', 'radio.mjs'), ...args], { encoding: 'utf8' });
+    const r = spawnSync(process.execPath, ['--import', pathToFileURL(mock).href, join(dir, 'status', 'radio.mjs'), ...args], { encoding: 'utf8', env: plainEnv() });
     const calls = existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
     const trees = {};
     const skillsRoot = join(dir, '.claude', 'skills');

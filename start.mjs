@@ -243,7 +243,14 @@ function migrate(status) {
   if (!status.home || typeof status.home !== 'object') {
     status.home = { enabled: false, branch: 'main' };
   }
-  status.schema_version = '1.7.0';
+  // 1.8.0 adds the standing scopes block. crm_write is on: CRM writes (notes,
+  // tasks, properties, meeting outcomes) are done and reported, never staged
+  // (K18). Sends are not a scope here; they stay staged.
+  if (!status.scopes || typeof status.scopes !== 'object') {
+    status.scopes = { crm_write: true };
+  }
+  if (typeof status.scopes.crm_write !== 'boolean') status.scopes.crm_write = true;
+  status.schema_version = '1.8.0';
   return status;
 }
 

@@ -20,7 +20,7 @@ Install the Prospect Research → Outreach workflow from my Orion folder.
 
 1. Read library/workflows/prospect-research-outreach/PACKAGE.md and adopt its
    chain as a standing procedure: when I hand you a prospect, run research →
-   staged outreach draft → my yes → CRM entry, in that order, every time,
+   staged outreach draft (waits for my yes) and CRM entry (written, reported), every time,
    exactly as agent/agent-definition.md task 1 describes.
 2. Check the connector prerequisites first (connectors/connector-checklist.md)
    and tell me plainly which, if any, are missing before we start.
@@ -34,11 +34,10 @@ Install the Prospect Research → Outreach workflow from my Orion folder.
 
 ## What it does
 
-A prospect's name in → research + drafted outreach out, with the two approval gates
-that define this whole kit: the message lands as a **draft in your Drafts folder**
-(sending it is your approval), and the CRM write waits for your explicit **yes in the
-conversation**. Say no and nothing is written. There is no auto-send path in it to
-switch on.
+A prospect's name in → research + drafted outreach out, with the gate that defines this
+whole kit: the message lands as a **draft in your Drafts folder** and sending it is your
+approval. The CRM entry is different: it is written for you under the standing `crm_write`
+scope and reported in one line. There is no auto-send path in it to switch on.
 
 Want it to run without you asking? That's a hire: give the chain to a scheduled agent
 (`library/HIRING.md`) and it becomes a shift with a report — the workflow is the
@@ -54,8 +53,8 @@ agent. This workflow does the per-prospect legwork once you know who.
 Run **VT-01** from `validation/validation-tasks.md`: hand your agent one real prospect.
 
 **You'll know it worked when**: a researched draft appears in your own Drafts folder
-(sent by no one), your agent asks for your yes on the CRM entry, and your CRM shows the
-new entry only after you give it. Then set the status fields from step 3 of the
+(sent by no one), your agent writes the CRM entry and tells you in one line, and your CRM shows the
+new entry. Then set the status fields from step 3 of the
 install prompt.
 
 ## Safety rails

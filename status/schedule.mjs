@@ -79,7 +79,7 @@ export const SCHTASKS_TR_MAX = 261;
  * the agent software, so both rungs wake the agent the same way.
  */
 export function shiftPrompt({ folder, name }) {
-  return `Open ${folder} and run the ${name} shift: first open the agent/adapters file for the software you are running in, so you know how to reach the radio here; then read .claude/agents/${name}.md, do the job section, then the report section with --shift. Stage everything; ask no questions.`;
+  return `Open ${folder} and run the ${name} shift: first open the agent/adapters file for the software you are running in, so you know how to reach the radio here; then read .claude/agents/${name}.md, do the job section, then the report section with --shift. Work inside the GO-LIVE scope on your job sheet: write to the CRM where crm_write allows and report it, stage every message and send nothing; ask no questions.`;
 }
 
 /** Split on the commas between tools, not the ones inside Bash(a, b). */
@@ -126,6 +126,24 @@ export function jobSheetTools(jobSheet) {
 }
 
 /**
+ * The job sheet's standing CRM scope (`crm_write:` in the frontmatter), the one
+ * home of that permission for a hired agent (K18). `standing` means notes,
+ * tasks, properties and meeting outcomes are written and reported, not staged;
+ * `off` means they stage. A sheet written before the key existed counts as
+ * standing, because that is the rule now. It never covers sending.
+ */
+export function jobSheetCrmWrite(jobSheet) {
+  const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(jobSheet);
+  const line = front && front[1].split(/\r?\n/).find((l) => /^crm_write:/.test(l));
+  if (!line) return 'standing';
+  const value = line.slice('crm_write:'.length).replace(/\s+#.*$/, '').trim().replace(/^["']|["']$/g, '').toLowerCase();
+  return ['off', 'false', 'no', 'staged'].includes(value) ? 'off' : 'standing';
+}
+
+/** The tools that write to a CRM. Only these follow the crm_write scope. */
+export const CRM_WRITE_TOOL = /(^|__)(manage_crm_objects|create_crm_.*|update_crm_.*|hubspot_.*(create|update|write).*|attio_.*(create|update|write).*)$/i;
+
+/**
  * What every shift needs whatever its job: read its job sheet, and run the
  * three scripts its report uses. `echo` is here because of a habit, found by
  * running real shifts: an assistant likes to end a command with
@@ -145,8 +163,10 @@ export const SHIFT_TOOLS = Object.freeze([
  * cover, as the one comma-separated value Claude Code takes. A sheet that
  * allows all of Bash already covers the three scripts.
  */
-export function allowedTools(sheetTools) {
-  const all = [...sheetTools];
+export function allowedTools(sheetTools, { crmWrite = 'standing' } = {}) {
+  // With the CRM scope off, the CRM write tools are not allowed: those writes
+  // stage. Nothing here ever adds a tool that sends.
+  const all = sheetTools.filter((t) => crmWrite === 'standing' || !CRM_WRITE_TOOL.test(t.split('(')[0]));
   for (const tool of SHIFT_TOOLS) {
     const base = tool.split('(')[0];
     if (!all.includes(tool) && !all.includes(base)) all.push(tool);
@@ -314,7 +334,7 @@ function guardedMacFolder(folder, home) {
  * Everything wire would write, worked out without touching the disk. Returns
  * { problems } when it cannot, or the files, the record, and any notes.
  */
-export function plan({ os, folder, name, surface, at, days, bin, sheetTools, nodeDir = null, home = null }) {
+export function plan({ os, folder, name, surface, at, days, bin, sheetTools, crmWrite = 'standing', nodeDir = null, home = null }) {
   const problems = [];
   const path = os === 'win32' ? win32 : posix;
 
@@ -332,7 +352,7 @@ export function plan({ os, folder, name, surface, at, days, bin, sheetTools, nod
   if (surface === 'claude-code' && !sheetTools) {
     problems.push(`The job sheet .claude/agents/${name}.md has no tools: line. An agent that runs with nobody watching is allowed what its job sheet names, so add that line first.`);
   }
-  const tools = sheetTools ? allowedTools(sheetTools) : undefined;
+  const tools = sheetTools ? allowedTools(sheetTools, { crmWrite }) : undefined;
   const runner = unattendedRunner(surface, { tools });
   if (!runner.schedulable) {
     problems.push(surface
@@ -616,7 +636,9 @@ function main(argv) {
     console.log(`There is no job sheet at .claude/agents/${name}.md, so there is no agent to schedule. Nothing was written.`);
     return 1;
   }
-  const sheetTools = jobSheetTools(readFileSync(sheetPath, 'utf8'));
+  const sheetText = readFileSync(sheetPath, 'utf8');
+  const sheetTools = jobSheetTools(sheetText);
+  const crmWrite = jobSheetCrmWrite(sheetText);
   const wanted = unattendedRunner(flags.surface);
   if (flags.bin) {
     let isFile = false;
@@ -642,7 +664,7 @@ function main(argv) {
   const days = flags.days ? String(flags.days).toLowerCase().split(',').map((d) => d.trim()).filter(Boolean) : [];
 
   const result = plan({
-    os: process.platform, folder, name, surface: flags.surface, at: flags.at, days, bin, sheetTools,
+    os: process.platform, folder, name, surface: flags.surface, at: flags.at, days, bin, sheetTools, crmWrite,
     nodeDir: dirname(process.execPath), home: homedir(),
   });
   if (result.problems.length > 0) {

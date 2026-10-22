@@ -201,9 +201,9 @@ Error Workflow.
   Priya doesn't have Node — acknowledged explicitly, per the pass criteria.
 - **VT-01**: real prospect submitted — summary + draft DM in Gmail Drafts within 3
   minutes. Sounds like "switchers" language, sounds like her. Passes.
-- **VT-02**: second real prospect, declines the CRM-write approval — HubSpot untouched.
+- **VT-02**: second real prospect, declines the draft and asks for a record delete — the delete is read back and waits, HubSpot untouched.
   Passes.
-- **VT-03**: approves the first prospect's entry — appears in HubSpot pipeline at
+- **VT-03**: looks at the first prospect's entry, written with no yes asked — appears in HubSpot pipeline at
   Prospect stage, fields set correctly. Passes.
 - **VT-04**: debriefs a real recent call — three sections, under 5 minutes, CRM updated
   correctly. Passes.

@@ -47,7 +47,9 @@
  *                             shift ran and found nothing to do.
  *         outreach_approved, outreach_rejected, debrief_completed, crm_updated,
  *         workflow_execution_completed
- *                             The five approval moments, unchanged.
+ *                             The five named moments, unchanged. Two of them
+ *                             (debrief_completed, crm_updated) follow a write
+ *                             under the standing crm_write scope, not a yes.
  *         install_checkpoint  The install journey. It is not work, so it carries
  *                             no tag and names nothing that ran.
  *       Any work type may carry --tag: the kind of work, from the menu in

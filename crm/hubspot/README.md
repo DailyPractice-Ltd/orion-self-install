@@ -24,6 +24,26 @@ account types and over time. Search Settings for "private app," or ask your AI a
 to help you find it — the end result (a token you copy once) is what matters, not the
 exact click path.
 
+## Letting your agent create custom properties
+
+The HubSpot connector can write notes, tasks and record updates, but it **cannot create a
+custom property** (a new field such as "Demo status"). So that your agent never has to
+stop and ask you for a key, pick one of these once, at install:
+
+1. **A scoped private app token (the supported route).** Use the token you generated
+   above. Put it in your machine's environment as `HUBSPOT_API_KEY` (never in a file in
+   this folder, never in memory, never in a chat). With it the agent creates properties
+   through HubSpot's own interface for them and reports what it made in one line. Keep the scopes
+   to the five listed above.
+2. **A Composio link to HubSpot (the alternative).** If you already use Composio, link
+   HubSpot there once and your agent creates properties through it. Linking is an
+   OAuth sign-in only you can click.
+
+Neither is a reason to pause a debrief: if a property is missing and neither route is
+set up, the agent writes the rest, names the missing property in its one-line report,
+and tells you which route to set up. Creating a property is an addition, not a delete,
+so it needs no yes once a route exists.
+
 ## How this differs from the Attio template
 
 HubSpot's funnel stage lives on a **standard property** (`lifecyclestage`) every portal

@@ -156,6 +156,7 @@ role: {bank slug from library/ROLES.md, or custom}
 purpose: "{the approved one-sentence purpose from the readback — the exact words the shelf report sends}"
 status: probation
 go_live: false
+crm_write: standing
 schedule: "{on-call | weekdays 07:00 local | after: {upstream-agent}}"
 schedule_proven: {false, when there is a schedule. On call: omit this key}
 memory: [shared, roles/{role-area}, agents/{name}]
@@ -171,8 +172,10 @@ Today's output lands at `{path — e.g. morning-list.md}`, in this folder, where
 
 ## What you must not do
 - Never send anything. Drafts only. Sending is always a separate yes.
-- Never write to {CRM} while `go_live` is false; after it flips, only the writes
-  listed under GO-LIVE below — everything else still stages.
+- Write to {CRM} inside the `crm_write` scope under GO-LIVE below, and report each
+  write in one line. Never delete, merge, change an owner or move a lifecycle stage
+  without reading it back and getting a yes. Every other external write still stages
+  until `go_live` flips.
 - Never exceed the commitments and pacing limits in knowledge base §7.
 - {Q3 extras, verbatim.}
 
@@ -232,7 +235,16 @@ company in the line.
 Probation is short. It lasts only until your first run passes {client}'s success
 line, on real work, in the hire session itself. It does not wait for your schedule
 to fire. GO-LIVE is separate, and it is the safety rule.
-While `go_live: false`: read and stage only — no external writes of any kind. When
+**Standing scope, `crm_write: standing`** (frontmatter). It is written at hire and is
+the one place this agent's CRM permission lives: nothing else restates it. Inside it,
+with no yes asked: notes, tasks, contact, company and deal properties, meeting
+outcomes. Do them, report in one line, log it. Outside it, always read back and wait
+for a yes: a delete, a merge, an owner change, a lifecycle-stage move (the list lives
+in `agent/agent-definition.md`, rule 1). Sending is not in it. The wake-up reads this
+line to decide which CRM tools a shift may use. `crm_write: off` stages the writes
+instead, and the client can say so at any time; the edit is the record.
+While `go_live: false`: read and stage only for everything outside `crm_write` — no
+other external writes. When
 {client} flips it (tell your assistant "take {name} live" — the edit is the record),
 additionally allowed, unattended: {the enumerated standing writes from the job sheet}.
 When it flips, refresh the frontmatter `description` if it still says drafts-only.
@@ -291,7 +303,9 @@ not the runtime. Both facts are fine, and stated.
      `Open {absolute folder path} and run the {name} shift: first open the
      agent/adapters file for the software you are running in, so you know how to
      reach the radio here; then read .claude/agents/{name}.md, do the job section,
-     then the report section with --shift. Stage everything; ask no questions.`
+     then the report section with --shift. Work inside the GO-LIVE scope on your job sheet:
+     write to the CRM where crm_write allows and report it, stage every message and
+     send nothing; ask no questions.`
      (The prompt deliberately contains no quote characters.)
      Cloud routines: refuse in one sentence — they run on a fresh copy fetched from
      the internet and cannot see this folder or the radio.

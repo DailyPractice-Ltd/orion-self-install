@@ -170,11 +170,24 @@ know why, just that the names are load-bearing; don't rename them.
    both and let the client (or your own capability) decide.
 2. **One question at a time.** This is a conversation, not a form. Never dump the whole
    knowledge-base capture as one wall of questions.
-3. **Nothing sends without an explicit yes.** Once the client's own Orion agent is installed,
-   every outreach draft, CRM write, or external communication is staged for their approval
-   in that session, never sent or written automatically. This rule governs the *installed*
-   agent's behaviour, and it governs you too: never call a script or API that writes to a
-   live external account without telling the client first what it's about to do.
+3. **Nothing sends without an explicit yes. CRM writes need none.** Once the client's own
+   Orion agent is installed, every outreach draft and every other outbound message is
+   staged for their approval in that session, never sent automatically. A CRM write is
+   different: it is internal and reversible, so it is done, then reported in one line
+   and logged. That is the standing `crm_write` scope, set once in
+   `status/status.json` (`scopes.crm_write`) and, for a hired agent, in its job sheet.
+   Read it there, never restate it. Writes that cannot be undone (deletes, merges, owner
+   changes, lifecycle-stage moves) are read back to the client and wait for their yes,
+   scope or no scope. This rule governs the *installed* agent's behaviour, and it
+   governs you too: never call a script or API that writes to a live external account
+   without telling the client first what it's about to do.
+
+   **If this folder's agent definition was filled in before 1.4.0**, its rule 1 and its
+   CRM Update output still say a CRM change is staged for approval. This rule wins over
+   that older wording. Say so once, in one sentence. On their okay, bring rule 1, the
+   CRM Update output and the radio lines in line with the current template (fetch it the
+   way `docs/updating.md` fetches files), add `"scopes": {"crm_write": true}` to
+   `status/status.json`, and change nothing else in their file.
 4. **Refuse reputationally harmful content.** If asked to draft something a reasonable
    person would consider harmful to send to a prospect, say plainly what you won't do and
    why, in one sentence, without lecturing — then offer the closest thing you can do.
@@ -193,14 +206,14 @@ know why, just that the names are load-bearing; don't rename them.
      built, an inbox cleared.
    - **(b) A hired agent's shift ends.** A shift is work a hired agent does on a
      schedule.
-   - **(c) One of the five approval moments**: `outreach_approved`,
+   - **(c) One of the five named moments**: `outreach_approved`,
      `outreach_rejected`, `debrief_completed`, `crm_updated`,
      `workflow_execution_completed`.
 
    The trigger table for all of them lives in `docs/radio.md` (canonical form in
    `specs/002-production-line/contracts/bridge-radio.md`).
 
-   **One signal per piece of work, and the most specific one wins.** An approved CRM
+   **One signal per piece of work, and the most specific one wins.** A CRM
    write is `crm_updated`, never also a finished task. A hired agent reports its own
    work, as the last step in its own job file. When it has, you send nothing more
    for that task.
@@ -210,8 +223,9 @@ know why, just that the names are load-bearing; don't rename them.
    count is only honest if it only counts real work.
 
    **Whose yes.** Every signal follows work your human asked for or approved. A
-   finished task follows a task they set in this session. An approval moment follows
-   their explicit yes, or no, on the work itself. A shift follows the standing yes
+   finished task follows a task they set in this session. `outreach_approved` and `outreach_rejected` follow
+   their explicit yes, or no, on a draft. `debrief_completed` and `crm_updated` follow the
+   write itself, under the standing `crm_write` scope: no yes is needed or waited for. A shift follows the standing yes
    they gave once, in writing, at hire time: the job sheet they approved names the
    schedule and its report step, and that standing yes covers exactly the shift's
    enumerated staging work and its report, nothing more (`library/HIRING.md`;
@@ -250,7 +264,7 @@ know why, just that the names are load-bearing; don't rename them.
    **If this folder's agent definition was filled in before 1.1.0.** An update does
    not replace the `agent/agent-definition.md` you filled in with your human unless
    they choose that, so its "# The radio" section may still say that only the
-   approval moments send a signal. This rule wins over that older wording. Say so
+   named moments send a signal. This rule wins over that older wording. Say so
    once, in one sentence. On their okay, bring that section and the AFTER habit above
    it in line with the current template (fetch it the way `docs/updating.md` fetches
    files), and change nothing else in their file.

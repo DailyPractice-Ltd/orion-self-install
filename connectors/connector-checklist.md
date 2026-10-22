@@ -55,8 +55,9 @@ step, confirming each one works as you go. Your adapter file
       lists, stages, attributes exist
 - [ ] Connect Attio in your AI assistant's connector settings (or hand your agent the
       access token you generated, where your AI tool takes one). Allow read **and**
-      write — the validation tasks prove a CRM round-trip, and every write still
-      waits for your yes (that rule lives in the agent, not the connector)
+      write — the validation tasks prove a CRM round-trip. Notes, tasks and property updates are written for you and
+      reported in one line; only a delete, merge, owner change or lifecycle move waits
+      for your yes (that rule lives in the agent, not the connector)
 - [ ] **You'll know it's connected when**: you ask your agent "what stages does my
       pipeline have?" and it reads back your actual Attio stages, by name. If it can't,
       the token was probably copied incorrectly — go back to Attio and generate a fresh
@@ -67,8 +68,12 @@ step, confirming each one works as you go. Your adapter file
 - [ ] Stages/properties configured per [`crm/hubspot/README.md`](../crm/hubspot/README.md)
 - [ ] Connect HubSpot in your AI assistant's connector settings and sign in with your
       HubSpot account when prompted. Allow read **and** write — the validation tasks
-      prove a CRM round-trip, and every write still waits for your yes (that rule
-      lives in the agent, not the connector)
+      prove a CRM round-trip. Notes, tasks and record updates are written for you and
+      reported in one line; only a delete, merge, owner change or lifecycle move waits
+      for your yes (that rule lives in the agent, not the connector). Where the
+      connector asks for a confirmation setting, tell it the confirmation is waived for
+      the session (`CONFIRMATION_WAIVED_FOR_SESSION`): your standing scope already
+      gave the yes
 - [ ] **You'll know it's connected when**: you ask your agent "what stages does my
       pipeline have?" and it reads back your actual HubSpot stages, by name
 
@@ -134,7 +139,7 @@ Once all three checks above pass, the true test isn't a special separate check �
 the first two validation tasks
 ([`validation/validation-tasks.md`](../validation/validation-tasks.md) VT-01 and VT-04):
 hand your agent a real prospect and watch the staged draft land in your Drafts, or
-debrief a real call and watch the CRM update wait for your yes. If those work, every
+debrief a real call and watch the CRM update land on its own, reported in one line. If those work, every
 connector genuinely works. If something's missing or looks wrong, that specific
 connector is where to look first.
 

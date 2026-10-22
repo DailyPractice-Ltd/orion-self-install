@@ -464,7 +464,10 @@ export function parseInstallDirective(body) {
  *
  * `tools` is the `tools:` line of the agent's job sheet. With nobody there to
  * answer a permission question, Claude Code is told to allow exactly those
- * tools and to refuse everything else without asking.
+ * tools and to refuse everything else without asking. The job sheet's standing
+ * `crm_write` scope decides whether its CRM write tools are in that list
+ * (status/schedule.mjs allowedTools); a send tool is only ever there if the
+ * sheet names it, so a shift that is allowed to write notes still cannot send.
  */
 export const PROMPT_SLOT = '{prompt}';
 

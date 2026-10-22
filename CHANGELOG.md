@@ -17,6 +17,32 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.4.0 — 2026-10-20
+
+**Your agent now writes to your CRM without asking. It still never sends without your yes.**
+
+- **CRM writes are done, then reported in one line.** Notes, tasks, contact, company
+  and deal properties and meeting outcomes are written straight away: "Wrote 1 note and
+  1 task on Acme." Before, every one of them waited for a yes, exactly like an email.
+  After a debrief, the CRM update is written and the follow-up message is still staged
+  for you.
+- **Still asks first: anything that cannot be undone.** A delete, a merge, an owner
+  change or a lifecycle-stage move is read back to you, and waits for your yes.
+- **Sending is unchanged.** Every message stays staged. Nothing here touches that.
+- **One switch.** `scopes.crm_write` in `status/status.json` (on by default), and
+  `crm_write: standing` on each hired agent's job sheet. Everything that checks the
+  rule reads it there. Say "stage my CRM writes again" and your agent flips it to off.
+- **A scheduled shift follows the same switch.** The shift's allowed tools include the
+  CRM write tool only while the job sheet's scope is on, and never add a tool that
+  sends. The shift instruction no longer says "stage everything".
+- **The two radio messages, "Debrief done" and "CRM updated", now follow the write,** not
+  a yes. Nothing about what the radio shares has changed.
+- **Custom HubSpot properties:** the connector cannot create them, so
+  `crm/hubspot/README.md` now gives one route, set once at install (a scoped private
+  app token, or a Composio link), so your agent never stops to ask for a key.
+- If your agent definition was filled in before this release, an update keeps it as it
+  is. `AGENTS.md` tells your agent to say so once and, on your okay, bring it in line.
+
 ## 1.3.0 — 2026-10-09
 
 **Groundwork for work that runs away from your own machine. Nothing changes for you unless you ask for it.**

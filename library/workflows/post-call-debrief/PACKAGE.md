@@ -19,8 +19,9 @@ Install the Post-Call Debrief workflow from my Orion folder.
 
 1. Read library/workflows/post-call-debrief/PACKAGE.md and adopt its chain as
    a standing procedure: when I debrief a call, produce the three labelled
-   sections (Call Summary / CRM Update / Follow-up Draft), stage everything,
-   and write to the CRM only on my yes — exactly as
+   sections (Call Summary / CRM Update / Follow-up Draft), write the CRM update and
+   report it in one line, stage the follow-up for my yes, and ask first only for a
+   delete, merge, owner change or lifecycle move — exactly as
    agent/agent-definition.md task 2 describes.
 2. Check the connector prerequisites first (connectors/connector-checklist.md)
    and tell me plainly which, if any, are missing.

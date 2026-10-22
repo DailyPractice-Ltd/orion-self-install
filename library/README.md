@@ -37,7 +37,8 @@ Four kinds live here, each in its own folder:
 - [Prospect Research → Outreach](workflows/prospect-research-outreach/PACKAGE.md) — the
   form-triggered research-and-draft chain from the core install.
 - [Post-Call Debrief](workflows/post-call-debrief/PACKAGE.md) — call notes in, summary +
-  CRM update + follow-up draft out, all gated on your yes.
+  CRM update + follow-up draft out. The CRM update is written and reported; the follow-up
+  waits for your yes.
 
 **Programs**
 - [Revenue Operating Cadence](programs/revenue-operating-cadence/PACKAGE.md) — the

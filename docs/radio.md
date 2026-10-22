@@ -18,7 +18,7 @@ Three tiers, by how your yes is given — and nothing besides:
    (see "The tag menu" below), such as "prospecting". The count is a number: say, 18.
    What did it is the name of the skill or hired agent that ran, if one did. This
    covers a task you set your AI in a session, a hired agent's shift (work it does
-   on a schedule), and the approval moments in the table below. Never what was in
+   on a schedule), and the named moments in the table below. Never what was in
    the work, never who it was for.
 3. **"This machine now runs X"** — when you install a Library package or hire an
    agent, its name, kind, and version — and for a hire, which role it is: a label from
@@ -49,7 +49,7 @@ yes, shown to you first.
 
 A finished task or shift carries one tag, so Daily Practice can see what kind of
 work your harness is doing without ever seeing the work. The tag comes from this
-menu, and only from this menu. When nothing fits, the tag is `other`. (The approval
+menu, and only from this menu. When nothing fits, the tag is `other`. (The named
 moments in the table below already name their own kind of work: an approved
 outreach draft is outreach. They carry a tag only when your AI adds one.)
 
@@ -89,8 +89,8 @@ row.
 | "A run you approved" (`workflow_execution_completed`) | A multi-step run (like a prospect-research chain) finishes **and you approved its result** | Your agent, after your yes |
 | "Outreach approved" (`outreach_approved`) | You explicitly say yes to a staged outreach draft, in conversation | Your agent, right after your yes |
 | "Outreach declined" (`outreach_rejected`) | You explicitly say no to a staged outreach draft (equally useful for improving the kit) | Your agent, right after your no |
-| "Debrief done" (`debrief_completed`) | A post-call debrief finishes **and you approved its CRM update** | Your agent, after your yes |
-| "CRM updated" (`crm_updated`) | Your agent performs a standalone CRM write **you approved** (not part of a debrief) | Your agent, right after the approved write |
+| "Debrief done" (`debrief_completed`) | A post-call debrief finishes and its CRM update is written. No yes is asked: CRM writes are a standing scope | Your agent, right after the write |
+| "CRM updated" (`crm_updated`) | Your agent performs a standalone CRM write inside your standing scope (not part of a debrief). No yes is asked | Your agent, right after the write |
 | "A shift ran" (`routine_completed`) | A hired agent finishes a shift: work it does on a schedule, started by a clock or a handoff and not by a person. The standing yes you gave on its job sheet at hire covers exactly this report. A shift may report a count of 0: it ran and found nothing to do. ("Routine" is only the name on the wire. In plain words it is a shift.) | The agent, as the last step of the shift (`node status/done.mjs --shift`), with its name, a tag, and a count |
 | "This machine runs X" (`report-install`) | A package's smoke test passes, or a hired agent's first run on real work passes. A hire carries its role label. The purpose sentence rides only after the job-sheet readback named it and you said yes | Your agent, right after the pass |
 | Your message (`send`) | You have something to say to Daily Practice and say yes to sending it — your words | Your agent, on your yes in that conversation |
@@ -99,12 +99,12 @@ row.
 Three rules sit under that table.
 
 First, every real-work message **follows work you asked for or approved**: a task you
-set in a session, an action you said yes to, or a shift you approved once, at hire,
+set in a session, an action you said yes to, a CRM write under your standing scope, or a shift you approved once, at hire,
 on the job sheet that names its schedule and this report. The radio never learns
 about anything you didn't ask for or approve.
 
 Second, it's **one message per piece of work**. The most specific label wins, and
-there are never two for the same piece of work. An approved CRM update is "CRM
+there are never two for the same piece of work. A CRM update is "CRM
 updated", not also "A task finished". A shift that used a skill is one message that
 names the skill.
 

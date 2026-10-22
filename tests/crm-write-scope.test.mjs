@@ -70,7 +70,7 @@ test('a job sheet from before the key existed counts as standing', () => {
 });
 
 test('the scope is read in the ways people write it', () => {
-  for (const [value, want] of [['standing', 'standing'], ['"standing"', 'standing'], ['off', 'off'], ['false', 'off'], ['staged', 'off'], ['standing # since hire', 'standing']]) {
+  for (const [value, want] of [['standing', 'standing'], ['"standing"', 'standing'], ['off', 'off'], ['false', 'off'], ['staged', 'off'], ['standing # since hire', 'standing'], ['on', 'standing'], ['disabled', 'off'], ['none', 'off'], ['ofF', 'off']]) {
     assert.equal(jobSheetCrmWrite(sheet(value)), want, value);
   }
 });

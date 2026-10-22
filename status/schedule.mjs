@@ -129,15 +129,18 @@ export function jobSheetTools(jobSheet) {
  * The job sheet's standing CRM scope (`crm_write:` in the frontmatter), the one
  * home of that permission for a hired agent (K18). `standing` means notes,
  * tasks, properties and meeting outcomes are written and reported, not staged;
- * `off` means they stage. A sheet written before the key existed counts as
- * standing, because that is the rule now. It never covers sending.
+ * `off` means they stage, and so does any value that is not a plain yes. A
+ * sheet written before the key existed counts as standing, because that is the
+ * rule now. It never covers sending.
  */
 export function jobSheetCrmWrite(jobSheet) {
   const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(jobSheet);
   const line = front && front[1].split(/\r?\n/).find((l) => /^crm_write:/.test(l));
   if (!line) return 'standing';
   const value = line.slice('crm_write:'.length).replace(/\s+#.*$/, '').trim().replace(/^["']|["']$/g, '').toLowerCase();
-  return ['off', 'false', 'no', 'staged'].includes(value) ? 'off' : 'standing';
+  // An authority scope fails closed: only a plain yes grants it, so a typo
+  // such as `disabled` stages the writes instead of allowing them.
+  return ['standing', 'on', 'true', 'yes'].includes(value) ? 'standing' : 'off';
 }
 
 /** The tools that write to a CRM. Only these follow the crm_write scope. */

@@ -17,6 +17,19 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.4.1 — 2026-11-03
+
+**Wish Orion did something it doesn't yet? Your agent now offers to tell Daily Practice.**
+
+- **Say "I wish it could..." and your agent offers, once, to pass it on.** "Want me to
+  send that to Daily Practice as a request? They look at requests every Friday."
+- **Your words, your yes.** Nothing goes unless you say yes, and it goes over the radio in
+  your words, like any message you choose to send. Say no and it is dropped, and the same
+  wish is not offered again.
+- **Daily Practice looks at requests every Friday** and tells you what it decided: yes, not
+  now, or no with a workaround. When it ships, you hear that too.
+- Nothing about what the radio shares has changed.
+
 ## 1.4.0 — 2026-10-20
 
 **Your agent now writes to your CRM without asking. It still never sends without your yes.**

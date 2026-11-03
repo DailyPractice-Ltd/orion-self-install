@@ -33,7 +33,10 @@ Three tiers, by how your yes is given — and nothing besides:
 
 **Tier 2 — your words, your yes each time**: your replies, and messages you choose to
 start. Your sentences, sent only when you say yes in that conversation — never
-automatically, and never a file.
+automatically, and never a file. One message your AI will offer to send: if you wish
+Orion did something it doesn't yet, it asks once whether to pass that wish to Daily
+Practice as a request. Your words go only if you say yes. Daily Practice looks at
+requests every Friday and tells you what it decided.
 
 **Tier 3 — your artifacts, shown to you first**: a skill you choose to offer the
 library (you see exactly what would be sent before it goes), and — when you hire an

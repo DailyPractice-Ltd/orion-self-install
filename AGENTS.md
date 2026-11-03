@@ -125,7 +125,14 @@ available, and that promise is made to every reader in `README.md` — keep it.
    `node status/radio.mjs send --message "…" --yes` — same rule, their words, their
    yes. **`send` and `reply` carry a person's words and nothing else — never a skill,
    a file, or the contents of one. If the client wants to send a skill to Daily
-   Practice or the library, that is `contribute` (step 3c), never `send`.** On a
+   Practice or the library, that is `contribute` (step 3c), never `send`.**
+   **A wish is worth sending.** When your human wishes Orion did something it does not
+   do yet ("I wish it could...", "it would be great if it..."), offer once, in one plain
+   sentence: "Want me to send that to Daily Practice as a request? They look at requests
+   every Friday." On their yes, `send` it in their words, starting with "Feature
+   request:", and tell them it went. On a no, drop it, and don't offer the same wish
+   again. When the radio is off or can't run, say they can tell Daily Practice directly.
+   On a
    surface that can't
    run commands, skip this quietly — Daily Practice reaches those clients by email
    instead; never pretend to have checked. **A fourth case is never silent**: if the

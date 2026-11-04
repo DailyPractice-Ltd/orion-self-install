@@ -249,11 +249,9 @@ function score(rest) {
     if (stops.length === 0) {
       const first = lowestLevelFor(points);
       const without = CONTENT_SHORT[labels.content] ? lowestLevelFor(points - RISK_MATRIX.content[labels.content]) : null;
-      const parts = [];
-      if (first === null) parts.push(`It is above ${SEND_CEILING}, which always waits for you`);
-      else parts.push(`It would send on its own at ${first}`);
-      if (without && (first === null || ['low', 'medium', 'high'].indexOf(without) < ['low', 'medium', 'high'].indexOf(first))) parts.push(`at ${without} without ${CONTENT_SHORT[labels.content]}`);
-      console.log(`${parts.join(', or ')}.`);
+      const lower = without && (first === null || ['low', 'medium', 'high'].indexOf(without) < ['low', 'medium', 'high'].indexOf(first));
+      if (first === null) console.log(`It is above ${SEND_CEILING}, which always waits for you.${lower ? ` Without ${CONTENT_SHORT[labels.content]} it would send on its own at ${without}.` : ''}`);
+      else console.log(`It would send on its own at ${first}${lower ? `, or at ${without} without ${CONTENT_SHORT[labels.content]}` : ''}.`);
     }
     console.log(`When ${status.client_name || 'your human'} says "send it", send that one message and record it:  node status/send.mjs verdict approved --agent ${agent} --channel ${labels.channel} --content ${labels.content} --score ${points}`);
   }
@@ -589,7 +587,9 @@ export const RETIRED = [
 ];
 
 /** An old rule in a wording this script does not know. The lines that still match after the table ran. */
-const RESIDUE_RE = /NOTHING SENDS WITHOUT|Never instruct a tool to send|nothing has been sent|Never send anything\. Drafts only|never sent (or written )?automatically|never automatic, live or not|That rule has no flip|Nothing sends without (an explicit yes|explicit approval)|sending stays the client's own act|Everything outbound still stages|stage every message and send nothing/i;
+// Case matters: the shouting form is rule 1's own, and a plain-words mention of
+// the old rule ("its rule 1 still says nothing sends without a yes") is not residue.
+const RESIDUE_RE = /NOTHING SENDS WITHOUT|Never instruct a tool to send|nothing has been sent|Never send anything\. Drafts only|never sent (or written )?automatically|never automatic, live or not|That rule has no flip|Nothing sends without (an explicit yes|explicit approval)|sending stays the client's own act|Everything outbound still stages|stage every message and send nothing/;
 
 const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 

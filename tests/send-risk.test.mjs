@@ -555,3 +555,23 @@ test('a skill arriving over the radio never carries a level: the status record i
   assert.ok(trees['bold-outreach'], 'the skill itself is installed, as text');
   assert.match(out, /A skill never sets your send level/);
 });
+
+test('tripwire: on a fresh 1.5.0 folder migrate has nothing to change and finds no residue, so set-level works at once', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'orion-fresh-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  execFileSync('git', ['archive', 'HEAD'], { cwd: ROOT, maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] });
+  const tar = execFileSync('git', ['archive', 'HEAD'], { cwd: ROOT, maxBuffer: 1 << 28 });
+  writeFileSync(join(dir, 'tree.tar'), tar);
+  execFileSync('tar', ['-xf', join(dir, 'tree.tar'), '-C', dir]);
+  // The working tree's own copies, so an uncommitted edit is checked too.
+  for (const rel of ['AGENTS.md', 'agent/agent-definition.md', 'agent/adapters/claude-code.md', 'agent/adapters/claude.md', 'agent/adapters/codex.md', 'agent/adapters/chatgpt.md', 'agent/adapters/copilot.md', 'status/send.mjs', 'status/shapes.mjs', 'status/schedule.mjs']) copyFileSync(join(ROOT, rel), join(dir, rel));
+  copyFileSync(join(dir, 'status', 'status.schema-template.json'), join(dir, 'status', 'status.json'));
+  const run = (...args) => spawnSync(process.execPath, [join(dir, 'status', 'send.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: plainEnv() });
+  const m = run('migrate');
+  assert.equal(m.status, 0, m.stdout + m.stderr);
+  assert.match(m.stdout, /^Nothing to change/m);
+  assert.doesNotMatch(m.stdout, /not a wording this script knows/);
+  const set = run('set-level', 'medium');
+  assert.equal(set.status, 0, set.stdout + set.stderr);
+  assert.match(set.stdout, /^Set to medium\./m);
+});

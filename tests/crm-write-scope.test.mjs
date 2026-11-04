@@ -1,9 +1,9 @@
 /**
- * K18: a CRM write needs no yes, a send still does. The standing `crm_write`
- * scope on the job sheet is the one home of the CRM permission, and the
- * unattended runner reads it. These tests run a simulated debrief shift
- * against the tools the wake-up really allows: the note and the task go
- * through with no prompt, and a send in the same shift is refused.
+ * K18: a CRM write needs no yes. The standing `crm_write` scope on the job sheet
+ * is the one home of the CRM permission, and the unattended runner reads it.
+ * These tests run a simulated debrief shift against the tools the wake-up really
+ * allows: the note and the task go through with no prompt. Sending has its own
+ * level since 1.5.0 (tests/send-risk.test.mjs); here it is simply off.
  *
  *   node --test
  */
@@ -14,48 +14,36 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { unattendedRunner } from '../status/shapes.mjs';
 import { shiftPrompt, jobSheetTools, jobSheetCrmWrite, allowedTools } from '../status/schedule.mjs';
+import { dontAsk, GMAIL_SEND, HUBSPOT_WRITE } from './helpers/dont-ask.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 
-const CRM = 'mcp__hubspot__manage_crm_objects';
-const SEND = 'mcp__gmail__send_message';
+const CRM = HUBSPOT_WRITE;
+const SEND = GMAIL_SEND;
 
 const sheet = (crm) => `---
 name: debrief
-tools: Read, ${CRM}, Bash(node status/done.mjs *)
+tools: Read, ${CRM}, ${SEND}, Bash(node status/done.mjs *)
 go_live: false${crm === undefined ? '' : `\ncrm_write: ${crm}`}
 schedule: "weekdays 07:00 local"
 ---
 # Debrief
 `;
 
-/** What Claude Code does with --permission-mode dontAsk: allowed tools run, anything else is refused without asking. */
-function dontAsk(allowedCsv, tool, command = '') {
-  const rules = allowedCsv.split(/,(?![^(]*\))/).map((r) => r.trim());
-  return rules.some((rule) => {
-    const open = rule.indexOf('(');
-    if (open === -1) return rule === tool;
-    if (rule.slice(0, open) !== tool) return false;
-    const pattern = rule.slice(open + 1, -1);
-    return pattern.endsWith(' *') ? command.startsWith(pattern.slice(0, -1)) : command === pattern;
-  }) ? 'runs' : 'refused';
-}
-
 function shiftTools(crm) {
   const text = sheet(crm);
   const runner = unattendedRunner('claude-code', {
-    tools: allowedTools(jobSheetTools(text), { crmWrite: jobSheetCrmWrite(text) }),
+    tools: allowedTools(jobSheetTools(text), { crmWrite: jobSheetCrmWrite(text), sendRisk: 'off' }),
   });
   return runner.args[runner.args.indexOf('--allowedTools') + 1];
 }
 
-test('standing crm_write: the debrief shift writes its note and task with no prompt, and a send still stops', () => {
+test('standing crm_write: the debrief shift writes its note and task with no prompt, and a send stops when the level is off', () => {
   const tools = shiftTools('standing');
   assert.equal(dontAsk(tools, CRM), 'runs', 'the note and the task are CRM writes and must run');
-  assert.equal(dontAsk(tools, SEND), 'refused', 'a send in the same shift must stop');
+  assert.equal(dontAsk(tools, SEND), 'refused', 'with the send level off, the send tool on the sheet is filtered out');
   assert.equal(dontAsk(tools, 'Bash', 'node status/done.mjs --agent debrief --tag crm --count 2 --line x'), 'runs');
-  assert.ok(!tools.includes('send'), 'the scope never adds a tool that sends');
 });
 
 test('crm_write off: the CRM write stages instead of running', () => {

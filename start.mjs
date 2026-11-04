@@ -216,7 +216,9 @@ function loadStatus() {
  * 1.2.0 (002a reconciliation) also removed the legacy unauthenticated webhook field;
  * delete it if an old bookmark still carries it.
  */
-function migrate(status) {
+let levelWrittenThisRun = false;
+
+function migrate(status, { firstRun = false } = {}) {
   if (!('machine_profile' in status)) status.machine_profile = null;
   if (!status.packages || typeof status.packages !== 'object') status.packages = {};
   status.sharing = status.sharing || {};
@@ -245,12 +247,28 @@ function migrate(status) {
   }
   // 1.8.0 adds the standing scopes block. crm_write is on: CRM writes (notes,
   // tasks, properties, meeting outcomes) are done and reported, never staged
-  // (K18). Sends are not a scope here; they stay staged.
+  // (K18).
   if (!status.scopes || typeof status.scopes !== 'object') {
     status.scopes = { crm_write: true };
   }
   if (typeof status.scopes.crm_write !== 'boolean') status.scopes.crm_write = true;
-  status.schema_version = '1.8.0';
+  // 1.9.0 adds the send level (spec 007, K16): the one knob the client moves.
+  // A fresh install starts at low; a folder with no level gains low. A folder
+  // that has one is left exactly as it is.
+  if (!['off', 'low', 'medium', 'high'].includes(status.scopes.send_risk)) {
+    status.scopes.send_risk = 'low';
+    status.scopes.send_risk_set_by = firstRun ? 'install' : 'update';
+    status.scopes.send_risk_set_on = null;
+  }
+  // The template ships the level with no date: the first run that sees that
+  // is the install, and it tells the client once. Local date, as send.mjs writes it.
+  if (!status.scopes.send_risk_set_on) {
+    const d = new Date();
+    status.scopes.send_risk_set_on = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    levelWrittenThisRun = true;
+  }
+  if (status.checklist && !('vt09_send_gate' in status.checklist)) status.checklist.vt09_send_gate = false;
+  status.schema_version = '1.9.0';
   return status;
 }
 
@@ -362,7 +380,7 @@ async function main() {
 
   // Step 0 — the bookmark: read it before saying anything (AGENTS.md rule 1).
   const { status: statusRaw, firstRun } = loadStatus();
-  const status = migrate(statusRaw);
+  const status = migrate(statusRaw, { firstRun });
 
   // --repair-radio: the escape hatch when the settings LOOK fine but aren't —
   // most often a key that was rotated our side. Shape-checking can't see that,
@@ -766,6 +784,10 @@ function printHandoff(surface) {
   say('(That prompt also lives in README.md, so you can copy it later without');
   say('re-running me. And if you ever switch AI tools, just run me again.)');
   say('');
+  if (levelWrittenThisRun) {
+    say("Your harness sends on its own at low: replies and logistics. Say 'set my risk to medium' to change it, or 'pause sending' to stop it.");
+    say('');
+  }
 }
 
 function box(text) {

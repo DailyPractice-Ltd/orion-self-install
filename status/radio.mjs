@@ -189,7 +189,15 @@ async function call(method, path, body) {
     });
     return res;
   } catch (err) {
-    console.log(`The radio address didn't answer (${err?.cause?.code || err.code || err.message}) — not retried, nothing lost locally.`);
+    const code = err?.cause?.code || err.code || err.message;
+    if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
+      // The name could not even be looked up: on a laptop that is no network at
+      // all, and in an assistant's sandbox it is the sandbox. Same next step
+      // either way, said plainly (K15).
+      console.log(`This assistant's sandbox is blocking the network, or this machine is offline (${code}). The radio is fine; ask for network approval for this command and run it again. Nothing lost locally.`);
+    } else {
+      console.log(`The radio address didn't answer (${code}) — not retried, nothing lost locally.`);
+    }
     if (isCloudRun()) {
       // A cloud machine may only reach the addresses its environment allows, and
       // a refusal looks exactly like no answer at all.
@@ -524,6 +532,9 @@ if (command === 'library') {
   }
   console.log(`Written: ${incoming.length} file${incoming.length === 1 ? '' : 's'} to .claude/skills/${slug}/`);
   for (const f of fill.filled) console.log(`Filled in: ${f.question} (${f.value})`);
+  // A skill is text in its own folder and nothing else (K3). The send level lives in
+  // status/status.json and on each job sheet; no skill can set or move it.
+  console.log('A skill never sets your send level: that lives in status/status.json and on each job sheet, and this install touched neither.');
 
   // The shelf is how Daily Practice knows who is affected when this improves.
   const report = await call('POST', '/assets', {

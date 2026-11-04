@@ -2,7 +2,7 @@
 
 The two minutes after a sales call, handled by your own agent: you tell it how the call
 went, it writes the structured summary, drafts your follow-up into **Drafts**, and
-updates your CRM — each write waiting for your yes. Part of the core install; packaged
+updates your CRM on its own and tells you in one line; the follow-up goes or waits by your risk level. Part of the core install; packaged
 here so you can point at it, reinstall it, or add it later.
 
 | Field | Value |
@@ -20,7 +20,7 @@ Install the Post-Call Debrief workflow from my Orion folder.
 1. Read library/workflows/post-call-debrief/PACKAGE.md and adopt its chain as
    a standing procedure: when I debrief a call, produce the three labelled
    sections (Call Summary / CRM Update / Follow-up Draft), write the CRM update and
-   report it in one line, stage the follow-up for my yes, and ask first only for a
+   report it in one line, send the follow-up by rule 1 (scored; inside my risk level it goes, otherwise it waits for my yes), and ask first only for a
    delete, merge, owner change or lifecycle move — exactly as
    agent/agent-definition.md task 2 describes.
 2. Check the connector prerequisites first (connectors/connector-checklist.md)
@@ -37,8 +37,9 @@ Install the Post-Call Debrief workflow from my Orion folder.
 
 Call notes in → three things out: a structured debrief (what happened, what it means,
 what's next), a follow-up message drafted in your voice into your Drafts, and a CRM
-note + stage update gated behind your yes in the conversation. Say no and your CRM
-stays untouched.
+note and task written for you and reported in one line. The follow-up goes out the way
+your agent's rule 1 says (a reply to someone who answered scores low and goes on its own
+at any level); a delete, merge, owner change or lifecycle move waits for your yes.
 
 Want the debrief to trigger other work — a proposal draft, a scheduling touch? That's
 a handoff: a hired agent can run "after a call" as its shift trigger
@@ -55,13 +56,14 @@ Run **VT-04** from `validation/validation-tasks.md`: debrief one real call from 
 week.
 
 **You'll know it worked when**: the summary reads like the call you were actually on,
-the follow-up draft sits unsent in your Drafts, and the CRM note appears only after
-your yes. Then set the status fields from step 3 of the install prompt.
+the follow-up has gone or sits in your Drafts with its score, and the CRM note is already there,
+reported in one line. Then set the status fields from step 3 of the install prompt.
 
 ## Safety rails
 
 Follow-up drafts run under your agent's tone and refusal rules (the VT-05 boundary).
-Nothing in this lane can send or write without your explicit yes.
+What sends is decided by rule 1 of the agent definition and the risk level you set; a
+change that cannot be undone always waits for your explicit yes.
 
 ## Changelog
 

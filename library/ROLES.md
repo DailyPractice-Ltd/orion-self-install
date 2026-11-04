@@ -30,8 +30,8 @@ back (as role slugs and counts, never content) and reshapes the menu.
 | `bdr` | BDR (prospector) | Finds new leads outside your CRM, researches and enriches them, brings them into the pipeline |
 | `deals` | Deals agent | Keeps deal records right so you never touch CRM admin; drafts your proposals and contracts |
 | `pipeline-review` | Pipeline Review agent | Watches movement stage by stage and flags any lead falling through the gaps |
-| `reporting` | Reporting agent | The week's honest scoreboard against your commitments, drafted for your approval |
-| `content` | Content agent | Drafts posts and outreach content in your voice, staged for your yes |
+| `reporting` | Reporting agent | The week's honest scoreboard against your commitments, drafted for you |
+| `content` | Content agent | Drafts posts and outreach content in your voice; a post is never published on its own |
 | `research` | Research agent | Preps you before calls, debriefs after, keeps the CRM current with what was learned |
 | `head-of-sales` | Head of Sales (orchestrator) | Plans each day, delegates to the rest of the team, paces your commitments |
 
@@ -56,7 +56,7 @@ back (as role slugs and counts, never content) and reshapes the menu.
 - **The job**: go out and find new leads that match the ICP, research and enrich
   them, and bring them into the pipeline with a one-line "why them". (Industry
   convention: the BDR is the outbound hunter.)
-- **Looks at / touches**: the open web, your CRM (adding, never sending).
+- **Looks at / touches**: the open web, your CRM (adding). What it sends follows your risk level, like every agent.
 - **Typical schedule**: weekday early morning, so the list is ready when you are.
 - **Success line to offer**: "every morning there are fresh, researched candidates
   in the pipeline that actually look like our customer."
@@ -89,7 +89,7 @@ back (as role slugs and counts, never content) and reshapes the menu.
 ## `reporting` — Reporting agent
 
 - **The job**: the week's honest scoreboard — activity and movement against your
-  §7 commitments, no vanity numbers, drafted for your approval.
+  §7 commitments, no vanity numbers, drafted for you.
 - **Looks at / touches**: your CRM, `status/shift-log.md`, knowledge base §7.
 - **Typical schedule**: Friday, before you close the week.
 - **Success line to offer**: "Friday tells me the truth about the week in one page."
@@ -99,7 +99,8 @@ back (as role slugs and counts, never content) and reshapes the menu.
 ## `content` — Content agent
 
 - **The job**: draft posts and outreach content in your voice from your knowledge
-  base, staged for your yes — never posted, never sent, on its own.
+  base. A post is never published on its own; a message goes or waits by your risk
+  level, like every agent.
 - **Looks at / touches**: knowledge base §2/§5, a drafts folder in this repo.
 - **Typical schedule**: two or three mornings a week.
 - **Success line to offer**: "there is always a draft that sounds like me waiting

@@ -89,7 +89,8 @@ export function runRadio(args, { reply, skill, writeSkill = writeRichSkill, stat
         trees[slug] = files;
       }
     }
-    return { code: r.status, out: r.stdout, err: r.stderr, calls, trees };
+    const statusAfter = JSON.parse(readFileSync(join(dir, 'status', 'status.json'), 'utf8'));
+    return { code: r.status, out: r.stdout, err: r.stderr, calls, trees, statusAfter };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

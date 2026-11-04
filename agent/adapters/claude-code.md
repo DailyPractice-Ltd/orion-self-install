@@ -64,9 +64,47 @@ works when asked, and its schedule reads "not yet wired" (HIRING.md, Part D).
 - Connector authentication (Gmail, Calendar, CRM OAuth) still happens in the client's own
   browser — you cannot and must not attempt to automate an OAuth flow or handle a
   password. Confirm with the client that they've completed it; don't try to do it for them.
-- Nothing sends without explicit approval — a code-capable surface makes it *easier* to
-  accidentally automate past that gate (e.g. by piping a script's output straight into a
-  send call). Don't. Every send/write path still stops for a yes.
+- Sending follows the risk level, and here the allowlist is a real tool boundary: a
+  scheduled shift is given the send tools on its job sheet only while the level allows
+  (`status/schedule.mjs`), and in a session rule 1 of the agent definition is the gate.
+  Never pipe anything into a send tool without the score line that allows it.
+
+## Sending, on this surface (verified 4 November 2026)
+
+- **Headless Claude Code is the proven route.** With a claude.ai login, `claude -p` under
+  `--permission-mode dontAsk` loads the hosted Gmail connector's send, reply and forward
+  tools and the Slack connector's send tool, and runs a connector tool only when its full
+  name is on `--allowedTools`. The real names carry a `claude_ai` prefix:
+  `mcp__claude_ai_Gmail__send_message`, `mcp__claude_ai_Gmail__reply`,
+  `mcp__claude_ai_Gmail__forward`, `mcp__claude_ai_Slack__slack_send_message`. Put the
+  one the job needs on the job sheet's `tools:` line by that name; `status/schedule.mjs`
+  passes it through only while the send level allows.
+- **Connectors load only on a claude.ai subscription login**, never on an API key. The
+  runner never passes `--bare`: bare mode drops every connector, so if a future Claude
+  Code makes it the default for `-p`, the runner must pass the opposite flag
+  (`unattendedRunner` in `status/shapes.mjs`, pinned by test).
+- **Team and Enterprise plans**: an organisation "needs approval" setting on a connector
+  prompts every call and is denied under dontAsk, so the message waits with that reason;
+  "blocked" removes the tool. Microsoft 365 send tools always ask on those plans.
+- **A Claude desktop scheduled task** (rung A) gets the connector in its session; allow
+  the send tool once in that task's "always allowed" panel, or the run stalls rather than
+  denies.
+- **The trust model.** In a session the gate is rule 1 of the agent definition plus
+  `status/send.mjs`, the same trust CRM writes rely on. On a scheduled shift the
+  allowlist adds a real tool boundary. There is no tool-boundary hook in 1.5.0; a send
+  with no score line in `status/send-log.md` is a breach, and the log shows it. A job
+  sheet with bare `Bash` can already send anything from the shell; `set-level` warns.
+
+## Waiting for you, on this surface
+
+- The truth is `status/waiting.md`, rewritten by every run. In the Claude desktop app's
+  Code tab, keep one local scheduled task named "Waiting for you" per harness, with no
+  schedule of its own, run by each shift so its newest run is the list; the sidebar's
+  Scheduled group keeps one row per task that opens the latest run. On the command line,
+  keep one session with a fixed id in `scopes.waiting_session` in `status/status.json`,
+  named once with /rename and appended to by each run with `claude -p --resume <id>`.
+- A Claude desktop scheduled task (rung A) sends once its send tool is allowed in that
+  task's "always allowed" panel; otherwise the run stalls rather than denies.
 
 ## Practical notes
 

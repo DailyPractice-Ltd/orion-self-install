@@ -35,9 +35,11 @@ persistent chat, first message = instructions, re-pinned as needed) adapted for 
 - Project knowledge is retrieved automatically — don't paste KB contents into the
   instructions as well (duplication drifts; the files are the single source).
 - Connectors/MCP inside Claude are **how the agent reaches the client's tools** —
-  connect the three the checklist names (CRM read-and-write, email read-and-draft,
-  calendar read) and nothing else. The
-  approval gate is the agent's own non-negotiable rules (drafts only, explicit yes;
-  Article III), not the tool: connectors read and stage drafts; **sending stays the
-  client's own act, from their own Drafts folder** — the agent never instructs a tool
-  to send (agent-definition rule 1).
+  connect the three the checklist names (CRM read-and-write, email read, draft and
+  send, calendar read) and nothing else. A claude.ai Project (the web chat) cannot send
+  or schedule on its own: here the agent scores by hand from `agent/risk-matrix.md`, says
+  so, and every message waits for the client in `status/waiting.md`, read out at the
+  start of each conversation. The Claude desktop app's Code tab is the `claude-code.md`
+  adapter, where a scheduled task does send once its send tool is allowed. The
+  gate is rule 1 of the agent definition, not the tool: every message is scored, goes
+  inside the client's risk level, and waits for them above it (agent-definition rule 1).

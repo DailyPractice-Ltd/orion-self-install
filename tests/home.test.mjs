@@ -362,7 +362,7 @@ test('a cloud run that cannot reach the radio says the environment may not be al
   const h = makeFolder(t, { sharing: { install_token: null }, answer: 'unreachable' });
   const r = h.run('status/radio.mjs', ['signal', '--type', 'task_completed', '--tag', 'crm', '--count', '1', '--result-line', 'yes'], CLOUD);
   assert.equal(r.code, 0);
-  assert.match(r.out, /The radio address didn't answer \(ENOTFOUND\)/);
+  assert.match(r.out, /This assistant's sandbox is blocking the network, or this machine is offline \(ENOTFOUND\)/);
   assert.match(r.out, /the cloud environment may not reach radio\.test\./);
   assert.match(r.out, /\[radio-result\] unreachable/);
   // The same silence on a person's own machine gets no cloud advice.

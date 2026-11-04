@@ -20,9 +20,9 @@ their own "connectors" or "integrations" settings, and that is where these sign-
 happen and where the credentials stay. No credential is ever stored in this folder or
 sent to Daily Practice (the optional check-in radio sends only labels and counts —
 `docs/radio.md` is that whole story). The safety is not the tool: it is your agent's own
-non-negotiable rules — everything external is a draft staged for your yes, and nothing
-sends on its own (`agent/agent-definition.md`; constitution Article III). Your yes is
-the gate, every time.
+non-negotiable rules — every message is scored and goes only inside the risk level you
+set; the rest waits for your yes (`agent/agent-definition.md`, rule 1; constitution
+Article III). Your level is the gate, and you move it.
 
 If your AI assistant is code-capable, it can walk you through this checklist step by
 step, confirming each one works as you go. Your adapter file
@@ -94,9 +94,9 @@ exactly the same thing; the rest of the install doesn't care which one you picke
 - [ ] Connect Gmail in your AI assistant's connector settings, signing in with the
       Google account you actually send from (double-check this is the address prospects
       will see)
-- [ ] When Google asks what to allow, say yes to reading and drafting — your agent's
-      standing rule is drafts only: nothing sends without your yes on that specific
-      message, ever
+- [ ] When Google asks what to allow, say yes to reading, drafting and sending in one
+      go, so your level can take effect without a second sign-in; what goes on its own
+      is still decided message by message by your risk level (rule 1)
 - [ ] **You'll know it's connected when**: you ask your agent to stage a one-line test
       draft to yourself, and it appears in your **Drafts** folder — and nowhere else
 
@@ -105,8 +105,8 @@ exactly the same thing; the rest of the install doesn't care which one you picke
 - [ ] Connect Outlook in your AI assistant's connector settings, signing in with the
       Microsoft account you actually send from (double-check this is the address
       prospects will see)
-- [ ] When Microsoft asks what to allow, say yes to reading and drafting — same promise
-      as above: drafts only, nothing sends without your yes on that specific message
+- [ ] When Microsoft asks what to allow, say yes to reading, drafting and sending — same
+      rule as above: your risk level decides, message by message
 - [ ] If you see a message about needing an administrator's approval, that's your
       company's Microsoft 365 settings, not a mistake you made. Whoever manages your IT
       can approve it in a minute. This is the most common stall on the Microsoft path

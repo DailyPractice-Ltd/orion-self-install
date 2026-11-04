@@ -67,7 +67,7 @@ test('the shift prompt does not tell the agent to stage everything, and names th
   const prompt = shiftPrompt({ folder: '/x', name: 'debrief' });
   assert.doesNotMatch(prompt, /Stage everything/);
   assert.match(prompt, /crm_write/);
-  assert.match(prompt, /send nothing/);
+  assert.match(prompt, /send only what the risk score allows at your send level/);
 });
 
 test('the product no longer stages a CRM write for approval', () => {

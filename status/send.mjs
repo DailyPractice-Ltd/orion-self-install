@@ -489,7 +489,7 @@ const OLD_RULE_ONE_TAIL = `external communication you produce is a STAGED DRAFT 
    claim something was sent. Never instruct a tool to send. End every staged draft with:
    "Staged for your approval — nothing has been sent."`;
 
-const AGENTS_RULE_THREE = `3. **Nothing sends above the risk level your human chose. CRM writes need no yes.** Once
+const AGENTS_RULE_THREE = `3. **Nothing sends above the risk level your human chose. CRM writes need none.** Once
    the client's own Orion agent is installed, every message to a person outside the folder
    is scored and goes, or waits for them, by rule 1 of \`agent/agent-definition.md\`: read
    the rule there, never restate it. A CRM write is different: it is internal and
@@ -594,7 +594,7 @@ const RESIDUE_RE = /NOTHING SENDS WITHOUT|Never instruct a tool to send|nothing 
 const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** The old words as a regular expression: loose whitespace, the name captured, the small per-release differences allowed. */
-function retiredRe(oldWords) {
+export function retiredRe(oldWords) {
   let re = escapeRe(oldWords)
     .replace(/\\\{\\\{CLIENT_NAME\\\}\\\}/g, "([^\\n]+?)")
     .replace(/\\\{\\\{SEP\\\}\\\}/g, '(?:,| —)')

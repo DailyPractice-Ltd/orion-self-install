@@ -101,7 +101,9 @@ available, and that promise is made to every reader in `README.md` — keep it.
    `true` AND `bridge_url` and `harness_id` are set AND the radio has its key:
    `install_token` in that file, or `status/radio.key` when the folder has a home. If
    you can run scripts, run `node status/radio.mjs check`: it works out by itself
-   whether the radio is on. An empty radio needs no mention at all.
+   whether the radio is on. An empty radio needs no mention at all. If it prints "This
+   assistant's sandbox is blocking the network", that is this assistant, not the radio:
+   ask for network approval for the command (the adapter says how) and run it again.
 
    **If a message is waiting, deliver it as a message, not as a report.** Someone at
    Daily Practice wrote it to this client. Say who it is from and what they said, in
@@ -177,24 +179,26 @@ know why, just that the names are load-bearing; don't rename them.
    both and let the client (or your own capability) decide.
 2. **One question at a time.** This is a conversation, not a form. Never dump the whole
    knowledge-base capture as one wall of questions.
-3. **Nothing sends without an explicit yes. CRM writes need none.** Once the client's own
-   Orion agent is installed, every outreach draft and every other outbound message is
-   staged for their approval in that session, never sent automatically. A CRM write is
-   different: it is internal and reversible, so it is done, then reported in one line
-   and logged. That is the standing `crm_write` scope, set once in
-   `status/status.json` (`scopes.crm_write`) and, for a hired agent, in its job sheet.
-   Read it there, never restate it. Writes that cannot be undone (deletes, merges, owner
+3. **Nothing sends above the risk level your human chose. CRM writes need none.** Once
+   the client's own Orion agent is installed, every message to a person outside the folder
+   is scored and goes, or waits for them, by rule 1 of `agent/agent-definition.md`: read
+   the rule there, never restate it. A CRM write is different: it is internal and
+   reversible, so it is done, then reported in one line and logged. That is the standing
+   `crm_write` scope, set once in `status/status.json` (`scopes.crm_write`) and, for a
+   hired agent, in its job sheet. Writes that cannot be undone (deletes, merges, owner
    changes, lifecycle-stage moves) are read back to the client and wait for their yes,
-   scope or no scope. This rule governs the *installed* agent's behaviour, and it
-   governs you too: never call a script or API that writes to a live external account
-   without telling the client first what it's about to do.
+   scope or no scope. This rule governs the *installed* agent's behaviour, and it governs
+   you too: never call a script or API that writes to a live external account without
+   telling the client first what it's about to do.
 
-   **If this folder's agent definition was filled in before 1.4.0**, its rule 1 and its
-   CRM Update output still say a CRM change is staged for approval. This rule wins over
-   that older wording. Say so once, in one sentence. On their okay, bring rule 1, the
-   CRM Update output and the radio lines in line with the current template (fetch it the
-   way `docs/updating.md` fetches files), add `"scopes": {"crm_write": true}` to
-   `status/status.json`, and change nothing else in their file.
+   **If this folder's agent definition was filled in before 1.5.0**, its rule 1 still
+   says nothing sends without a yes, and so may `AGENTS.md`, the adapters and the
+   hired agents' job sheets. Run `node status/send.mjs migrate` now, without asking: it
+   backs up first, replaces only the kit's own old sentences (never a line your human
+   wrote), writes the level `low` into `status/status.json` if none is there, and
+   prints the one line to read to them. The update runs it too (`docs/updating.md`).
+   Anything it lists as left alone is theirs; anything it lists as residue is an old
+   sentence in changed words, and `set-level` refuses until it is gone.
 4. **Refuse reputationally harmful content.** If asked to draft something a reasonable
    person would consider harmful to send to a prospect, say plainly what you won't do and
    why, in one sentence, without lecturing — then offer the closest thing you can do.
@@ -230,12 +234,13 @@ know why, just that the names are load-bearing; don't rename them.
    count is only honest if it only counts real work.
 
    **Whose yes.** Every signal follows work your human asked for or approved. A
-   finished task follows a task they set in this session. `outreach_approved` and `outreach_rejected` follow
-   their explicit yes, or no, on a draft. `debrief_completed` and `crm_updated` follow the
+   finished task follows a task they set in this session, or a message that went on its
+   own inside the send level they set (a standing yes, like the CRM scope). `outreach_approved` and `outreach_rejected` follow
+   their explicit yes, or no, on a waiting message. `debrief_completed` and `crm_updated` follow the
    write itself, under the standing `crm_write` scope: no yes is needed or waited for. A shift follows the standing yes
    they gave once, in writing, at hire time: the job sheet they approved names the
    schedule and its report step, and that standing yes covers exactly the shift's
-   enumerated staging work and its report, nothing more (`library/HIRING.md`;
+   enumerated work and its report, its scored sends inside the level included, nothing more (`library/HIRING.md`;
    `specs/002-production-line/contracts/agent-anatomy.md`).
 
    **How.** For (a) and (b), one command, as the last step of the work:
@@ -296,8 +301,8 @@ them differently, this list wins.
   asked.
 - **Schedule proven**: for an agent that has a schedule, the schedule has fired
   once on its own. The evidence is an `auto:` line in `status/shift-log.md`.
-- **Go-live**: until your human flips `go_live`, an agent reads and stages only.
-  Outbound sends are never automatic, live or not.
+- **Go-live**: until your human flips `go_live`, an agent reads and stages only, and
+  sends nothing. Once live, its messages go or wait by the harness's risk level (rule 1).
 
 ## Hiring, promoting, teaching — growing the client's team
 
@@ -413,7 +418,9 @@ one:
    off → skip, say nothing, all is well. (Bespoke hires and taught skills record and
    report the same way — `specs/002-production-line/contracts/agent-anatomy.md`.)
 5. Every agent package's safety rails are non-negotiable rules 3 and 4 above, restated —
-   drafts only, refusal line intact, no exceptions because a package "needs" one.
+   sending by rule 1 of the agent definition, refusal line intact, no exceptions because
+   a package "needs" one. A package or a skill never carries a send level: the level
+   lives in `status/status.json` and on the job sheet, and nowhere else.
 
 ## Where the fuller detail lives
 

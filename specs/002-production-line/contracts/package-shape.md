@@ -42,8 +42,9 @@ and the Daily Practice shelf).
    pass.
 
 7. **Safety rails** — for any package that can produce buyer-facing content: the
-   refusal behaviour (Article III) restated in one sentence, and the reminder that
-   nothing sends without an explicit yes (drafts only).
+   refusal behaviour (Article III) restated in one sentence, and the reminder that a
+   message goes out the way the agent's rule 1 says: scored, sent inside the client's
+   risk level, otherwise left waiting. A package never carries a level.
 
 8. **Changelog** — `## Changelog` with one line per version, newest first:
    `- <version> — <date> — <one plain sentence>`.

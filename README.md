@@ -331,9 +331,11 @@ running `node start.mjs` again greets you with exactly where things stand.)
 
 ## What this will never do
 
-- **Nothing sends without your yes.** Every message, every change to your CRM, every email
-  your agent drafts is shown to you first, every single time. It sends nothing on its own,
-  ever.
+- **Nothing sends above the risk level you chose.** Every message your agent wants to
+  send is scored first. Inside your level (low to start: replies and logistics) it goes on
+  its own; above it, the draft waits for you with the score and what would bring it
+  inside. Say "set my risk to medium" or "pause sending" and it changes at once. The whole
+  matrix, in plain words: [`agent/risk-matrix.md`](agent/risk-matrix.md).
 - **It won't write anything that could embarrass you or your business.** If you ask for
   something that crosses a line, it'll tell you plainly and suggest a better way — not
   just refuse and leave you stuck.

@@ -17,10 +17,11 @@ use the fallback below).
 3. **Knowledge**: upload the seven completed knowledge-base files with numbered filenames
    intact.
 4. **Capabilities**: enable web browsing (prospect research needs it). Connect only the
-   connectors the checklist names (CRM read-and-write, email read-and-draft, calendar
-   read). The approval
-   gate is the agent's own rules — drafts only; sending stays the client's own act,
-   from their own Drafts folder, never the agent instructing a tool
+   connectors the checklist names (CRM read-and-write, email read, draft and send,
+   calendar read). A custom GPT cannot send or schedule on its own (verified 4 November
+   2026): the agent scores by hand from `agent/risk-matrix.md` and says so. The approval
+   gate is rule 1 of the agent definition: every message is scored; a custom GPT
+   cannot send on its own, so here every message waits for the client
    (agent-definition rule 1).
 5. **First-run check, right there in the conversation**: the vocabulary check — one
    prospect-research task, read the draft back, "does this sound like you?"

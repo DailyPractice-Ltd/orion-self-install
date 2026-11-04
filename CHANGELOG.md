@@ -17,6 +17,58 @@ Write each section for the client who will read it there.
 ---
 
 
+## 1.5.0 — 2026-11-04
+
+**Nothing sends above the risk level you chose. Inside it, your agent now sends on its own.**
+
+- **Every message gets a score from 0 to 100 before it goes.** Who it is to (a reply,
+  a follow-up, a known lead, a stranger), what it says (logistics, standard information,
+  a claim, money), where it goes (email, a DM, WhatsApp), what you decided about that kind
+  of message before, and whether they are already a customer. The matrix in plain words
+  is `agent/risk-matrix.md`; Daily Practice improves it release by release.
+- **You set one level: low, medium or high.** Low sends replies and logistics on its own.
+  Medium adds first contact to known leads with standard information. High adds cold
+  logistics and cold information. Money to a stranger never goes on its own, and above
+  70 everything waits for you whatever the level. A fresh install starts at low. Say
+  "set my risk to medium", "pause sending" or "resume sending" and your agent moves it;
+  "the Friday report never sends" keeps one hired agent apart.
+- **A message above your level waits for you**, under one sentence, word for word: "This
+  message falls outside of your risk parameters, and you need to approve this manually."
+  Then the score, your level, and what would bring it inside. Say "send it" and it goes;
+  "no" and it does not; or open the draft, change it and send it yourself. Your verdicts
+  feed back: a kind of message you rejected scores higher for thirty days, one you
+  approved scores lower.
+- **Never on its own, at any level**: anyone on your no-contact list; a follow-up to
+  someone who has replied; anything past a pacing cap you set; a hired agent that is not
+  live yet. Anything that would harm your reputation is refused before it is scored.
+- **Scheduled shifts follow the same level.** On Claude Code a shift is given the send
+  tool on its job sheet only while the level allows it, by its real name
+  (`mcp__claude_ai_Gmail__send_message` and the like); changing the level re-renders
+  the wake-up, no re-wiring. The shift instruction is one line.
+- **What each assistant can really do, verified on 4 November 2026.** Claude Code is the
+  proven route: in a session and on a schedule, with a claude.ai login (never an API
+  key). A Claude desktop scheduled task sends once you allow the send tool in its panel.
+  Codex loads no mail or Slack tool, so there every message waits for you. A custom GPT
+  or a Copilot agent cannot send or schedule, so there every message waits too. WhatsApp
+  and SMS have no route yet; LinkedIn never will (its terms forbid it). Each adapter says
+  its own truth.
+- **Every decision is logged on this machine, content-free**: `status/send-log.md`
+  holds the date, the agent, the channel, the labels, the score and the decision. Never
+  the content, never who it was to. The radio carries nothing new: a message that went
+  on its own is a finished task, count and tag only.
+- **If your agent was set up before this release**, the update replaces the old rule
+  ("nothing sends without your yes") in the files it keeps, with `node status/send.mjs
+  migrate`: it backs up first, never touches a line you wrote, and tells you in one
+  line. Your harness lands at low; say the word to move it.
+- **The trust model, said plainly.** In a session, and unattended on Codex, the gate is
+  your agent's rule plus the script, the same trust CRM writes rely on today. On a
+  scheduled Claude Code shift the allowlist adds a real tool boundary. There is no
+  tool-boundary hook yet; a send with no score line in the log is a breach, and the log
+  shows it.
+- **Also in this release (K15):** when an assistant's sandbox blocks the network, the
+  radio says so in those words instead of "didn't answer", and the Codex adapter asks
+  for network approval up front rather than calling it a one-time fix.
+
 ## 1.4.1 — 2026-11-03
 
 **Wish Orion did something it doesn't yet? Your agent now offers to tell Daily Practice.**

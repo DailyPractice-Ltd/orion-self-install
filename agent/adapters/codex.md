@@ -83,8 +83,15 @@ The one source for the command is `unattendedRunner('codex')` in `status/shapes.
 - Codex reads `AGENTS.md` natively at session start — that is why this repository's
   instructions file carries that name. No pasting needed; the wizard's handoff prompt is
   enough.
-- Approval modes vary by session. A session someone started in a restricted mode can
-  have the sandbox fix in place and still need a one-time approval for the first network
-  call — that is the retry-once case above, not a defect.
-- Everything outbound still stages for the client's yes. A code-capable surface makes it
-  easier to automate past that gate; don't. Same rule as `claude-code.md`.
+- Approval modes vary by session. Diagnose before fixing: if `node status/radio.mjs
+  check` prints "This assistant's sandbox is blocking the network", the config fix was
+  not applied to this session, so ask for network approval for the radio commands up
+  front, before the first one, and run it again. It is not a one-time fix: a session
+  started in a restricted mode needs it again.
+- **Sending on Codex (verified 4 November 2026):** `codex exec` loads no mail, Slack or
+  calendar tool, so in 1.5.0 Codex has no send route. Every message waits for the
+  client, with that reason, whatever the level. There is no tool gate here, only the
+  prompt and `status/send.mjs`. A Composio route for Gmail is its own later research.
+- Sending follows the risk level (rule 1 of the agent definition). Codex's headless run
+  loads no mail, Slack or calendar tool, so on Codex every message waits for the client
+  with that reason; there is no tool gate here, only the prompt and the script.

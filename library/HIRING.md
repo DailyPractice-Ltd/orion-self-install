@@ -97,13 +97,19 @@ human name, and a roster of job titles reads like an org chart.
 
 **Q2 — sources and tools.**
 > "Where should `@{name}` look, and what may it touch? From your setup I can see:
-> {their CRM, email drafts, calendar, this folder's files}. Which of these — and
+> {their CRM, email, calendar, this folder's files}. Which of these — and
 > anything else you already have? Nothing that would need buying."
+If the job sends messages, put the route's send tool on `tools:` by its real name (on
+Claude Code the hosted connectors are `mcp__claude_ai_Gmail__send_message`, `reply`,
+`forward` and `mcp__claude_ai_Slack__slack_send_message`; `agent/adapters/claude-code.md`).
+A shift is given that tool only while the harness's send level allows (`status/schedule.mjs`).
 
 **Q3 — guardrails beyond the defaults.**
-> "House rules already apply to everyone I'd hire for you: drafts only, nothing sends
-> without your yes, no invented facts, never past your pacing limits. Anything this one
-> specifically must never do, on top? 'No' is a fine answer."
+> "House rules already apply to everyone I'd hire for you: every message is scored and
+> goes only inside the risk level you set, the rest waits for you, no invented facts,
+> never past your pacing limits. Anything this one specifically must never do, on top?
+> 'No' is a fine answer." If they say this one must never send, its job sheet gets
+> `send_risk: never`.
 
 **Q4: when it works.**
 > "When should `@{name}` work? Three ways. On call: they work when you ask, and only
@@ -149,7 +155,7 @@ The one copy of this template in the repo. `.claude/agents/{name}.md`:
 ```markdown
 ---
 name: {name}
-description: Use when {delegation trigger from Q1/Q5}. {One-sentence job}. Lists and drafts only.
+description: Use when {delegation trigger from Q1/Q5}. {One-sentence job}. Sends inside the risk level.
 tools: {comma-separated allowlist from Q2, least privilege}
 skills: [{role skill, if extracted — else omit this key}]
 role: {bank slug from library/ROLES.md, or custom}
@@ -157,6 +163,7 @@ purpose: "{the approved one-sentence purpose from the readback — the exact wor
 status: probation
 go_live: false
 crm_write: standing
+send_risk: harness
 schedule: "{on-call | weekdays 07:00 local | after: {upstream-agent}}"
 schedule_proven: {false, when there is a schedule. On call: omit this key}
 memory: [shared, roles/{role-area}, agents/{name}]
@@ -171,7 +178,7 @@ Today's output lands at `{path — e.g. morning-list.md}`, in this folder, where
 {client} reads it.
 
 ## What you must not do
-- Never send anything. Drafts only. Sending is always a separate yes.
+- Send only what rule 1 of the agent definition allows at this harness's risk level, scored first; everything else waits for a yes.
 - Write to {CRM} inside the `crm_write` scope under GO-LIVE below, and report each
   write in one line. Never delete, merge, change an owner or move a lifecycle stage
   without reading it back and getting a yes. Every other external write still stages
@@ -243,12 +250,17 @@ for a yes: a delete, a merge, an owner change, a lifecycle-stage move (the list 
 in `agent/agent-definition.md`, rule 1). Sending is not in it. The wake-up reads this
 line to decide which CRM tools a shift may use. `crm_write: off` stages the writes
 instead, and the client can say so at any time; the edit is the record.
-While `go_live: false`: read and stage only for everything outside `crm_write` — no
-other external writes. When
-{client} flips it (tell your assistant "take {name} live" — the edit is the record),
-additionally allowed, unattended: {the enumerated standing writes from the job sheet}.
-When it flips, refresh the frontmatter `description` if it still says drafts-only.
-Outbound messages are never automatic, live or not. That rule has no flip.
+**Send line, `send_risk: harness`** (frontmatter). This role sends with the harness's
+level (`scopes.send_risk` in `status/status.json`, the client's one knob) or, with
+`send_risk: never`, not at all; it can never go above the harness. Every message is
+scored by rule 1 of the agent definition; the wake-up reads this line and the level to
+decide whether a shift is given its send tools. "The Friday report never sends" is
+`node status/send.mjs set-level never --agent {name}`; the edit is the record.
+While `go_live: false`: read and stage only for everything outside `crm_write`, and
+nothing sends. When {client} flips it (tell your assistant "take {name} live" — the
+edit is the record), additionally allowed, unattended: {the enumerated standing writes
+from the job sheet}, and its messages go or wait by the harness's level.
+Sending follows the harness's risk level (`send_risk:` in the frontmatter, scored message by message), not go-live; while `go_live: false` nothing sends.
 
 ## Changelog
 - 0.1.0 — {date} — Hired. {One line on the job.}
@@ -304,8 +316,8 @@ not the runtime. Both facts are fine, and stated.
      agent/adapters file for the software you are running in, so you know how to
      reach the radio here; then read .claude/agents/{name}.md, do the job section,
      then the report section with --shift. Work inside the GO-LIVE scope on your job sheet:
-     write to the CRM where crm_write allows and report it, stage every message and
-     send nothing; ask no questions.`
+     write to the CRM where crm_write allows and report it, send only what the risk
+     score allows at your send level and leave the rest waiting; ask no questions.`
      (The prompt deliberately contains no quote characters.)
      Cloud routines: refuse in one sentence — they run on a fresh copy fetched from
      the internet and cannot see this folder or the radio.
@@ -348,8 +360,9 @@ not the runtime. Both facts are fine, and stated.
 7. **First run now, on real work, in this session.** Two checks. The first one makes
    the hire. The second applies only when there is a schedule.
    *The job*: run the job section immediately, supervised, while you both watch.
-   This is a first run, not a shift: a person started it. Then run its report
-   section, without `--shift`. Pass = the client's Q5 line is true on real data, and
+   This is a first run, not a shift: a person started it. If the job sends, score one
+   real message with `node status/send.mjs score` and do what it says, so the client
+   sees the level at work once. Then run its report section, without `--shift`. Pass = the client's Q5 line is true on real data, and
    the report ran. On a pass, in this order: flip `smoke_test_passed: true`, set
    `status: hired` in the agent file, and change the roster row from `Probation` to
    `Hired`.
@@ -408,7 +421,7 @@ written to the memory log (`memory/agents/{name}/log.md`) when memory is on.
 > **Status legend.** `Probation`: the hire is still in flight. Its first run has not
 > passed yet. `Hired`: it has done its job once on real work and reported it,
 > whether you asked or its schedule started it. A hired agent still reads and stages
-> only, until you take it live.
+> only, and sends nothing, until you take it live; then what it sends follows your risk level.
 >
 > **Schedule legend.** `on call`: no schedule. It works when you ask. Otherwise the
 > cell shows the schedule, then how far its proof has got. `(not yet wired)`: a
@@ -463,9 +476,10 @@ and re-reading it back for a yes — only if the job materially changed; the fil
 line is always what is sent).
 
 Guardrails only ever grow in a promotion. Removing one requires the client saying so
-explicitly, and gets its own changelog line. If the new duty adds standing writes,
-`go_live` resets to `false`. New powers start staged again, until the client takes
-them live.
+explicitly, and gets its own changelog line. If the new duty adds standing writes or a
+send tool, `go_live` resets to `false`. New powers start staged again, until the
+client takes them live; then the role sends with the harness level like any other, and
+the client hears one line that it now sends.
 
 **Giving an on-call agent a schedule is a promotion too.** Set its `schedule:` line,
 add `schedule_proven: false`, wire it by step 6, run step 7's wake-up check, and

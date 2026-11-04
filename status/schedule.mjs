@@ -79,7 +79,7 @@ export const SCHTASKS_TR_MAX = 261;
  * the agent software, so both rungs wake the agent the same way.
  */
 export function shiftPrompt({ folder, name }) {
-  return `Open ${folder} and run the ${name} shift: first open the agent/adapters file for the software you are running in, so you know how to reach the radio here; then read .claude/agents/${name}.md, do the job section, then the report section with --shift. Work inside the GO-LIVE scope on your job sheet: write to the CRM where crm_write allows and report it, stage every message and send nothing; ask no questions.`;
+  return `Open ${folder} and run the ${name} shift: first open the agent/adapters file for the software you are running in, so you know how to reach the radio here; then read .claude/agents/${name}.md, do the job section, then the report section with --shift. Work inside the GO-LIVE scope on your job sheet: write to the CRM where crm_write allows and report it, send only what the risk score allows at your send level and leave the rest waiting; ask no questions.`;
 }
 
 /** Split on the commas between tools, not the ones inside Bash(a, b). */

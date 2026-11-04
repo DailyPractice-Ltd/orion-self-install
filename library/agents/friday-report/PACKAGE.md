@@ -26,8 +26,8 @@ Install the Friday Report from my Orion folder.
    and email evidence — following every rule on the package page, especially:
    evidence or it didn't happen, zeros said plainly, carry-overs never counted as
    this week's wins, and ONE next action.
-4. Show it to me as a draft for approval. Never send or publish it anywhere
-   yourself.
+4. Show it to me as a draft. It is a report for me, not a message to anyone else:
+   never publish it anywhere yourself.
 5. Run the smoke test at the bottom of the package page, and only when it passes,
    record the install in status/status.json under packages.friday-report
    (kind "agent", role "reporting", version "1.0.0", smoke_test_passed true).

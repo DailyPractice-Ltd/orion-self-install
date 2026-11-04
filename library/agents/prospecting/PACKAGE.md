@@ -2,7 +2,7 @@
 
 Fill the top of your pipeline with prospects who actually match your ideal customer —
 about twenty at a time, each with a one-line "why them" you'd stand behind — and stage
-the first drafts. Lists and drafts only; nothing is ever sent by itself.
+the first drafts. What it sends goes out the way your agent's rule 1 says: scored, and inside your risk level.
 
 | Field | Value |
 |---|---|
@@ -28,7 +28,9 @@ Install the Prospecting agent from my Orion folder.
    one-line "why them" tied to something checkable (size, trigger event, sector,
    vocabulary match) — never a guessed fact stated as truth.
 4. For the ones I pick, stage first-touch drafts (via the Prospect Research → Outreach procedure if it's
-   installed, otherwise as drafts in our chat for me to copy). Send nothing.
+   installed, otherwise as drafts in our chat for me to copy). Each one goes out the
+   way rule 1 of the agent definition says: scored, sent inside my risk level,
+   otherwise left waiting for me.
 5. Count only evidence: a prospect isn't "contacted" until a real touch is logged
    in my CRM, and isn't "interested" until a two-way exchange happened. Feed
    these numbers to my Friday Report if that package is installed.
@@ -69,7 +71,7 @@ vendor decision to make deliberately — your agent can help you evaluate one, a
 program is where a channel like that gets managed and measured.
 
 Also: it never scrapes where scraping is prohibited, never invents contact details,
-and never sends anything.
+and sends nothing above your risk level.
 
 ## Training it onto your business
 

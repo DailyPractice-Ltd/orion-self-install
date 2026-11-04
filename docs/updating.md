@@ -166,6 +166,17 @@ reverse: **a path not on the `remove` list is never deleted** — not "also tidi
 **every path on it is deleted without asking**; if one carried local edits, name it in
 the step 8 report with the backup path. The backup holds it either way.
 
+**4c. Bring the sending rule in line, by script, without asking.** Run
+`node status/send.mjs migrate`. Files the update kept in step 4 (the agent definition
+with the client's name in it, a changed `AGENTS.md`, the adapters, every hired agent's
+job sheet) may still carry the old rule that nothing sends without a yes. The script
+backs each one up first, replaces only the kit's own old sentences (every wording it
+ever shipped; never a line the client wrote), writes the send level `low` into
+`status/status.json` when none is recorded, and prints what it did. Read its one line
+to the client in the step 8 report, word for word. Anything it lists as "left alone" is
+theirs; anything it lists as residue is an old sentence in changed words, and the level
+cannot move until it is gone, so name it.
+
 **5. Prove the scripts survived the trip.** Run `node --check` on every `.mjs` file
 just fetched. A truncated download must fail here, loudly, not at 07:00 tomorrow. On
 any failure: restore that file from the backup and report which one.

@@ -56,7 +56,7 @@ back (as role slugs and counts, never content) and reshapes the menu.
 - **The job**: go out and find new leads that match the ICP, research and enrich
   them, and bring them into the pipeline with a one-line "why them". (Industry
   convention: the BDR is the outbound hunter.)
-- **Looks at / touches**: the open web, your CRM (adding, never sending).
+- **Looks at / touches**: the open web, your CRM (adding). What it sends follows your risk level, like every agent.
 - **Typical schedule**: weekday early morning, so the list is ready when you are.
 - **Success line to offer**: "every morning there are fresh, researched candidates
   in the pipeline that actually look like our customer."
@@ -99,7 +99,8 @@ back (as role slugs and counts, never content) and reshapes the menu.
 ## `content` — Content agent
 
 - **The job**: draft posts and outreach content in your voice from your knowledge
-  base, staged for your yes — never posted, never sent, on its own.
+  base. A post is never published on its own; a message goes or waits by your risk
+  level, like every agent.
 - **Looks at / touches**: knowledge base §2/§5, a drafts folder in this repo.
 - **Typical schedule**: two or three mornings a week.
 - **Success line to offer**: "there is always a draft that sounds like me waiting

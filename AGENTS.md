@@ -197,6 +197,8 @@ know why, just that the names are load-bearing; don't rename them.
    backs up first, replaces only the kit's own old sentences (never a line your human
    wrote), writes the level `low` into `status/status.json` if none is there, and
    prints the one line to read to them. The update runs it too (`docs/updating.md`).
+   When knowledge base §7 is captured, record its pacing limits once:
+   `node status/send.mjs set-level low --cap-email N --cap-dm N --cap-sms N` (per day).
    Anything it lists as left alone is theirs; anything it lists as residue is an old
    sentence in changed words, and `set-level` refuses until it is gone.
 4. **Refuse reputationally harmful content.** If asked to draft something a reasonable
@@ -301,7 +303,7 @@ them differently, this list wins.
   asked.
 - **Schedule proven**: for an agent that has a schedule, the schedule has fired
   once on its own. The evidence is an `auto:` line in `status/shift-log.md`.
-- **Go-live**: until your human flips `go_live`, an agent reads and stages only, and
+- **Go-live**: until your human flips `go_live`, an agent reads and drafts only, and
   sends nothing. Once live, its messages go or wait by the harness's risk level (rule 1).
 
 ## Hiring, promoting, teaching — growing the client's team

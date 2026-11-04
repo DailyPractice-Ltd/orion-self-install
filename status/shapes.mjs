@@ -517,11 +517,13 @@ export const SEND_LEVELS = Object.freeze(['off', 'low', 'medium', 'high']);
 
 /**
  * A tool that sends a message to a person, by its last name part: the hosted
- * connectors' send, reply and forward tools, Slack's send, and anything that
- * sends mail, a DM or a text. A draft tool is never a send tool, however it is
- * spelled, and neither is a search.
+ * connectors' send, reply and forward tools, Slack's send, anything that sends
+ * mail, a DM or a text, and a calendar tool that creates, changes or answers an
+ * event, because an invite to an outside person is a message (spec 007, D10).
+ * A draft tool is never a send tool, however it is spelled, and neither is a
+ * search or a listing.
  */
-export const SEND_TOOL = /(^|__)(?!.*draft)([a-z0-9]+_)*(send|reply|forward|schedule_message)(_[a-z0-9]+)*$/i;
+export const SEND_TOOL = /(^|__)(?!.*draft)([a-z0-9]+_)*(send|reply|forward|schedule_message|create_event|update_event|respond_to_event|send_invite)(_[a-z0-9]+)*$/i;
 
 /**
  * The matrix, v1. One label per factor; the points are summed and floored at 0.
@@ -597,7 +599,7 @@ export function riskScore({ relationship, content, channel, customer = false, hi
 
 /** The lowest level that sends this score on its own, or null above the ceiling. */
 export function lowestLevelFor(score) {
-  for (const level of ['low', 'medium', 'high']) if (score <= SEND_THRESHOLDS[level]) return level;
+  for (const level of SEND_LEVELS) if (level !== 'off' && score <= SEND_THRESHOLDS[level]) return level;
   return null;
 }
 

@@ -95,6 +95,17 @@ works when asked, and its schedule reads "not yet wired" (HIRING.md, Part D).
   with no score line in `status/send-log.md` is a breach, and the log shows it. A job
   sheet with bare `Bash` can already send anything from the shell; `set-level` warns.
 
+## Waiting for you, on this surface
+
+- The truth is `status/waiting.md`, rewritten by every run. In the Claude desktop app's
+  Code tab, keep one local scheduled task named "Waiting for you" per harness, with no
+  schedule of its own, run by each shift so its newest run is the list; the sidebar's
+  Scheduled group keeps one row per task that opens the latest run. On the command line,
+  keep one session with a fixed id in `scopes.waiting_session` in `status/status.json`,
+  named once with /rename and appended to by each run with `claude -p --resume <id>`.
+- A Claude desktop scheduled task (rung A) sends once its send tool is allowed in that
+  task's "always allowed" panel; otherwise the run stalls rather than denies.
+
 ## Practical notes
 
 - Confirm Node.js is available (`node --version`) before offering the scripted CRM/status

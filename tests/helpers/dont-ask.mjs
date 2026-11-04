@@ -25,3 +25,5 @@ export const GMAIL_SEARCH = 'mcp__claude_ai_Gmail__search_threads';
 export const SLACK_SEND = 'mcp__claude_ai_Slack__slack_send_message';
 export const SLACK_DRAFT = 'mcp__claude_ai_Slack__slack_send_message_draft';
 export const HUBSPOT_WRITE = 'mcp__claude_ai_HubSpot__manage_crm_objects';
+export const GCAL_CREATE = 'mcp__claude_ai_Google_Calendar__create_event';
+export const GCAL_LIST = 'mcp__claude_ai_Google_Calendar__list_events';

@@ -20,11 +20,11 @@ import { runRadio } from './helpers/run-radio.mjs';
 import { pathToFileURL } from 'node:url';
 import { plainEnv } from './helpers/env.mjs';
 import { jobSheetTools, jobSheetCrmWrite, jobSheetSendRisk, allowedTools, SHIFT_TOOLS } from '../status/schedule.mjs';
-import { dontAsk, GMAIL_SEND, GMAIL_REPLY, GMAIL_FORWARD, GMAIL_DRAFT, GMAIL_SEARCH, SLACK_SEND, SLACK_DRAFT, HUBSPOT_WRITE } from './helpers/dont-ask.mjs';
+import { dontAsk, GMAIL_SEND, GMAIL_REPLY, GMAIL_FORWARD, GMAIL_DRAFT, GMAIL_SEARCH, SLACK_SEND, SLACK_DRAFT, HUBSPOT_WRITE, GCAL_CREATE, GCAL_LIST } from './helpers/dont-ask.mjs';
 
 const sheet = ({ tools, sendRisk } = {}) => `---
 name: follow-up
-tools: ${tools ?? `Read, ${GMAIL_SEARCH}, ${GMAIL_DRAFT}, ${GMAIL_SEND}, ${GMAIL_REPLY}, ${SLACK_SEND}, ${HUBSPOT_WRITE}`}
+tools: ${tools ?? `Read, ${GMAIL_SEARCH}, ${GMAIL_DRAFT}, ${GMAIL_SEND}, ${GMAIL_REPLY}, ${SLACK_SEND}, ${HUBSPOT_WRITE}, ${GCAL_CREATE}, ${GCAL_LIST}`}
 go_live: true
 crm_write: standing${sendRisk === undefined ? '' : `\nsend_risk: ${sendRisk}`}
 schedule: "weekdays 07:00 local"
@@ -44,7 +44,7 @@ function shiftTools(text, level) {
 test('at a level that sends, the job sheet\'s send tools pass through by their real names, and a draft tool was never in question', () => {
   for (const level of ['low', 'medium', 'high']) {
     const tools = shiftTools(sheet(), level);
-    for (const t of [GMAIL_SEND, GMAIL_REPLY, SLACK_SEND, GMAIL_DRAFT, GMAIL_SEARCH, HUBSPOT_WRITE]) {
+    for (const t of [GMAIL_SEND, GMAIL_REPLY, SLACK_SEND, GMAIL_DRAFT, GMAIL_SEARCH, HUBSPOT_WRITE, GCAL_CREATE, GCAL_LIST]) {
       assert.equal(dontAsk(tools, t), 'runs', `${t} at ${level}`);
     }
     assert.equal(dontAsk(tools, 'Bash', 'node status/send.mjs score --agent follow-up --channel email'), 'runs', 'the shift can score its messages');
@@ -53,8 +53,8 @@ test('at a level that sends, the job sheet\'s send tools pass through by their r
 
 test('with the level off, every send tool is filtered out and the rest of the sheet stands', () => {
   const tools = shiftTools(sheet(), 'off');
-  for (const t of [GMAIL_SEND, GMAIL_REPLY, GMAIL_FORWARD, SLACK_SEND]) assert.equal(dontAsk(tools, t), 'refused', t);
-  for (const t of [GMAIL_DRAFT, GMAIL_SEARCH, HUBSPOT_WRITE]) assert.equal(dontAsk(tools, t), 'runs', t);
+  for (const t of [GMAIL_SEND, GMAIL_REPLY, GMAIL_FORWARD, SLACK_SEND, GCAL_CREATE]) assert.equal(dontAsk(tools, t), 'refused', `${t}: a calendar invite to an outside person is a message too`);
+  for (const t of [GMAIL_DRAFT, GMAIL_SEARCH, HUBSPOT_WRITE, GCAL_LIST]) assert.equal(dontAsk(tools, t), 'runs', t);
   assert.equal(dontAsk(tools, SLACK_DRAFT), 'refused', 'a tool the sheet never named is never added');
 });
 
@@ -191,6 +191,10 @@ test('hard stops: no-contact, a follow-up to someone who replied, a cap, a role 
   assert.match(r.out, /replied in this thread/);
   r = score(h2, { relationship: 'reply', more: ['--replied'] });
   assert.match(r.out, /^Decision: send/m, 'a reply to someone who replied is the normal case');
+  for (const relationship of ['known', 'cold', 'stranger']) {
+    r = score(h2, { relationship, more: ['--replied'] });
+    assert.match(r.out, /replied in this thread/, `${relationship} with --replied is a follow-up to someone who answered`);
+  }
 
   // A cap counts today's sends on that channel group from the log.
   const h3 = makeHarness(t, { level: 'high' });
@@ -240,13 +244,17 @@ test('history: the client\'s verdicts on this kind of message move the score for
 
 test('outcome records what happened, content-free, and refuses what it does not know', (t) => {
   const h = makeHarness(t, { level: 'low' });
-  assert.equal(h.run('outcome', 'sent', '--agent', 'follow-up', '--score', '0').code, 0);
-  assert.equal(h.run('outcome', 'failed', '--agent', 'follow-up', '--score', '0', '--why', 'the connector refused the send').code, 0);
-  assert.match(h.log(), /\| follow-up \| outcome \| sent \| 0$/m);
-  assert.match(h.log(), /\| follow-up \| outcome \| failed \| 0 \| the connector refused the send$/m);
+  assert.equal(h.run('outcome', 'sent', '--agent', 'follow-up', '--channel', 'email', '--relationship', 'reply', '--content', 'logistics', '--score', '0').code, 0);
+  assert.equal(h.run('outcome', 'failed', '--agent', 'follow-up', '--channel', 'email', '--content', 'logistics', '--score', '0').code, 0);
+  // One shape for every line: date | agent | channel | relationship | content | score | what happened.
+  assert.match(h.log(), /^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \| follow-up \| email \| reply \| logistics \| 0 \| sent$/m, h.log());
+  assert.match(h.log(), /\| follow-up \| email \| - \| logistics \| 0 \| failed$/m);
+  for (const line of h.log().split('\n').filter(Boolean)) assert.equal(line.split('|').length, 7, `every line has the same seven cells: ${line}`);
   const r = h.run('outcome', 'exploded', '--agent', 'follow-up', '--score', '0');
   assert.equal(r.code, 1);
   assert.match(r.out, /sent, failed or waiting/);
+  const why = h.run('outcome', 'failed', '--agent', 'follow-up', '--score', '0', '--why', 'Priya said no to the price');
+  assert.equal(why.code, 1, 'free text has no place in a content-free log');
 });
 
 test('set-level writes the record, says in one line what now sends, remembers the level through a pause, and sets a role apart', (t) => {
@@ -270,7 +278,7 @@ test('set-level writes the record, says in one line what now sends, remembers th
 
   r = h.run('set-level', 'never', '--agent', 'follow-up');
   assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /^follow-up never sends on its own\. The rest of the harness is still at medium\.$/m);
+  assert.match(r.out, /^follow-up never sends\. The rest of the harness is still at medium\.$/m);
   assert.match(readFileSync(join(h.dir, '.claude', 'agents', 'follow-up.md'), 'utf8'), /^crm_write: standing\nsend_risk: never$/m);
   assert.match(score(h).out, /^Decision: waiting/m);
   r = h.run('set-level', 'harness', '--agent', 'follow-up');
@@ -359,7 +367,7 @@ Outbound messages are never automatic, live or not. That rule has no flip.
   return { dir, run, read };
 }
 
-const RETIRED_RE = /NOTHING SENDS WITHOUT|Never instruct a tool to send|nothing has been sent|Never send anything\. Drafts only|never sent (or written )?automatically|never automatic, live or not|no flip|Nothing sends without|sending stays the client's own act|Everything outbound still stages|never send it\)|STAGED FOR APPROVAL/;
+const RETIRED_RE = /NOTHING SENDS WITHOUT|Never instruct a tool to send|nothing has been sent|Never send anything\. Drafts only|never sent (or written )?automatically|never automatic, live or not|That rule has no flip|Nothing sends without (an explicit yes|explicit approval)|sending stays the client's own act|Everything outbound still stages|never send it\)|STAGED FOR APPROVAL/;
 
 for (const tag of ['v1.3.0', 'v1.4.0']) {
   test(`migrate on a ${tag} harness: the kit's old sentences go, the client's own line stays and is named, the level is written, and running it twice changes nothing`, (t) => {
@@ -482,7 +490,7 @@ test('tripwire: every template carries the words migrate writes into a kept file
   }
 });
 
-const RETIRED_WORDS = /NOTHING SENDS WITHOUT|Never instruct a tool to send|nothing has been sent|Never send anything\. Drafts only|never sent (or written )?automatically|never automatic, live or not|That rule has no flip|Nothing sends without (your|an explicit) yes|sending stays the client's own act|Everything outbound still stages|stage every message and send nothing|STAGED FOR APPROVAL|Lists and drafts only|never sending on its own|never sends anything|nothing is ever sent by itself|Never send or publish|per-item client yes forever|It sends nothing on its own|drafts only, nothing sends|drafts only; nothing sends|standing rule is drafts only|every message stays staged|GO-LIVE cannot grant sending|Sending is always a separate yes|Send nothing\./;
+const RETIRED_WORDS = /NOTHING SENDS WITHOUT|Never instruct a tool to send|nothing has been sent|Never send anything\. Drafts only|never sent (or written )?automatically|never automatic, live or not|That rule has no flip|Nothing sends without (your|an explicit) yes|sending stays the client's own act|Everything outbound still stages|stage every message and send nothing|STAGED FOR APPROVAL|Lists and drafts only|never sending on its own|never sends anything|nothing is ever sent by itself|Never send or publish|per-item client yes forever|It sends nothing on its own|drafts only, nothing sends|drafts only; nothing sends|standing rule is drafts only|every message stays staged|GO-LIVE cannot grant sending|Sending is always a separate yes|Send nothing\.|never sent on (its|their) own|no auto-send path|sent nowhere|sent by no one|sends nothing and writes nothing|cannot send or write without|each write waiting for your yes|gated behind your yes|stage the follow-up for my yes|drafts staged for you|staged for your yes|drafted for your approval|New powers start staged|reads and stages only/;
 
 test('tripwire: the retired sentences are gone from every file that enforces or promises the rule', () => {
   const files = [
@@ -492,6 +500,7 @@ test('tripwire: the retired sentences are gone from every file that enforces or 
     'connectors/connector-checklist.md', 'status/status-schema.md', 'validation/validation-tasks.md', 'docs/radio.md', 'docs/updating.md',
     'specs/002-production-line/contracts/agent-anatomy.md', 'specs/002-production-line/contracts/package-shape.md',
     '.claude/agents/README.md', '.claude/skills/hire-agent/SKILL.md', '.claude/skills/update-harness/SKILL.md', '.claude/skills/create-skill/SKILL.md',
+    'specs/002-production-line/contracts/send-risk.md',
   ];
   const packages = (dir) => readdirSync(join(ROOT, dir)).map((d) => `${dir}/${d}/PACKAGE.md`).filter((p) => existsSync(join(ROOT, p)));
   for (const f of [...files, ...packages('library/agents'), ...packages('library/workflows'), ...packages('library/programs'), ...packages('library/skills')]) {
@@ -559,7 +568,6 @@ test('a skill arriving over the radio never carries a level: the status record i
 test('tripwire: on a fresh 1.5.0 folder migrate has nothing to change and finds no residue, so set-level works at once', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'orion-fresh-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  execFileSync('git', ['archive', 'HEAD'], { cwd: ROOT, maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] });
   const tar = execFileSync('git', ['archive', 'HEAD'], { cwd: ROOT, maxBuffer: 1 << 28 });
   writeFileSync(join(dir, 'tree.tar'), tar);
   execFileSync('tar', ['-xf', join(dir, 'tree.tar'), '-C', dir]);
@@ -574,4 +582,50 @@ test('tripwire: on a fresh 1.5.0 folder migrate has nothing to change and finds 
   const set = run('set-level', 'medium');
   assert.equal(set.status, 0, set.stdout + set.stderr);
   assert.match(set.stdout, /^Set to medium\./m);
+});
+
+test('set-level warns about a job sheet that allows all of Bash, whichever form is used, and re-renders a wake-up wired before 1.5.0', (t) => {
+  const h = makeHarness(t, { level: 'low' });
+  writeFileSync(join(h.dir, '.claude', 'agents', 'ops.md'), `---\nname: ops\ntools: Read, Bash\ngo_live: true\n---\n# Ops\n`);
+  const r = h.run('set-level', 'medium');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /ops[^\n]*allows all of Bash/, r.out);
+  // A shift wired by 1.4.x has no bin in its record: the wake-up file still says what was started.
+  const sched = (...args) => spawnSync(process.execPath, [join(h.dir, 'status', 'schedule.mjs'), ...args], { cwd: h.dir, encoding: 'utf8', env: plainEnv() });
+  const wired = sched('wire', '--agent', 'follow-up', '--surface', 'claude-code', '--at', '07:00', '--bin', process.execPath);
+  assert.equal(wired.status, 0, wired.stdout + wired.stderr);
+  const recordPath = join(h.dir, 'status', 'shifts', 'follow-up.json');
+  const record = JSON.parse(readFileSync(recordPath, 'utf8'));
+  delete record.bin; delete record.node_dir; delete record.send_risk;
+  writeFileSync(recordPath, JSON.stringify(record, null, 2));
+  const wakeUp = join(h.dir, 'status', 'shifts', process.platform === 'win32' ? 'follow-up.cmd' : 'follow-up.sh');
+  writeFileSync(wakeUp, readFileSync(wakeUp, 'utf8').replace('send only what the risk score allows at your send level and leave the rest waiting', 'stage every message and send nothing'));
+  const again = h.run('set-level', 'low');
+  assert.match(again.out, /Re-rendered the wake-up for follow-up/, again.out);
+  assert.ok(readFileSync(wakeUp, 'utf8').includes('send only what the risk score allows'), 'the old prompt is gone from the wake-up');
+  assert.equal(JSON.parse(readFileSync(recordPath, 'utf8')).bin, process.execPath, 'the record learns its bin for next time');
+  // migrate re-renders too, so an update brings a wired shift along with no re-wiring.
+  writeFileSync(wakeUp, readFileSync(wakeUp, 'utf8').replace('send only what the risk score allows at your send level and leave the rest waiting', 'stage every message and send nothing'));
+  const m = h.run('migrate');
+  assert.match(m.out, /Re-rendered the wake-up for follow-up/, m.out);
+  assert.ok(readFileSync(wakeUp, 'utf8').includes('send only what the risk score allows'));
+});
+
+test('tripwire: the "waiting for you" words and the route sentences are in the agent definition, word for word', () => {
+  const def = squash(read('agent/agent-definition.md'));
+  for (const words of [
+    "Waiting for you: 3 messages. Say 'send it' and the number, 'send all', or 'no' and the number. Or open a draft, change it and send it yourself; that counts as a yes.",
+    'Nothing is waiting for you.',
+    '1. Priya at Northwind, email, follow-up with the proposal price, score 55 against low, waiting 2 days, would send at high. Open the draft: <link>',
+    'Your Gmail connection can read and draft but not send. Re-authorise Gmail with send permission and the level will take effect.',
+    'This assistant cannot send on its own. Every message waits for you here.',
+    'status/waiting.md',
+    '--cap-email',
+  ]) assert.ok(def.includes(words), `the agent definition should carry: ${words}`);
+  assert.match(read('agent/risk-matrix.md'), /your own team[^\n]*`reply`/, 'a message to the client\'s own team is a reply: relationship 0, logged like any other');
+  for (const a of ['claude-code', 'claude', 'codex', 'chatgpt', 'copilot']) assert.match(read(`agent/adapters/${a}.md`), /status\/waiting\.md/, `${a} says where the waiting list lives`);
+  const manifest = JSON.parse(read('update/manifest.json'));
+  assert.ok(Object.keys(manifest.never_touch).some((k) => k.includes('status/waiting.md')));
+  const contract = read('specs/002-production-line/contracts/send-risk.md');
+  for (const words of ['send-log.md', 'no-contact.md', 'waiting.md', 'send_risk', 'node_dir']) assert.ok(contract.includes(words), `the contract names ${words}`);
 });

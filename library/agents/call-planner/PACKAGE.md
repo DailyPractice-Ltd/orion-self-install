@@ -93,7 +93,8 @@ flip `packages.call-planner.smoke_test_passed` to `true`.
 
 ## Safety rails
 
-This agent plans calls; it sends nothing and writes nothing external without your yes.
+This agent plans calls; it sends no message of its own (a plan is for you, not a prospect)
+and writes nothing external without your yes.
 If an angle would need to shame, pressure, or mislead the person being called to work,
 your agent refuses it in one sentence and offers the closest honest angle instead.
 

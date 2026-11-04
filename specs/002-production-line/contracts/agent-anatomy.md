@@ -72,7 +72,7 @@ Body sections, in order: `The job` · `What you must not do` · `Training` ·
   for. Flipping it to `true` is done by a later session that finds that evidence. A
   schedule that is not wired, or not proven, is shown as exactly that on the roster
   and never as proven. It does not hold the agent back from `hired`.
-- `go_live: false` → the agent reads and stages only, asked or scheduled. `true` →
+- `go_live: false` → the agent reads and drafts only, asked or scheduled, and sends nothing. `true` →
   additionally the
   **enumerated** standing writes named in the agent file's GO-LIVE section, nothing
   else. The flip is a file edit made at the client's spoken instruction; the edit is

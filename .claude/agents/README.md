@@ -23,7 +23,7 @@ member is working the same session.
 
 **Status legend.** `Probation`: the hire is still in flight. Its first run has not
 passed yet. `Hired`: it has done its job once on real work and reported it,
-whether you asked or its schedule started it. A hired agent still reads and stages
+whether you asked or its schedule started it. A hired agent still reads and drafts
 only, and sends nothing, until you take it live; then what it sends follows your risk level.
 
 **Schedule legend.** `on call`: no schedule. It works when you ask. Otherwise the

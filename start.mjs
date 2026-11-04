@@ -218,7 +218,7 @@ function loadStatus() {
  */
 let levelWrittenThisRun = false;
 
-function migrate(status) {
+function migrate(status, { firstRun = false } = {}) {
   if (!('machine_profile' in status)) status.machine_profile = null;
   if (!status.packages || typeof status.packages !== 'object') status.packages = {};
   status.sharing = status.sharing || {};
@@ -257,13 +257,14 @@ function migrate(status) {
   // that has one is left exactly as it is.
   if (!['off', 'low', 'medium', 'high'].includes(status.scopes.send_risk)) {
     status.scopes.send_risk = 'low';
-    status.scopes.send_risk_set_by = 'install';
+    status.scopes.send_risk_set_by = firstRun ? 'install' : 'update';
     status.scopes.send_risk_set_on = null;
   }
   // The template ships the level with no date: the first run that sees that
-  // is the install, and it tells the client once.
+  // is the install, and it tells the client once. Local date, as send.mjs writes it.
   if (!status.scopes.send_risk_set_on) {
-    status.scopes.send_risk_set_on = new Date().toISOString().slice(0, 10);
+    const d = new Date();
+    status.scopes.send_risk_set_on = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     levelWrittenThisRun = true;
   }
   if (status.checklist && !('vt09_send_gate' in status.checklist)) status.checklist.vt09_send_gate = false;
@@ -379,7 +380,7 @@ async function main() {
 
   // Step 0 — the bookmark: read it before saying anything (AGENTS.md rule 1).
   const { status: statusRaw, firstRun } = loadStatus();
-  const status = migrate(statusRaw);
+  const status = migrate(statusRaw, { firstRun });
 
   // --repair-radio: the escape hatch when the settings LOOK fine but aren't —
   // most often a key that was rotated our side. Shape-checking can't see that,

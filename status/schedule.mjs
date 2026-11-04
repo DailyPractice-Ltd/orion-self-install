@@ -157,6 +157,15 @@ export function jobSheetSendRisk(jobSheet) {
   return ['harness', 'with the harness', 'on', 'true', 'yes'].includes(value) ? 'harness' : 'never';
 }
 
+/** The job sheet's go-live flag: absent counts as live (an older sheet), anything but a plain yes is not live. */
+export function jobSheetGoLive(jobSheet) {
+  const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(jobSheet);
+  const line = front && front[1].split(/\r?\n/).find((l) => /^go_live:/.test(l));
+  if (!line) return true;
+  const value = line.slice('go_live:'.length).replace(/\s+#.*$/, '').trim().replace(/^["']|["']$/g, '').toLowerCase();
+  return ['true', 'yes', 'on'].includes(value);
+}
+
 /** The tools that write to a CRM. Only these follow the crm_write scope. */
 export const CRM_WRITE_TOOL = /(^|__)(manage_crm_objects|create_crm_.*|update_crm_.*|hubspot_.*(create|update|write).*|attio_.*(create|update|write).*)$/i;
 
@@ -589,13 +598,23 @@ export function effectiveSendRisk({ status, sheetText }) {
   const harness = status?.scopes?.send_risk;
   const level = typeof harness === 'string' && SEND_LEVELS.includes(harness.toLowerCase()) ? harness.toLowerCase() : 'off';
   if (jobSheetSendRisk(sheetText) === 'never') return 'never';
-  const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(sheetText);
-  const goLive = front && front[1].split(/\r?\n/).find((l) => /^go_live:/.test(l));
-  if (goLive) {
-    const value = goLive.slice('go_live:'.length).replace(/\s+#.*$/, '').trim().replace(/^["']|["']$/g, '').toLowerCase();
-    if (!['true', 'yes', 'on'].includes(value)) return 'off';
-  }
+  if (!jobSheetGoLive(sheetText)) return 'off';
   return level;
+}
+
+/** The command and PATH a wake-up file starts, as its wire wrote them: `exec 'bin' ...` on a shell, `call "bin" ...` on Windows. */
+function commandFromWakeUp(record) {
+  let text;
+  try { text = readFileSync(record.wake_up, 'utf8'); } catch { return null; }
+  if (record.os === 'win32') {
+    const call = /^call "([^"]+)"/m.exec(text);
+    const pathLine = /^set "PATH=([^;"]+)/m.exec(text);
+    return call ? { bin: call[1], node_dir: pathLine ? pathLine[1] : null } : null;
+  }
+  const exec = /^exec '((?:[^']|'\\'')+)'/m.exec(text);
+  const pathLine = /^export PATH='((?:[^']|'\\'')+)'/m.exec(text);
+  const unquote = (s) => s.replace(/'\\''/g, "'");
+  return exec ? { bin: unquote(exec[1]), node_dir: pathLine ? unquote(pathLine[1]) : null } : null;
 }
 
 function readStatusFile(folder) {
@@ -614,7 +633,13 @@ export function rerender({ folder, name }) {
   if (!existsSync(recordPath)) return { problem: 'no wake-up is wired for it' };
   let record = null;
   try { record = JSON.parse(readFileSync(recordPath, 'utf8')); } catch { return { problem: 'its record could not be read' }; }
-  if (!record.bin) return { problem: `it was wired before 1.5.0; wire it again with  node status/schedule.mjs wire --agent ${name} ...` };
+  if (!record.bin) {
+    // Wired before 1.5.0: the record did not keep the command, but the wake-up
+    // file says exactly what was started, so read it back from there.
+    const learned = commandFromWakeUp(record);
+    if (!learned) return { problem: `it was wired before 1.5.0 and its wake-up could not be read; wire it again with  node status/schedule.mjs wire --agent ${name} ...` };
+    Object.assign(record, learned);
+  }
   const sheetPath = join(folder, '.claude', 'agents', `${name}.md`);
   if (!existsSync(sheetPath)) return { problem: 'its job sheet is gone' };
   const sheetText = readFileSync(sheetPath, 'utf8');

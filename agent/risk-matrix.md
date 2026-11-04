@@ -16,6 +16,9 @@ what runs.
 | first contact to a known lead | `known` | 25 |
 | cold, a stranger | `cold` | 50 |
 
+A message to your own team (an address at your own business) is `reply`: relationship
+0, logged like any other, not exempt.
+
 ## What it says
 
 One label, the highest that applies. An attachment counts as the last row.

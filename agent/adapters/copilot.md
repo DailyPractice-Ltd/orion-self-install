@@ -17,8 +17,9 @@ organisation.
 3. **Knowledge**: upload the seven knowledge-base files (or point the agent at a dedicated
    SharePoint/OneDrive folder containing exactly those seven files).
 4. **Actions/plugins**: only the connectors the checklist names (CRM read-and-write, email read, draft and
-   send, calendar read). A Copilot agent cannot send or schedule on its own (verified 4
-   November 2026): the agent scores by hand from `agent/risk-matrix.md` and says so. The gate is rule 1 of the agent definition: every message is scored; a
+   send, calendar read). Verified 4 November 2026: the agent scores by hand from
+   `agent/risk-matrix.md`, says so, and the waiting list is `status/waiting.md`, handed
+   over and read out at the start of each conversation. The gate is rule 1 of the agent definition: every message is scored; a
    Copilot agent cannot send on its own, so here every message waits for the
    client (agent-definition rule 1). In
    a work/organisation tenant, an admin may need to approve the agent — if the client

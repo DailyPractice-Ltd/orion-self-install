@@ -5,7 +5,7 @@
  *
  *   node status/send.mjs score --agent <name> --to <address> --channel <c> --relationship <r> --content <l> [--customer] [--replied]
  *   node status/send.mjs set-level <off|low|medium|high|pause|resume> [--agent <name> <harness|never>] [--cap-email N] [--cap-dm N] [--cap-sms N] [--by <who>]
- *   node status/send.mjs outcome <sent|failed|waiting> --agent <name> --score <n>
+ *   node status/send.mjs outcome <sent|failed|waiting> --agent <name> --score <n> [--channel <c>] [--relationship <r>] [--content <l>]
  *   node status/send.mjs verdict <approved|rejected> --agent <name> --channel <c> --content <l> --score <n>
  *   node status/send.mjs no-contact --add <address or domain>
  *   node status/send.mjs migrate [--backup <dir>]
@@ -46,6 +46,7 @@ import {
   SEND_LEVELS, SEND_THRESHOLDS, SEND_CEILING, WAITING_SENTENCE, LEVEL_SENDS, LEVEL_WAITS, CONTENT_SHORT, HISTORY_DAYS,
   RISK_MATRIX, SEND_TOOL, riskLabel, riskScore, lowestLevelFor, levelSends, labelProblem, countProblem,
 } from './shapes.mjs';
+import { jobSheetSendRisk, jobSheetGoLive, jobSheetTools, rerender } from './schedule.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FOLDER = join(here, '..');
@@ -95,17 +96,12 @@ function frontValue(lines, key) {
   return line.slice(key.length + 1).replace(/\s+#.*$/, '').trim().replace(/^["']|["']$/g, '');
 }
 
-/** The role's own send line and go-live flag, from its job sheet; a name with no sheet is the harness's own agent. */
+/** The role's own send line and go-live flag, read the way the scheduler reads them; a name with no sheet is the harness's own agent. */
 function roleOf(name) {
   const path = join(FOLDER, '.claude', 'agents', `${name}.md`);
   if (!existsSync(path)) return { sheet: null, sendRisk: 'harness', live: true };
   const text = readFileSync(path, 'utf8');
-  const lines = frontmatter(text);
-  const raw = frontValue(lines, 'send_risk');
-  const sendRisk = raw === undefined || ['harness', 'with the harness', 'on', 'true', 'yes'].includes(raw.toLowerCase()) ? 'harness' : 'never';
-  const goLive = frontValue(lines, 'go_live');
-  const live = goLive === undefined ? true : ['true', 'yes', 'on'].includes(goLive.toLowerCase());
-  return { sheet: path, text, sendRisk, live };
+  return { sheet: path, text, sendRisk: jobSheetSendRisk(text), live: jobSheetGoLive(text) };
 }
 
 function appendLog(line) {
@@ -224,7 +220,7 @@ function score(rest) {
   // The hard stops, in the order the client would want to hear them.
   const stops = [];
   if (onNoContact(flags.to)) stops.push('This person is on your no-contact list, so nothing goes to them on its own, ever.');
-  if (flags.replied === true && labels.relationship === 'follow-up') stops.push('They have replied in this thread, so a follow-up never goes on its own: answer them instead.');
+  if (flags.replied === true && labels.relationship !== 'reply') stops.push('They have replied in this thread, so a follow-up never goes on its own: answer them instead.');
   const caps = status.scopes?.send_caps || {};
   const group = capGroup(labels.channel);
   if (Number.isInteger(caps[group]) && sentTodayOn(group) >= caps[group]) stops.push(`Today's ${group} cap of ${caps[group]} is reached, so the rest wait for you.`);
@@ -255,7 +251,7 @@ function score(rest) {
     }
     console.log(`When ${status.client_name || 'your human'} says "send it", send that one message and record it:  node status/send.mjs verdict approved --agent ${agent} --channel ${labels.channel} --content ${labels.content} --score ${points}`);
   }
-  appendLog(`${stamp()} | ${agent} | ${labels.channel} | ${labels.relationship} | ${labels.content} | ${points} | ${decision}`);
+  appendLog(logLine(agent, labels, points, decision));
   return 0;
 }
 
@@ -278,15 +274,20 @@ function refuse(problems) {
   return 1;
 }
 
+/** One line shape for the whole log: date | agent | channel | relationship | content | score | what. A cell not given is "-". */
+const logLine = (agent, labels, score, what) =>
+  `${stamp()} | ${agent} | ${labels.channel ?? '-'} | ${labels.relationship ?? '-'} | ${labels.content ?? '-'} | ${score} | ${what}`;
+
 function outcome(rest) {
   const [what, ...more] = rest;
-  const { flags, problems } = parseFlags(more, { values: ['agent', 'score', 'why'] });
+  const { flags, problems } = parseFlags(more, { values: ['agent', 'score', 'channel', 'relationship', 'content'] });
   if (!['sent', 'failed', 'waiting'].includes(what)) problems.unshift(`outcome takes sent, failed or waiting, not "${what ?? ''}".`);
   agentAndScore(flags, problems);
-  const why = flags.why === undefined ? '' : String(flags.why).replace(/\s+/g, ' ').trim();
-  if (why.length > 120) problems.push('--why is one short line, at most 120 characters.');
   if (problems.length > 0) return refuse(problems);
-  appendLog(`${stamp()} | ${flags.agent} | outcome | ${what} | ${Number(flags.score)}${why ? ` | ${why}` : ''}`);
+  // No free text here: the log is content-free, so why a send failed goes in the agent's report, not in a cell.
+  const labels = {};
+  for (const kind of ['channel', 'relationship', 'content']) if (flags[kind] !== undefined) labels[kind] = riskLabel(kind, flags[kind]);
+  appendLog(logLine(flags.agent, labels, Number(flags.score), what));
   console.log(`Recorded: ${what}.`);
   return 0;
 }
@@ -300,7 +301,7 @@ function verdict(rest) {
   if (problems.length > 0) return refuse(problems);
   const channel = riskLabel('channel', flags.channel);
   const content = riskLabel('content', flags.content);
-  appendLog(`${stamp()} | ${flags.agent} | ${channel} | - | ${content} | ${Number(flags.score)} | verdict | ${what}`);
+  appendLog(`${logLine(flags.agent, { channel, content }, Number(flags.score), 'verdict')} | ${what}`);
   console.log(`Recorded: ${what}. This kind of message (${flags.agent}, ${channel}, ${content}) scores ${what === 'rejected' ? '+20' : '-10'} for the next ${HISTORY_DAYS} days.`);
   return 0;
 }
@@ -339,24 +340,33 @@ function setSheetLine(text, key, value) {
   return `${front[1]}${lines.join(nl)}${front[3]}${text.slice(front[0].length)}`;
 }
 
-/** Every wired wake-up follows the level: re-render each one in place, when the scheduler can. */
-async function rerenderShifts() {
+/** Every wired wake-up follows the level: re-render each one in place, so the next scheduled run follows with no re-wiring. */
+function rerenderShifts() {
   const shifts = join(here, 'shifts');
   if (!existsSync(shifts)) return [];
-  let schedule = null;
-  try { schedule = await import('./schedule.mjs'); } catch { return []; }
-  if (typeof schedule.rerender !== 'function') return [];
   const done = [];
   for (const f of readdirSync(shifts).filter((n) => n.endsWith('.json'))) {
     const name = f.slice(0, -5);
-    const result = schedule.rerender({ folder: FOLDER, name });
+    const result = rerender({ folder: FOLDER, name });
     if (result && result.written) done.push(name);
     else if (result && result.problem) console.log(`The wake-up for ${name} was not re-rendered: ${result.problem}`);
   }
   return done;
 }
 
-async function setLevel(rest) {
+/** A job sheet that allows all of Bash can send from the shell with nothing at the tool boundary: say so, once per sheet. */
+function bareShellWarnings() {
+  const agents = join(FOLDER, '.claude', 'agents');
+  if (!existsSync(agents)) return [];
+  const found = [];
+  for (const f of readdirSync(agents).filter((n) => n.endsWith('.md') && n !== 'README.md').sort()) {
+    const tools = jobSheetTools(readFileSync(join(agents, f), 'utf8')) || [];
+    if (tools.includes('Bash')) found.push(`${f.slice(0, -3)}'s job sheet allows all of Bash, which can send from the shell on its own: the level is the rule there, with nothing at the tool boundary.`);
+  }
+  return found;
+}
+
+function setLevel(rest) {
   const [what, ...more] = rest;
   const { flags, problems } = parseFlags(more, { values: ['agent', 'cap-email', 'cap-dm', 'cap-sms', 'by'] });
   const word = String(what ?? '').trim().toLowerCase();
@@ -400,16 +410,21 @@ async function setLevel(rest) {
       console.log(`There is no job sheet at .claude/agents/${flags.agent}.md, so there is no role to set. The harness level is set without --agent.`);
       return 1;
     }
-    writeFileSync(role.sheet, setSheetLine(role.text, 'send_risk', word));
-    const levelNow = harnessLevel(status) ?? 'off';
-    if (word === 'never') console.log(`${flags.agent} never sends on its own. The rest of the harness is still at ${levelNow}.`);
-    else console.log(`${flags.agent} now sends with the harness, at ${levelNow}${LEVEL_SENDS[levelNow] ? `: ${LEVEL_SENDS[levelNow]}` : ''}.`);
-    const tools = (frontValue(frontmatter(role.text), 'tools') || '').split(',').map((t) => t.trim()).filter(Boolean);
-    if (word === 'harness' && !tools.some((t) => SEND_TOOL.test(t.split('(')[0]) || t === 'Bash')) {
-      console.log(`Its job sheet names no tool that sends, so on a scheduled shift its messages wait for you until a promotion adds one.`);
+    const rewritten = setSheetLine(role.text, 'send_risk', word);
+    if (rewritten === null) {
+      console.log(`The job sheet .claude/agents/${flags.agent}.md has no frontmatter block to write the line into. Add one (library/HIRING.md gives the template), then set it again. Nothing was written.`);
+      return 1;
     }
-    if (tools.includes('Bash')) console.log('Its job sheet allows all of Bash, which can send from the shell on its own: the level is the rule there, with nothing at the tool boundary.');
-    for (const name of await rerenderShifts()) console.log(`Re-rendered the wake-up for ${name}, so the next scheduled run follows this.`);
+    writeFileSync(role.sheet, rewritten);
+    const levelNow = harnessLevel(status) ?? 'off';
+    if (word === 'never') console.log(`${flags.agent} never sends. The rest of the harness is still at ${levelNow}.`);
+    else console.log(`${flags.agent} now sends with the harness, at ${levelNow}${LEVEL_SENDS[levelNow] ? `: ${LEVEL_SENDS[levelNow]}` : ''}.`);
+    const tools = jobSheetTools(role.text) || [];
+    if (word === 'harness' && !tools.some((t) => SEND_TOOL.test(t.split('(')[0]) || t === 'Bash')) {
+      console.log('Its job sheet names no tool that sends, so on a scheduled shift its messages wait for you until a promotion adds one. In a session: "This assistant cannot send on its own. Every message waits for you here."');
+    }
+    for (const w of bareShellWarnings()) console.log(w);
+    for (const name of rerenderShifts()) console.log(`Re-rendered the wake-up for ${name}, so the next scheduled run follows this.`);
     return 0;
   }
 
@@ -436,9 +451,10 @@ async function setLevel(rest) {
   }
   if (Object.keys(caps).length > 0) console.log(`Caps per day, on its own: ${Object.entries(status.scopes.send_caps).map(([g, n]) => `${g} ${n}`).join(', ')}.`);
   if (level !== 'off' && status.checklist && status.checklist.connector_email_live === false) {
-    console.log('No email connector is live yet, so nothing can send until one is. When it is, grant reading, drafting and sending in one go.');
+    console.log('No email connector is live yet, so nothing can send until one is. When it is, grant reading, drafting and sending in one go; if the grant turns out to be read and draft only, the words are: "Your Gmail connection can read and draft but not send. Re-authorise Gmail with send permission and the level will take effect."');
   }
-  for (const name of await rerenderShifts()) console.log(`Re-rendered the wake-up for ${name}, so the next scheduled run follows this.`);
+  for (const w of bareShellWarnings()) console.log(w);
+  for (const name of rerenderShifts()) console.log(`Re-rendered the wake-up for ${name}, so the next scheduled run follows this.`);
   return 0;
 }
 
@@ -469,8 +485,13 @@ export const RULE_ONE = `1. SEND INSIDE ${NAME}'S RISK LEVEL, NEVER ABOVE IT. Ev
    "no" records \`rejected\`. Never claim something was sent that was not. Where you cannot
    run scripts, score by hand from agent/risk-matrix.md and say so. ${NAME} moves
    the level in plain words ("set my risk to medium", "pause sending", "resume sending"):
-   run \`node status/send.mjs set-level <level>\` and read back the one line it prints. The
-   level lives in \`status/status.json\` (\`scopes.send_risk\`): read it there, never restate it.`;
+   run \`node status/send.mjs set-level <level>\` and read back the one line it prints; the
+   first time, pass the pacing limits from knowledge base §7 as --cap-email, --cap-dm and
+   --cap-sms, per day. The level lives in \`status/status.json\` (\`scopes.send_risk\`): read it
+   there, never restate it. If a send tool refuses or is missing, say so in these words:
+   "Your Gmail connection can read and draft but not send. Re-authorise Gmail with send
+   permission and the level will take effect." or, on an assistant with no send route,
+   "This assistant cannot send on its own. Every message waits for you here."`;
 
 /** The CRM paragraph of rule 1 since 1.4.0, appended when a tree from before it is migrated. */
 const CRM_PARAGRAPH = `   CRM WRITES NEED NO YES. While \`scopes.crm_write\` in \`status/status.json\` is true,
@@ -559,7 +580,7 @@ export const RETIRED = [
     AGENTS_RULE_THREE],
   ['AGENTS.md',
     '- **Go-live**: until your human flips `go_live`, an agent reads and stages only.\n  Outbound sends are never automatic, live or not.',
-    '- **Go-live**: until your human flips `go_live`, an agent reads and stages only, and\n  sends nothing. Once live, its messages go or wait by the harness\'s risk level (rule 1).'],
+    '- **Go-live**: until your human flips `go_live`, an agent reads and drafts only, and\n  sends nothing. Once live, its messages go or wait by the harness\'s risk level (rule 1).'],
   ['agent/adapters/claude-code.md',
     "- Nothing sends without explicit approval — a code-capable surface makes it *easier* to\n  accidentally automate past that gate (e.g. by piping a script's output straight into a\n  send call). Don't. Every send/write path still stops for a yes.",
     '- Sending follows the risk level, and here the allowlist is a real tool boundary: a\n  scheduled shift is given the send tools on its job sheet only while the level allows\n  (`status/schedule.mjs`), and in a session rule 1 of the agent definition is the gate.\n  Never pipe anything into a send tool without the score line that allows it.'],
@@ -656,7 +677,10 @@ function migrate(rest) {
   const { flags, problems } = parseFlags(rest, { values: ['backup'] });
   if (problems.length > 0) return refuse(problems);
   const files = keptFiles();
-  const backupDir = flags.backup ? join(FOLDER, flags.backup) : join(FOLDER, '.update-backup', `send-risk-${stamp().slice(0, 10)}`);
+  // The update's own backup folder is .update-backup/{version}-{date}/ (docs/updating.md step 3)
+  // and this runs before step 6 bumps the version, so the two land in one place.
+  const beforeStatus = readStatus();
+  const backupDir = flags.backup ? join(FOLDER, flags.backup) : join(FOLDER, '.update-backup', `${beforeStatus?.template_version || 'send-risk'}-${stamp().slice(0, 10)}`);
   const replaced = [];
   for (const rel of files) {
     const path = join(FOLDER, rel);
@@ -706,6 +730,7 @@ function migrate(rest) {
     console.log('Old rule still present, not a wording this script knows (left alone; set-level refuses until it is changed by hand):');
     for (const r of left) console.log(`  ${r.file}:${r.line}  ${r.text}`);
   }
+  for (const name of rerenderShifts()) console.log(`Re-rendered the wake-up for ${name}, so its next scheduled run follows the level with no re-wiring.`);
   return 0;
 }
 
@@ -732,4 +757,4 @@ function runAsCommand() {
   if (!process.argv[1]) return false;
   try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
 }
-if (runAsCommand()) process.exit(await main(process.argv.slice(2)));
+if (runAsCommand()) process.exit(main(process.argv.slice(2)));

@@ -172,7 +172,8 @@ with the client's name in it, a changed `AGENTS.md`, the adapters, every hired a
 job sheet) may still carry the old rule that nothing sends without a yes. The script
 backs each one up first, replaces only the kit's own old sentences (every wording it
 ever shipped; never a line the client wrote), writes the send level `low` into
-`status/status.json` when none is recorded, and prints what it did. Read its one line
+`status/status.json` when none is recorded, and prints what it did. It backs up into the same
+`.update-backup/{local-version}-{date}/` folder as step 3, so one restore undoes both. Read its one line
 to the client in the step 8 report, word for word. Anything it lists as "left alone" is
 theirs; anything it lists as residue is an old sentence in changed words, and the level
 cannot move until it is gone, so name it.
@@ -182,8 +183,9 @@ just fetched. A truncated download must fail here, loudly, not at 07:00 tomorrow
 any failure: restore that file from the backup and report which one.
 
 **6. Record it.** In `status/status.json` (the client's file — an update may edit
-exactly three things in it: `template_version`, one appended `notes` line, and the key
-deletions step 4b names — nothing else, ever): set `template_version` to the new
+exactly three things in it by hand: `template_version`, one appended `notes` line, and
+the key deletions step 4b names — nothing else, ever; the one script step 4c runs writes
+`scopes.send_risk: low` when no level is recorded, and touches nothing else): set `template_version` to the new
 version, and append one line to `notes`: "updated to {version} on {date}; backup in
 .update-backup/…".
 

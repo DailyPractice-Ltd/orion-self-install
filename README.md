@@ -4,7 +4,8 @@ Orion is a personal sales agent that learns your business, your customers, and h
 actually sell — then takes on the parts of selling that aren't talking to people. You
 tell it about a prospect; it researches them and drafts a message for you to look over.
 After a call, you tell it how it went; it writes the summary, updates your pipeline, and
-drafts your follow-up — all as drafts waiting for you, never sent on their own.
+drafts your follow-up. What goes out on its own is up to you: you set a risk level, and
+nothing sends above it.
 
 Nobody sits with you for this. Your own AI assistant — Claude, ChatGPT,
 Copilot, Codex, whichever you already use — installs it with you, using the files in
@@ -74,7 +75,7 @@ from there, fits it to your business, and proves it works on your real data.
 - **[Call-Planner Control Tower](library/agents/call-planner/PACKAGE.md)** — who to
   call today, in what order, with context and the angle.
 - **[Friday Report](library/agents/friday-report/PACKAGE.md)** — the week's honest
-  scoreboard, drafted for your approval.
+  scoreboard, drafted for you.
 
 **Skills** — one teachable capability:
 

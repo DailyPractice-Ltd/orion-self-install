@@ -18,8 +18,9 @@ use the fallback below).
    intact.
 4. **Capabilities**: enable web browsing (prospect research needs it). Connect only the
    connectors the checklist names (CRM read-and-write, email read, draft and send,
-   calendar read). A custom GPT cannot send or schedule on its own (verified 4 November
-   2026): the agent scores by hand from `agent/risk-matrix.md` and says so. The approval
+   calendar read). Verified 4 November 2026: the agent scores by hand from
+   `agent/risk-matrix.md`, says so, and the waiting list is `status/waiting.md`, handed
+   over and read out at the start of each conversation. The approval
    gate is rule 1 of the agent definition: every message is scored; a custom GPT
    cannot send on its own, so here every message waits for the client
    (agent-definition rule 1).

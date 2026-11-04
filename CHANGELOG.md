@@ -65,7 +65,7 @@ Write each section for the client who will read it there.
   scheduled Claude Code shift the allowlist adds a real tool boundary. There is no
   tool-boundary hook yet; a send with no score line in the log is a breach, and the log
   shows it.
-- **Also in this release (K15):** when an assistant's sandbox blocks the network, the
+- **Also in this release:** when an assistant's sandbox blocks the network, the
   radio says so in those words instead of "didn't answer", and the Codex adapter asks
   for network approval up front rather than calling it a one-time fix.
 

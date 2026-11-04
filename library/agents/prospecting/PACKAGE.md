@@ -86,7 +86,7 @@ With your knowledge base complete, ask your AI: **"Build my first prospecting ba
 **You'll know it worked when**: you're looking at ~20 real candidates from your own
 market, each with a one-line "why them" you could say out loud to that prospect, at
 least a couple honestly disqualified with reasons — and drafts exist only for the ones
-you picked, sent nowhere. Then flip `packages.prospecting.smoke_test_passed` to `true`.
+you picked, each with its score and none above your level sent. Then flip `packages.prospecting.smoke_test_passed` to `true`.
 
 ## Safety rails
 

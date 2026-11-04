@@ -72,6 +72,7 @@
     "status/status.json": "the client's own record — pairing, stages, packages, choices. An update edits exactly three things in it by hand: template_version, one appended notes line, and deleting keys named in remove_status_checklist_keys — nothing else, ever. The one script an update runs, node status/send.mjs migrate (since 1.5.0), writes scopes.send_risk: low when no level is recorded and touches nothing else in it",
     "status/send-log.md": "the client's own record of every send decision and verdict, content-free (since 1.5.0)",
     "status/no-contact.md": "the client's own no-contact list, for good (since 1.5.0)",
+    "status/waiting.md": "the client's list of messages waiting for them, rewritten by every run (since 1.5.0)",
     "status/shift-log.md": "the client's work history",
     "status/work-log.md": "the client's work history: one line per finished task they asked for (since 1.1.0)",
     "status/shifts/": "the wake-up files written for this machine by status/schedule.mjs: full paths and schedules that only make sense here (since 1.2.0)",

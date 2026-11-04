@@ -88,10 +88,10 @@ The one source for the command is `unattendedRunner('codex')` in `status/shapes.
   not applied to this session, so ask for network approval for the radio commands up
   front, before the first one, and run it again. It is not a one-time fix: a session
   started in a restricted mode needs it again.
-- **Sending on Codex (verified 4 November 2026):** `codex exec` loads no mail, Slack or
-  calendar tool, so in 1.5.0 Codex has no send route. Every message waits for the
-  client, with that reason, whatever the level. There is no tool gate here, only the
-  prompt and `status/send.mjs`. A Composio route for Gmail is its own later research.
+- **Waiting for you, on this surface:** the truth is `status/waiting.md`, rewritten by
+  every run. Keep one thread the client names once and append to it with
+  `codex exec resume <name>`. Verified 4 November 2026; a Composio route for Gmail is its
+  own later research.
 - Sending follows the risk level (rule 1 of the agent definition). Codex's headless run
   loads no mail, Slack or calendar tool, so on Codex every message waits for the client
   with that reason; there is no tool gate here, only the prompt and the script.

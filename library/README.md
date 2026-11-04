@@ -14,7 +14,7 @@ Four kinds live here, each in its own folder:
 
 | Kind | Plainly | Folder |
 |---|---|---|
-| **Agents** | A colleague with a job — it runs a whole role for you; what it sends is scored and goes only inside the risk level you set, the rest waits for you | [`agents/`](agents/) |
+| **Agents** | A colleague with a job. It runs a whole role for you; what it sends is scored and goes only inside the risk level you set, the rest waits for you | [`agents/`](agents/) |
 | **Skills** | One teachable capability your agent applies everywhere (like how to size a meeting) | [`skills/`](skills/) |
 | **Workflows** | An automated chain that runs when you trigger it — form in, drafted work out | [`workflows/`](workflows/) |
 | **Programs** | An operating rhythm: a cadence your agent runs with you daily or weekly | [`programs/`](programs/) |
@@ -23,11 +23,11 @@ Four kinds live here, each in its own folder:
 
 **Agents**
 - [Prospecting](agents/prospecting/PACKAGE.md) — fill the top of your pipeline: ~20
-  researched candidates with a one-line "why them," drafts staged for you.
+  researched candidates with a one-line "why them," first drafts scored against your risk level.
 - [Call-Planner Control Tower](agents/call-planner/PACKAGE.md) — who to call today, in
   what order, with context and the likely angle.
 - [Friday Report](agents/friday-report/PACKAGE.md) — the week's honest scoreboard,
-  drafted for your approval.
+  drafted for you.
 
 **Skills**
 - [Meeting Sizing](skills/meeting-sizing/PACKAGE.md) — every meeting gets an outcome, a

@@ -136,7 +136,7 @@ commitments (knowledge base); their name or business name (status.json); machine
 (machine profile); timezone (schedule times are "your time" by construction).
 
 Then the **job sheet readback**: the whole agent file in plain words (the job, the
-must-nots, when it works, the report line and its tag, "reads and stages only until
+must-nots, when it works, the report line and its tag, "reads and drafts only until
 you take it live"), and then the exact purpose sentence, word for word: *"One
 sentence describes what this agent is for: '{purpose: ≤140 chars, about the agent,
 never a person, company, or number}'. If your check-ins are on, that exact sentence
@@ -420,7 +420,7 @@ written to the memory log (`memory/agents/{name}/log.md`) when memory is on.
 
 > **Status legend.** `Probation`: the hire is still in flight. Its first run has not
 > passed yet. `Hired`: it has done its job once on real work and reported it,
-> whether you asked or its schedule started it. A hired agent still reads and stages
+> whether you asked or its schedule started it. A hired agent still reads and drafts
 > only, and sends nothing, until you take it live; then what it sends follows your risk level.
 >
 > **Schedule legend.** `on call`: no schedule. It works when you ask. Otherwise the
@@ -477,7 +477,7 @@ line is always what is sent).
 
 Guardrails only ever grow in a promotion. Removing one requires the client saying so
 explicitly, and gets its own changelog line. If the new duty adds standing writes or a
-send tool, `go_live` resets to `false`. New powers start staged again, until the
+send tool, `go_live` resets to `false`. New powers start as drafts again, until the
 client takes them live; then the role sends with the harness level like any other, and
 the client hears one line that it now sends.
 

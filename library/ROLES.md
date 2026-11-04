@@ -30,8 +30,8 @@ back (as role slugs and counts, never content) and reshapes the menu.
 | `bdr` | BDR (prospector) | Finds new leads outside your CRM, researches and enriches them, brings them into the pipeline |
 | `deals` | Deals agent | Keeps deal records right so you never touch CRM admin; drafts your proposals and contracts |
 | `pipeline-review` | Pipeline Review agent | Watches movement stage by stage and flags any lead falling through the gaps |
-| `reporting` | Reporting agent | The week's honest scoreboard against your commitments, drafted for your approval |
-| `content` | Content agent | Drafts posts and outreach content in your voice, staged for your yes |
+| `reporting` | Reporting agent | The week's honest scoreboard against your commitments, drafted for you |
+| `content` | Content agent | Drafts posts and outreach content in your voice; a post is never published on its own |
 | `research` | Research agent | Preps you before calls, debriefs after, keeps the CRM current with what was learned |
 | `head-of-sales` | Head of Sales (orchestrator) | Plans each day, delegates to the rest of the team, paces your commitments |
 
@@ -89,7 +89,7 @@ back (as role slugs and counts, never content) and reshapes the menu.
 ## `reporting` — Reporting agent
 
 - **The job**: the week's honest scoreboard — activity and movement against your
-  §7 commitments, no vanity numbers, drafted for your approval.
+  §7 commitments, no vanity numbers, drafted for you.
 - **Looks at / touches**: your CRM, `status/shift-log.md`, knowledge base §7.
 - **Typical schedule**: Friday, before you close the week.
 - **Success line to offer**: "Friday tells me the truth about the week in one page."

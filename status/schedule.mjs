@@ -65,7 +65,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, delimiter, isAbsolute, win32, posix } from 'node:path';
 import { homedir } from 'node:os';
-import { labelProblem, unattendedRunner, PROMPT_SLOT } from './shapes.mjs';
+import { labelProblem, unattendedRunner, PROMPT_SLOT, SEND_TOOL, SEND_LEVELS } from './shapes.mjs';
 
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 /** Windows refuses a scheduled task whose command is longer than this. */
@@ -79,7 +79,7 @@ export const SCHTASKS_TR_MAX = 261;
  * the agent software, so both rungs wake the agent the same way.
  */
 export function shiftPrompt({ folder, name }) {
-  return `Open ${folder} and run the ${name} shift: first open the agent/adapters file for the software you are running in, so you know how to reach the radio here; then read .claude/agents/${name}.md, do the job section, then the report section with --shift. Work inside the GO-LIVE scope on your job sheet: write to the CRM where crm_write allows and report it, stage every message and send nothing; ask no questions.`;
+  return `Open ${folder} and run the ${name} shift: first open the agent/adapters file for the software you are running in, so you know how to reach the radio here; then read .claude/agents/${name}.md, do the job section, then the report section with --shift. Work inside the GO-LIVE scope on your job sheet: write to the CRM where crm_write allows and report it, send only what the risk score allows at your send level and leave the rest waiting; ask no questions.`;
 }
 
 /** Split on the commas between tools, not the ones inside Bash(a, b). */
@@ -143,6 +143,29 @@ export function jobSheetCrmWrite(jobSheet) {
   return ['standing', 'on', 'true', 'yes'].includes(value) ? 'standing' : 'off';
 }
 
+/**
+ * The job sheet's send line (`send_risk:` in the frontmatter): whether this
+ * role sends with the harness's level (`harness`) or never. Absent means with
+ * the harness, because that is the rule now (spec 007, D2). Anything that is not
+ * a plain yes means never: a typo keeps a role from sending, never the reverse.
+ */
+export function jobSheetSendRisk(jobSheet) {
+  const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(jobSheet);
+  const line = front && front[1].split(/\r?\n/).find((l) => /^send_risk:/.test(l));
+  if (!line) return 'harness';
+  const value = line.slice('send_risk:'.length).replace(/\s+#.*$/, '').trim().replace(/^["']|["']$/g, '').toLowerCase();
+  return ['harness', 'with the harness', 'on', 'true', 'yes'].includes(value) ? 'harness' : 'never';
+}
+
+/** The job sheet's go-live flag: absent counts as live (an older sheet), anything but a plain yes is not live. */
+export function jobSheetGoLive(jobSheet) {
+  const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(jobSheet);
+  const line = front && front[1].split(/\r?\n/).find((l) => /^go_live:/.test(l));
+  if (!line) return true;
+  const value = line.slice('go_live:'.length).replace(/\s+#.*$/, '').trim().replace(/^["']|["']$/g, '').toLowerCase();
+  return ['true', 'yes', 'on'].includes(value);
+}
+
 /** The tools that write to a CRM. Only these follow the crm_write scope. */
 export const CRM_WRITE_TOOL = /(^|__)(manage_crm_objects|create_crm_.*|update_crm_.*|hubspot_.*(create|update|write).*|attio_.*(create|update|write).*)$/i;
 
@@ -158,6 +181,7 @@ export const SHIFT_TOOLS = Object.freeze([
   'Bash(node status/done.mjs *)',
   'Bash(node status/memory.mjs *)',
   'Bash(node status/radio.mjs *)',
+  'Bash(node status/send.mjs *)',
   'Bash(echo *)',
 ]);
 
@@ -166,10 +190,18 @@ export const SHIFT_TOOLS = Object.freeze([
  * cover, as the one comma-separated value Claude Code takes. A sheet that
  * allows all of Bash already covers the three scripts.
  */
-export function allowedTools(sheetTools, { crmWrite = 'standing' } = {}) {
+export function allowedTools(sheetTools, { crmWrite = 'standing', sendRisk = 'off' } = {}) {
   // With the CRM scope off, the CRM write tools are not allowed: those writes
-  // stage. Nothing here ever adds a tool that sends.
-  const all = sheetTools.filter((t) => crmWrite === 'standing' || !CRM_WRITE_TOOL.test(t.split('(')[0]));
+  // stage. With the send level off, or this role's line saying never, the
+  // tools that send are not allowed: those messages wait. Nothing here ever
+  // adds a tool the sheet does not name.
+  const sends = SEND_LEVELS.includes(sendRisk) && sendRisk !== 'off';
+  const all = sheetTools.filter((t) => {
+    const base = t.split('(')[0];
+    if (crmWrite !== 'standing' && CRM_WRITE_TOOL.test(base)) return false;
+    if (!sends && SEND_TOOL.test(base)) return false;
+    return true;
+  });
   for (const tool of SHIFT_TOOLS) {
     const base = tool.split('(')[0];
     if (!all.includes(tool) && !all.includes(base)) all.push(tool);
@@ -337,7 +369,7 @@ function guardedMacFolder(folder, home) {
  * Everything wire would write, worked out without touching the disk. Returns
  * { problems } when it cannot, or the files, the record, and any notes.
  */
-export function plan({ os, folder, name, surface, at, days, bin, sheetTools, crmWrite = 'standing', nodeDir = null, home = null }) {
+export function plan({ os, folder, name, surface, at, days, bin, sheetTools, crmWrite = 'standing', sendRisk = 'off', nodeDir = null, home = null }) {
   const problems = [];
   const path = os === 'win32' ? win32 : posix;
 
@@ -355,7 +387,7 @@ export function plan({ os, folder, name, surface, at, days, bin, sheetTools, crm
   if (surface === 'claude-code' && !sheetTools) {
     problems.push(`The job sheet .claude/agents/${name}.md has no tools: line. An agent that runs with nobody watching is allowed what its job sheet names, so add that line first.`);
   }
-  const tools = sheetTools ? allowedTools(sheetTools, { crmWrite }) : undefined;
+  const tools = sheetTools ? allowedTools(sheetTools, { crmWrite, sendRisk }) : undefined;
   const runner = unattendedRunner(surface, { tools });
   if (!runner.schedulable) {
     problems.push(surface
@@ -381,7 +413,9 @@ export function plan({ os, folder, name, surface, at, days, bin, sheetTools, crm
   const files = [];
   const notes = [];
   const tag = folderTag(folder);
-  const record = { agent: name, surface, os, at: atPadded, days: ordered, wake_up: wakeUpPath, log: logPath, tag };
+  // bin and node_dir are kept so the wake-up can be re-rendered in place when
+  // the send level changes (status/send.mjs set-level), with no re-wiring.
+  const record = { agent: name, surface, os, at: atPadded, days: ordered, wake_up: wakeUpPath, log: logPath, tag, bin, node_dir: nodeDir, send_risk: sendRisk };
 
   if (os === 'win32') {
     let text;
@@ -555,6 +589,74 @@ export function isOn(record, { uid, run = spawnSync } = {}) {
   return lines !== null && lines.some((line) => line.includes(record.marker));
 }
 
+/**
+ * The level a shift really runs at: never when the role's line says so, off
+ * while the harness is paused or has no level or the role is not live, else
+ * the harness level (spec 007, D3). Read from status.json and the job sheet.
+ */
+export function effectiveSendRisk({ status, sheetText }) {
+  const harness = status?.scopes?.send_risk;
+  const level = typeof harness === 'string' && SEND_LEVELS.includes(harness.toLowerCase()) ? harness.toLowerCase() : 'off';
+  if (jobSheetSendRisk(sheetText) === 'never') return 'never';
+  if (!jobSheetGoLive(sheetText)) return 'off';
+  return level;
+}
+
+/** The command and PATH a wake-up file starts, as its wire wrote them: `exec 'bin' ...` on a shell, `call "bin" ...` on Windows. */
+function commandFromWakeUp(record) {
+  let text;
+  try { text = readFileSync(record.wake_up, 'utf8'); } catch { return null; }
+  if (record.os === 'win32') {
+    const call = /^call "([^"]+)"/m.exec(text);
+    const pathLine = /^set "PATH=([^;"]+)/m.exec(text);
+    return call ? { bin: call[1], node_dir: pathLine ? pathLine[1] : null } : null;
+  }
+  const exec = /^exec '((?:[^']|'\\'')+)'/m.exec(text);
+  const pathLine = /^export PATH='((?:[^']|'\\'')+)'/m.exec(text);
+  const unquote = (s) => s.replace(/'\\''/g, "'");
+  return exec ? { bin: unquote(exec[1]), node_dir: pathLine ? unquote(pathLine[1]) : null } : null;
+}
+
+function readStatusFile(folder) {
+  try { return JSON.parse(readFileSync(join(folder, 'status', 'status.json'), 'utf8')); } catch { return null; }
+}
+
+/**
+ * Re-render one wired wake-up from its record, the job sheet and the level as
+ * they are now. Only the wake-up file is rewritten (and the record's level);
+ * the schedule itself is untouched, so this is safe under a switched-on
+ * schedule: the next run simply follows the new level. Returns { written } or
+ * { problem }.
+ */
+export function rerender({ folder, name }) {
+  const recordPath = join(folder, 'status', 'shifts', `${name}.json`);
+  if (!existsSync(recordPath)) return { problem: 'no wake-up is wired for it' };
+  let record = null;
+  try { record = JSON.parse(readFileSync(recordPath, 'utf8')); } catch { return { problem: 'its record could not be read' }; }
+  if (!record.bin) {
+    // Wired before 1.5.0: the record did not keep the command, but the wake-up
+    // file says exactly what was started, so read it back from there.
+    const learned = commandFromWakeUp(record);
+    if (!learned) return { problem: `it was wired before 1.5.0 and its wake-up could not be read; wire it again with  node status/schedule.mjs wire --agent ${name} ...` };
+    Object.assign(record, learned);
+  }
+  const sheetPath = join(folder, '.claude', 'agents', `${name}.md`);
+  if (!existsSync(sheetPath)) return { problem: 'its job sheet is gone' };
+  const sheetText = readFileSync(sheetPath, 'utf8');
+  const sendRisk = effectiveSendRisk({ status: readStatusFile(folder), sheetText });
+  const result = plan({
+    os: record.os, folder, name, surface: record.surface, at: record.at, days: record.days || [], bin: record.bin,
+    sheetTools: jobSheetTools(sheetText), crmWrite: jobSheetCrmWrite(sheetText), sendRisk, nodeDir: record.node_dir || null, home: homedir(),
+  });
+  if (result.problems.length > 0) return { problem: result.problems.join(' ') };
+  const wakeUp = result.files.find((f) => f.path === record.wake_up);
+  if (!wakeUp) return { problem: 'the wake-up path in its record no longer matches this folder' };
+  writeFileSync(wakeUp.path, wakeUp.text);
+  if (wakeUp.executable) chmodSync(wakeUp.path, 0o755);
+  writeFileSync(recordPath, `${JSON.stringify({ ...record, send_risk: sendRisk }, null, 2)}\n`);
+  return { written: wakeUp.path, sendRisk };
+}
+
 // ── The command ─────────────────────────────────────────────────────────────
 
 const USAGE = [
@@ -642,6 +744,7 @@ function main(argv) {
   const sheetText = readFileSync(sheetPath, 'utf8');
   const sheetTools = jobSheetTools(sheetText);
   const crmWrite = jobSheetCrmWrite(sheetText);
+  const sendRisk = effectiveSendRisk({ status: readStatusFile(folder), sheetText });
   const wanted = unattendedRunner(flags.surface);
   if (flags.bin) {
     let isFile = false;
@@ -667,7 +770,7 @@ function main(argv) {
   const days = flags.days ? String(flags.days).toLowerCase().split(',').map((d) => d.trim()).filter(Boolean) : [];
 
   const result = plan({
-    os: process.platform, folder, name, surface: flags.surface, at: flags.at, days, bin, sheetTools, crmWrite,
+    os: process.platform, folder, name, surface: flags.surface, at: flags.at, days, bin, sheetTools, crmWrite, sendRisk,
     nodeDir: dirname(process.execPath), home: homedir(),
   });
   if (result.problems.length > 0) {

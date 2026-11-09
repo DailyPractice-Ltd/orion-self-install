@@ -2,7 +2,7 @@
 
 Your week's scoreboard, written the hard-honest way: every number backed by evidence
 your CRM and calendar can actually show, zeros stated plainly, and exactly one next
-action — drafted for your approval, never sent on its own.
+action, drafted for you and published nowhere on its own.
 
 | Field | Value |
 |---|---|
@@ -26,8 +26,8 @@ Install the Friday Report from my Orion folder.
    and email evidence — following every rule on the package page, especially:
    evidence or it didn't happen, zeros said plainly, carry-overs never counted as
    this week's wins, and ONE next action.
-4. Show it to me as a draft for approval. Never send or publish it anywhere
-   yourself.
+4. Show it to me as a draft. It is a report for me, not a message to anyone else:
+   never publish it anywhere yourself.
 5. Run the smoke test at the bottom of the package page, and only when it passes,
    record the install in status/status.json under packages.friday-report
    (kind "agent", role "reporting", version "1.0.0", smoke_test_passed true).
@@ -91,7 +91,7 @@ At the end of a real working week, ask your AI: **"Draft my weekly report."**
 **You'll know it worked when**: one draft report exists covering the real window, every
 number in it can answer "where's that from?", at least one honest zero or
 did-not-happen appears if the week had one, and it ends with exactly one next action —
-waiting for your approval, sent nowhere. Then flip
+waiting for you, published nowhere. Then flip
 `packages.friday-report.smoke_test_passed` to `true`.
 
 ## Safety rails

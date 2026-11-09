@@ -83,15 +83,17 @@ Every outgoing message has one named moment. If a moment isn't in this table, no
 is sent. Your AI saying good morning, answering a question, making a plan, thinking
 out loud, or showing you a draft that still waits on your yes: none of that touches
 the radio. A task you set that is now finished does. That is the "A task finished"
-row.
+row. A message your agent sent on its own, inside the risk level you set, is a finished
+task too: it reports as "A task finished" with the tag `outreach` and a count, and the
+radio never learns your level, the score, or who it was to.
 
 | Message | The one moment it fires | Sent by |
 |---|---|---|
 | "Here's which step I'm on" (`install_checkpoint`) | You accept check-ins in the wizard; your install moves to a new stage | The wizard / the status script — automatic |
 | "A task finished" (`task_completed`) | A task you set your AI is finished: you have the thing you asked for, or the action is taken. One message per finished task. A finished task did at least one thing, so its count is 1 or more | Your agent, as the last step of the task (`node status/done.mjs`), with a tag, a count, and the name of the skill or agent that ran, if one did |
 | "A run you approved" (`workflow_execution_completed`) | A multi-step run (like a prospect-research chain) finishes **and you approved its result** | Your agent, after your yes |
-| "Outreach approved" (`outreach_approved`) | You explicitly say yes to a staged outreach draft, in conversation | Your agent, right after your yes |
-| "Outreach declined" (`outreach_rejected`) | You explicitly say no to a staged outreach draft (equally useful for improving the kit) | Your agent, right after your no |
+| "Outreach approved" (`outreach_approved`) | You say "send it" to a message that was waiting for you (one above your risk level) | Your agent, right after your yes |
+| "Outreach declined" (`outreach_rejected`) | You say no to a message that was waiting for you (equally useful for improving the kit) | Your agent, right after your no |
 | "Debrief done" (`debrief_completed`) | A post-call debrief finishes and its CRM update is written. No yes is asked: CRM writes are a standing scope | Your agent, right after the write |
 | "CRM updated" (`crm_updated`) | Your agent performs a standalone CRM write inside your standing scope (not part of a debrief). No yes is asked | Your agent, right after the write |
 | "A shift ran" (`routine_completed`) | A hired agent finishes a shift: work it does on a schedule, started by a clock or a handoff and not by a person. The standing yes you gave on its job sheet at hire covers exactly this report. A shift may report a count of 0: it ran and found nothing to do. ("Routine" is only the name on the wire. In plain words it is a shift.) | The agent, as the last step of the shift (`node status/done.mjs --shift`), with its name, a tag, and a count |
@@ -208,6 +210,7 @@ and gets out of the way. What each line means:
 | "Radio quiet — no messages" | Everything works; nothing waiting | Nothing |
 | "Radio is off (or not configured)" | Check-ins are off, or pairing never happened | Your choice — run `node start.mjs` to pair if you want it on |
 | "The radio address didn't answer (…)" | The call left your machine and hit a wall — see below | One of the two fixes below |
+| "This assistant's sandbox is blocking the network, or this machine is offline (…)" | The address could not even be looked up: inside an AI assistant that is nearly always its sandbox, not the radio | Ask the assistant for network approval for the command (its adapter file says how) and run it again; off a sandbox, check the connection |
 | "that key isn't valid (401)" | Your key was revoked or replaced | Ask Daily Practice for a fresh pairing code |
 | "Radio check answered 4xx/5xx" | Reached Daily Practice, answered oddly | Nothing — it tries again next session |
 

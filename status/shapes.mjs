@@ -505,6 +505,109 @@ export function unattendedRunner(surface, { tools } = {}) {
   }
 }
 
+// ── Send Risk: one level, one matrix, one sentence (spec 007, K16) ──────────
+//
+// Every message to a person outside the folder is scored 0 to 100. The client
+// sets one level for the harness; a message at or under it sends on its own,
+// one above it waits for them. The matrix lives here and nowhere else in code;
+// agent/risk-matrix.md is its plain-words twin and a test holds the two equal.
+
+/** The levels, in the order a client can move through them. `off` is paused. */
+export const SEND_LEVELS = Object.freeze(['off', 'low', 'medium', 'high']);
+
+/**
+ * A tool that sends a message to a person, by its last name part: the hosted
+ * connectors' send, reply and forward tools, Slack's send, anything that sends
+ * mail, a DM or a text, and a calendar tool that creates, changes or answers an
+ * event, because an invite to an outside person is a message (spec 007, D10).
+ * A draft tool is never a send tool, however it is spelled, and neither is a
+ * search or a listing.
+ */
+export const SEND_TOOL = /(^|__)(?!.*draft)([a-z0-9]+_)*(send|reply|forward|schedule_message|create_event|update_event|respond_to_event|send_invite)(_[a-z0-9]+)*$/i;
+
+/**
+ * The matrix, v1. One label per factor; the points are summed and floored at 0.
+ * Content is the single highest label that applies, and an attachment counts as
+ * money. History is read from the client's own verdicts in the send log over
+ * the last HISTORY_DAYS. Nothing else is a factor: pacing is a hard stop.
+ */
+export const RISK_MATRIX = Object.freeze({
+  relationship: Object.freeze({ reply: 0, 'follow-up': 15, known: 25, cold: 50 }),
+  content: Object.freeze({ logistics: 0, information: 10, claim: 20, money: 25 }),
+  channel: Object.freeze({ email: 0, calendar: 0, linkedin: 10, slack: 10, dm: 10, whatsapp: 20, sms: 20 }),
+  history: Object.freeze({ rejected: 20, approved: -10 }),
+  customer: -10,
+});
+export const HISTORY_DAYS = 30;
+
+/** What each level sends up to. Above the highest, every message waits, whatever the level. */
+export const SEND_THRESHOLDS = Object.freeze({ low: 20, medium: 45, high: 70 });
+export const SEND_CEILING = 70;
+
+/** The one sentence under every waiting message. Asserted word for word in rule 1. */
+export const WAITING_SENTENCE = 'This message falls outside of your risk parameters, and you need to approve this manually.';
+
+/** Each label in the words the client reads. The plain-words twin, agent/risk-matrix.md, uses the same. */
+export const FACTOR_WORDS = Object.freeze({
+  relationship: Object.freeze({ reply: 'a reply in a thread they answered', 'follow-up': 'a follow-up with no reply yet', known: 'first contact to a known lead', cold: 'cold, a stranger' }),
+  content: Object.freeze({ logistics: 'logistics', information: 'standard information', claim: 'a results claim or a third party named', money: 'price, discount, commitment, signature, deadline or an attachment' }),
+  channel: Object.freeze({ email: 'email', calendar: 'a calendar invite', linkedin: 'LinkedIn', slack: 'Slack', dm: 'a DM', whatsapp: 'WhatsApp', sms: 'SMS' }),
+  history: Object.freeze({ rejected: 'this kind of message rejected in the last 30 days', approved: 'this kind of message approved in the last 30 days' }),
+  customer: 'an existing customer',
+});
+
+/** What each level sends on its own, in one phrase, for the lines the client hears. */
+export const LEVEL_SENDS = Object.freeze({
+  low: 'replies and logistics',
+  medium: 'replies, logistics, and first contact to known leads with standard information',
+  high: 'replies, logistics, first contact to known leads, and cold logistics and cold information',
+});
+
+/** What still waits at each level, for the same lines. */
+export const LEVEL_WAITS = Object.freeze({
+  low: 'First contact, money and cold contact still wait for you.',
+  medium: 'Money and cold contact still wait for you.',
+  high: 'Cold contact with money, and anything scoring above 70, still wait for you.',
+});
+
+/** The short word for a content label, in "without the price". */
+export const CONTENT_SHORT = Object.freeze({ information: 'the information', claim: 'the claim', money: 'the price' });
+
+/**
+ * An unknown label fails closed: an unknown relationship scores as cold, unknown
+ * content as money, an unknown channel as WhatsApp. The caller says so.
+ */
+export const UNKNOWN_AS = Object.freeze({ relationship: 'cold', content: 'money', channel: 'whatsapp' });
+
+export function riskLabel(kind, value) {
+  const v = String(value ?? '').trim().toLowerCase();
+  return Object.hasOwn(RISK_MATRIX[kind], v) ? v : UNKNOWN_AS[kind];
+}
+
+/** The score and its factors, in plain words, from labels already read with riskLabel. */
+export function riskScore({ relationship, content, channel, customer = false, history = null }) {
+  const factors = [
+    [FACTOR_WORDS.relationship[relationship], RISK_MATRIX.relationship[relationship]],
+    [FACTOR_WORDS.content[content], RISK_MATRIX.content[content]],
+    [FACTOR_WORDS.channel[channel], RISK_MATRIX.channel[channel]],
+  ];
+  if (history && Object.hasOwn(RISK_MATRIX.history, history)) factors.push([FACTOR_WORDS.history[history], RISK_MATRIX.history[history]]);
+  if (customer) factors.push([FACTOR_WORDS.customer, RISK_MATRIX.customer]);
+  const score = Math.max(0, factors.reduce((sum, [, points]) => sum + points, 0));
+  return { score, factors };
+}
+
+/** The lowest level that sends this score on its own, or null above the ceiling. */
+export function lowestLevelFor(score) {
+  for (const level of SEND_LEVELS) if (level !== 'off' && score <= SEND_THRESHOLDS[level]) return level;
+  return null;
+}
+
+/** Whether a level sends a score on its own. `off`, `never` and anything unknown send nothing. */
+export function levelSends(level, score) {
+  return Object.hasOwn(SEND_THRESHOLDS, level) && score <= SEND_THRESHOLDS[level] && score <= SEND_CEILING;
+}
+
 // ── Skill bundles: a skill is a folder, and the whole folder travels ────────
 //
 // A skill is more than its SKILL.md: references, templates, examples. The radio

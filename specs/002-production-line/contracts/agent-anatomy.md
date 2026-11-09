@@ -72,13 +72,17 @@ Body sections, in order: `The job` · `What you must not do` · `Training` ·
   for. Flipping it to `true` is done by a later session that finds that evidence. A
   schedule that is not wired, or not proven, is shown as exactly that on the roster
   and never as proven. It does not hold the agent back from `hired`.
-- `go_live: false` → the agent reads and stages only, asked or scheduled. `true` →
+- `go_live: false` → the agent reads and drafts only, asked or scheduled, and sends nothing. `true` →
   additionally the
   **enumerated** standing writes named in the agent file's GO-LIVE section, nothing
   else. The flip is a file edit made at the client's spoken instruction; the edit is
   the record.
-- Outbound sends are per-item client yes forever. GO-LIVE cannot grant sending;
-  Article III is not softened by this contract.
+- Outbound sends follow the harness's send level (`scopes.send_risk` in
+  `status/status.json`) and the agent file's `send_risk:` line (`harness` or `never`),
+  scored message by message by `status/send.mjs` (spec 007 in `dailypractice-mono`).
+  GO-LIVE does not grant sending: while `go_live: false` nothing sends; once live, the
+  level decides. Article III is not softened by this contract: the reputation refusal
+  runs before any scoring, and above the ceiling every message waits for the client.
 
 ## The report
 

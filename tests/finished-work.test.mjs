@@ -563,7 +563,8 @@ test('done: an unreachable radio marks the shift line, and the report still exit
     '--tag', 'prospecting', '--count', '5', '--agent', 'prospecting', '--shift', '--line', '5 found',
   ]);
   assert.equal(code, 0, err);
-  assert.match(out, /The radio address didn't answer \(ENOTFOUND\)/);
+  // ENOTFOUND is the one failure that is almost always an assistant's sandbox (K15): it says so.
+  assert.match(out, /This assistant's sandbox is blocking the network, or this machine is offline \(ENOTFOUND\)/);
   assert.doesNotMatch(out, /radio-result/, 'the machine line is for the script, never shown');
   const lines = h.shiftLog().trimEnd().split('\n');
   assert.equal(lines.length, 2, 'the shift line, then one marker line under it');

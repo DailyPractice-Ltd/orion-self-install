@@ -20,7 +20,7 @@ Install the Prospect Research → Outreach workflow from my Orion folder.
 
 1. Read library/workflows/prospect-research-outreach/PACKAGE.md and adopt its
    chain as a standing procedure: when I hand you a prospect, run research →
-   staged outreach draft (waits for my yes) and CRM entry (written, reported), every time,
+   outreach draft (scored; sent inside my risk level, otherwise waiting for my yes) and CRM entry (written, reported), every time,
    exactly as agent/agent-definition.md task 1 describes.
 2. Check the connector prerequisites first (connectors/connector-checklist.md)
    and tell me plainly which, if any, are missing before we start.
@@ -35,9 +35,11 @@ Install the Prospect Research → Outreach workflow from my Orion folder.
 ## What it does
 
 A prospect's name in → research + drafted outreach out, with the gate that defines this
-whole kit: the message lands as a **draft in your Drafts folder** and sending it is your
-approval. The CRM entry is different: it is written for you under the standing `crm_write`
-scope and reported in one line. There is no auto-send path in it to switch on.
+whole kit: the message goes out the way your agent's rule 1 says. It is scored first; a
+first touch to a stranger scores above every level, so it lands as a **draft in your
+Drafts folder** and sending it is your approval. A reply or a follow-up to a known lead
+can go on its own inside the level you set. The CRM entry is different: it is written for
+you under the standing `crm_write` scope and reported in one line.
 
 Want it to run without you asking? That's a hire: give the chain to a scheduled agent
 (`library/HIRING.md`) and it becomes a shift with a report — the workflow is the
@@ -45,7 +47,7 @@ procedure, the hire is the clock.
 
 ## What it doesn't do
 
-It won't find prospects for you — that's the [Prospecting](../../agents/prospecting/PACKAGE.md)
+It won't find prospects for you — that's the [Prospecting](../prospecting/PACKAGE.md)
 agent. This workflow does the per-prospect legwork once you know who.
 
 ## Smoke test — prove it works
@@ -53,7 +55,7 @@ agent. This workflow does the per-prospect legwork once you know who.
 Run **VT-01** from `validation/validation-tasks.md`: hand your agent one real prospect.
 
 **You'll know it worked when**: a researched draft appears in your own Drafts folder
-(sent by no one), your agent writes the CRM entry and tells you in one line, and your CRM shows the
+with its score and the sentence that it waits for you, your agent writes the CRM entry and tells you in one line, and your CRM shows the
 new entry. Then set the status fields from step 3 of the
 install prompt.
 

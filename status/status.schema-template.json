@@ -1,6 +1,6 @@
 {
-  "schema_version": "1.8.0",
-  "template_version": "1.4.1",
+  "schema_version": "1.9.0",
+  "template_version": "1.5.0",
   "client_id": null,
   "business_name": null,
   "agent_name": null,
@@ -31,7 +31,8 @@
     "vt05_safety_boundary": false,
     "vt06_daily_drive": false,
     "vt07_resume_after_interruption": false,
-    "vt08_status_signal_emission": false
+    "vt08_status_signal_emission": false,
+    "vt09_send_gate": false
   },
   "packages": {},
   "memory": {
@@ -45,7 +46,10 @@
     "branch": "main"
   },
   "scopes": {
-    "crm_write": true
+    "crm_write": true,
+    "send_risk": "low",
+    "send_risk_set_by": "install",
+    "send_risk_set_on": null
   },
   "stage_history": [],
   "sharing": {

@@ -4,7 +4,8 @@ Orion is a personal sales agent that learns your business, your customers, and h
 actually sell — then takes on the parts of selling that aren't talking to people. You
 tell it about a prospect; it researches them and drafts a message for you to look over.
 After a call, you tell it how it went; it writes the summary, updates your pipeline, and
-drafts your follow-up — all as drafts waiting for you, never sent on their own.
+drafts your follow-up. What goes out on its own is up to you: you set a risk level, and
+nothing sends above it.
 
 Nobody sits with you for this. Your own AI assistant — Claude, ChatGPT,
 Copilot, Codex, whichever you already use — installs it with you, using the files in
@@ -74,7 +75,7 @@ from there, fits it to your business, and proves it works on your real data.
 - **[Call-Planner Control Tower](library/agents/call-planner/PACKAGE.md)** — who to
   call today, in what order, with context and the angle.
 - **[Friday Report](library/agents/friday-report/PACKAGE.md)** — the week's honest
-  scoreboard, drafted for your approval.
+  scoreboard, drafted for you.
 
 **Skills** — one teachable capability:
 
@@ -331,9 +332,11 @@ running `node start.mjs` again greets you with exactly where things stand.)
 
 ## What this will never do
 
-- **Nothing sends without your yes.** Every message, every change to your CRM, every email
-  your agent drafts is shown to you first, every single time. It sends nothing on its own,
-  ever.
+- **Nothing sends above the risk level you chose.** Every message your agent wants to
+  send is scored first. Inside your level (low to start: replies and logistics) it goes on
+  its own; above it, the draft waits for you with the score and what would bring it
+  inside. Say "set my risk to medium" or "pause sending" and it changes at once. The whole
+  matrix, in plain words: [`agent/risk-matrix.md`](agent/risk-matrix.md).
 - **It won't write anything that could embarrass you or your business.** If you ask for
   something that crosses a line, it'll tell you plainly and suggest a better way — not
   just refuse and leave you stuck.

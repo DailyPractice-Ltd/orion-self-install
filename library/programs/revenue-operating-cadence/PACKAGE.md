@@ -84,8 +84,9 @@ it, never when someone says it was made.
 
 ## What it doesn't do
 
-It never sends a collections message, changes an invoice, or touches your CRM without
-your yes — the program proposes, you approve. Escalations beyond polite persistence
+A collections message goes out the way your agent's rule 1 says (scored; money and
+commitments wait for you at every level), it never changes an invoice, and CRM writes
+follow your standing scope — the program proposes, you approve what waits. Escalations beyond polite persistence
 (fees, holds, legal) are decisions this program surfaces to you, never takes.
 
 ## Smoke test — prove it works

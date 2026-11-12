@@ -612,6 +612,7 @@
    "e643c267ea9176d83a659e6f720bdadd6c7b49dda5f31de366e0b810a6dd84c2"
   ],
   "update/apply.mjs": [
+   "50e84ff447030754aaea51a85f4771313aa9740a7646fdd0d18bc32395f62da8",
    "f175dd7f3fa2530cc360c84cf515a78e7cdd802020c57d526e638148a94d0271"
   ],
   "update/destination-resolver.mjs": [

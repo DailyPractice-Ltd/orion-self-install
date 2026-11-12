@@ -66,6 +66,7 @@
     "status/status.schema-template.json",
     "update/manifest.json",
     "update/pristine.json",
+    "update/apply.mjs",
     "validation/validation-tasks.md"
   ],
   "never_touch": {
@@ -158,10 +159,12 @@
       "status/status.schema-template.json",
       "update/manifest.json",
       "update/pristine.json",
+      "update/apply.mjs",
       "update/release-contract.mjs",
       "update/destination-resolver.mjs",
       "validation/validation-tasks.md"
     ],
+    "retired": [],
     "entries": [
       {
         "source": "skills/create-skill/SKILL.md",

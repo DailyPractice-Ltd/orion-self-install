@@ -88,17 +88,21 @@ test('parses the directive exactly as the server formats it', () => {
  * status.json it left behind, every call the bridge received, and the skill
  * file it wrote, if any.
  */
-function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, skills = {} } = {}) {
+function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, skills = {}, tool = 'claude-code' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'orion-radio-'));
   try {
     mkdirSync(join(dir, 'status'));
     for (const f of ['radio.mjs', 'shapes.mjs']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
+    mkdirSync(join(dir, 'update'));
+    for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(statusDir, '..', 'update', f), join(dir, 'update', f));
     for (const [slug, content] of Object.entries(skills)) {
-      mkdirSync(join(dir, '.claude', 'skills', slug), { recursive: true });
-      writeFileSync(join(dir, '.claude', 'skills', slug, 'SKILL.md'), content);
+      const skillRoot = tool === 'codex' ? '.agents' : '.claude';
+      mkdirSync(join(dir, skillRoot, 'skills', slug), { recursive: true });
+      writeFileSync(join(dir, skillRoot, 'skills', slug, 'SKILL.md'), content);
     }
     writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
       template_version: '0.6.4',
+      selected_tool: tool,
       sharing: {
         status_signal_enabled: true,
         bridge_url: 'https://radio.test/api/bridge',
@@ -139,13 +143,20 @@ function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, s
     const calls = existsSync(log)
       ? readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
       : [];
-    const skillFile = join(dir, '.claude', 'skills', SKILL.slug, 'SKILL.md');
+    const skillFile = join(dir, tool === 'codex' ? '.agents' : '.claude', 'skills', SKILL.slug, 'SKILL.md');
     const written = existsSync(skillFile) ? readFileSync(skillFile, 'utf8') : null;
     return { code: r.status, out: r.stdout, err: r.stderr, status, calls, written };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
+
+test('Codex library install writes to the selected skills directory', () => {
+  const result = runRadio(['library', '--install', 'meeting-sizing', '--yes'], { tool: 'codex' });
+  assert.equal(result.code, 0, result.out + result.err);
+  assert.ok(result.written?.includes('Size the meeting'));
+  assert.match(result.out, /\.agents\/skills\/meeting-sizing/);
+});
 
 const now = () => new Date().toISOString();
 const fromUs = (over) => ({

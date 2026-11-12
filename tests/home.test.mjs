@@ -140,11 +140,13 @@ function folder(base, dir, { answer = 201 } = {}) {
 function makeFolder(t, { base = scratch(t), name = 'harness', sharing = {}, status = {}, keyFile = null, files = {}, answer } = {}) {
   const dir = join(base, name);
   mkdirSync(join(dir, 'status'), { recursive: true });
+  mkdirSync(join(dir, 'update'));
+  for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(repo, 'update', f), join(dir, 'update', f));
   for (const f of readdirSync(statusDir).filter((n) => n.endsWith('.mjs'))) {
     copyFileSync(join(statusDir, f), join(dir, 'status', f));
   }
   writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
-    template_version: '1.3.0',
+    template_version: '1.3.0', selected_tool: 'claude-code',
     agent_name: 'Neo',
     ops_stage: 'seven_day_checkin',
     harness_status: 'validated',

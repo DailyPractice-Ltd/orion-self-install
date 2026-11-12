@@ -83,6 +83,21 @@ export function resolveDestinations({ root, releaseRoot = RELEASE_ROOT, legacyTo
   return { selected_tool: tool, legacy_migration: status.selected_tool == null, entries: entries.map((entry) => ({ ...entry, state: destinationState(root, entry, pristine) })) };
 }
 
+/** Paths used by a running client harness, from its recorded tool and release map. */
+export function runtimeLayout(root, { legacyTool } = {}) {
+  const manifest = readJson(join(root, 'update/manifest.json'), 'deployment manifest');
+  const status = readJson(join(root, 'status/status.json'), 'harness status');
+  const tool = selectedTool(status, manifest.deployment, { legacyTool });
+  const skill = manifest.deployment.entries.find((entry) => entry.source === 'skills/create-skill/SKILL.md');
+  const roster = manifest.deployment.entries.find((entry) => entry.source === 'agents/README.md');
+  if (!skill?.destinations?.[tool] || !roster?.destinations?.[tool]) throw new Error(`Missing runtime destinations for ${tool}`);
+  const skillRoot = dirname(dirname(skill.destinations[tool]));
+  const rosterPath = roster.destinations[tool];
+  safePath(root, skillRoot);
+  safePath(root, rosterPath);
+  return { tool, skillRoot, rosterPath, jobRoot: dirname(rosterPath) };
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     const value = (flag) => { const at = process.argv.indexOf(flag); return at < 0 ? undefined : process.argv[at + 1]; };

@@ -532,9 +532,9 @@ test('tripwire: the status template, the wizard, the manifest and the changelog 
   const template = JSON.parse(read('status/status.schema-template.json'));
   assert.equal(template.scopes.send_risk, 'low');
   assert.equal(template.schema_version, '1.9.0');
-  assert.equal(template.template_version, '1.5.0');
+  assert.equal(template.template_version, '2.0.0');
   const manifest = JSON.parse(read('update/manifest.json'));
-  assert.equal(manifest.template_version, '1.5.0');
+  assert.equal(manifest.template_version, template.template_version);
   for (const f of ['status/send.mjs', 'agent/risk-matrix.md']) assert.ok(manifest.refresh.includes(f), `${f} on the refresh list`);
   const never = Object.keys(manifest.never_touch).join(' ');
   assert.match(never, /status\/send-log\.md/);

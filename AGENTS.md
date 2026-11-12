@@ -2,7 +2,7 @@
 
 You are about to help someone install **Orion** — a personal, agentic sales harness — into
 their own workflow. There is no coach in this session. You are the installer. This file is
-the first thing to read, regardless of which AI product you are (Claude, ChatGPT, Copilot,
+the canonical shared instruction file, regardless of which AI product you are (Claude, ChatGPT, Copilot,
 Claude Code, or anything else that can read this repo).
 
 ## Which harness you are, and staying in its own folder
@@ -354,15 +354,14 @@ the work belong in memory/, and the private store holds at most pointers into it
 
 When the client says anything like **"update my harness"**, **"get the latest
 version"**, **"am I up to date?"**, or **"restore my harness from the backup"** — read
-`docs/updating.md` and follow it exactly. The short version you may never shorten
-further: the allowlist is `update/manifest.json` fetched fresh from main; nothing
-outside it is ever written; back up before replacing; never roll back; end with the
-plain-words report that the client's knowledge base, agents, skills, status and logs
-were not touched. **The request is the consent**: the procedure runs start to finish
-without asking the client anything. No "apply the merge?", no diff to approve, no
-"shall I continue?". A file the client has changed is kept as it is and named in the
-report, never replaced and never asked about. On Claude Code this is also invocable as
-`/update-harness`.
+`docs/updating.md` and follow it exactly. Obtain the current release as a temporary
+checkout, resolve its full commit, and run that commit's `update/apply.mjs` with its
+pinned manifest and source files. The selected tool in status determines destinations.
+Back up before replacing or retiring; report preserved edits and collisions. Released
+`status/*.mjs` scripts are the documented backed-up exception that update together.
+**The request is the consent**: run start to finish without an extra confirmation.
+For a tool change, follow the same document's `switch` and schedule steps. On Claude
+Code and Codex this is also invocable as `/update-harness`.
 
 ## The Library — adding capabilities after (or during) the install
 

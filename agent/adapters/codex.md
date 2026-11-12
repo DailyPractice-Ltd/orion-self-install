@@ -12,6 +12,10 @@ Best fit when the client works in Codex — the CLI in a terminal, the IDE exten
 the desktop app. The wizard detects it (`codex` on PATH or `~/.codex` present) and hands
 off to exactly the same prompt as Claude Code.
 
+In a deployed Codex folder, installed skills live in `.agents/skills/` and hired job
+sheets plus the roster live in `team/`. Use `status.selected_tool` to confirm the
+layout before reading or writing them. `AGENTS.md` is the shared instruction file.
+
 ## The sandbox — why the radio needs one setting here
 
 Codex runs commands inside a safety sandbox, and by default that sandbox **allows file

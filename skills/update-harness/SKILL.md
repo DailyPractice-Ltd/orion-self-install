@@ -1,6 +1,6 @@
 ---
 name: update-harness
-description: Bring the client's Orion harness up to the latest template. Use when the client says "update my harness", "get the latest version", "am I up to date?", or "restore my harness from the backup". Refresh-and-prune from the template's main branch; the client's own work is untouchable by construction.
+description: Update, restore, or switch the client's deployed Orion harness. Use for "update my harness", "am I up to date?", "restore my harness", or "switch my harness to Codex/Claude Code". Run the pinned release updater and report preserved edits.
 ---
 
 Read `docs/updating.md` and follow it exactly — it is the entire procedure and it wins
@@ -12,12 +12,11 @@ the client has changed is kept as it is and named in the report, never replaced 
 never asked about. The client hears from you once, in the plain-words report, after
 the update has landed.
 
-The permission is `update/manifest.json`, always fetched fresh and pinned to main's
-current commit: the `refresh` list is everything an update may write, the `remove`
-list is everything it may delete (a release retiring a file), and
-`remove_status_checklist_keys` names the only checklist keys it may drop. Nothing
-outside those lists is touched. Back up before replacing or removing — including one
-copy of `status/status.json` — `node --check` the scripts after, never roll back, and
-end with the plain-words report: the client's knowledge base, agents, skills and logs
-were not touched, and in their status file only the version, one note line, and any
-retired checklist entries changed.
+Use the current release's `update/apply.mjs` from a temporary clone at one full pinned
+commit, with its manifest, pristine registry, and source files from that commit. The
+`deployment` plan selects only the layout recorded in `status.selected_tool`; the old
+`refresh` list is for legacy same-path updaters. Back up before replacement or
+retirement. Keep client edits and collisions, except backed-up `status/*.mjs` scripts
+which update together. Report the version, selected layout, changed and kept files,
+backup path, and radio check. For a tool switch, follow `docs/updating.md`'s switch,
+schedule, recovery, and restore steps.

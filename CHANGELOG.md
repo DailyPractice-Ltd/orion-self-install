@@ -16,6 +16,29 @@ Write each section for the client who will read it there.
 
 ---
 
+## 2.0.0 — 2026-11-12
+
+**Your Orion folder is now separate from the release, with a layout chosen for Claude Code or Codex.**
+
+- Install from the downloaded release with `node install.mjs --tool codex --target
+  /path/to/my-orion` or `--tool claude-code`. The client folder has common runtime
+  files and only the selected tool's skills and team layout. Release sources, tests,
+  specs and Speckit skills stay in the release checkout. The installer makes a local
+  git repository; an optional private GitHub home still needs an empty repository
+  created by the client and `node status/home.mjs prepare --remote <address> --yes`.
+- `AGENTS.md` is the shared instruction file. New installs omit `CLAUDE.md`.
+  Claude Code setups with Anthropic's `agents-md` plugin can load `AGENTS.md` when
+  there is no `CLAUDE.md` in scope. An older setup can use a `CLAUDE.md` containing
+  only `@AGENTS.md`.
+- Updates now run the updater, manifest and files from one pinned release commit.
+  They preserve edited and client-owned files, report collisions, and back up every
+  replacement or retirement. Executable `status/*.mjs` scripts remain the documented
+  backed-up exception that update together.
+- A tool switch moves released skills and team routing to the new layout, carries
+  personalized skills and job sheets, and records the new selection only after
+  validation. Saved schedules must be rewired for the new tool. The switch has a
+  backup and recovery command. See [updating](docs/updating.md).
+
 
 ## 1.5.0 — 2026-11-04
 

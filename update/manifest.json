@@ -1,8 +1,8 @@
 {
-  "_read_first": "Read this before you use the lists below. The procedure that goes with this manifest is docs/updating.md at the same commit you fetched this manifest from. If you are following a copy of docs/updating.md that was already in the client's folder, it is older than this manifest: fetch docs/updating.md from that same commit now and continue from its step 2. Two rules in it replace anything older you have read. One: never stop to ask the client anything. Their request to update is the consent. There is no merge to approve and no difference to show. Two: never replace a file the client has changed. update/pristine.json at the same commit lists the fingerprint of every copy of each file Daily Practice has shipped. A local file whose fingerprint is not listed there is the client's now: keep it exactly as it is and name it in your final report.",
+  "_read_first": "Read docs/updating.md and update/pristine.json from the pinned release commit. Run that commit's update/apply.mjs, not the older client copy. The deployment plan selects the tool recorded in status. The request is the consent: never stop to ask; never replace a file the client has changed, except executable status/*.mjs scripts, which are backed up and replaced together. Report collisions.",
   "_what": "Legacy refresh/remove lists remain for older harnesses. deployment is the source-to-destination and ownership contract for separate client repositories; select exactly one recorded tool. Contract: docs/updating.md and deployment._contract.",
   "_regenerate": "Legacy refresh is retained for existing same-path updaters. For new deployments, maintain deployment.common_sources and deployment.entries as explicit allowlists; never include specs, tests, Speckit skills, release skills/, or release agents/ as destination paths. Bump template_version with the status schema. Then run node tests/helpers/pristine.mjs --write after release edits.",
-  "template_version": "1.5.0",
+  "template_version": "2.0.0",
   "refresh": [
     ".claude/skills/create-skill/SKILL.md",
     ".claude/skills/hire-agent/SKILL.md",

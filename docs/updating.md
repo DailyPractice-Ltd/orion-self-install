@@ -1,64 +1,95 @@
 # Updating a deployed Orion harness
 
-The request is the consent. A file the client has changed is kept, except executable
-`status/*.mjs` scripts, which are backed up and replaced as a version-consistent set.
-`update/pristine.json` holds historical source fingerprints. A collision or edit is
-reported without a prompt. The client's knowledge base, hired team, logs, and status
-choices remain theirs.
+The request is the consent. Work in the **deployed
+client folder**, whose `status/status.json` records `selected_tool` as `claude-code` or
+`codex`. The release repository is a separate, temporary source. A client needs only
+their deployed folder to begin.
 
-## Update
+## Update from a pinned release
 
-The harness must be a separate deployed repository with `status/status.json` recording
-`selected_tool` as `claude-code` or `codex`. Resolve the current `main` commit SHA from
-`https://api.github.com/repos/DailyPractice-Ltd/orion-self-install/commits/main`.
-Fetch or clone that release commit into a local release repository. The commit must be
-present there. Run from the deployed harness:
+Run this in the deployed folder. It downloads the current `main` release, resolves its
+full commit hash, runs that commit's updater with its manifest and source files, then
+removes the temporary checkout. The script and the content it applies come from the
+same commit; do not run the older `update/apply.mjs` already in the client folder.
 
 ```sh
-node update/apply.mjs update --root . --release-repo /path/to/release-repository --commit FULL_COMMIT_SHA
+(
+  set -eu
+  cd /path/to/my-orion
+  release_tmp=$(mktemp -d)
+  trap 'rm -rf "$release_tmp"' EXIT
+  git clone --quiet --depth 1 https://github.com/DailyPractice-Ltd/orion-self-install.git "$release_tmp/release"
+  release_commit=$(git -C "$release_tmp/release" rev-parse HEAD)
+  node "$release_tmp/release/update/apply.mjs" update --root "$PWD" --release-repo "$release_tmp/release" --commit "$release_commit"
+)
 ```
 
-The command reads **one pinned Git commit** for `update/manifest.json`,
-`update/pristine.json`, and every source file. It uses `deployment.common_sources` and
-`deployment.entries` to map portable release sources to the destination for the
-recorded selected tool. It never copies the release-only `skills/` or `agents/` tree,
-Speckit skills, tests, specs, or the other tool's runtime tree. The selected tool is
-read from status; the current AI surface does not choose the target.
+If clone or update fails, inspect the error. The temporary checkout is removed on
+success or failure. Never fall back to the older local script or an unpinned `main` path.
+The update reads `update/manifest.json`, `update/pristine.json`, and all released
+files from that one commit. Its `deployment` plan maps portable release sources into
+the destination for the tool recorded in status. The current AI app does not choose
+the destination. The client folder never receives release-only `skills/`, `agents/`,
+tests, specs, Speckit skills, `CLAUDE.md`, or the other tool's runtime tree.
 
-The manifest's `deployment.retired` names selected-tool destinations to retire. The
-legacy `remove` list names common deployed paths to retire. A retired file is removed
-only when its fingerprint matches a historical shipped copy. Changed retired files
-remain and are reported. A client-created path or symlink is a collision and remains.
-The client roster template is installed only when absent; later roster edits and rows
-belong to the client.
+A file the client has changed is kept and reported, as is a collision. The client roster and job sheets
+remain client-owned. A retired released file is removed only if it still matches a
+historical shipped fingerprint. Before changing files, the updater backs up status
+and each file it will replace or retire under `.update-backup/`. Executable
+`status/*.mjs` scripts are the narrow exception: they are backed up and replaced as a
+version-consistent set even when edited. The updater changes only
+`template_version`, one notes line, and named retired checklist keys in status.
 
-Before the first change, the command backs up status and all files it will replace or
-retire under `.update-backup/`. A journal records replacements, new paths and retired
-paths. It checks all new `.mjs` syntax before writing, then updates only
-`template_version`, one notes line, and named retired checklist keys in status. Run
-`node status/send.mjs migrate` for legacy sending-rule migration when applicable; that
-script manages its own narrow status change and backups. Run `node status/radio.mjs check`
-afterward and report its result. Report version change, refreshed, added, retired,
-kept, collisions, edited scripts replaced with backup location, and the backup path.
+When applicable, run `node status/send.mjs migrate` for the older sending-rule
+migration. Then run `node status/radio.mjs check`. Report the pinned commit, version
+change, refreshed, added, retired, kept and collided files, replaced edited scripts,
+radio result, and backup path.
+
+## Switch the selected tool
+
+Use the same pinned release procedure, with `switch` as the operation:
+
+```sh
+(
+  set -eu
+  cd /path/to/my-orion
+  release_tmp=$(mktemp -d)
+  trap 'rm -rf "$release_tmp"' EXIT
+  git clone --quiet --depth 1 https://github.com/DailyPractice-Ltd/orion-self-install.git "$release_tmp/release"
+  release_commit=$(git -C "$release_tmp/release" rev-parse HEAD)
+  node "$release_tmp/release/update/apply.mjs" switch --root "$PWD" --release-repo "$release_tmp/release" --commit "$release_commit" --to codex
+)
+```
+
+Use `--to claude-code` to move the other way. For an older Claude harness with no
+`selected_tool`, add `--legacy-tool claude-code` to migrate it explicitly. The switch
+preflights collisions, backs up, stages and validates the new layout, then records the
+new selection. It retires released files from the old layout while preserving edited
+skills, hired job sheets and roster rows. Active computer schedules must first be
+turned off with `node status/schedule.mjs off --agent <name>`; saved schedules are
+invalidated by the switch and must be rewired for the new tool. The switch reports
+its backup. If interrupted, run the pinned release script with `recover --root "$PWD"`
+before trying again. The temporary checkout is removed automatically.
 
 ## Restore
 
-Use the backup path returned by the update command:
+Use the backup path printed by update or switch:
 
 ```sh
 node update/apply.mjs restore --root . --backup .update-backup/VERSION-TIMESTAMP
 ```
 
-Restore copies replaced and retired files back and removes files created by the update.
-If a newly created or replaced file has changed since the update, restore keeps and
-reports it. It restores the prior version and retired checklist keys without replacing
-the client's live status wholesale. The backup remains available.
+For an update, restore puts prior released files back and removes newly installed
+files. A file changed after update is kept and reported. It restores the prior
+version and retired checklist keys without replacing the client's live status
+wholesale. A completed switch can also be restored from its reported backup; any
+new-layout edits that conflict must be handled first. Keep the backup for audit.
 
-## Older same-path harnesses
+## Older same-path folders
 
-For installs older than 0.5.7, first fetch `docs/updating.md` and
-`update/manifest.json` from the release, then migrate to a separate deployed
-repository with a recorded selected tool before running this updater. The legacy
-`refresh` list remains in the manifest for older harnesses; it is not the deployment
-plan for new installs. Use the release changelog to identify changes to client-visible
-check-ins. Run `node tests/helpers/pristine.mjs --write` before tagging a release.
+Older folders that used the release checkout as their business folder must first be
+migrated into a separate deployed repository with an explicit selected tool. Use the
+release's migration procedure and `--legacy-tool claude-code` for an older Claude
+layout with no selection. The manifest's legacy `refresh` list remains for old
+updaters; `deployment` is the contract for separate client folders. Maintainers run
+`node tests/helpers/pristine.mjs --write` after release edits and before tagging.

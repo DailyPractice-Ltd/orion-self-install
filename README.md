@@ -25,7 +25,8 @@ months from now.
 - **It keeps up without you.** Daily Practice ships improvements as numbered
   [releases](https://github.com/DailyPractice-Ltd/orion-self-install/releases). Ask your
   AI "what version is my harness on?", and if it is behind, say "update my harness".
-  Your own files are never touched by an update ([how that is guaranteed](docs/updating.md)).
+  Your edits and business records are preserved by the update rules
+  ([how updates and backups work](docs/updating.md)).
 
 ---
 
@@ -54,12 +55,16 @@ node start.mjs
 The wizard checks your computer, offers the radio choice, and gives you the prompt
 to start working with your AI assistant. Keep this client folder as your business's
 Orion home. The downloaded release folder is only the source for installing and
-updating it.
+updating it. The installer creates a **local** git repository. To keep a private
+copy on GitHub, create an empty private repository under your own account, then run
+`node status/home.mjs prepare --remote <its-address> --yes` in the client folder.
+The installer does not create a GitHub repository or remote for you.
 
-For Claude Code, `AGENTS.md` is the shared instruction file. Claude Code setups
-that do not load it can add a `CLAUDE.md` containing only `@AGENTS.md` in the
-client folder. Keep that pointer narrow so the shared instructions stay in one
-place.
+`AGENTS.md` is the shared instruction file in either layout. The installer does not
+copy `CLAUDE.md`. Anthropic's optional `agents-md` plugin can load `AGENTS.md` when
+there is no `CLAUDE.md` in scope; this depends on the client's Claude Code setup.
+For an older setup that does not load it, add a client-folder `CLAUDE.md` containing
+only `@AGENTS.md`. Keep the shared instructions in one place.
 
 ---
 

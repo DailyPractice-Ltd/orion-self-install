@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { plainEnv } from './env.mjs';
 
 const statusDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'status');
+const updateDir = join(statusDir, '..', 'update');
 
 // A key that is well shaped and opens nothing. Built here, never written out
 // whole, so no file in this folder holds a line shaped like a key.
@@ -44,8 +45,10 @@ export function runRadio(args, { reply, skill, writeSkill = writeRichSkill, stat
   try {
     mkdirSync(join(dir, 'status'));
     for (const f of ['radio.mjs', 'shapes.mjs']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
+    mkdirSync(join(dir, 'update'));
+    for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(updateDir, f), join(dir, 'update', f));
     writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
-      template_version: '1.2.1',
+      template_version: '1.2.1', selected_tool: 'claude-code',
       ...(status || {}),
       sharing: {
         status_signal_enabled: true,

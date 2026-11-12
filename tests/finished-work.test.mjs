@@ -61,13 +61,15 @@ function makeHarness(t, { sharing = {}, status = {}, unreachable = false, refuse
   const dir = mkdtempSync(join(tmpdir(), 'orion-done-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, 'status'));
+  mkdirSync(join(dir, 'update'));
+  for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(repo, 'update', f), join(dir, 'update', f));
   // Every script the status folder ships, exactly as it is on disk right now.
   for (const f of readdirSync(statusDir).filter((name) => name.endsWith('.mjs'))) {
     copyFileSync(join(statusDir, f), join(dir, 'status', f));
   }
   if (!noStatus) {
     writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
-      ...BASE_PAYLOAD,
+      ...BASE_PAYLOAD, selected_tool: 'claude-code',
       agent_name: 'Neo',
       memory: { enabled: true, backend: 'folder', remote: null, path: 'memory' },
       ...status,

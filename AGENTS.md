@@ -315,9 +315,9 @@ exactly. On Claude Code the same procedures are invocable as `/hire-agent` and
 `/create-skill`; on every other surface this paragraph is the trigger.
 
 Teach the client the line once, at their first hire, and never lecture it again:
-**@ summons an agent — a who. / runs a skill — a what.**
+**A job sheet names who does the work; a skill names what procedure to run.**
 
-The roster lives at `.claude/agents/README.md`. At session start, scan it. An agent
+Resolve `status.selected_tool` through `update/destination-resolver.mjs` before reading or writing a job or skill. Claude Code uses `.claude/agents/README.md` and `.claude/skills/`; Codex uses `team/README.md` and `.agents/skills/`. On Codex, read the team job sheet and run its job and report sections; `@` discovery is specific to Claude Code. The roster for the selected tool is the one to scan. At session start, scan it. An agent
 that has a schedule which is not yet proven (or not yet wired) gets exactly one plain
 sentence ("your {name} agent hasn't yet fired on its own. Want me to check the
 schedule?"), never more. An on-call agent needs no mention. A row still marked
@@ -385,7 +385,7 @@ one:
    `node status/radio.mjs library --install <slug>`. With no `--yes` that command only
    shows what the skill is, what it needs, and where it would go. Tell the client that
    in your own plain words, and run it again with `--yes` only if they want it. It
-   writes the skill's folder under `.claude/skills/<slug>/`, never overwrites a skill
+   writes the skill's folder under the selected tool's skills directory, never overwrites a skill
    they already have, and reports the shelf itself. Then smoke-test it on something
    real before saying it works.
 

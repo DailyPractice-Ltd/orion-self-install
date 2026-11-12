@@ -70,11 +70,19 @@ function readBlobs(ids) {
 
 export function computePristine() {
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
-  const idsByPath = new Map(manifest.refresh.filter((p) => p !== PRISTINE_PATH).map((p) => [p, blobIds(p)]));
+  const aliases = manifest.deployment?.fingerprints?.legacy_aliases || {};
+  const sources = new Set([
+    ...manifest.refresh,
+    ...(manifest.deployment?.common_sources || []),
+    ...(manifest.deployment?.entries || []).map((entry) => entry.fingerprint_key),
+  ]);
+  const idsByPath = new Map([...sources].filter((p) => p !== PRISTINE_PATH).map((p) => [
+    p, new Set([...blobIds(p), ...(aliases[p] ? blobIds(aliases[p]) : [])]),
+  ]));
   const blobs = readBlobs(new Set([...idsByPath.values()].flatMap((s) => [...s])));
 
   const files = {};
-  for (const path of [...manifest.refresh].sort()) {
+  for (const path of [...sources].sort()) {
     // This file has no entry for itself. It cannot hold its own fingerprint, and
     // listing its earlier copies would change it on every regeneration. It is pure
     // data that nobody edits, so an update always replaces it (docs/updating.md, step 4).
@@ -87,7 +95,7 @@ export function computePristine() {
     files[path] = [...prints].sort();
   }
   return {
-    _what: "For every path 'update my harness' may refresh: the fingerprint of every copy of it Daily Practice has ever shipped. A local file whose fingerprint is listed under its path was never changed by the client, so the update refreshes it. One that is not listed is the client's now, and the update keeps it exactly as it is. Contract: docs/updating.md, step 4.",
+    _what: "Fingerprints are keyed by stable release source path, independent of deployed destination. Legacy Claude paths contribute historical hashes to their portable source key. A destination whose fingerprint is not listed under its source key is client-edited and must be preserved. Legacy refresh keys remain until migration. Contract: update/manifest.json deployment and docs/updating.md.",
     _fingerprint: 'SHA-256, as lowercase hex, of the file read as UTF-8 text with every CRLF turned into LF.',
     _regenerate: 'node tests/helpers/pristine.mjs --write, before every release. node --test fails if it is stale.',
     files,

@@ -1,5 +1,5 @@
 {
- "_what": "For every path 'update my harness' may refresh: the fingerprint of every copy of it Daily Practice has ever shipped. A local file whose fingerprint is listed under its path was never changed by the client, so the update refreshes it. One that is not listed is the client's now, and the update keeps it exactly as it is. Contract: docs/updating.md, step 4.",
+ "_what": "Fingerprints are keyed by stable release source path, independent of deployed destination. Legacy Claude paths contribute historical hashes to their portable source key. A destination whose fingerprint is not listed under its source key is client-edited and must be preserved. Legacy refresh keys remain until migration. Contract: update/manifest.json deployment and docs/updating.md.",
  "_fingerprint": "SHA-256, as lowercase hex, of the file read as UTF-8 text with every CRLF turned into LF.",
  "_regenerate": "node tests/helpers/pristine.mjs --write, before every release. node --test fails if it is stale.",
  "files": {
@@ -213,6 +213,16 @@
    "34035f1fac1523a86689a641824e6ef79466b3f9d5eac51d5fdc0ec7a0c56cee",
    "c764bed6bab56d23f25281cd6340d65239bfd005379dac1ec28fe1453885e954"
   ],
+  "agents/README.md": [
+   "0d39b59963af9a056775580c67b2d3664ea8f589e5ea42b3c3dd212547100832",
+   "32f0c7ad2b0c2150515cb081cfb76b321686d37d5e9a52d311038344ba61f20b",
+   "6a27b0ba2ab5089d245f5323de56edc78c6792cdb874408486ad3d52a2b113b9",
+   "6e2fa58bac8c2c1a551d3c5fcb051b3ceddea909589524473577a28a79e449c0",
+   "8660a2bd218154715ecc1aa412d41b06c3d289bf0cad10e5b4b68d33e23c84c2",
+   "97c6a676697efb0033b7ed106dbb3e014e834cd7071fd02d381625fc4c5c6736",
+   "a07a629bdc292d20498662d6189d7a53aba0496415a56ca947c9c2010ba4eebd",
+   "e39b3779f587a8fef08db4e76bfbeb25afe9f51e9bbdabc7b0a4c6c981678163"
+  ],
   "connectors/connector-checklist.md": [
    "2a32898d696d4dd333b339e29d2edd805b76ada6851caee5f524d5315416a47d",
    "2d7c1e57fbddb35038336959975a8e1bb4bf6d476a2210932b5bd55af5129fbe",
@@ -410,6 +420,21 @@
    "63e91a31b8651f47a7046eeb13a1642ac7604ca7084db38348674772cf800932",
    "b076979b103c4f0b77ba6635fed2f95e78823d8a7cb85e5b808a689479596b59"
   ],
+  "skills/create-skill/SKILL.md": [
+   "3b6d2bd65e00b422aace6a57beb432e4befa9e2eb9b16c44a11aaf09976540ae",
+   "a7d53bfebfb856e35d7469b91cc6da1806be1d13bdac224b9918facf37c5a010",
+   "d50714304118add05075dba9613835c61213759594b3d8c3defad2f14f9f1302"
+  ],
+  "skills/hire-agent/SKILL.md": [
+   "75c479d9dc00e53579a29972c02262635e0239ceb59075f53d3bf2092ee72f5f",
+   "7d11accf71237ac769011cd47ec604c2f7e6eb427ad23f04f6240507e9af3d56"
+  ],
+  "skills/update-harness/SKILL.md": [
+   "5a01e7840dd33711606563442dfe7869bda088640faa1f9ccc4df1a2466d032e",
+   "b7b732d37bc1db7f4e76f2496186d61e4390447614fe6f557e478daac926b795",
+   "d1a9dd93101f087b1f69f140f9fbc3f5defa44955dc5d1f53cbb3bb3d998867a",
+   "fe5de8c5339206ff9050735af4cbc55afe5c45289029f5543d4f7577ce62a6e6"
+  ],
   "start.mjs": [
    "0f0811915296725f3f46670297423839344ce4ee539eea4e5df0d8b4594f15b7",
    "118cf3981cac5881f20f6d098c044798d606d974f2dd21044600909f0c2030bf",
@@ -597,6 +622,7 @@
    "9127c3081e85b3d9dd64d58d047b0e7fc9453bb1bad8bbf2ae81ceba385eae05",
    "934a152a7d5dc3494d0ce23eb8b28ac2691b3ced0adf9e723116fcea8618144d",
    "97ec61572addb1654a6a32f7d0d6a4408d281e5ead1fd0af84742095c47f71cb",
+   "9a391c16ab7fd52f3fc6975e970ec88ff988ed5ca580f468c51df684bdebadf4",
    "9df211f37fc9053a3b60af733ae4e484168f714385f49411b9c01ff9b3719b62",
    "aaf58db59afd051ccb631916de8a42c637caae00848b1645fe617c7e646eccf6",
    "afd54c2c326d8c23c135779f51c40858a38bdacd4c921d502f02357c335c7364",
@@ -610,6 +636,9 @@
    "d01b85441062198cc3c696e88ac113f702d9e97e8b67b8c45591baec7269f6e1",
    "d998260b7546b73067e02f6ec0c8ec4b152231b84fc63988ef3b0144826f3122",
    "dfc60a60de1b0454f9a2396e735e7be8934fde38463502f03316bab71c264d11"
+  ],
+  "update/release-contract.mjs": [
+   "39e52cfed518c63ce9654a8575c08023f9508506c6ec99d95b89cecdfd42911a"
   ],
   "validation/validation-tasks.md": [
    "22866df94e2181892cc06c068b9abc23563a3853aa0f9b2a24a21ffd9f9202a7",

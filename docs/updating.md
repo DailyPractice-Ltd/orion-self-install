@@ -63,6 +63,8 @@ Use the same pinned release procedure, with `switch` as the operation:
 
 Use `--to claude-code` to move the other way. For an older Claude harness with no
 `selected_tool`, add `--legacy-tool claude-code` to migrate it explicitly. The switch
+requires the harness version, manifest, and common runtime scripts to match the pinned
+release. Run the pinned update command above first if it reports an older version.
 preflights collisions, backs up, stages and validates the new layout, then records the
 new selection. It retires released files from the old layout while preserving edited
 skills, hired job sheets and roster rows. Active computer schedules must first be
@@ -88,8 +90,24 @@ new-layout edits that conflict must be handled first. Keep the backup for audit.
 ## Older same-path folders
 
 Older folders that used the release checkout as their business folder must first be
-migrated into a separate deployed repository with an explicit selected tool. Use the
-release's migration procedure and `--legacy-tool claude-code` for an older Claude
-layout with no selection. The manifest's legacy `refresh` list remains for old
-updaters; `deployment` is the contract for separate client folders. Maintainers run
+migrated into a separate deployed repository with an explicit selected tool. From a
+fresh release checkout, run:
+
+```sh
+node install.mjs --tool claude-code --target /path/to/new-client-folder \
+  --migrate-from /path/to/legacy-checkout --github-repo OWNER/PRIVATE-REPO
+```
+
+Use `--tool codex` only when the legacy status already records Codex. The migration
+copies the client's status and logs, knowledge, memory, skills, roster and job sheets,
+then overlays edited deployed files. Saved computer schedules are invalidated because
+their paths refer to the legacy folder; wire them again in the new folder. The new
+private repository becomes the home, while `--local-only` leaves home disabled. It excludes release-only trees. The legacy
+checkout is left intact. The command creates and pushes a private GitHub repository;
+`--remote https://github.com/OWNER/PRIVATE-REPO.git` uses an existing private
+repository, verified through `gh`. `--local-only` creates a local staging repository
+when GitHub credentials are unavailable and reports that remote setup is pending.
+
+The manifest's legacy `refresh` list remains for old updaters; `deployment` is the
+contract for separate client folders. Maintainers run
 `node tests/helpers/pristine.mjs --write` after release edits and before tagging.

@@ -1,20 +1,15 @@
 /** Pinned, manifest-driven update and restore for a deployed Orion harness. */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, existsSync, rmSync, lstatSync, readdirSync, rmdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, existsSync, rmSync, lstatSync, readdirSync, rmdirSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve, relative, sep } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { destinationState, fingerprint, planForTool, selectedTool } from './destination-resolver.mjs';
+import { destinationState, fingerprint, planForTool, selectedTool, safePath } from './destination-resolver.mjs';
 import { isOn } from '../status/schedule.mjs';
 
 const arg = name => { const i=process.argv.indexOf(name); return i<0 ? undefined : process.argv[i+1]; };
 const json = path => JSON.parse(readFileSync(path,'utf8'));
-const safe = (root,path) => {
-  if (typeof path !== 'string' || !path || path==='.' || path.startsWith('/') || path.split(/[\\/]/).includes('..')) throw new Error(`Unsafe path: ${path}`);
-  const target=resolve(root,path); if (relative(root,target).startsWith(`..${sep}`)) throw new Error(`Unsafe path: ${path}`);
-  let part=resolve(root); for (const segment of path.split('/')) { part=join(part,segment); if (existsSync(part) && lstatSync(part).isSymbolicLink()) throw new Error(`Symlink collision: ${path}`); }
-  return target;
-};
+const safe = safePath;
 const copyTo = (from,to) => { mkdirSync(dirname(to),{recursive:true}); copyFileSync(from,to); };
 const versionParts = version => String(version).split('.').map(Number);
 const newer = (a,b) => { const x=versionParts(a),y=versionParts(b); for(let i=0;i<3;i++) {if((x[i]||0)!==(y[i]||0)) return (x[i]||0)>(y[i]||0);} return false; };
@@ -28,6 +23,7 @@ function sourceSnapshot(repo, commit) {
   return dir;
 }
 function update(root,repo,commit) {
+  recoverPendingUpdates(root);
   const snapshot=sourceSnapshot(repo,commit);
   try {
     const manifest=json(join(snapshot,'update/manifest.json'));
@@ -58,20 +54,34 @@ function update(root,repo,commit) {
     const backupRel=`.update-backup/${status.template_version}-${stamp}`;
     const backup=safe(root,backupRel); if(existsSync(backup)) throw new Error('Backup already exists');
     mkdirSync(backup,{recursive:true}); copyTo(statusPath,join(backup,'status/status.json'));
-    const journal={from:status.template_version,to:manifest.template_version,commit,selected_tool:tool,actions:[],remove_status_checklist_keys:manifest.remove_status_checklist_keys||[]};
-    // All existing targets are backed up before the first write or removal.
-    for (const a of actions) if(a.kind!=='add') copyTo(a.dest,join(backup,'files',a.e.destination));
-    writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
-    for (const a of actions) {
-      if(a.kind==='retire') {rmSync(a.dest);report.retired.push(a.e.destination);}
-      else {copyTo(a.src,a.dest);report[a.kind==='add'?'added':'refreshed'].push(a.e.destination);}
-      journal.actions.push({kind:a.kind,destination:a.e.destination,installed_hash:a.kind==='retire'?null:fingerprint(readFileSync(a.dest))});
-      writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
-    }
+    const journal={kind:'update',state:'pending',from:status.template_version,to:manifest.template_version,commit,selected_tool:tool,
+      actions:actions.map(a=>({kind:a.kind,destination:a.e.destination,installed_hash:a.kind==='retire'?null:fingerprint(readFileSync(a.src)),prior_hash:a.kind==='add'?null:fingerprint(readFileSync(a.dest))})),
+      remove_status_checklist_keys:manifest.remove_status_checklist_keys||[]};
     for(const key of journal.remove_status_checklist_keys) delete status.checklist?.[key];
     status.template_version=manifest.template_version;
     status.notes=[status.notes||'',`updated to ${manifest.template_version}; backup in ${backupRel}`].filter(Boolean).join('\n');
-    writeFileSync(statusPath,JSON.stringify(status,null,2)+'\n');
+    const nextStatus=JSON.stringify(status,null,2)+'\n';
+    journal.status_installed_hash=fingerprint(nextStatus);
+    // All existing targets are backed up before the first write or removal.
+    for (const a of actions) if(a.kind!=='add') copyTo(a.dest,join(backup,'files',a.e.destination));
+    for (const a of actions) if(a.kind!=='retire') copyTo(a.src,join(backup,'stage',a.e.destination));
+    mkdirSync(join(backup,'stage/status'),{recursive:true});
+    writeFileSync(join(backup,'stage/status/status.json'),nextStatus);
+    writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
+    try {
+      let count=0;
+      for (const a of actions) {
+        if(a.kind==='retire') {rmSync(a.dest);report.retired.push(a.e.destination);}
+        else {mkdirSync(dirname(a.dest),{recursive:true});renameSync(join(backup,'stage',a.e.destination),a.dest);report[a.kind==='add'?'added':'refreshed'].push(a.e.destination);}
+        if(process.env.ORION_UPDATE_FAIL_AFTER && ++count===Number(process.env.ORION_UPDATE_FAIL_AFTER)) throw new Error('Injected update interruption');
+      }
+      renameSync(join(backup,'stage/status/status.json'),statusPath);
+      journal.state='complete';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
+    } catch(error) {
+      rollbackUpdate(root,backup,journal);
+      journal.state='recovered';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
+      throw error;
+    }
     return {...report,backup:backupRel};
   } finally {rmSync(snapshot,{recursive:true,force:true});}
 }
@@ -80,6 +90,7 @@ function update(root,repo,commit) {
 // skills, job sheets and the roster are copied across, then left in place.
 function switchTool(root,repo,commit,to,legacyTool) {
   recoverPendingSwitches(root);
+  recoverPendingUpdates(root);
   const snapshot=sourceSnapshot(repo,commit);
   try {
     const manifest=json(join(snapshot,'update/manifest.json'));
@@ -87,6 +98,17 @@ function switchTool(root,repo,commit,to,legacyTool) {
     const deployment=manifest.deployment;
     const statusPath=safe(root,'status/status.json'), status=json(statusPath);
     const from=selectedTool(status,deployment,{legacyTool});
+    if (status.template_version !== manifest.template_version ||
+        !existsSync(safe(root,'update/manifest.json')) ||
+        fingerprint(readFileSync(safe(root,'update/manifest.json'))) !== fingerprint(readFileSync(safe(snapshot,'update/manifest.json')))) {
+      throw new Error(`Update this harness to pinned release ${manifest.template_version} before switching tools`);
+    }
+    for(const path of deployment.common_sources.filter(p=>/^status\/[^/]+\.mjs$/.test(p) || /^update\/(manifest\.json|apply\.mjs|destination-resolver\.mjs|release-contract\.mjs)$/.test(p))) {
+      const installed=safe(root,path), released=safe(snapshot,path);
+      if(!existsSync(installed) || fingerprint(readFileSync(installed))!==fingerprint(readFileSync(released))) {
+        throw new Error(`Update this harness to the pinned release before switching: ${path}`);
+      }
+    }
     if (!deployment.tools.includes(to) || to===from) throw new Error(`Choose the other supported tool (current: ${from})`);
     const sourcePlan=planForTool(deployment,from,{releaseRoot:snapshot,root});
     const targetPlan=planForTool(deployment,to,{releaseRoot:snapshot,root});
@@ -218,6 +240,43 @@ function recoverPendingSwitches(root) {
   return recovered;
 }
 
+function rollbackUpdate(root,backup,journal) {
+  const statusPath=safe(root,'status/status.json');
+  const statusHash=fingerprint(readFileSync(statusPath));
+  const oldStatusHash=fingerprint(readFileSync(join(backup,'status/status.json')));
+  if(statusHash!==oldStatusHash && statusHash!==journal.status_installed_hash) throw new Error('Update recovery collision: status/status.json');
+  const conflicts=journal.actions.filter(a=>{
+    const dest=safe(root,a.destination);
+    if(!existsSync(dest)) return a.kind==='replace';
+    if(!lstatSync(dest).isFile()) return true;
+    const current=fingerprint(readFileSync(dest));
+    return current!==a.prior_hash && current!==a.installed_hash;
+  }).map(a=>a.destination);
+  if(conflicts.length) throw new Error(`Update recovery collisions: ${conflicts.join(', ')}`);
+  for(const a of [...journal.actions].reverse()) {
+    const dest=safe(root,a.destination);
+    if(a.kind==='add') {if(existsSync(dest)) rmSync(dest);}
+    else copyTo(join(backup,'files',a.destination),dest);
+  }
+  copyTo(join(backup,'status/status.json'),safe(root,'status/status.json'));
+  const stage=join(backup,'stage');if(existsSync(stage)) rmSync(stage,{recursive:true,force:true});
+}
+
+function recoverPendingUpdates(root) {
+  const backups=safe(root,'.update-backup');if(!existsSync(backups)) return [];
+  const recovered=[];
+  for(const name of readdirSync(backups)) {
+    const backup=safe(root,`.update-backup/${name}`), path=join(backup,'journal.json');
+    if(!existsSync(path)) continue;
+    const journal=json(path);
+    if(journal.kind==='update' && journal.state==='pending') {
+      rollbackUpdate(root,backup,journal);
+      journal.state='recovered';writeFileSync(path,JSON.stringify(journal,null,2));recovered.push(name);
+    }
+  }
+  return recovered;
+}
+
 function rollbackSwitch(root,backup,journal) {
   const conflicts=journal.actions.filter(a=>{
     const path=safe(root,a.destination);
@@ -246,6 +305,7 @@ function restore(root,backupRel) {
     journal.state='restored';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
     return {restored:journal.retire,removed:journal.actions.map(a=>a.destination),backup:backupRel};
   }
+  if(journal.state!=='complete') throw new Error(`Update backup is ${journal.state}; only completed updates can be restored`);
   const statusPath=safe(root,'status/status.json'), status=json(statusPath), old=json(join(backup,'status/status.json'));
   const restored=[],kept=[];
   for(const a of [...journal.actions].reverse()) {
@@ -268,6 +328,6 @@ function restore(root,backupRel) {
 try {
   const command=process.argv[2], root=arg('--root'); if(!root) throw new Error('--root is required');
   const repo=arg('--release-repo')||dirname(dirname(fileURLToPath(import.meta.url)));
-  const result=command==='update' ? update(root,repo,arg('--commit')) : command==='switch' ? switchTool(root,repo,arg('--commit'),arg('--to'),arg('--legacy-tool')) : command==='restore' ? restore(root,arg('--backup')) : command==='recover' ? {recovered:recoverPendingSwitches(root)} : (()=>{throw new Error('Use update, switch, restore or recover');})();
+  const result=command==='update' ? update(root,repo,arg('--commit')) : command==='switch' ? switchTool(root,repo,arg('--commit'),arg('--to'),arg('--legacy-tool')) : command==='restore' ? restore(root,arg('--backup')) : command==='recover' ? {recovered:[...recoverPendingUpdates(root),...recoverPendingSwitches(root)]} : (()=>{throw new Error('Use update, switch, restore or recover');})();
   console.log(JSON.stringify(result,null,2));
 } catch(error) {console.error(error.message);process.exitCode=2;}

@@ -27,3 +27,19 @@ test('pinned selected update preserves collisions and restores additions and ret
   const restored=run('restore','--root',client,'--backup',report.backup); assert.equal(restored.status,0,restored.stderr); assert.equal(get(client,'AGENTS.md'),'old instructions\n'); assert.equal(get(client,'status/a.mjs'),'client edited script\n'); assert.equal(get(client,'.agents/skills/old/SKILL.md'),'old retired\n'); assert.equal(existsSync(join(client,'update/manifest.json')),false); assert.equal(get(client,'.agents/skills/foo/SKILL.md'),'client edit\n'); assert.equal(JSON.parse(get(client,'status/status.json')).template_version,'1.0.0');
 });
 function requireHash(s) { return createHash('sha256').update(s).digest('hex'); }
+
+test('failed update rolls back writes from the predeclared transaction',t=>{
+  const base=mkdtempSync(join(tmpdir(),'orion-update-failure-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
+  const source=join(base,'release'),client=join(base,'client');mkdirSync(source);mkdirSync(client);
+  const manifest={template_version:'2.0.0',deployment:{tools:['claude-code','codex'],common_sources:['AGENTS.md','README.md'],entries:[]}};
+  put(source,'AGENTS.md','new agents\n');put(source,'README.md','new readme\n');put(source,'update/manifest.json',JSON.stringify(manifest));
+  put(source,'update/pristine.json',JSON.stringify({files:{'AGENTS.md':[requireHash('old agents\n')],'README.md':[requireHash('old readme\n')]}}));
+  git(source,'init','-q');git(source,'add','.');git(source,'-c','user.email=test@example.com','-c','user.name=Test','commit','-qm','release');
+  put(client,'status/status.json',JSON.stringify({template_version:'1.0.0',selected_tool:'codex'}));
+  put(client,'AGENTS.md','old agents\n');put(client,'README.md','old readme\n');
+  const result=spawnSync(process.execPath,[script,'update','--root',client,'--release-repo',source,'--commit',git(source,'rev-parse','HEAD')],{encoding:'utf8',env:{...process.env,ORION_UPDATE_FAIL_AFTER:'1'}});
+  assert.equal(result.status,2);assert.match(result.stderr,/Injected update interruption/);
+  assert.equal(get(client,'AGENTS.md'),'old agents\n');assert.equal(get(client,'README.md'),'old readme\n');
+  assert.equal(JSON.parse(get(client,'status/status.json')).template_version,'1.0.0');
+  const recovery=run('recover','--root',client);assert.equal(recovery.status,0,recovery.stderr);
+});

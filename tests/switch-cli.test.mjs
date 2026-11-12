@@ -24,7 +24,8 @@ function fixture(t, from='claude-code') {
   execFileSync('git',['init','-q'],{cwd:release});execFileSync('git',['add','.'],{cwd:release});execFileSync('git',['-c','user.email=test@example.com','-c','user.name=Test','commit','-qm','release'],{cwd:release});
   const commit=execFileSync('git',['rev-parse','HEAD'],{cwd:release,encoding:'utf8'}).trim();
   const skill=from==='codex'?'.agents/skills':'.claude/skills', job=from==='codex'?'team':'.claude/agents';
-  put(client,'status/status.json',JSON.stringify({template_version:'1.0.0',selected_tool:from,notes:'keep'}));
+  put(client,'update/manifest.json',JSON.stringify(manifest));
+  put(client,'status/status.json',JSON.stringify({template_version:'2.0.0',selected_tool:from,notes:'keep'}));
   put(client,`${skill}/foo/SKILL.md`,'old foo\n');put(client,`${skill}/bar/SKILL.md`,'my edited bar\n');put(client,`${skill}/custom/SKILL.md`,'my skill\n');
   put(client,`${skill}/speckit-plan/SKILL.md`,'maintainer only\n');
   put(client,`${job}/README.md`,'my roster rows\n');put(client,`${job}/writer.md`,'my job\n');
@@ -81,6 +82,15 @@ test('an interrupted switch journal is recovered before another switch',t=>{
   journal.state='pending';writeFileSync(journalPath,JSON.stringify(journal));
   const recovered=run({},'recover','--root',h.client);assert.equal(recovered.status,0,recovered.stderr);
   assert.equal(JSON.parse(get(h.client,'status/status.json')).selected_tool,'claude-code');
+  assert.equal(get(h.client,'.claude/skills/foo/SKILL.md'),'old foo\n');
+  assert.equal(existsSync(join(h.client,'.agents/skills/foo/SKILL.md')),false);
+});
+
+test('switch rejects an older harness until the pinned release is installed',t=>{
+  const h=fixture(t);const status=JSON.parse(get(h.client,'status/status.json'));
+  status.template_version='1.0.0';put(h.client,'status/status.json',JSON.stringify(status));
+  const blocked=run({},'switch','--root',h.client,'--release-repo',h.release,'--commit',h.commit,'--to','codex');
+  assert.equal(blocked.status,2);assert.match(blocked.stderr,/Update this harness/);
   assert.equal(get(h.client,'.claude/skills/foo/SKILL.md'),'old foo\n');
   assert.equal(existsSync(join(h.client,'.agents/skills/foo/SKILL.md')),false);
 });

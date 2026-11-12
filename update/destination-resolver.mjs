@@ -11,13 +11,19 @@ function readJson(path, name) {
   catch (error) { throw new Error(`Cannot read ${name} at ${path}: ${error.message}`); }
 }
 
-function safePath(root, path) {
+export function safePath(root, path) {
   if (typeof path !== 'string' || !path || path === '.' || isAbsolute(path) || path.split(/[\\/]/).includes('..')) {
     throw new Error(`Invalid deployment path: ${path}`);
   }
   const target = resolve(root, path);
   if (target === resolve(root) || relative(root, target).startsWith(`..${sep}`)) {
     throw new Error(`Deployment path escapes root: ${path}`);
+  }
+  let part = resolve(root);
+  for (const segment of path.split('/')) {
+    part = join(part, segment);
+    try { if (lstatSync(part).isSymbolicLink()) throw new Error(`Symlink collision: ${path}`); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
   return target;
 }

@@ -159,6 +159,7 @@
       "update/manifest.json",
       "update/pristine.json",
       "update/release-contract.mjs",
+      "update/destination-resolver.mjs",
       "validation/validation-tasks.md"
     ],
     "entries": [

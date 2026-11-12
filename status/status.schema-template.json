@@ -1,6 +1,7 @@
 {
   "schema_version": "1.9.0",
   "template_version": "1.5.0",
+  "selected_tool": null,
   "client_id": null,
   "business_name": null,
   "agent_name": null,

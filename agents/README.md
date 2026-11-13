@@ -12,8 +12,7 @@ or fire someone by deleting their file.
 **No one hired yet.** Say **"I want to hire an agent"** and the interview starts —
 you'll be offered the roles teams typically hire (the role bank at `library/ROLES.md`),
 or just describe the work in your own words; five questions, then your first team
-member is working the same session. The role bank is `library/ROLES.md` at the
-harness root.
+member is working the same session.
 
 ## The team
 

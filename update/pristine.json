@@ -1,8 +1,17 @@
 {
- "_what": "Fingerprints are keyed by stable release source path, independent of deployed destination. Legacy Claude paths contribute historical hashes to their portable source key. A destination whose fingerprint is not listed under its source key is client-edited and must be preserved. Legacy refresh keys remain until migration. Contract: update/manifest.json deployment and docs/updating.md.",
+ "_what": "Fingerprints are keyed by stable release source path, independent of deployed destination. Legacy Claude paths contribute historical hashes to their portable source key. A destination whose fingerprint is not listed under its source key is client-edited and must be preserved. Historical legacy refresh keys remain in this registry for clients still on a same-path updater, although the retired .claude skill sources are no longer in the refresh list. Contract: update/manifest.json deployment and docs/updating.md.",
  "_fingerprint": "SHA-256, as lowercase hex, of the file read as UTF-8 text with every CRLF turned into LF.",
  "_regenerate": "node tests/helpers/pristine.mjs --write, before every release. node --test fails if it is stale.",
  "files": {
+  ".claude/agents/README.md": [
+   "0d39b59963af9a056775580c67b2d3664ea8f589e5ea42b3c3dd212547100832",
+   "32f0c7ad2b0c2150515cb081cfb76b321686d37d5e9a52d311038344ba61f20b",
+   "6e2fa58bac8c2c1a551d3c5fcb051b3ceddea909589524473577a28a79e449c0",
+   "8660a2bd218154715ecc1aa412d41b06c3d289bf0cad10e5b4b68d33e23c84c2",
+   "97c6a676697efb0033b7ed106dbb3e014e834cd7071fd02d381625fc4c5c6736",
+   "a07a629bdc292d20498662d6189d7a53aba0496415a56ca947c9c2010ba4eebd",
+   "e39b3779f587a8fef08db4e76bfbeb25afe9f51e9bbdabc7b0a4c6c981678163"
+  ],
   ".claude/skills/create-skill/SKILL.md": [
    "3b6d2bd65e00b422aace6a57beb432e4befa9e2eb9b16c44a11aaf09976540ae",
    "a7d53bfebfb856e35d7469b91cc6da1806be1d13bdac224b9918facf37c5a010",
@@ -21,6 +30,7 @@
   ".gitignore": [
    "3810a1e71f4d70e7593d09c1718f2bb080dfcb4bbdaa9c11d76534d950f0f495",
    "886370b541aa01f77cfc33e655f1051dcff3cbad92196b11ee1b28a043c37d1a",
+   "8f7b240e95cf905561884b4d8b83828a599cceed5b081e805a488d78da30ab49",
    "9c60645bead4b2525494335dbed310b6e2608ca84220d779a4120d4c49fbd974",
    "dbc211e17286e54d0d967ce083113025aaf590af50103213c7b827d489d2b7b1"
   ],
@@ -69,6 +79,7 @@
    "1a1e37e57c1e76a8810d943ba15237c809d3991a71e021f142d867d0f870636c",
    "207bb5a9a70a99e89b7f9ba0b1630dceb483b0b776e5fc5a71916c5343175776",
    "282cc3591a1db9f106d32464445c1adc9b35e6b379b56988f34a8ff9cbae6a31",
+   "2e103e137177ceb587ae9b12750bd109964beded924e43fc9a9eafa39b8167bb",
    "31b179c3b75fcb93816cf127dbfef2b42242cdff442ff48e501a9de93f90c05c",
    "36cf7ff5a805aa8e788713966a897dae9e023efc0dbd54418d6f1d0e5f255324",
    "39a4828c46f03d8e7ebf1056097f62468fa5efec81174933fa4c0676424d1061",
@@ -226,6 +237,7 @@
    "c764bed6bab56d23f25281cd6340d65239bfd005379dac1ec28fe1453885e954"
   ],
   "agents/README.md": [
+   "032f6812891c182e177719cb3250170a373fd6d9df16c9ea57d41ed30241b470",
    "0d39b59963af9a056775580c67b2d3664ea8f589e5ea42b3c3dd212547100832",
    "32f0c7ad2b0c2150515cb081cfb76b321686d37d5e9a52d311038344ba61f20b",
    "6a27b0ba2ab5089d245f5323de56edc78c6792cdb874408486ad3d52a2b113b9",
@@ -345,7 +357,8 @@
    "bae7559860e77b96082929b533c3818c128ed819e08fc0b005093c0a3c27e29f",
    "bdca48141bd88f49b12d2752e9b4f003e19d2866caafc632a4da85249a7abd6f",
    "d955a6db05bcd3ce56d47d5bd745fdbf504c71912c25504660ecf34a37b7e10e",
-   "db7adc1772fb26f048ea6c06f021a0065183d0aac257464a5c8826fc522d9110"
+   "db7adc1772fb26f048ea6c06f021a0065183d0aac257464a5c8826fc522d9110",
+   "e905dcbf014a065e0efe3df865ab6cd33f5d170effb5629d4a92944db2382534"
   ],
   "library/HIRING.md": [
    "12d023a62a72df2193982677582efb2f4cdc2b81c0237044f2f9fc5ba6fb3f01",
@@ -653,6 +666,7 @@
    "0eff6cd32e296f7c8121d45d6558015726d0e8b228d39a00ec1896a9547cb66b",
    "16e48e4af85d80f0c58fabc8f60e4f85c77904c69cf627e5b3987f1c703f540a",
    "22f3834380263b326b92b3f016f610303e9351082420e1a5b7254b2ef7031aa5",
+   "285942150fbae5d2199bbdad156c5a765e63e6805a75cb50fdd3239435d6055c",
    "3643332997f0c90636d05f66b8bb7530959c447d7ada74c8e55b135dbbb2afb8",
    "3bfb83a1ea5d7572fad83ae4f484ac2bfa0768aa8171f0fbeae13cc85fceb8d0",
    "3c02b87c7cf4e1511680dc80860a3204a4ab69e9b99f2eb1c089558afc015258",

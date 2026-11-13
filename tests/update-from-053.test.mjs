@@ -218,6 +218,17 @@ test('the update leaves the client\'s knowledge base byte-identical', (t) => {
   assert.equal(status.template_version, TARGET_VERSION);
 });
 
+test('legacy same-path refresh leaves retired Claude skill copies in place', (t) => {
+  if (!haveBaselineTag()) return t.skip(`${BASELINE_TAG} not fetched`);
+  const dir = makeClient();
+  const path = '.claude/skills/hire-agent/SKILL.md';
+  mkdirSync(dirname(join(dir, path)), { recursive: true });
+  writeFileSync(join(dir, path), 'Legacy client skill copy.\n');
+  assert.equal(REFRESH.includes(path), false);
+  runUpdate(dir);
+  assert.equal(readFileSync(join(dir, path), 'utf8'), 'Legacy client skill copy.\n');
+});
+
 test('every refresh-list file that existed is in the backup, so restore can undo it', (t) => {
   if (!haveBaselineTag()) return t.skip(`${BASELINE_TAG} not fetched`);
   const dir = makeClient();

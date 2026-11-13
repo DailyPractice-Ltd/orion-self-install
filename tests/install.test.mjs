@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +21,9 @@ for (const tool of ['claude-code', 'codex']) {
     assert.ok(existsSync(join(target, 'AGENTS.md')));
     assert.ok(existsSync(join(target, tool === 'codex' ? '.agents/skills/hire-agent/SKILL.md' : '.claude/skills/hire-agent/SKILL.md')));
     assert.ok(existsSync(join(target, tool === 'codex' ? 'agents/README.md' : '.claude/agents/README.md')));
+    for (const name of readdirSync(join(release, 'skills')).filter(name => name.startsWith('speckit-'))) {
+      assert.equal(existsSync(join(target, tool === 'codex' ? `.agents/skills/${name}` : `.claude/skills/${name}`)), false, `${name} leaked into client`);
+    }
     for (const path of ['skills', 'tests', 'specs', 'CLAUDE.md', tool === 'codex' ? '.claude' : '.agents', ...(tool === 'codex' ? [] : ['agents'])]) {
       assert.equal(existsSync(join(target, path)), false, `${path} leaked into client`);
     }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,4 +45,39 @@ test('release contract rejects an unsupported tool and keeps historical ownershi
   const pristine = JSON.parse(readFileSync(join(repo, 'update/pristine.json'), 'utf8'));
   assert.ok(pristine.files['skills/hire-agent/SKILL.md'].length > 0);
   assert.ok(pristine.files['agents/README.md'].length > 0);
+});
+
+test('all release skills have one source and only client skills are deployable', () => {
+  const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
+  const names = readdirSync(join(repo, 'skills')).sort();
+  const client = names.filter(name => !name.startsWith('speckit-'));
+  const maintainer = names.filter(name => name.startsWith('speckit-'));
+  assert.deepEqual(client, ['create-skill', 'hire-agent', 'update-harness']);
+  assert.equal(maintainer.length, 11);
+  assert.deepEqual(manifest.deployment.entries.filter(entry => entry.source.startsWith('skills/')).map(entry => entry.source).sort(),
+    client.map(name => `skills/${name}/SKILL.md`));
+  for (const name of names) assert.ok(existsSync(join(repo, 'skills', name, 'SKILL.md')));
+  assert.equal(existsSync(join(repo, '.claude')), false, 'release must not track or generate a second skill tree');
+  for (const path of manifest.refresh) assert.ok(existsSync(join(repo, path)), `legacy refresh source missing: ${path}`);
+  for (const name of client) assert.equal(manifest.refresh.includes(`.claude/skills/${name}/SKILL.md`), false);
+});
+
+test('maintainer Claude discovery copies are generated from portable sources', (t) => {
+  const release = mkdtempSync(join(tmpdir(), 'orion-maintainer-skills-'));
+  t.after(() => rmSync(release, { recursive: true, force: true }));
+  const script = '.specify/scripts/generate-claude-skills.mjs';
+  mkdirSync(dirname(join(release, script)), { recursive: true });
+  copyFileSync(join(repo, script), join(release, script));
+  const names = readdirSync(join(repo, 'skills')).filter(name => name.startsWith('speckit-'));
+  for (const name of names) {
+    const path = `skills/${name}/SKILL.md`;
+    mkdirSync(dirname(join(release, path)), { recursive: true });
+    copyFileSync(join(repo, path), join(release, path));
+  }
+  const run = spawnSync(process.execPath, [join(release, script)], { encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  for (const name of names) {
+    assert.equal(readFileSync(join(release, `.claude/skills/${name}/SKILL.md`), 'utf8'),
+      readFileSync(join(release, `skills/${name}/SKILL.md`), 'utf8'));
+  }
 });

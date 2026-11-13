@@ -4,3 +4,5 @@ status/radio.key
 .update-backup/
 memory/*
 !memory/README.md
+# Optional maintainer discovery copies generated from skills/speckit-*/.
+/.claude/skills/speckit-*/

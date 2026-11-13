@@ -511,7 +511,7 @@ test('tripwire: the retired sentences are gone from every file that enforces or 
     'library/HIRING.md', 'library/README.md', 'library/ROLES.md',
     'connectors/connector-checklist.md', 'status/status-schema.md', 'validation/validation-tasks.md', 'docs/radio.md', 'docs/updating.md',
     'specs/002-production-line/contracts/agent-anatomy.md', 'specs/002-production-line/contracts/package-shape.md',
-    '.claude/agents/README.md', '.claude/skills/hire-agent/SKILL.md', '.claude/skills/update-harness/SKILL.md', '.claude/skills/create-skill/SKILL.md',
+    'agents/README.md', 'skills/hire-agent/SKILL.md', 'skills/update-harness/SKILL.md', 'skills/create-skill/SKILL.md',
     'specs/002-production-line/contracts/send-risk.md',
   ];
   const packages = (dir) => readdirSync(join(ROOT, dir)).map((d) => `${dir}/${d}/PACKAGE.md`).filter((p) => existsSync(join(ROOT, p)));

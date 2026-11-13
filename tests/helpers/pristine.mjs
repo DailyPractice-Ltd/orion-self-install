@@ -73,6 +73,7 @@ export function computePristine() {
   const aliases = manifest.deployment?.fingerprints?.legacy_aliases || {};
   const sources = new Set([
     ...manifest.refresh,
+    ...Object.values(aliases),
     ...(manifest.deployment?.common_sources || []),
     ...(manifest.deployment?.entries || []).map((entry) => entry.fingerprint_key),
   ]);
@@ -95,7 +96,7 @@ export function computePristine() {
     files[path] = [...prints].sort();
   }
   return {
-    _what: "Fingerprints are keyed by stable release source path, independent of deployed destination. Legacy Claude paths contribute historical hashes to their portable source key. A destination whose fingerprint is not listed under its source key is client-edited and must be preserved. Legacy refresh keys remain until migration. Contract: update/manifest.json deployment and docs/updating.md.",
+    _what: "Fingerprints are keyed by stable release source path, independent of deployed destination. Legacy Claude paths contribute historical hashes to their portable source key. A destination whose fingerprint is not listed under its source key is client-edited and must be preserved. Historical legacy refresh keys remain in this registry for clients still on a same-path updater, although the retired .claude skill sources are no longer in the refresh list. Contract: update/manifest.json deployment and docs/updating.md.",
     _fingerprint: 'SHA-256, as lowercase hex, of the file read as UTF-8 text with every CRLF turned into LF.',
     _regenerate: 'node tests/helpers/pristine.mjs --write, before every release. node --test fails if it is stale.',
     files,

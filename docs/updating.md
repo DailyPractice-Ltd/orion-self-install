@@ -115,6 +115,13 @@ checkout is left intact. The command creates and pushes a private GitHub reposit
 repository, verified through `gh`. `--local-only` creates a local staging repository
 when GitHub credentials are unavailable and reports that remote setup is pending.
 
-The manifest's legacy `refresh` list remains for old updaters; `deployment` is the
-contract for separate client folders. Maintainers run
+The manifest's legacy `refresh` list remains for old same-path updaters, but no longer
+lists the three `.claude/skills/` source files removed from the release. An older
+same-path updater can still refresh the other listed files; it will leave those
+three installed skills as they are. To receive current skill definitions, migrate
+the harness into a separate client folder with `install.mjs --migrate-from` above,
+or run the pinned updater in an already deployed folder. That updater maps the
+`skills/` sources to the chosen runtime paths and recognizes historical Claude
+copies by fingerprint. `deployment` is the contract for separate client folders.
+Maintainers run
 `node tests/helpers/pristine.mjs --write` after release edits and before tagging.

@@ -38,6 +38,11 @@ Write each section for the client who will read it there.
   personalized skills and job sheets, and records the new selection only after
   validation. Saved schedules must be rewired for the new tool. The switch has a
   backup and recovery command. See [updating](docs/updating.md).
+- All release skill definitions now live under `skills/`. The three client skills
+  deploy to the selected tool; the Speckit skills stay in the release checkout.
+  Claude Code maintainers can generate local discovery copies with
+  `node .specify/scripts/generate-claude-skills.mjs`. Older same-path updaters leave
+  their existing skill copies in place until the harness is migrated.
 
 
 ## 1.5.0 — 2026-11-04

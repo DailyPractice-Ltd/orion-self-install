@@ -66,37 +66,34 @@ function install() {
       if(oldStatus.selected_tool && oldStatus.selected_tool!==tool) throw new Error('Legacy selected_tool differs; migrate with its current tool, then switch.');
       if(!oldStatus.selected_tool && tool!=='claude-code') throw new Error('Legacy layout without selected_tool requires --tool claude-code.');
       const pristine=JSON.parse(readFileSync(join(release,'update/pristine.json'),'utf8'));
+      const planned=new Map(plan.map(entry=>[entry.destination,entry]));
+      const excluded=['.git','.github','.codex','node_modules','install.mjs','n8n',...manifest.deployment.release_only.filter(path=>!path.includes('*')).map(path=>path.replace(/\/$/,'')),...(manifest.remove||[])];
+      const skillRoot=tool==='codex'?'.agents/skills':'.claude/skills';
+      const otherRoot=tool==='codex'?'.claude':'.agents';
+      const excludedPath=path=>excluded.some(prefix=>path===prefix || path.startsWith(`${prefix}/`)) ||
+        path===otherRoot || path.startsWith(`${otherRoot}/`) ||
+        path==='status/shifts' || path.startsWith('status/shifts/') ||
+        path==='status/status.json' || path==='status/status.schema-template.json' || path==='status/status-schema.md' ||
+        /^status\/[^/]+\.mjs$/.test(path) ||
+        path.startsWith(`${skillRoot}/speckit`);
       const copyTree=(path)=>{
+        if(excludedPath(path)) return;
         const source=safePath(migration,path), dest=safePath(stage,path);
         if(!existsSync(source)) return;
         if(lstatSync(source).isSymbolicLink()) throw new Error(`Legacy symlink collision: ${path}`);
         if(lstatSync(source).isDirectory()) {
           for(const name of readdirSync(source)) copyTree(`${path}/${name}`);
-        } else if(lstatSync(source).isFile()) {mkdirSync(dirname(dest),{recursive:true});copyFileSync(source,dest);}
+        } else if(lstatSync(source).isFile()) {
+          const entry=planned.get(path);
+          if(entry && entry.ownership!=='client-template') {
+            const known=pristine.files?.[entry.fingerprint_key]||[];
+            if(known.includes(fingerprint(readFileSync(source)))) return;
+          }
+          mkdirSync(dirname(dest),{recursive:true});copyFileSync(source,dest);
+        }
         else throw new Error(`Legacy special file: ${path}`);
       };
-      const oldStatusDir=safePath(migration,'status');
-      if(existsSync(oldStatusDir)) for(const name of readdirSync(oldStatusDir)) {
-        if(name==='status.schema-template.json' || name==='status-schema.md' || name==='shifts' || name.endsWith('.mjs')) continue;
-        copyTree(`status/${name}`);
-      }
-      const skillRoot=tool==='codex'?'.agents/skills':'.claude/skills';
-      const jobRoot=tool==='codex'?'team':'.claude/agents';
-      for(const path of ['agent/knowledge-base','memory',jobRoot]) copyTree(path);
-      const oldSkills=safePath(migration,skillRoot);
-      if(existsSync(oldSkills)) for(const name of readdirSync(oldSkills)) {
-        if(name.startsWith('speckit')) continue;
-        const path=`${skillRoot}/${name}`;
-        const shipped=plan.some(e=>e.destination.startsWith(`${path}/`));
-        if(!shipped) copyTree(path);
-      }
-      for(const entry of plan) {
-        if(entry.destination==='status/status.schema-template.json') continue;
-        const old=safePath(migration,entry.destination);
-        if(!existsSync(old) || !lstatSync(old).isFile()) continue;
-        const known=pristine.files?.[entry.fingerprint_key]||[];
-        if(!known.includes(fingerprint(readFileSync(old)))) copyTree(entry.destination);
-      }
+      for(const name of readdirSync(migration)) copyTree(name);
       oldStatus.selected_tool=tool;
       oldStatus.template_version=manifest.template_version;
       oldStatus.home={enabled:false,branch:'main'};

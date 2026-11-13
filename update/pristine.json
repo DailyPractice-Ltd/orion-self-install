@@ -34,6 +34,60 @@
    "9c60645bead4b2525494335dbed310b6e2608ca84220d779a4120d4c49fbd974",
    "dbc211e17286e54d0d967ce083113025aaf590af50103213c7b827d489d2b7b1"
   ],
+  ".specify/extensions.yml": [
+   "411357796faff0ccab4e345d420d70e4c959ef4af4046e3db39e258359ea8e2c"
+  ],
+  ".specify/extensions/agent-context/README.md": [
+   "8d44a2cb4a5f4bc491546ed5e3ea0caa073b1caae737844e548f2b0607026372"
+  ],
+  ".specify/extensions/agent-context/agent-context-config.yml": [
+   "9c2aabab5ec737410624b3ad1de16ea69d5f5b4e22c623a77844a787e6552715"
+  ],
+  ".specify/extensions/agent-context/extension.yml": [
+   "9a1dc02d2d0139bb03860392ecacef79183be2c442feda2f9ccaa4e5907b1e47"
+  ],
+  ".specify/extensions/agent-context/scripts/bash/update-agent-context.sh": [
+   "218e44c9393869bb14e901a36fba3c80e1ba3a9eace1867a4426e46b87e589de"
+  ],
+  ".specify/extensions/agent-context/scripts/powershell/update-agent-context.ps1": [
+   "afe18a3d55748cd0885ed73f3f0aebbf89c81376ddf2b337b1c25b1e8a1c9770"
+  ],
+  ".specify/init-options.json": [
+   "4e81b231d6a09b54fccab022d3bd6696d903649ced45610d99aa190529194315"
+  ],
+  ".specify/integration.json": [
+   "4c018e58b9dff674f2ba1ad91b6a1591ca34e5b32f0a600fed3135c525ec1dc6"
+  ],
+  ".specify/scripts/bash/check-prerequisites.sh": [
+   "afce0aa8db177320d83aa0b8e3619c06b865fd810781894e4a7a3f81664941ce"
+  ],
+  ".specify/scripts/bash/common.sh": [
+   "af8a16f87b4f9084759c42ff9abf35c0b2a2025dffe58c298758ff86de2923b2"
+  ],
+  ".specify/scripts/bash/create-new-feature.sh": [
+   "9ba116b64f0328eb69bc1a195d209074ea38823a73a554160d69df34a74daa65"
+  ],
+  ".specify/scripts/bash/setup-plan.sh": [
+   "4eb12c5b00f5c66a7d01b56c90898d320dcef4425d9b96652d57156c84948eda"
+  ],
+  ".specify/scripts/bash/setup-tasks.sh": [
+   "cf21ba2212b4dd5b435c5ea8527500cfd27768b86c0bbc7ebc3207759f118d27"
+  ],
+  ".specify/templates/checklist-template.md": [
+   "c37695297e5d3153d64f82c21223509940b13932046c7961c42d1d669516130c"
+  ],
+  ".specify/templates/constitution-template.md": [
+   "ce7549540fa45543cca797a150201d868e64495fdff39dc38246fb17bd4024b3"
+  ],
+  ".specify/templates/plan-template.md": [
+   "613065ef2bb68371165ab1e38e8e15733efda04e8b7ce67a9d63532f749133f0"
+  ],
+  ".specify/templates/spec-template.md": [
+   "3945437fc35cd30a5b2bf7beea680337c3516826d3efa5a6b92c4a7eca1ba28e"
+  ],
+  ".specify/templates/tasks-template.md": [
+   "0423fac9a7cdb13006e79bac60964c90bdf8e2aa53a2100a2a37e9d36a25a88a"
+  ],
   "AGENTS.md": [
    "06afd7356247ba89a0dfdc6fad00c9baa471238159fee6ede153ae32b8714532",
    "1b28ed6696faee2725ebda2f4c8311458b96b7fcf413f4da4ebbc50a98f7380c",
@@ -86,6 +140,7 @@
    "3eaa9d5bb44f02deb48cef98c0a3d22ce5a32e8fa9c29baff569095340f6040c",
    "432fef9c4149994b9928c56e37c63f88221532c4a050abb71755695656793f22",
    "4723e0c4f1316ea93f2ba3e00a27828ee262ac90e305e77d3f88130425d2fd0a",
+   "489b164b78b66022d492c26eb03bffd85e73d9da612e6dc1b5ac1346f7a7c204",
    "4a8ae93dcb6ae2627c9253e761572d174ea3229a850ca92f395110642bdc98ed",
    "5282213ba0f72de4bd34447c816ca3a436481ca70dc7d4e085d006f074f4fc82",
    "52c8b94430797abbf03f980a9d31d536ebb77602744cc925f780a9754feda4ea",
@@ -152,7 +207,8 @@
    "a3eec0d85a3a8af74c95be5bae1372631cde34aed5033adb142cdb97a4908c67",
    "c1b25bc5bcf4ff830d9e9a9368e8ef62a7048bf1be682481c796b881a67ba74e",
    "e30c2f6ac06019635971fbaf68f952ed7a59472dd631d2307a6a1b4b821b341d",
-   "f372a159a1836913e46bfc769f6955c011ec54c67e2c2d2928248f36fa349a03"
+   "f372a159a1836913e46bfc769f6955c011ec54c67e2c2d2928248f36fa349a03",
+   "f592945eac7913d79fdbfaca9cbddaf840bf732313c5fb2ac9e0e1486f9a63ed"
   ],
   "SHOTLIST.md": [
    "330cd0156b7ba9ccb514d3cd09e5e37418e49b85043a55780e8242c033554ffe",
@@ -353,6 +409,7 @@
    "65b6fd68557d1165acc3b1511e6ea6079ed9b69bb168ae1feb3d9ab9e321ef89",
    "8ce3a5abd97f83ec2728135235f56591aac2c811e46c05098bb1737e3c6ef502",
    "8d32751b4f4acaa3dddc9401151e48a531c7a18748049616808e547c11494a28",
+   "9847a6905c8dc9084c734094b8a9d87a92005a842e308762264430d48c1d8cdd",
    "a5720a04ac520c53d6cd912eb4144b704a4fc2e5a2c09571a2e5784afbcd9dad",
    "bae7559860e77b96082929b533c3818c128ed819e08fc0b005093c0a3c27e29f",
    "bdca48141bd88f49b12d2752e9b4f003e19d2866caafc632a4da85249a7abd6f",
@@ -466,6 +523,39 @@
    "7d11accf71237ac769011cd47ec604c2f7e6eb427ad23f04f6240507e9af3d56",
    "819773ceb514c196c89861a4585f690f5c25f8bd81e137dbac0ebb4f878a338b"
   ],
+  "skills/speckit-agent-context-update/SKILL.md": [
+   "4bebe9b02a5aa3f65b27d54fee7e4e112cc3bb89cc554866d370c9082c8f0fe8"
+  ],
+  "skills/speckit-analyze/SKILL.md": [
+   "fecd4bf113c3dda58c75d387473c0106fc2dfea97a27bb7c65af94f3f916c188"
+  ],
+  "skills/speckit-checklist/SKILL.md": [
+   "946c6bc808891436972a11a423f89f0fbd272a79809bb8fd1d29f481ebe02613"
+  ],
+  "skills/speckit-clarify/SKILL.md": [
+   "c1c2098756ca407530cca11c5b608f517d769962215ddafa013951b81e3e19c5"
+  ],
+  "skills/speckit-constitution/SKILL.md": [
+   "ee3972318415a05559c6bf281dcbd2e8deda944e595d64ab5474abeacf558697"
+  ],
+  "skills/speckit-converge/SKILL.md": [
+   "04226b8443797337624983111546d5e5a48d9993a176c4e6d72a4099a0af50d4"
+  ],
+  "skills/speckit-implement/SKILL.md": [
+   "823049e49aa983fe398d4bccf6c686ab6afe8f2cd3856e0380c3ef797d78d56d"
+  ],
+  "skills/speckit-plan/SKILL.md": [
+   "53733c8a4f4fd01685759bb1c68e94c73da4ce90d549139e79e419dec6471510"
+  ],
+  "skills/speckit-specify/SKILL.md": [
+   "9324dd55d12d420cd581031419fa37eb94ef75ae0bdd53391dd4414bd9d45e02"
+  ],
+  "skills/speckit-tasks/SKILL.md": [
+   "cb29fb8247a30aac751be83de88d0399221692589dd26327552ae6f193816fda"
+  ],
+  "skills/speckit-taskstoissues/SKILL.md": [
+   "dfe23aaca349cd76e98505dafa9aae1ef4616a0c35a5c79122b9bd881e16b62f"
+  ],
   "skills/update-harness/SKILL.md": [
    "5a01e7840dd33711606563442dfe7869bda088640faa1f9ccc4df1a2466d032e",
    "99d9b18736a582ce0f83ffa796a11e280f14d867ab878a6be5d376efe39cd0c2",
@@ -478,6 +568,7 @@
    "118cf3981cac5881f20f6d098c044798d606d974f2dd21044600909f0c2030bf",
    "18fbf47a8d51f04b2162c748ee868e7d1ac518f1f9dd0c2d8e3db985213ddf6b",
    "499041073f13a1b8969db9ed755182d18378c98764bcf52156f3364204a4b62b",
+   "4add7da032311aaf24feaa7c3adf7f8fc2e5ee80ecd5bfbfa0a906b1eaf50647",
    "4ed6739311a400021dcb7e86b938766a7dc66b13c229b10b90807e13fa38e1d8",
    "625f603c63b7e344daccd9f171ac66e16f818c4b5c0be581d1db63bd76971685",
    "70f587ae97356f972164805c67272f2d7c90b1dfaf9ea7211762ce53dc29fd8f",
@@ -614,6 +705,7 @@
    "19e19c8df949fdf8c7c191ab8b4ad76cfff1d4e774c7aaa9a308f6be3a033d00",
    "1dfa8500b767d1c4e31fa208d64433aaa892f45b739e931e53eabfa3e379d8ee",
    "255e7d920050d4c05db974660a3b7618b486ca2cab3116920c9c506a87077e32",
+   "28dba2a79676586322793a5f5bd91d6c9b331b52ca5276e419906fd1615a647c",
    "2b883f4c46d8714cad80a2e95c6a02fc1a21e4c22429c1f37fa1c265ac8cf986",
    "3ad7005e8dee1d150300b4d5c92e375a5662ea26eb7f822010813b840089977c",
    "4804c1440cc3aaa0ad1b1bed6be7029ceb55fc2c52fe5b5fe07024362926ba60",
@@ -650,10 +742,12 @@
    "50e84ff447030754aaea51a85f4771313aa9740a7646fdd0d18bc32395f62da8",
    "aa6f26cf3b15ff55389d12173a78c7b5273b39930ce2464812cf3422d798683a",
    "c6edca1aad2bad17487502689cb53943cdf1cb32802ae0d31d1d779692025905",
-   "f175dd7f3fa2530cc360c84cf515a78e7cdd802020c57d526e638148a94d0271"
+   "f175dd7f3fa2530cc360c84cf515a78e7cdd802020c57d526e638148a94d0271",
+   "f49f708d2d56f1eff0a634886334db8164f386cecf69cd1cec6685e69dcf8139"
   ],
   "update/destination-resolver.mjs": [
    "56f956f389976a7c74fa33ae3b51b456c8a02856eb0221fc7ebff126bc9d6de3",
+   "bbe1f7aa3914c13ed72a755dcde53d8b59388f3130b507dcb6af12feb40c5f6d",
    "d722d0da4489fb9098dc9a3c2f7a6b9c3d9d8de1d325375f4937817d311703d2",
    "e72fd0eded4aa3e6a71beb687ad0b13d61843635ae405c68f4409dd4a1914636"
   ],
@@ -697,11 +791,21 @@
    "d01b85441062198cc3c696e88ac113f702d9e97e8b67b8c45591baec7269f6e1",
    "d998260b7546b73067e02f6ec0c8ec4b152231b84fc63988ef3b0144826f3122",
    "dfc60a60de1b0454f9a2396e735e7be8934fde38463502f03316bab71c264d11",
-   "e6b371b1713ae4aeddd21076fb99aa255b58f680f27aa47dad6f08e7f332011d"
+   "e6b371b1713ae4aeddd21076fb99aa255b58f680f27aa47dad6f08e7f332011d",
+   "faf502d8a7ca4211eeb2c0b93d33fb032c9046aef8515ac9bf15319617575a8f"
   ],
   "update/release-contract.mjs": [
    "39e52cfed518c63ce9654a8575c08023f9508506c6ec99d95b89cecdfd42911a",
    "f2ad21270591649dc472ee70bf6f260a318f966985465ad32731f0ecf5df5159"
+  ],
+  "update/scaffold/codex-agent-context-config.yml": [
+   "6a4ded82dd549d4249abe481a41e2410ac0e70a217b02cb2c78f81614627cdb8"
+  ],
+  "update/scaffold/codex-init-options.json": [
+   "537ae5647dfcdf62eafa0e800741dea4e32a97e8aa83656df468e94b85877c95"
+  ],
+  "update/scaffold/codex-integration.json": [
+   "d154116e22b59c8d0afd8ac2def3baf5d1bb595f4a62117ebab2ee06a7b4d728"
   ],
   "validation/validation-tasks.md": [
    "22866df94e2181892cc06c068b9abc23563a3853aa0f9b2a24a21ffd9f9202a7",

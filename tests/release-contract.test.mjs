@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +14,7 @@ test('release contract plans one selected runtime from portable sources', (t) =>
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
   for (const path of ['update/manifest.json', 'update/release-contract.mjs',
     ...manifest.deployment.common_sources,
-    ...manifest.deployment.entries.map((entry) => entry.source)]) {
+    ...manifest.deployment.entries.flatMap((entry) => [entry.source,...Object.values(entry.sources || {})])]) {
     mkdirSync(dirname(join(release, path)), { recursive: true });
     copyFileSync(join(repo, path), join(release, path));
   }
@@ -27,13 +27,25 @@ test('release contract plans one selected runtime from portable sources', (t) =>
     assert.ok(destinations.includes(tool === 'codex' ? 'agents/README.md' : '.claude/agents/README.md'));
     assert.ok(plan.entries.some((entry) => entry.source === 'skills/hire-agent/SKILL.md' && entry.fingerprint_key === 'skills/hire-agent/SKILL.md'));
     assert.ok(plan.entries.some((entry) => entry.source === 'agents/README.md' && entry.ownership === 'client-template'));
-    assert.ok(destinations.every((path) => !path.startsWith('skills/') && (tool === 'codex' ? path === 'agents/README.md' || !path.startsWith('agents/') : !path.startsWith('agents/')) && !path.startsWith('.claude/skills/speckit')));
+    assert.ok(destinations.every((path) => !path.startsWith('skills/') && (tool === 'codex' ? path === 'agents/README.md' || !path.startsWith('agents/') : !path.startsWith('agents/'))));
     assert.ok(destinations.every((path) => tool === 'codex' ? !path.startsWith('.claude/') : !path.startsWith('.agents/')));
   }
   rmSync(join(release, 'skills/hire-agent/SKILL.md'));
   const missing = spawnSync(process.execPath, [join(release, 'update/release-contract.mjs'), '--tool', 'codex'], { encoding: 'utf8' });
   assert.notEqual(missing.status, 0);
-  assert.match(missing.stderr, /missing release source/i);
+  assert.match(missing.stderr, /skill mappings|missing release source/i);
+  copyFileSync(join(repo, 'skills/hire-agent/SKILL.md'), join(release, 'skills/hire-agent/SKILL.md'));
+  mkdirSync(join(release, 'skills/unmapped'), { recursive: true });
+  copyFileSync(join(repo, 'skills/hire-agent/SKILL.md'), join(release, 'skills/unmapped/SKILL.md'));
+  const unmapped = spawnSync(process.execPath, [join(release, 'update/release-contract.mjs'), '--tool', 'codex'], { encoding: 'utf8' });
+  assert.notEqual(unmapped.status, 0);
+  assert.match(unmapped.stderr, /skill mappings/i);
+  rmSync(join(release, 'skills/unmapped'), { recursive: true });
+  manifest.deployment.entries.push(manifest.deployment.entries.find(entry => entry.source === 'skills/hire-agent/SKILL.md'));
+  writeFileSync(join(release, 'update/manifest.json'), JSON.stringify(manifest));
+  const duplicate = spawnSync(process.execPath, [join(release, 'update/release-contract.mjs'), '--tool', 'claude-code'], { encoding: 'utf8' });
+  assert.notEqual(duplicate.status, 0);
+  assert.match(duplicate.stderr, /skill mappings/i);
 });
 
 test('release contract rejects an unsupported tool and keeps historical ownership hashes', () => {
@@ -47,19 +59,17 @@ test('release contract rejects an unsupported tool and keeps historical ownershi
   assert.ok(pristine.files['agents/README.md'].length > 0);
 });
 
-test('all release skills have one source and only client skills are deployable', () => {
+test('all release skills have exactly one mapping for both tools', () => {
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
   const names = readdirSync(join(repo, 'skills')).sort();
-  const client = names.filter(name => !name.startsWith('speckit-'));
-  const maintainer = names.filter(name => name.startsWith('speckit-'));
-  assert.deepEqual(client, ['create-skill', 'hire-agent', 'update-harness']);
-  assert.equal(maintainer.length, 11);
+  assert.equal(names.length,14);
   assert.deepEqual(manifest.deployment.entries.filter(entry => entry.source.startsWith('skills/')).map(entry => entry.source).sort(),
-    client.map(name => `skills/${name}/SKILL.md`));
+    names.map(name => `skills/${name}/SKILL.md`));
+  for(const name of names) for(const tool of ['codex','claude-code']) assert.equal(manifest.deployment.entries.filter(e=>e.source===`skills/${name}/SKILL.md` && e.destinations?.[tool]===`${tool==='codex'?'.agents':'.claude'}/skills/${name}/SKILL.md`).length,1);
   for (const name of names) assert.ok(existsSync(join(repo, 'skills', name, 'SKILL.md')));
   assert.equal(existsSync(join(repo, '.claude')), false, 'release must not track or generate a second skill tree');
   for (const path of manifest.refresh) assert.ok(existsSync(join(repo, path)), `legacy refresh source missing: ${path}`);
-  for (const name of client) assert.equal(manifest.refresh.includes(`.claude/skills/${name}/SKILL.md`), false);
+  for (const name of names) assert.equal(manifest.refresh.includes(`.claude/skills/${name}/SKILL.md`), false);
 });
 
 test('maintainer Claude discovery copies are generated from portable sources', (t) => {

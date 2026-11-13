@@ -1,6 +1,6 @@
 /** Resolve a deployed harness's selected destinations and file ownership. */
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -64,9 +64,19 @@ export function destinationState(root, entry, pristine) {
 /** The sole source-to-destination mapper for release and deployed harnesses. */
 export function planForTool(deployment, tool, { releaseRoot = RELEASE_ROOT, root } = {}) {
   if (!deployment.tools.includes(tool)) throw new Error(`Unsupported selected tool: ${tool || '(missing)'}`);
+  const actualSkills = (existsSync(join(releaseRoot, 'skills')) ? readdirSync(join(releaseRoot, 'skills'), { withFileTypes: true }) : [])
+    .filter((item) => item.isDirectory() && existsSync(join(releaseRoot, 'skills', item.name, 'SKILL.md')))
+    .map((item) => `skills/${item.name}/SKILL.md`).sort();
+  const mappedSkills = deployment.entries.filter((entry) => entry.source.startsWith('skills/'));
+  const skillSources = mappedSkills.map((entry) => entry.source).sort();
+  if (JSON.stringify(actualSkills) !== JSON.stringify(skillSources)) throw new Error('Deployment skill mappings must cover every skills/*/SKILL.md exactly once');
+  for (const entry of mappedSkills) for (const selected of deployment.tools) {
+    const expected = `${selected === 'codex' ? '.agents' : '.claude'}/skills/${entry.source.slice('skills/'.length)}`;
+    if (entry.destinations?.[selected] !== expected) throw new Error(`Invalid skill mapping for ${entry.source} (${selected})`);
+  }
   const entries = [
     ...deployment.common_sources.map((source) => ({ source, destination: source, ownership: 'release', fingerprint_key: source })),
-    ...deployment.entries.map((entry) => ({ source: entry.source, destination: entry.destinations[tool], ownership: entry.ownership, fingerprint_key: entry.fingerprint_key })),
+    ...deployment.entries.map((entry) => ({ source: entry.sources?.[tool] || entry.source, destination: entry.destinations[tool], ownership: entry.ownership, fingerprint_key: entry.sources?.[tool] || entry.fingerprint_key })),
   ];
   const destinations = new Set();
   for (const entry of entries) {

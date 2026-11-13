@@ -14,22 +14,29 @@ for (const tool of ['claude-code', 'codex']) {
     const base = mkdtempSync(join(tmpdir(), 'orion-install-'));
     t.after(() => rmSync(base, { recursive: true, force: true }));
     const target = join(base, 'client');
-    const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', target, '--local-only'], { encoding: 'utf8' });
+    const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', target], { encoding: 'utf8' });
     assert.equal(run.status, 0, run.stderr);
     const read = (path) => readFileSync(join(target, path), 'utf8');
     assert.equal(JSON.parse(read('status/status.json')).selected_tool, tool);
     assert.ok(existsSync(join(target, 'AGENTS.md')));
     assert.ok(existsSync(join(target, tool === 'codex' ? '.agents/skills/hire-agent/SKILL.md' : '.claude/skills/hire-agent/SKILL.md')));
     assert.ok(existsSync(join(target, tool === 'codex' ? 'agents/README.md' : '.claude/agents/README.md')));
-    for (const name of readdirSync(join(release, 'skills')).filter(name => name.startsWith('speckit-'))) {
-      assert.equal(existsSync(join(target, tool === 'codex' ? `.agents/skills/${name}` : `.claude/skills/${name}`)), false, `${name} leaked into client`);
+    for (const name of readdirSync(join(release, 'skills'))) {
+      assert.ok(existsSync(join(target, tool === 'codex' ? `.agents/skills/${name}/SKILL.md` : `.claude/skills/${name}/SKILL.md`)), `${name} missing`);
     }
+    for (const path of ['.specify/scripts/bash/check-prerequisites.sh', '.specify/scripts/bash/setup-plan.sh', '.specify/templates/spec-template.md', '.specify/memory/constitution.md']) assert.ok(existsSync(join(target,path)), `${path} missing`);
+    assert.match(read('.specify/memory/constitution.md'), /\[PROJECT_NAME\]/);
+    assert.notEqual(read('.specify/memory/constitution.md'), readFileSync(join(release,'.specify/memory/constitution.md'),'utf8'));
+    assert.equal(JSON.parse(read('.specify/init-options.json')).ai, tool === 'codex' ? 'codex' : 'claude');
+    assert.equal(JSON.parse(read('.specify/integration.json')).integration, tool === 'codex' ? 'codex' : 'claude');
+    assert.ok(existsSync(join(target,'.git')));
     for (const path of ['skills', 'tests', 'specs', 'CLAUDE.md', tool === 'codex' ? '.claude' : '.agents', ...(tool === 'codex' ? [] : ['agents'])]) {
       assert.equal(existsSync(join(target, path)), false, `${path} leaked into client`);
     }
     const wizard = spawnSync(process.execPath, [join(target, 'start.mjs'), '--checkins', 'no'], { encoding: 'utf8', input: '', cwd: target });
     assert.equal(wizard.status, 0, wizard.stderr);
     assert.equal(JSON.parse(read('status/status.json')).machine_profile.chosen_surface, tool);
+    assert.equal(JSON.parse(read('status/status.json')).schema_version, '2.0.0');
     const second = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', target, '--local-only'], { encoding: 'utf8' });
     assert.notEqual(second.status, 0);
     assert.equal(JSON.parse(read('status/status.json')).selected_tool, tool);
@@ -72,6 +79,8 @@ test('legacy migration carries personal work into a separate deployed repository
   put('status/shifts/writer.json',JSON.stringify({wake_up:join(legacy,'status/shifts/writer.sh')}));
   put('agent/knowledge-base/01-business-context.md','my business\n');
   put('memory/INDEX.md','my memory\n');
+  put('.specify/memory/constitution.md','# My constitution\n');
+  put('.specify/templates/plan-template.md','my edited plan template\n');
   put('.claude/skills/custom/SKILL.md','my skill\n');
   put('.claude/skills/speckit-plan/SKILL.md','release only\n');
   put('.claude/agents/README.md','my roster\n');put('.claude/agents/writer.md','my job\n');
@@ -88,13 +97,17 @@ test('legacy migration carries personal work into a separate deployed repository
   assert.equal(JSON.parse(read('status/status.json')).home.enabled,false);
   assert.equal(read('agent/knowledge-base/01-business-context.md'),'my business\n');
   assert.equal(read('memory/INDEX.md'),'my memory\n');
+  assert.equal(read('.specify/memory/constitution.md'),'# My constitution\n');
+  assert.equal(read('.specify/templates/plan-template.md'),'my edited plan template\n');
   assert.equal(read('.claude/skills/custom/SKILL.md'),'my skill\n');
   assert.equal(read('.claude/agents/README.md'),'my roster\n');
   assert.equal(read('.claude/agents/writer.md'),'my job\n');
   assert.equal(read('client-notes.md'),'my top-level notes\n');
   assert.equal(read('docs/my-playbook.md'),'my playbook\n');
   for(const path of ['skills','tests','n8n']) assert.equal(existsSync(join(target,path)),false);
-  assert.equal(existsSync(join(target,'.claude/skills/speckit-plan')),false);
+  assert.ok(existsSync(join(target,'.claude/skills/speckit-plan/SKILL.md')));
+  assert.equal(JSON.parse(read('status/status.json')).schema_version,'2.0.0');
+  assert.match(result.stdout,/Migration collisions \(client edits preserved\)/);
   assert.equal(readFileSync(join(legacy,'status/status.json'),'utf8').includes('selected_tool'),false);
 });
 
@@ -113,13 +126,13 @@ test('Codex migration maps legacy team jobs without copying release agent source
   assert.equal(existsSync(join(target,'team')),false);
 });
 
-test('install requires an explicit repository provisioning choice',t=>{
+test('install defaults to a local repository',t=>{
   const base=mkdtempSync(join(tmpdir(),'orion-install-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
   const target=join(base,'client');
   const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','codex','--target',target],{encoding:'utf8'});
-  assert.equal(result.status,2);
-  assert.match(result.stderr,/Choose exactly one/);
-  assert.equal(existsSync(target),false);
+  assert.equal(result.status,0,result.stderr);
+  assert.ok(existsSync(join(target,'.git')));
+  assert.equal(JSON.parse(readFileSync(join(target,'status/status.json'),'utf8')).home.enabled,false);
 });
 
 test('remote setup rejects a repository that is not verified private',t=>{

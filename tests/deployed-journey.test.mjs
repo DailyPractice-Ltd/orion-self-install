@@ -60,12 +60,10 @@ for (const tool of ['claude-code', 'codex']) {
     put(client, `${skill(tool)}/hire-agent/SKILL.md`, edited);
     put(client, `${skill(tool)}/personal/SKILL.md`, '# Personal skill\n');
     const manifest = JSON.parse(read(release, 'update/manifest.json'));
-    manifest.deployment.entries = manifest.deployment.entries.filter(e => e.source !== 'skills/create-skill/SKILL.md');
-    manifest.deployment.retired.push({
-      source: 'skills/create-skill/SKILL.md',
-      destinations: { 'claude-code': '.claude/skills/create-skill/SKILL.md', codex: '.agents/skills/create-skill/SKILL.md' },
-      fingerprint_key: 'skills/create-skill/SKILL.md',
-    });
+    rmSync(join(client, `${skill(tool)}/speckit-tasks/SKILL.md`));
+    rmSync(join(client, '.specify/scripts/bash/setup-tasks.sh'));
+    put(client, '.specify/memory/constitution.md', '# My constitution\n');
+    put(client, `${skill(tool)}/speckit-plan/SKILL.md`, '# My edited plan skill\n');
     manifest.deployment.entries.push({
       source: 'skills/new-release/SKILL.md',
       destinations: { 'claude-code': '.claude/skills/new-release/SKILL.md', codex: '.agents/skills/new-release/SKILL.md' },
@@ -86,16 +84,23 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(read(client, `${skill(tool)}/hire-agent/SKILL.md`), edited);
     assert.equal(read(client, `${skill(tool)}/personal/SKILL.md`), '# Personal skill\n');
     assert.equal(read(client, `${skill(tool)}/new-release/SKILL.md`), '# New release skill\n');
-    assert.equal(existsSync(join(client, `${skill(tool)}/create-skill/SKILL.md`)), false);
+    assert.ok(existsSync(join(client, `${skill(tool)}/speckit-tasks/SKILL.md`)));
+    assert.ok(existsSync(join(client, '.specify/scripts/bash/setup-tasks.sh')));
+    assert.equal(read(client, '.specify/memory/constitution.md'), '# My constitution\n');
+    assert.equal(read(client, `${skill(tool)}/speckit-plan/SKILL.md`), '# My edited plan skill\n');
     assert.ok(report.kept.includes(`${skill(tool)}/hire-agent/SKILL.md`));
-    assert.ok(report.retired.includes(`${skill(tool)}/create-skill/SKILL.md`));
+    assert.ok(report.added.includes(`${skill(tool)}/speckit-tasks/SKILL.md`));
+    assert.ok(report.added.includes('.specify/scripts/bash/setup-tasks.sh'));
+    assert.ok(report.kept.includes(`${skill(tool)}/speckit-plan/SKILL.md`));
+    assert.ok(report.collisions.includes('.specify/memory/constitution.md'));
     for (const forbidden of ['skills', tool === 'codex' ? '.claude' : '.agents', ...(tool === 'codex' ? [] : ['agents'])]) {
       assert.equal(existsSync(join(client, forbidden)), false, `${forbidden} after update`);
     }
     ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
     assert.equal(read(client, 'AGENTS.md'), original);
     assert.equal(existsSync(join(client, `${skill(tool)}/new-release/SKILL.md`)), false);
-    assert.equal(existsSync(join(client, `${skill(tool)}/create-skill/SKILL.md`)), true);
+    assert.equal(existsSync(join(client, `${skill(tool)}/speckit-tasks/SKILL.md`)), false);
+    assert.equal(existsSync(join(client, '.specify/scripts/bash/setup-tasks.sh')), false);
     assert.equal(read(client, `${skill(tool)}/hire-agent/SKILL.md`), edited);
   });
 
@@ -139,12 +144,16 @@ for (const tool of ['claude-code', 'codex']) {
     ok(switched);
     const report = JSON.parse(switched.stdout);
     assert.equal(status(client).selected_tool, other(tool));
+    assert.equal(JSON.parse(read(client, '.specify/init-options.json')).ai, other(tool) === 'codex' ? 'codex' : 'claude');
+    assert.equal(JSON.parse(read(client, '.specify/integration.json')).integration, other(tool) === 'codex' ? 'codex' : 'claude');
     assert.match(read(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`), /Size the meeting/);
     assert.equal(existsSync(join(client, `${skill(tool)}/meeting-sizing/SKILL.md`)), false);
     assert.equal(existsSync(join(client, `${jobs(tool)}/follow-up.md`)), false);
     assert.equal(existsSync(join(client, `${jobs(other(tool))}/follow-up.md`)), true);
     ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
     assert.equal(status(client).selected_tool, tool);
+    assert.equal(JSON.parse(read(client, '.specify/init-options.json')).ai, tool === 'codex' ? 'codex' : 'claude');
+    assert.equal(JSON.parse(read(client, '.specify/integration.json')).integration, tool === 'codex' ? 'codex' : 'claude');
     assert.match(read(client, `${skill(tool)}/meeting-sizing/SKILL.md`), /Size the meeting/);
     assert.equal(existsSync(join(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`)), false);
   });

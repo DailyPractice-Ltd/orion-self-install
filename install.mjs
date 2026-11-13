@@ -28,7 +28,8 @@ function install() {
   const migrationArg=arg('--migrate-from');
   const migration=migrationArg && realpathSync(migrationArg);
   const githubRepo=arg('--github-repo'), remote=arg('--remote'), localOnly=process.argv.includes('--local-only');
-  if([!!githubRepo,!!remote,localOnly].filter(Boolean).length!==1) throw new Error('Choose exactly one of --github-repo, --remote, or --local-only.');
+  if([!!githubRepo,!!remote,localOnly].filter(Boolean).length>1) throw new Error('Choose at most one of --github-repo, --remote, or --local-only.');
+  const useLocal = !githubRepo && !remote;
   if(githubRepo && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(githubRepo)) throw new Error('Expected --github-repo OWNER/NAME');
   const remoteRepo=remote?.match(/^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:\.git)?$/)?.[1];
   if(remote && !remoteRepo) throw new Error('Expected an HTTPS GitHub repository URL.');
@@ -67,7 +68,7 @@ function install() {
       if(!oldStatus.selected_tool && tool!=='claude-code') throw new Error('Legacy layout without selected_tool requires --tool claude-code.');
       const pristine=JSON.parse(readFileSync(join(release,'update/pristine.json'),'utf8'));
       const planned=new Map(plan.map(entry=>[entry.destination,entry]));
-      const excluded=['.git','.github','.codex','node_modules','install.mjs','n8n',...(tool==='codex'?['team']:[]),...manifest.deployment.release_only.filter(path=>!path.includes('*')).map(path=>path.replace(/\/$/,'')),...(manifest.remove||[])];
+      const excluded=['.git','.github','.codex','node_modules','install.mjs','n8n',...(tool==='codex'?['team']:[]),...manifest.deployment.release_only.filter(path=>!path.includes('*') && path!=='.specify/').map(path=>path.replace(/\/$/,'')),...(manifest.remove||[])];
       const skillRoot=tool==='codex'?'.agents/skills':'.claude/skills';
       const otherRoot=tool==='codex'?'.claude':'.agents';
       const excludedPath=path=>excluded.some(prefix=>path===prefix || path.startsWith(`${prefix}/`)) ||
@@ -75,7 +76,9 @@ function install() {
         path==='status/shifts' || path.startsWith('status/shifts/') ||
         path==='status/status.json' || path==='status/status.schema-template.json' || path==='status/status-schema.md' ||
         /^status\/[^/]+\.mjs$/.test(path) ||
-        path.startsWith(`${skillRoot}/speckit`);
+        path==='.specify/MAINTAINER-SKILLS.md' || path==='.specify/feature.json' || path.startsWith('.specify/integrations/') || path.startsWith('.specify/workflows/') ||
+        path.startsWith(`${skillRoot}/speckit`) && !planned.has(path);
+      const collisions=[];
       const copyTree=(path)=>{
         if(excludedPath(path)) return;
         const source=safePath(migration,path), dest=safePath(stage,path);
@@ -85,10 +88,17 @@ function install() {
           for(const name of readdirSync(source)) copyTree(`${path}/${name}`);
         } else if(lstatSync(source).isFile()) {
           const entry=planned.get(path);
+          if(path==='.specify/memory/constitution.md') {
+            const known=pristine.files?.[path]||[];
+            if(known.includes(fingerprint(readFileSync(source))) ||
+                fingerprint(readFileSync(source))===fingerprint(readFileSync(join(release,path)))) return;
+          }
           if(entry && entry.ownership!=='client-template') {
-            const known=pristine.files?.[entry.fingerprint_key]||[];
+            const sourceEntry=manifest.deployment.entries.find(item=>item.destinations?.[tool]===path);
+            const known=[...(pristine.files?.[entry.fingerprint_key]||[]),...(pristine.files?.[sourceEntry?.fingerprint_key]||[])];
             if(known.includes(fingerprint(readFileSync(source)))) return;
           }
+          if(entry && existsSync(dest) && fingerprint(readFileSync(source))!==fingerprint(readFileSync(dest))) collisions.push(path);
           mkdirSync(dirname(dest),{recursive:true});copyFileSync(source,dest);
         }
         else throw new Error(`Legacy special file: ${path}`);
@@ -106,16 +116,26 @@ function install() {
           copyFileSync(source,safePath(stage,`agents/${name}`));
         }
       }
+      const template=JSON.parse(readFileSync(join(release,'status/status.schema-template.json'),'utf8'));
+      Object.assign(oldStatus,{...template,...oldStatus});
+      oldStatus.checklist={...template.checklist,...oldStatus.checklist};
+      delete oldStatus.checklist.n8n_wf01_imported;
+      delete oldStatus.checklist.n8n_wf02_imported;
+      oldStatus.sharing={...template.sharing,...oldStatus.sharing,pairing:{...template.sharing.pairing,...oldStatus.sharing?.pairing}};
+      oldStatus.scopes={...template.scopes,...oldStatus.scopes};
+      oldStatus.memory={...template.memory,...oldStatus.memory};
+      oldStatus.schema_version=template.schema_version;
       oldStatus.selected_tool=tool;
       oldStatus.template_version=manifest.template_version;
       oldStatus.home={enabled:false,branch:'main'};
       oldStatus.notes=[oldStatus.notes||'','Saved schedules need to be wired again in this new folder.'].filter(Boolean).join('\n');
       oldStatus.notes=[oldStatus.notes||'',`migrated from legacy checkout to ${target}`].filter(Boolean).join('\n');
       writeFileSync(join(stage,'status/status.json'),JSON.stringify(oldStatus,null,2)+'\n');
+      if(collisions.length) console.log(`Migration collisions (client edits preserved): ${collisions.sort().join(', ')}`);
     }
     const init = spawnSync('git', ['-C', stage, 'init', '-q', '-b', 'main'], { encoding: 'utf8' });
     if (init.status !== 0) throw new Error(`Could not create client repository: ${init.stderr.trim()}`);
-    if(!localOnly) {
+    if(!useLocal) {
       const name=githubRepo||remoteRepo;
       if(remoteRepo) {
         const view=spawnSync('gh',['api',`repos/${name}`,'--jq','.private'],{encoding:'utf8'});
@@ -140,7 +160,7 @@ function install() {
     if (existsSync(target)) rmdirSync(target);
     renameSync(stage, target);
     console.log(`Created ${tool} client repository at ${target}`);
-    console.log(localOnly?'GitHub repository pending: rerun with --github-repo or set up a private remote.':`Private GitHub repository provisioned: ${githubRepo||remoteRepo}`);
+    console.log(useLocal?'Local Git repository ready; a private GitHub remote can be added later.':`Private GitHub repository provisioned: ${githubRepo||remoteRepo}`);
     console.log(`Next: cd ${JSON.stringify(target)} and run node start.mjs`);
   } finally {
     if (existsSync(stage)) rmSync(stage, { recursive: true, force: true });

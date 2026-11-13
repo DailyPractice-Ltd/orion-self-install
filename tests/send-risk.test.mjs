@@ -531,7 +531,7 @@ test('tripwire: the shift prompt is one line that names the level, and HIRING.md
 test('tripwire: the status template, the wizard, the manifest and the changelog carry the level', (t) => {
   const template = JSON.parse(read('status/status.schema-template.json'));
   assert.equal(template.scopes.send_risk, 'low');
-  assert.equal(template.schema_version, '1.9.0');
+  assert.equal(template.schema_version, '2.0.0');
   assert.equal(template.template_version, '2.0.0');
   const manifest = JSON.parse(read('update/manifest.json'));
   assert.equal(manifest.template_version, template.template_version);

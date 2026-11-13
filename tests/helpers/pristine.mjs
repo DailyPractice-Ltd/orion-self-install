@@ -76,6 +76,7 @@ export function computePristine() {
     ...Object.values(aliases),
     ...(manifest.deployment?.common_sources || []),
     ...(manifest.deployment?.entries || []).map((entry) => entry.fingerprint_key),
+    ...(manifest.deployment?.entries || []).flatMap((entry) => Object.values(entry.sources || {})),
   ]);
   const idsByPath = new Map([...sources].filter((p) => p !== PRISTINE_PATH).map((p) => [
     p, new Set([...blobIds(p), ...(aliases[p] ? blobIds(aliases[p]) : [])]),

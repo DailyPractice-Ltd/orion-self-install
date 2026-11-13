@@ -33,18 +33,17 @@ months from now.
 ## ▶ Press Start
 
 Download this release, then create your own Orion folder with one command. Choose the
-AI tool that will run your harness. Sign in to the GitHub CLI (`gh auth login`) first,
-then choose a new private repository name under your account:
+AI tool that will run your harness. Without GitHub options, this creates a local Git repository:
 
 ```bash
-node install.mjs --tool codex --target /path/to/my-orion --github-repo YOUR-USERNAME/my-orion
+node install.mjs --tool codex --target /path/to/my-orion
 # or
-node install.mjs --tool claude-code --target /path/to/my-orion --github-repo YOUR-USERNAME/my-orion
+node install.mjs --tool claude-code --target /path/to/my-orion
 ```
 
 The target must be a new or empty folder outside this release. The installer creates
-and pushes a separate private GitHub repository, copies the common runtime files and only your chosen
-tool's skills and team layout, and records that choice in `status/status.json`. It
+a separate local Git repository, copies all fourteen released skills into your chosen
+tool's layout with their Speckit runtime scaffold and team layout, and records that choice in `status/status.json`. It
 leaves the release sources, tests, and specs behind. Then enter your new folder and
 press Start:
 
@@ -59,7 +58,7 @@ Orion home. The downloaded release folder is only the source for installing and
 updating it. If you already created an empty
 private repository, use `--remote https://github.com/YOUR-USERNAME/my-orion.git`
 instead; the installer verifies that it is private and pushes the new harness.
-If GitHub is not ready, use `--local-only` to stage the harness on this computer.
+For a private GitHub home during installation, add `--github-repo OWNER/NAME` after signing in with `gh auth login`. `--local-only` is an optional explicit form of the local default.
 Its GitHub home stays off until you set up a private remote with
 `node status/home.mjs prepare --remote <its-address> --yes` in the client folder.
 
@@ -128,9 +127,9 @@ release folder into the terminal window, and press Enter. Sign in with
 `YOUR-USERNAME` with your GitHub username:
 
 ```bash
-node install.mjs --tool codex --target /path/to/my-orion --github-repo YOUR-USERNAME/my-orion
+node install.mjs --tool codex --target /path/to/my-orion
 # or
-node install.mjs --tool claude-code --target /path/to/my-orion --github-repo YOUR-USERNAME/my-orion
+node install.mjs --tool claude-code --target /path/to/my-orion
 ```
 
 Replace `/path/to/my-orion` with the location you chose in Step 2. If it contains
@@ -138,13 +137,11 @@ spaces, put the path in quotation marks. The command prints the exact next step:
 enter your new client folder and run `node start.mjs` there. The wizard saves its
 answers in that client's `status/status.json`, never in the release checkout.
 
-If you need to work locally first, replace `--github-repo YOUR-USERNAME/my-orion`
-with `--local-only`. The installer will tell you that private GitHub setup is
-pending. If you have an existing empty private repository, use
+The local repository is ready immediately. Add `--github-repo YOUR-USERNAME/my-orion` to create and push a private GitHub repository during installation, or connect one later with `node status/home.mjs prepare --remote <address> --yes`. If you have an existing empty private repository, use
 `--remote https://github.com/YOUR-USERNAME/my-orion.git` instead.
 
 If Node.js, git, or the GitHub CLI is missing, install it before using the private
-GitHub path, or use `--local-only` for now. You can also ask your
+GitHub path, or install locally for now. You can also ask your
 AI assistant to help with the manual setup.
 
 ---

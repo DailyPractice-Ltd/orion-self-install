@@ -23,9 +23,11 @@ Write each section for the client who will read it there.
 - Install from the downloaded release with `node install.mjs --tool codex --target
   /path/to/my-orion` or `--tool claude-code`. The client folder has common runtime
   files and only the selected tool's skills and team layout. Release sources, tests,
-  specs and Speckit skills stay in the release checkout. The installer makes a local
-  git repository; an optional private GitHub home still needs an empty repository
-  created by the client and `node status/home.mjs prepare --remote <address> --yes`.
+  specs stay in the release checkout. All fourteen skills and the Speckit runtime
+  scaffold deploy. The client constitution starts from an unfilled template. The
+  installer makes a local Git repository by default; `--github-repo OWNER/NAME`
+  creates a private GitHub home during installation, or a private remote can be
+  connected later with `node status/home.mjs prepare --remote <address> --yes`.
 - `AGENTS.md` is the shared instruction file. New installs omit `CLAUDE.md`.
   Claude Code setups with Anthropic's `agents-md` plugin can load `AGENTS.md` when
   there is no `CLAUDE.md` in scope. An older setup can use a `CLAUDE.md` containing
@@ -38,8 +40,9 @@ Write each section for the client who will read it there.
   personalized skills and job sheets, and records the new selection only after
   validation. Saved schedules must be rewired for the new tool. The switch has a
   backup and recovery command. See [updating](docs/updating.md).
-- All release skill definitions now live under `skills/`. The three client skills
-  deploy to the selected tool; the Speckit skills stay in the release checkout.
+- All release skill definitions now live under `skills/`. All fourteen skills
+  deploy to the selected tool with the Speckit scripts, templates,
+  and configuration.
   Claude Code maintainers can generate local discovery copies with
   `node .specify/scripts/generate-claude-skills.mjs`. Older same-path updaters leave
   their existing skill copies in place until the harness is migrated.

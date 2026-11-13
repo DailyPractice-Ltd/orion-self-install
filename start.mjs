@@ -268,7 +268,7 @@ function migrate(status, { firstRun = false } = {}) {
     levelWrittenThisRun = true;
   }
   if (status.checklist && !('vt09_send_gate' in status.checklist)) status.checklist.vt09_send_gate = false;
-  status.schema_version = '1.9.0';
+  status.schema_version = '2.0.0';
   return status;
 }
 

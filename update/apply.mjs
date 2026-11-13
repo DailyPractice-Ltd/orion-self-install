@@ -141,9 +141,19 @@ function switchTool(root,repo,commit,to,legacyTool) {
       actions.push({kind,destination,source});
     };
     for (const entry of deployment.entries) {
-      const old=sourcePlan.find(e=>e.source===entry.source), next=targetPlan.find(e=>e.source===entry.source);
+      const old=sourcePlan.find(e=>e.destination===entry.destinations[from]), next=targetPlan.find(e=>e.destination===entry.destinations[to]);
       const oldPath=safe(root,old.destination);
       const state=destinationState(root,old,pristine);
+      if (old.destination===next.destination) {
+        if (old.source!==next.source && entry.ownership==='release') {
+          if (state==='absent') add(next.destination,safe(snapshot,next.source));
+          else if (state==='owned') {
+            targetPaths.add(next.destination);
+            actions.push({kind:'replace',destination:next.destination,source:safe(snapshot,next.source)});
+          }
+        }
+        continue;
+      }
       if (state==='preserve' && existsSync(oldPath) && lstatSync(oldPath).isSymbolicLink()) throw new Error(`Source symlink collision: ${old.destination}`);
       if (state==='absent') {
         if (entry.ownership==='release') add(next.destination,safe(snapshot,entry.source));
@@ -205,10 +215,13 @@ function switchTool(root,repo,commit,to,legacyTool) {
     const backupRel=`.update-backup/switch-${from}-to-${to}-${stamp}`;
     const backup=safe(root,backupRel);if(existsSync(backup)) throw new Error('Backup already exists');
     mkdirSync(backup,{recursive:true});copyTo(statusPath,join(backup,'status/status.json'));
-    for(const a of actions) copyTo(a.source,join(backup,'stage',a.destination));
+    for(const a of actions) {
+      if(a.kind==='replace') copyTo(safe(root,a.destination),join(backup,'files',a.destination));
+      copyTo(a.source,join(backup,'stage',a.destination));
+    }
     const retired=[...new Set(retire)];
     for(const destination of retired) copyTo(safe(root,destination),join(backup,'files',destination));
-    const journal={kind:'switch',state:'pending',from,to,actions:actions.map(a=>({destination:a.destination,hash:fingerprint(readFileSync(join(backup,'stage',a.destination)))})),retire:retired,invalidated};
+    const journal={kind:'switch',state:'pending',from,to,actions:actions.map(a=>({destination:a.destination,kind:a.kind||'copy',hash:fingerprint(readFileSync(join(backup,'stage',a.destination))),prior_hash:a.kind==='replace'?fingerprint(readFileSync(join(backup,'files',a.destination))):null})),retire:retired,invalidated};
     writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
     try {
       let count=0;
@@ -298,11 +311,13 @@ function recoverPendingUpdates(root) {
 function rollbackSwitch(root,backup,journal) {
   const conflicts=journal.actions.filter(a=>{
     const path=safe(root,a.destination);
-    return existsSync(path) && (!lstatSync(path).isFile() || fingerprint(readFileSync(path))!==a.hash);
+    return existsSync(path) && (!lstatSync(path).isFile() || ![a.hash,a.prior_hash].includes(fingerprint(readFileSync(path))));
   }).map(a=>a.destination);
   if(conflicts.length) throw new Error(`Switch recovery collisions: ${conflicts.join(', ')}`);
-  for(const destination of journal.actions.map(a=>a.destination).reverse()) {
-    const path=safe(root,destination);if(existsSync(path)) rmSync(path);
+  for(const action of [...journal.actions].reverse()) {
+    const path=safe(root,action.destination);
+    if(action.kind==='replace') copyTo(join(backup,'files',action.destination),path);
+    else if(existsSync(path)) rmSync(path);
   }
   for(const destination of journal.retire) {
     const old=join(backup,'files',destination);

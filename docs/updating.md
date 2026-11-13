@@ -32,7 +32,7 @@ the destination for the tool recorded in status. The current AI app does not cho
 the destination. Codex receives only the explicitly mapped `agents/README.md` from
 the release `agents/` tree; hired job sheets in that folder belong to the client.
 The client folder never receives the release source trees wholesale, tests, specs,
-Speckit skills, `CLAUDE.md`, or the other tool's runtime tree.
+`CLAUDE.md`, or the other tool's runtime tree. All fourteen released skills and the Speckit scripts, templates, and configuration are mapped explicitly. The client's constitution and specs remain their own; the initial constitution is an unfilled template.
 
 A file the client has changed is kept and reported, as is a collision. The client roster and job sheets
 remain client-owned. A retired released file is removed only if it still matches a
@@ -112,8 +112,7 @@ their paths refer to the legacy folder; wire them again in the new folder. The n
 private repository becomes the home, while `--local-only` leaves home disabled. The legacy
 checkout is left intact. The command creates and pushes a private GitHub repository;
 `--remote https://github.com/OWNER/PRIVATE-REPO.git` uses an existing private
-repository, verified through `gh`. `--local-only` creates a local staging repository
-when GitHub credentials are unavailable and reports that remote setup is pending.
+repository, verified through `gh`. With no GitHub option, installation creates a local Git repository; `--local-only` is the explicit equivalent. A private remote can be connected later with `node status/home.mjs prepare --remote <address> --yes`.
 
 The manifest's legacy `refresh` list remains for old same-path updaters, but no longer
 lists the three `.claude/skills/` source files removed from the release. An older

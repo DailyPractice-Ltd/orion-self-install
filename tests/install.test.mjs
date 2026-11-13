@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 const release = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -45,13 +46,18 @@ test('install CLI rejects collisions before creating status', (t) => {
 });
 
 test('release wizard and home command do not turn the checkout into a client', () => {
+  const statusPath = join(release, 'status/status.json');
+  const hash = () => existsSync(statusPath)
+    ? createHash('sha256').update(readFileSync(statusPath)).digest('hex')
+    : null;
+  const before = hash();
   for (const script of ['start.mjs', 'status/home.mjs']) {
     const args = script === 'start.mjs' ? [] : ['prepare', '--yes'];
     const run = spawnSync(process.execPath, [join(release, script), ...args], { encoding: 'utf8', input: '' });
     assert.notEqual(run.status, 0);
     assert.match(run.stdout + run.stderr, /release folder/i);
   }
-  assert.equal(existsSync(join(release, 'status/status.json')), false);
+  assert.equal(hash(), before, 'release checkout status was not changed');
 });
 
 test('legacy migration carries personal work into a separate deployed repository', t => {

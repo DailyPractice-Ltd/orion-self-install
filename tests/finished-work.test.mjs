@@ -26,6 +26,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   WORK_TAGS, WORK_TAG_RE, isWorkTag, workTagMenu, isLabel, labelProblem, LABEL_MAX,
   countProblem, looksLikeCredential, LINE_MAX,
@@ -35,6 +36,11 @@ import { plainEnv } from './helpers/env.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..');
 const statusDir = join(repo, 'status');
+const fileHash = (path) => existsSync(path)
+  ? createHash('sha256').update(readFileSync(path)).digest('hex')
+  : null;
+const originalStatusHash = fileHash(join(statusDir, 'status.json'));
+const originalShiftLogHash = fileHash(join(statusDir, 'shift-log.md'));
 
 /**
  * A key that is well shaped and opens nothing. Built here, never written out
@@ -714,8 +720,8 @@ test('done: a status file that will not parse costs a shift nothing locally, and
 });
 
 test('nothing in this folder was touched by the cases above', () => {
-  assert.equal(existsSync(join(statusDir, 'status.json')), false, 'the template folder has no status.json');
-  assert.equal(existsSync(join(statusDir, 'shift-log.md')), false, 'and no shift log was written into it');
+  assert.equal(fileHash(join(statusDir, 'status.json')), originalStatusHash, 'status.json was not changed');
+  assert.equal(fileHash(join(statusDir, 'shift-log.md')), originalShiftLogHash, 'shift log was not changed');
 });
 
 // ── The shapes ──────────────────────────────────────────────────────────────

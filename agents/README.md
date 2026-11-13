@@ -2,8 +2,8 @@
 
 The roster and job sheets in this folder are Orion's record of the team. Read a
 job sheet by name to route work to an agent. On Claude Code, installed job sheets
-also appear through native agent discovery. On Codex, use this roster and the job
-sheets to route the same work.
+also appear through native agent discovery. On Codex, `AGENTS.md` routes you to
+this roster and its job sheets; Codex does not discover them as native agents.
 
 Each agent is one file in this folder: its job, its limits, its schedule, its report
 step. You are the manager — you can read any job description, ask for a promotion,

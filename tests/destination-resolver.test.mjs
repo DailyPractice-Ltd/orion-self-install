@@ -28,7 +28,7 @@ test('recorded tool selects only its destinations and classifies absent files', 
   const plan = JSON.parse(result.stdout);
   assert.equal(plan.selected_tool, 'codex');
   assert.ok(plan.entries.some((e) => e.destination === '.agents/skills/hire-agent/SKILL.md' && e.state === 'absent'));
-  assert.ok(plan.entries.some((e) => e.destination === 'team/README.md' && e.ownership === 'client-template'));
+  assert.ok(plan.entries.some((e) => e.destination === 'agents/README.md' && e.ownership === 'client-template'));
   assert.ok(plan.entries.every((e) => !e.destination.startsWith('.claude/')));
 });
 

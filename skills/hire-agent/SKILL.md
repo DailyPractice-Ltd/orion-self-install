@@ -7,7 +7,7 @@ Read `library/HIRING.md` and follow it exactly — it is the entire procedure an
 over anything else you have read about hiring.
 
 Resolve `status.selected_tool` first. Claude Code job sheets and roster live in
-`.claude/agents/`; Codex job sheets and roster live in `team/`. Use the selected
+`.claude/agents/`; Codex job sheets and roster live in `agents/`. Use the selected
 tool's skill directory, never a path inferred from the current assistant.
 
 Part A is a hire, Part B is a promotion, Part D covers half-done hires and surfaces

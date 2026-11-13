@@ -29,8 +29,10 @@ success or failure. Never fall back to the older local script or an unpinned `ma
 The update reads `update/manifest.json`, `update/pristine.json`, and all released
 files from that one commit. Its `deployment` plan maps portable release sources into
 the destination for the tool recorded in status. The current AI app does not choose
-the destination. The client folder never receives release-only `skills/`, `agents/`,
-tests, specs, Speckit skills, `CLAUDE.md`, or the other tool's runtime tree.
+the destination. Codex receives only the explicitly mapped `agents/README.md` from
+the release `agents/` tree; hired job sheets in that folder belong to the client.
+The client folder never receives the release source trees wholesale, tests, specs,
+Speckit skills, `CLAUDE.md`, or the other tool's runtime tree.
 
 A file the client has changed is kept and reported, as is a collision. The client roster and job sheets
 remain client-owned. A retired released file is removed only if it still matches a
@@ -39,6 +41,9 @@ and each file it will replace or retire under `.update-backup/`. Executable
 `status/*.mjs` scripts are the narrow exception: they are backed up and replaced as a
 version-consistent set even when edited. The updater changes only
 `template_version`, one notes line, and named retired checklist keys in status.
+For a Codex client that already has the earlier `team/` layout, update copies its
+roster and Markdown job sheets into `agents/` when those destinations are absent.
+It leaves the old files in place and reports destination collisions for review.
 
 When applicable, run `node status/send.mjs migrate` for the older sending-rule
 migration. Then run `node status/radio.mjs check`. Report the pinned commit, version

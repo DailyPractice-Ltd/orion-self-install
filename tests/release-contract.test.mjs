@@ -24,10 +24,10 @@ test('release contract plans one selected runtime from portable sources', (t) =>
     const plan = JSON.parse(run.stdout);
     const destinations = plan.entries.map((entry) => entry.destination);
     assert.ok(destinations.includes(tool === 'codex' ? '.agents/skills/hire-agent/SKILL.md' : '.claude/skills/hire-agent/SKILL.md'));
-    assert.ok(destinations.includes(tool === 'codex' ? 'team/README.md' : '.claude/agents/README.md'));
+    assert.ok(destinations.includes(tool === 'codex' ? 'agents/README.md' : '.claude/agents/README.md'));
     assert.ok(plan.entries.some((entry) => entry.source === 'skills/hire-agent/SKILL.md' && entry.fingerprint_key === 'skills/hire-agent/SKILL.md'));
     assert.ok(plan.entries.some((entry) => entry.source === 'agents/README.md' && entry.ownership === 'client-template'));
-    assert.ok(destinations.every((path) => !path.startsWith('skills/') && !path.startsWith('agents/') && !path.startsWith('.claude/skills/speckit')));
+    assert.ok(destinations.every((path) => !path.startsWith('skills/') && (tool === 'codex' ? path === 'agents/README.md' || !path.startsWith('agents/') : !path.startsWith('agents/')) && !path.startsWith('.claude/skills/speckit')));
     assert.ok(destinations.every((path) => tool === 'codex' ? !path.startsWith('.claude/') : !path.startsWith('.agents/')));
   }
   rmSync(join(release, 'skills/hire-agent/SKILL.md'));

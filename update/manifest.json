@@ -1,7 +1,7 @@
 {
   "_read_first": "Read docs/updating.md and update/pristine.json from the pinned release commit. Run that commit's update/apply.mjs, not the older client copy. The deployment plan selects the tool recorded in status. The request is the consent: never stop to ask; never replace a file the client has changed, except executable status/*.mjs scripts, which are backed up and replaced together. Report collisions.",
   "_what": "Legacy refresh/remove lists remain for older harnesses. deployment is the source-to-destination and ownership contract for separate client repositories; select exactly one recorded tool. Contract: docs/updating.md and deployment._contract.",
-  "_regenerate": "Legacy refresh is retained for existing same-path updaters. For new deployments, maintain deployment.common_sources and deployment.entries as explicit allowlists; never include specs, tests, Speckit skills, release skills/, or release agents/ as destination paths. Bump template_version with the status schema. Then run node tests/helpers/pristine.mjs --write after release edits.",
+  "_regenerate": "Legacy refresh is retained for existing same-path updaters. For new deployments, maintain deployment.common_sources and deployment.entries as explicit allowlists; never include specs, tests, Speckit skills, or release source trees wholesale. The Codex agents/README.md destination is an explicit mapping. Bump template_version with the status schema. Then run node tests/helpers/pristine.mjs --write after release edits.",
   "template_version": "2.0.0",
   "refresh": [
     ".claude/skills/create-skill/SKILL.md",
@@ -95,7 +95,7 @@
     "n8n_wf02_imported"
   ],
   "deployment": {
-    "_contract": "Release sources are read from one pinned commit. Install and update select exactly one tool recorded in status. common_sources keep their path; entries map portable sources to the selected destination. No release-only path may be copied to a deployed harness.",
+    "_contract": "Release sources are read from one pinned commit. Install and update select exactly one tool recorded in status. common_sources keep their path; entries map portable sources to the selected destination. A release-only source may reach a deployed harness only through an explicit entry; never copy its tree wholesale.",
     "tools": [
       "claude-code",
       "codex"
@@ -197,7 +197,7 @@
         "source": "agents/README.md",
         "destinations": {
           "claude-code": ".claude/agents/README.md",
-          "codex": "team/README.md"
+          "codex": "agents/README.md"
         },
         "ownership": "client-template",
         "fingerprint_key": "agents/README.md"

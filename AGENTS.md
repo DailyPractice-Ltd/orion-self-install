@@ -317,7 +317,7 @@ exactly. On Claude Code the same procedures are invocable as `/hire-agent` and
 Teach the client the line once, at their first hire, and never lecture it again:
 **A job sheet names who does the work; a skill names what procedure to run.**
 
-Resolve `status.selected_tool` through `update/destination-resolver.mjs` before reading or writing a job or skill. Claude Code uses `.claude/agents/README.md` and `.claude/skills/`; Codex uses `team/README.md` and `.agents/skills/`. On Codex, read the team job sheet and run its job and report sections; `@` discovery is specific to Claude Code. The roster for the selected tool is the one to scan. At session start, scan it. An agent
+Resolve `status.selected_tool` through `update/destination-resolver.mjs` before reading or writing a job or skill. Claude Code uses `.claude/agents/README.md` and `.claude/skills/`; Codex uses `agents/README.md` and `.agents/skills/`. On Codex, read the team job sheet and run its job and report sections; `@` discovery is specific to Claude Code. The roster for the selected tool is the one to scan. At session start, scan it. An agent
 that has a schedule which is not yet proven (or not yet wired) gets exactly one plain
 sentence ("your {name} agent hasn't yet fired on its own. Want me to check the
 schedule?"), never more. An on-call agent needs no mention. A row still marked

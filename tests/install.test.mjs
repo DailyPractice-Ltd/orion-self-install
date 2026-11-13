@@ -20,8 +20,8 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(JSON.parse(read('status/status.json')).selected_tool, tool);
     assert.ok(existsSync(join(target, 'AGENTS.md')));
     assert.ok(existsSync(join(target, tool === 'codex' ? '.agents/skills/hire-agent/SKILL.md' : '.claude/skills/hire-agent/SKILL.md')));
-    assert.ok(existsSync(join(target, tool === 'codex' ? 'team/README.md' : '.claude/agents/README.md')));
-    for (const path of ['skills', 'agents', 'tests', 'specs', 'CLAUDE.md', tool === 'codex' ? '.claude' : '.agents']) {
+    assert.ok(existsSync(join(target, tool === 'codex' ? 'agents/README.md' : '.claude/agents/README.md')));
+    for (const path of ['skills', 'tests', 'specs', 'CLAUDE.md', tool === 'codex' ? '.claude' : '.agents', ...(tool === 'codex' ? [] : ['agents'])]) {
       assert.equal(existsSync(join(target, path)), false, `${path} leaked into client`);
     }
     const wizard = spawnSync(process.execPath, [join(target, 'start.mjs'), '--checkins', 'no'], { encoding: 'utf8', input: '', cwd: target });
@@ -93,6 +93,21 @@ test('legacy migration carries personal work into a separate deployed repository
   for(const path of ['skills','tests','n8n']) assert.equal(existsSync(join(target,path)),false);
   assert.equal(existsSync(join(target,'.claude/skills/speckit-plan')),false);
   assert.equal(readFileSync(join(legacy,'status/status.json'),'utf8').includes('selected_tool'),false);
+});
+
+test('Codex migration maps legacy team jobs without copying release agent sources', t => {
+  const base=mkdtempSync(join(tmpdir(),'orion-codex-migrate-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
+  const legacy=join(base,'legacy'),target=join(base,'client');mkdirSync(legacy);
+  const put=(path,body)=>{const full=join(legacy,path);mkdirSync(dirname(full),{recursive:true});writeFileSync(full,body);};
+  put('status/status.json',JSON.stringify({template_version:'2.0.0',selected_tool:'codex'}));
+  put('team/README.md','my roster\n');put('team/writer.md','my job\n');
+  put('agents/README.md','release roster source\n');put('agents/maintainer.md','release-only agent\n');
+  const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','codex','--target',target,'--migrate-from',legacy,'--local-only'],{encoding:'utf8'});
+  assert.equal(result.status,0,result.stderr);
+  assert.equal(readFileSync(join(target,'agents/README.md'),'utf8'),'my roster\n');
+  assert.equal(readFileSync(join(target,'agents/writer.md'),'utf8'),'my job\n');
+  assert.equal(existsSync(join(target,'agents/maintainer.md')),false);
+  assert.equal(existsSync(join(target,'team')),false);
 });
 
 test('install requires an explicit repository provisioning choice',t=>{

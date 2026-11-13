@@ -11,7 +11,7 @@ import { plainEnv } from './helpers/env.mjs';
 const checkout = join(dirname(fileURLToPath(import.meta.url)), '..');
 const other = tool => tool === 'codex' ? 'claude-code' : 'codex';
 const skill = tool => tool === 'codex' ? '.agents/skills' : '.claude/skills';
-const jobs = tool => tool === 'codex' ? 'team' : '.claude/agents';
+const jobs = tool => tool === 'codex' ? 'agents' : '.claude/agents';
 const read = (root, path) => readFileSync(join(root, path), 'utf8');
 const put = (root, path, text) => {
   const full = join(root, path);
@@ -39,7 +39,7 @@ for (const tool of ['claude-code', 'codex']) {
   test(`${tool} deployed journey: runtime commands, pinned update, and restore`, t => {
     const { release, client } = journey(t, tool);
     assert.equal(status(client).selected_tool, tool);
-    for (const forbidden of ['skills', 'agents', 'tests', 'specs', tool === 'codex' ? '.claude' : '.agents']) {
+    for (const forbidden of ['skills', 'tests', 'specs', tool === 'codex' ? '.claude' : '.agents', ...(tool === 'codex' ? [] : ['agents'])]) {
       assert.equal(existsSync(join(client, forbidden)), false, `${forbidden} in client`);
     }
 
@@ -89,7 +89,7 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(existsSync(join(client, `${skill(tool)}/create-skill/SKILL.md`)), false);
     assert.ok(report.kept.includes(`${skill(tool)}/hire-agent/SKILL.md`));
     assert.ok(report.retired.includes(`${skill(tool)}/create-skill/SKILL.md`));
-    for (const forbidden of ['skills', 'agents', tool === 'codex' ? '.claude' : '.agents']) {
+    for (const forbidden of ['skills', tool === 'codex' ? '.claude' : '.agents', ...(tool === 'codex' ? [] : ['agents'])]) {
       assert.equal(existsSync(join(client, forbidden)), false, `${forbidden} after update`);
     }
     ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));

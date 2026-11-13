@@ -9,9 +9,9 @@ The line worth learning once, because everything else hangs off it:
 
 > **A job sheet names who does the work; a skill names what procedure to run.**
 
-On Claude Code, `@prospecting` can summon the prospecting agent and `/meeting-sizing` runs a skill. On Codex, read `team/README.md`, then open `team/prospecting.md` and run its job and report sections; invoke a skill from `.agents/skills/` by name. Codex does not discover team job sheets through `@`.
+On Claude Code, `@prospecting` can summon the prospecting agent and `/meeting-sizing` runs a skill. On Codex, read `agents/README.md`, then open `agents/prospecting.md` and run its job and report sections; invoke a skill from `.agents/skills/` by name. Codex does not discover team job sheets through `@`.
 
-**Paths in this procedure come from `status.selected_tool` through `update/destination-resolver.mjs`: Claude Code uses `{job-root}` = `.claude/agents` and `{skill-root}` = `.claude/skills`; Codex uses `{job-root}` = `team` and `{skill-root}` = `.agents/skills`. Read the selected value before creating or reading a job sheet, roster, or skill. A missing selection requires explicit legacy migration.**
+**Paths in this procedure come from `status.selected_tool` through `update/destination-resolver.mjs`: Claude Code uses `{job-root}` = `.claude/agents` and `{skill-root}` = `.claude/skills`; Codex uses `{job-root}` = `agents` and `{skill-root}` = `.agents/skills`. Read the selected value before creating or reading a job sheet, roster, or skill. A missing selection requires explicit legacy migration.**
 
 **If any other file in this folder describes hiring differently, this file wins.**
 The shape it produces is contracted in

@@ -45,6 +45,24 @@ function update(root,repo,commit) {
       if (state==='absent') actions.push({kind:'add',e,src,dest});
       else if (fingerprint(readFileSync(dest))!==fingerprint(readFileSync(src))) actions.push({kind:'replace',e,src,dest});
     }
+    // A Codex harness deployed by the earlier preview may still hold client
+    // jobs in team/. Promote only Markdown job sheets to agents/ on update.
+    if (tool==='codex' && existsSync(safe(root,'team'))) {
+      const oldJobs=safe(root,'team');
+      if (!lstatSync(oldJobs).isDirectory()) throw new Error('Legacy team/ is not a directory');
+      for (const name of readdirSync(oldJobs).filter(n=>/^[A-Za-z0-9][A-Za-z0-9_-]*\.md$/.test(n))) {
+        const oldRel=`team/${name}`, nextRel=`agents/${name}`;
+        const src=safe(root,oldRel), dest=safe(root,nextRel);
+        if (!lstatSync(src).isFile()) throw new Error(`Legacy job sheet collision: ${oldRel}`);
+        if (existsSync(dest)) {
+          if (!lstatSync(dest).isFile() || fingerprint(readFileSync(dest))!==fingerprint(readFileSync(src))) report.collisions.push(nextRel);
+          continue;
+        }
+        const existing=actions.find(a=>a.e.destination===nextRel);
+        if (existing) existing.src=src;
+        else actions.push({kind:'add',e:{source:oldRel,destination:nextRel,ownership:'client-template',fingerprint_key:'agents/README.md'},src,dest});
+      }
+    }
     for (const e of [...retired,...commonRetired]) {
       const dest=safe(root,e.destination), state=destinationState(root,e,pristine);
       if (state==='owned') actions.push({kind:'retire',e,dest});
@@ -160,8 +178,8 @@ function switchTool(root,repo,commit,to,legacyTool) {
     };
     const oldSkill=from==='codex'?'.agents/skills':'.claude/skills';
     const newSkill=to==='codex'?'.agents/skills':'.claude/skills';
-    const oldJobs=from==='codex'?'team':'.claude/agents';
-    const newJobs=to==='codex'?'team':'.claude/agents';
+    const oldJobs=dirname(sourcePlan.find(e=>e.source==='agents/README.md').destination);
+    const newJobs=dirname(targetPlan.find(e=>e.source==='agents/README.md').destination);
     portable(oldSkill,newSkill);portable(oldJobs,newJobs);
     const shifts=safe(root,'status/shifts');
     if(existsSync(shifts)) for(const name of readdirSync(shifts).filter(n=>n.endsWith('.json'))) {

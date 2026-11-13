@@ -86,7 +86,7 @@ function makeHarness(t, { level = 'low', sheetExtra = '', status = {}, tool = 'c
   const dir = mkdtempSync(join(tmpdir(), 'orion-send-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, 'status'));
-  const jobRoot = tool === 'codex' ? 'team' : '.claude/agents';
+  const jobRoot = tool === 'codex' ? 'agents' : '.claude/agents';
   mkdirSync(join(dir, jobRoot), { recursive: true });
   mkdirSync(join(dir, 'update'));
   for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(ROOT, 'update', f), join(dir, 'update', f));
@@ -111,10 +111,10 @@ function makeHarness(t, { level = 'low', sheetExtra = '', status = {}, tool = 'c
 const score = (h, { relationship = 'reply', content = 'logistics', channel = 'email', more = [] } = {}) =>
   h.run('score', '--agent', 'follow-up', '--to', 'priya@northwind.example', '--channel', channel, '--relationship', relationship, '--content', content, ...more);
 
-test('Codex send gate reads and changes team job sheets', (t) => {
+test('Codex send gate reads and changes agents/ job sheets', (t) => {
   const h = makeHarness(t, { tool: 'codex' });
   assert.equal(h.run('set-level', 'never', '--agent', 'follow-up').code, 0);
-  assert.match(readFileSync(join(h.dir, 'team', 'follow-up.md'), 'utf8'), /send_risk: never/);
+  assert.match(readFileSync(join(h.dir, 'agents', 'follow-up.md'), 'utf8'), /send_risk: never/);
   assert.match(score(h).out, /wait|never/i);
 });
 

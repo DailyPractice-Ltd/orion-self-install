@@ -18,19 +18,19 @@ function fixture(t, from='claude-code') {
   const manifest={template_version:'2.0.0',deployment:{tools:['claude-code','codex'],common_sources:[],entries:[
     {source:'skills/foo/SKILL.md',destinations:{'claude-code':'.claude/skills/foo/SKILL.md',codex:'.agents/skills/foo/SKILL.md'},ownership:'release',fingerprint_key:'skills/foo/SKILL.md'},
     {source:'skills/bar/SKILL.md',destinations:{'claude-code':'.claude/skills/bar/SKILL.md',codex:'.agents/skills/bar/SKILL.md'},ownership:'release',fingerprint_key:'skills/bar/SKILL.md'},
-    {source:'agents/README.md',destinations:{'claude-code':'.claude/agents/README.md',codex:'team/README.md'},ownership:'client-template',fingerprint_key:'agents/README.md'}]}};
+    {source:'agents/README.md',destinations:{'claude-code':'.claude/agents/README.md',codex:'agents/README.md'},ownership:'client-template',fingerprint_key:'agents/README.md'}]}};
   put(release,'skills/foo/SKILL.md','new foo\n');put(release,'skills/bar/SKILL.md','new bar\n');put(release,'agents/README.md','template\n');
   put(release,'update/manifest.json',JSON.stringify(manifest));put(release,'update/pristine.json',JSON.stringify({files:{'skills/foo/SKILL.md':[hash('old foo\n')],'skills/bar/SKILL.md':[hash('old bar\n')]}}));
   execFileSync('git',['init','-q'],{cwd:release});execFileSync('git',['add','.'],{cwd:release});execFileSync('git',['-c','user.email=test@example.com','-c','user.name=Test','commit','-qm','release'],{cwd:release});
   const commit=execFileSync('git',['rev-parse','HEAD'],{cwd:release,encoding:'utf8'}).trim();
-  const skill=from==='codex'?'.agents/skills':'.claude/skills', job=from==='codex'?'team':'.claude/agents';
+  const skill=from==='codex'?'.agents/skills':'.claude/skills', job=from==='codex'?'agents':'.claude/agents';
   put(client,'update/manifest.json',JSON.stringify(manifest));
   put(client,'status/status.json',JSON.stringify({template_version:'2.0.0',selected_tool:from,notes:'keep'}));
   put(client,`${skill}/foo/SKILL.md`,'old foo\n');put(client,`${skill}/bar/SKILL.md`,'my edited bar\n');put(client,`${skill}/custom/SKILL.md`,'my skill\n');
   put(client,`${skill}/speckit-plan/SKILL.md`,'maintainer only\n');
   put(client,`${job}/README.md`,'my roster rows\n');put(client,`${job}/writer.md`,'my job\n');
   put(client,'status/shift-log.md','old log\n');put(client,'status/shifts/writer.sh','old prompt\n');put(client,'status/shifts/writer.log','old run log\n');put(client,'status/shifts/writer.json',JSON.stringify({agent:'writer',surface:from,os:'other',wake_up:join(client,'status/shifts/writer.sh')}));
-  return {release,client,commit,skill,job,to:from==='codex'?'claude-code':'codex',targetSkill:from==='codex'?'.claude/skills':'.agents/skills',targetJob:from==='codex'?'.claude/agents':'team'};
+  return {release,client,commit,skill,job,to:from==='codex'?'claude-code':'codex',targetSkill:from==='codex'?'.claude/skills':'.agents/skills',targetJob:from==='codex'?'.claude/agents':'agents'};
 }
 
 for (const from of ['claude-code','codex']) test(`switch ${from} preserves client work and invalidates saved schedules`,t=>{

@@ -396,7 +396,7 @@ test('whether a schedule is on is asked of the scheduler itself', () => {
 function scratchHarness(tool = 'claude-code') {
   const base = mkdtempSync(join(tmpdir(), 'orion-sched-'));
   mkdirSync(join(base, 'status'), { recursive: true });
-  const jobRoot = tool === 'codex' ? 'team' : '.claude/agents';
+  const jobRoot = tool === 'codex' ? 'agents' : '.claude/agents';
   mkdirSync(join(base, jobRoot), { recursive: true });
   mkdirSync(join(base, 'update'));
   for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(ROOT, 'update', f), join(base, 'update', f));
@@ -407,12 +407,12 @@ function scratchHarness(tool = 'claude-code') {
   return { base, run };
 }
 
-test('Codex schedule reads the team job sheet and embeds that path in its wake-up', () => {
+test('Codex schedule reads the agents/ job sheet and embeds that path in its wake-up', () => {
   const { base, run } = scratchHarness('codex');
   try {
     const r = run('wire', '--agent', 'probe', '--surface', 'codex', '--at', '07:00', '--bin', process.execPath);
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.match(readFileSync(join(base, 'status', 'shifts', 'probe.sh'), 'utf8'), /team\/probe\.md/);
+    assert.match(readFileSync(join(base, 'status', 'shifts', 'probe.sh'), 'utf8'), /agents\/probe\.md/);
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
 

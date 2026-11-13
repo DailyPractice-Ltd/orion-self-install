@@ -67,7 +67,7 @@ function install() {
       if(!oldStatus.selected_tool && tool!=='claude-code') throw new Error('Legacy layout without selected_tool requires --tool claude-code.');
       const pristine=JSON.parse(readFileSync(join(release,'update/pristine.json'),'utf8'));
       const planned=new Map(plan.map(entry=>[entry.destination,entry]));
-      const excluded=['.git','.github','.codex','node_modules','install.mjs','n8n',...manifest.deployment.release_only.filter(path=>!path.includes('*')).map(path=>path.replace(/\/$/,'')),...(manifest.remove||[])];
+      const excluded=['.git','.github','.codex','node_modules','install.mjs','n8n',...(tool==='codex'?['team']:[]),...manifest.deployment.release_only.filter(path=>!path.includes('*')).map(path=>path.replace(/\/$/,'')),...(manifest.remove||[])];
       const skillRoot=tool==='codex'?'.agents/skills':'.claude/skills';
       const otherRoot=tool==='codex'?'.claude':'.agents';
       const excludedPath=path=>excluded.some(prefix=>path===prefix || path.startsWith(`${prefix}/`)) ||
@@ -94,6 +94,18 @@ function install() {
         else throw new Error(`Legacy special file: ${path}`);
       };
       for(const name of readdirSync(migration)) copyTree(name);
+      // Older Codex clients used team/. Copy only their roster and job sheets
+      // into the new destination. Release agents/ remains excluded above.
+      if(tool==='codex' && existsSync(safePath(migration,'team'))) {
+        const oldJobs=safePath(migration,'team');
+        if(!lstatSync(oldJobs).isDirectory()) throw new Error('Legacy team/ is not a directory');
+        for(const name of readdirSync(oldJobs)) {
+          if(!/^[A-Za-z0-9][A-Za-z0-9_-]*\.md$/.test(name)) continue;
+          const source=safePath(migration,`team/${name}`);
+          if(!lstatSync(source).isFile()) throw new Error(`Legacy job sheet collision: team/${name}`);
+          copyFileSync(source,safePath(stage,`agents/${name}`));
+        }
+      }
       oldStatus.selected_tool=tool;
       oldStatus.template_version=manifest.template_version;
       oldStatus.home={enabled:false,branch:'main'};

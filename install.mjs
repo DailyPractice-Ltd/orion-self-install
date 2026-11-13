@@ -68,7 +68,7 @@ function install() {
       if(!oldStatus.selected_tool && tool!=='claude-code') throw new Error('Legacy layout without selected_tool requires --tool claude-code.');
       const pristine=JSON.parse(readFileSync(join(release,'update/pristine.json'),'utf8'));
       const planned=new Map(plan.map(entry=>[entry.destination,entry]));
-      const excluded=['.git','.github','.codex','node_modules','install.mjs','n8n',...(tool==='codex'?['team']:[]),...manifest.deployment.release_only.filter(path=>!path.includes('*') && path!=='.specify/').map(path=>path.replace(/\/$/,'')),...(manifest.remove||[])];
+      const excluded=['.git','.github','.codex','node_modules','install.mjs','n8n','.specify','update/scaffold',...(tool==='codex'?['team']:[]),...manifest.deployment.release_only.filter(path=>!path.includes('*')).map(path=>path.replace(/\/$/,'')),...(manifest.remove||[])];
       const skillRoot=tool==='codex'?'.agents/skills':'.claude/skills';
       const otherRoot=tool==='codex'?'.claude':'.agents';
       const excludedPath=path=>excluded.some(prefix=>path===prefix || path.startsWith(`${prefix}/`)) ||
@@ -76,8 +76,7 @@ function install() {
         path==='status/shifts' || path.startsWith('status/shifts/') ||
         path==='status/status.json' || path==='status/status.schema-template.json' || path==='status/status-schema.md' ||
         /^status\/[^/]+\.mjs$/.test(path) ||
-        path==='.specify/MAINTAINER-SKILLS.md' || path==='.specify/feature.json' || path.startsWith('.specify/integrations/') || path.startsWith('.specify/workflows/') ||
-        path.startsWith(`${skillRoot}/speckit`) && !planned.has(path);
+        path.startsWith(`${skillRoot}/speckit`);
       const collisions=[];
       const copyTree=(path)=>{
         if(excludedPath(path)) return;
@@ -88,11 +87,6 @@ function install() {
           for(const name of readdirSync(source)) copyTree(`${path}/${name}`);
         } else if(lstatSync(source).isFile()) {
           const entry=planned.get(path);
-          if(path==='.specify/memory/constitution.md') {
-            const known=pristine.files?.[path]||[];
-            if(known.includes(fingerprint(readFileSync(source))) ||
-                fingerprint(readFileSync(source))===fingerprint(readFileSync(join(release,path)))) return;
-          }
           if(entry && entry.ownership!=='client-template') {
             const sourceEntry=manifest.deployment.entries.find(item=>item.destinations?.[tool]===path);
             const known=[...(pristine.files?.[entry.fingerprint_key]||[]),...(pristine.files?.[sourceEntry?.fingerprint_key]||[])];

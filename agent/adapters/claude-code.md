@@ -121,4 +121,3 @@ works when asked, and its schedule reads "not yet wired" (HIRING.md, Part D).
   don't need for anything else.
 - Both CRM apply scripts and `emit-status.mjs` are dependency-free (`node:fs` + global
   `fetch` only) — there's no `npm install` step to walk anyone through.
-- Speckit skills belong to the release checkout and are not deployed to the client.

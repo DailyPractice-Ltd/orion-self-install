@@ -62,7 +62,7 @@ test('release contract rejects an unsupported tool and keeps historical ownershi
 test('all release skills have exactly one mapping for both tools', () => {
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
   const names = readdirSync(join(repo, 'skills')).sort();
-  assert.equal(names.length,14);
+  assert.equal(names.length,3);
   assert.deepEqual(manifest.deployment.entries.filter(entry => entry.source.startsWith('skills/')).map(entry => entry.source).sort(),
     names.map(name => `skills/${name}/SKILL.md`));
   for(const name of names) for(const tool of ['codex','claude-code']) assert.equal(manifest.deployment.entries.filter(e=>e.source===`skills/${name}/SKILL.md` && e.destinations?.[tool]===`${tool==='codex'?'.agents':'.claude'}/skills/${name}/SKILL.md`).length,1);
@@ -70,24 +70,4 @@ test('all release skills have exactly one mapping for both tools', () => {
   assert.equal(existsSync(join(repo, '.claude')), false, 'release must not track or generate a second skill tree');
   for (const path of manifest.refresh) assert.ok(existsSync(join(repo, path)), `legacy refresh source missing: ${path}`);
   for (const name of names) assert.equal(manifest.refresh.includes(`.claude/skills/${name}/SKILL.md`), false);
-});
-
-test('maintainer Claude discovery copies are generated from portable sources', (t) => {
-  const release = mkdtempSync(join(tmpdir(), 'orion-maintainer-skills-'));
-  t.after(() => rmSync(release, { recursive: true, force: true }));
-  const script = '.specify/scripts/generate-claude-skills.mjs';
-  mkdirSync(dirname(join(release, script)), { recursive: true });
-  copyFileSync(join(repo, script), join(release, script));
-  const names = readdirSync(join(repo, 'skills')).filter(name => name.startsWith('speckit-'));
-  for (const name of names) {
-    const path = `skills/${name}/SKILL.md`;
-    mkdirSync(dirname(join(release, path)), { recursive: true });
-    copyFileSync(join(repo, path), join(release, path));
-  }
-  const run = spawnSync(process.execPath, [join(release, script)], { encoding: 'utf8' });
-  assert.equal(run.status, 0, run.stderr);
-  for (const name of names) {
-    assert.equal(readFileSync(join(release, `.claude/skills/${name}/SKILL.md`), 'utf8'),
-      readFileSync(join(release, `skills/${name}/SKILL.md`), 'utf8'));
-  }
 });

@@ -31,6 +31,12 @@ function journey(t, tool) {
   const release = join(base, 'release');
   const client = join(base, 'client');
   git(base, 'clone', '-q', checkout, release);
+  const changes = execFileSync('git', ['diff', '--binary', 'HEAD'], { cwd: checkout });
+  if (changes.length) {
+    execFileSync('git', ['apply', '--binary', '-'], { cwd: release, input: changes });
+    git(release, 'add', '-A');
+    git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'working release');
+  }
   ok(run(release, 'install.mjs', '--tool', tool, '--target', client, '--local-only'));
   return { release, client };
 }
@@ -60,10 +66,7 @@ for (const tool of ['claude-code', 'codex']) {
     put(client, `${skill(tool)}/hire-agent/SKILL.md`, edited);
     put(client, `${skill(tool)}/personal/SKILL.md`, '# Personal skill\n');
     const manifest = JSON.parse(read(release, 'update/manifest.json'));
-    rmSync(join(client, `${skill(tool)}/speckit-tasks/SKILL.md`));
-    rmSync(join(client, '.specify/scripts/bash/setup-tasks.sh'));
-    put(client, '.specify/memory/constitution.md', '# My constitution\n');
-    put(client, `${skill(tool)}/speckit-plan/SKILL.md`, '# My edited plan skill\n');
+    assert.equal(existsSync(join(client, '.specify')), false);
     manifest.deployment.entries.push({
       source: 'skills/new-release/SKILL.md',
       destinations: { 'claude-code': '.claude/skills/new-release/SKILL.md', codex: '.agents/skills/new-release/SKILL.md' },
@@ -84,23 +87,14 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(read(client, `${skill(tool)}/hire-agent/SKILL.md`), edited);
     assert.equal(read(client, `${skill(tool)}/personal/SKILL.md`), '# Personal skill\n');
     assert.equal(read(client, `${skill(tool)}/new-release/SKILL.md`), '# New release skill\n');
-    assert.ok(existsSync(join(client, `${skill(tool)}/speckit-tasks/SKILL.md`)));
-    assert.ok(existsSync(join(client, '.specify/scripts/bash/setup-tasks.sh')));
-    assert.equal(read(client, '.specify/memory/constitution.md'), '# My constitution\n');
-    assert.equal(read(client, `${skill(tool)}/speckit-plan/SKILL.md`), '# My edited plan skill\n');
     assert.ok(report.kept.includes(`${skill(tool)}/hire-agent/SKILL.md`));
-    assert.ok(report.added.includes(`${skill(tool)}/speckit-tasks/SKILL.md`));
-    assert.ok(report.added.includes('.specify/scripts/bash/setup-tasks.sh'));
-    assert.ok(report.kept.includes(`${skill(tool)}/speckit-plan/SKILL.md`));
-    assert.ok(report.collisions.includes('.specify/memory/constitution.md'));
+    assert.equal(existsSync(join(client, '.specify')), false);
     for (const forbidden of ['skills', tool === 'codex' ? '.claude' : '.agents', ...(tool === 'codex' ? [] : ['agents'])]) {
       assert.equal(existsSync(join(client, forbidden)), false, `${forbidden} after update`);
     }
     ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
     assert.equal(read(client, 'AGENTS.md'), original);
     assert.equal(existsSync(join(client, `${skill(tool)}/new-release/SKILL.md`)), false);
-    assert.equal(existsSync(join(client, `${skill(tool)}/speckit-tasks/SKILL.md`)), false);
-    assert.equal(existsSync(join(client, '.specify/scripts/bash/setup-tasks.sh')), false);
     assert.equal(read(client, `${skill(tool)}/hire-agent/SKILL.md`), edited);
   });
 
@@ -144,17 +138,52 @@ for (const tool of ['claude-code', 'codex']) {
     ok(switched);
     const report = JSON.parse(switched.stdout);
     assert.equal(status(client).selected_tool, other(tool));
-    assert.equal(JSON.parse(read(client, '.specify/init-options.json')).ai, other(tool) === 'codex' ? 'codex' : 'claude');
-    assert.equal(JSON.parse(read(client, '.specify/integration.json')).integration, other(tool) === 'codex' ? 'codex' : 'claude');
+    assert.equal(existsSync(join(client, '.specify')), false);
     assert.match(read(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`), /Size the meeting/);
     assert.equal(existsSync(join(client, `${skill(tool)}/meeting-sizing/SKILL.md`)), false);
     assert.equal(existsSync(join(client, `${jobs(tool)}/follow-up.md`)), false);
     assert.equal(existsSync(join(client, `${jobs(other(tool))}/follow-up.md`)), true);
     ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
     assert.equal(status(client).selected_tool, tool);
-    assert.equal(JSON.parse(read(client, '.specify/init-options.json')).ai, tool === 'codex' ? 'codex' : 'claude');
-    assert.equal(JSON.parse(read(client, '.specify/integration.json')).integration, tool === 'codex' ? 'codex' : 'claude');
+    assert.equal(existsSync(join(client, '.specify')), false);
     assert.match(read(client, `${skill(tool)}/meeting-sizing/SKILL.md`), /Size the meeting/);
     assert.equal(existsSync(join(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`)), false);
+  });
+}
+
+for (const tool of ['claude-code', 'codex']) {
+  test(`${tool} update retires shipped Spec Kit files and keeps client edits`, t => {
+    const base = mkdtempSync(join(tmpdir(), 'orion-retire-speckit-'));
+    t.after(() => rmSync(base, { recursive: true, force: true }));
+    const release = join(base, 'release');
+    const client = join(base, 'client');
+    git(base, 'clone', '-q', checkout, release);
+    ok(run(release, 'install.mjs', '--tool', tool, '--target', client, '--local-only'));
+    const oldSkill = `${skill(tool)}/speckit-tasks/SKILL.md`;
+    const editedSkill = `${skill(tool)}/speckit-plan/SKILL.md`;
+    assert.ok(existsSync(join(client, oldSkill)));
+    assert.ok(existsSync(join(client, '.specify/scripts/bash/setup-tasks.sh')));
+    put(client, editedSkill, '# Client edited plan skill\n');
+    put(client, '.specify/memory/constitution.md', '# Client constitution\n');
+
+    const changes = execFileSync('git', ['diff', '--binary', 'HEAD'], { cwd: checkout });
+    execFileSync('git', ['apply', '--binary', '-'], { cwd: release, input: changes });
+    git(release, 'add', '-A');
+    git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'without Spec Kit');
+    const pinned = git(release, 'rev-parse', 'HEAD');
+    const result = run(client, 'update/apply.mjs', 'update', '--root', client, '--release-repo', release, '--commit', pinned);
+    ok(result);
+    const report = JSON.parse(result.stdout);
+    assert.equal(existsSync(join(client, oldSkill)), false);
+    assert.equal(existsSync(join(client, '.specify/scripts/bash/setup-tasks.sh')), false);
+    assert.equal(read(client, editedSkill), '# Client edited plan skill\n');
+    assert.equal(read(client, '.specify/memory/constitution.md'), '# Client constitution\n');
+    assert.ok(report.retired.includes(oldSkill));
+    assert.ok(report.retired.includes('.specify/scripts/bash/setup-tasks.sh'));
+    assert.ok(report.kept.includes(editedSkill));
+    assert.equal(existsSync(join(client, 'update/scaffold')), false);
+    ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
+    assert.ok(existsSync(join(client, oldSkill)));
+    assert.ok(existsSync(join(client, '.specify/scripts/bash/setup-tasks.sh')));
   });
 }

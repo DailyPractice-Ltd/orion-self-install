@@ -1,7 +1,7 @@
 {
   "_read_first": "Read docs/updating.md and update/pristine.json from the pinned release commit. Run that commit's update/apply.mjs, not the older client copy. The deployment plan selects the tool recorded in status. The request is the consent: never stop to ask; never replace a file the client has changed, except executable status/*.mjs scripts, which are backed up and replaced together. Report collisions.",
   "_what": "Legacy refresh/remove lists remain for older harnesses, except their three retired .claude skill sources. deployment is the source-to-destination and ownership contract for separate client repositories; select exactly one recorded tool. Contract: docs/updating.md and deployment._contract.",
-  "_regenerate": "Maintain deployment entries for every skills/*/SKILL.md and the Speckit runtime scaffold. Never deploy maintainer specs or constitution. Run node tests/helpers/pristine.mjs --write after release edits.",
+  "_regenerate": "Maintain deployment entries for every skills/*/SKILL.md. Historical Spec Kit paths are retired only when they still match shipped fingerprints. Run node tests/helpers/pristine.mjs --write after release edits.",
   "template_version": "2.0.0",
   "refresh": [
     ".gitignore",
@@ -92,7 +92,7 @@
     "n8n_wf02_imported"
   ],
   "deployment": {
-    "_contract": "Pinned release sources and destinations are the install, migration, and update contract. Every skills/*/SKILL.md has one mapping for each supported tool. Scaffold files are explicit; client constitution and specs remain client-owned.",
+    "_contract": "Pinned release sources and destinations are the install, migration, and update contract. Every skills/*/SKILL.md has one mapping for each supported tool. Maintainer specs remain release-only; retired Spec Kit files are removed only when unedited.",
     "tools": [
       "claude-code",
       "codex"
@@ -159,24 +159,281 @@
       "update/apply.mjs",
       "update/release-contract.mjs",
       "update/destination-resolver.mjs",
-      "validation/validation-tasks.md",
-      ".specify/scripts/bash/check-prerequisites.sh",
-      ".specify/scripts/bash/common.sh",
-      ".specify/scripts/bash/create-new-feature.sh",
-      ".specify/scripts/bash/setup-plan.sh",
-      ".specify/scripts/bash/setup-tasks.sh",
-      ".specify/templates/checklist-template.md",
-      ".specify/templates/constitution-template.md",
-      ".specify/templates/plan-template.md",
-      ".specify/templates/spec-template.md",
-      ".specify/templates/tasks-template.md",
-      ".specify/extensions.yml",
-      ".specify/extensions/agent-context/extension.yml",
-      ".specify/extensions/agent-context/README.md",
-      ".specify/extensions/agent-context/scripts/bash/update-agent-context.sh",
-      ".specify/extensions/agent-context/scripts/powershell/update-agent-context.ps1"
+      "validation/validation-tasks.md"
     ],
-    "retired": [],
+    "retired": [
+      {
+        "source": "skills/speckit-agent-context-update/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-agent-context-update/SKILL.md",
+          "codex": ".agents/skills/speckit-agent-context-update/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-agent-context-update/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-analyze/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-analyze/SKILL.md",
+          "codex": ".agents/skills/speckit-analyze/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-analyze/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-checklist/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-checklist/SKILL.md",
+          "codex": ".agents/skills/speckit-checklist/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-checklist/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-clarify/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-clarify/SKILL.md",
+          "codex": ".agents/skills/speckit-clarify/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-clarify/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-constitution/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-constitution/SKILL.md",
+          "codex": ".agents/skills/speckit-constitution/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-constitution/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-converge/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-converge/SKILL.md",
+          "codex": ".agents/skills/speckit-converge/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-converge/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-implement/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-implement/SKILL.md",
+          "codex": ".agents/skills/speckit-implement/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-implement/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-plan/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-plan/SKILL.md",
+          "codex": ".agents/skills/speckit-plan/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-plan/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-specify/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-specify/SKILL.md",
+          "codex": ".agents/skills/speckit-specify/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-specify/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-tasks/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-tasks/SKILL.md",
+          "codex": ".agents/skills/speckit-tasks/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-tasks/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-taskstoissues/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-taskstoissues/SKILL.md",
+          "codex": ".agents/skills/speckit-taskstoissues/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-taskstoissues/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": ".specify/init-options.json",
+        "destinations": {
+          "claude-code": ".specify/init-options.json",
+          "codex": ".specify/init-options.json"
+        },
+        "fingerprint_key": ".specify/init-options.json",
+        "sources": {
+          "claude-code": ".specify/init-options.json",
+          "codex": "update/scaffold/codex-init-options.json"
+        }
+      },
+      {
+        "source": "update/scaffold/codex-agent-context-config.yml",
+        "destinations": {
+          "claude-code": ".specify/extensions/agent-context/agent-context-config.yml",
+          "codex": ".specify/extensions/agent-context/agent-context-config.yml"
+        },
+        "fingerprint_key": "update/scaffold/codex-agent-context-config.yml",
+        "sources": {
+          "claude-code": ".specify/extensions/agent-context/agent-context-config.yml",
+          "codex": "update/scaffold/codex-agent-context-config.yml"
+        }
+      },
+      {
+        "source": ".specify/integration.json",
+        "destinations": {
+          "claude-code": ".specify/integration.json",
+          "codex": ".specify/integration.json"
+        },
+        "fingerprint_key": ".specify/integration.json",
+        "sources": {
+          "claude-code": ".specify/integration.json",
+          "codex": "update/scaffold/codex-integration.json"
+        }
+      },
+      {
+        "source": ".specify/scripts/bash/check-prerequisites.sh",
+        "destinations": {
+          "claude-code": ".specify/scripts/bash/check-prerequisites.sh",
+          "codex": ".specify/scripts/bash/check-prerequisites.sh"
+        },
+        "fingerprint_key": ".specify/scripts/bash/check-prerequisites.sh"
+      },
+      {
+        "source": ".specify/scripts/bash/common.sh",
+        "destinations": {
+          "claude-code": ".specify/scripts/bash/common.sh",
+          "codex": ".specify/scripts/bash/common.sh"
+        },
+        "fingerprint_key": ".specify/scripts/bash/common.sh"
+      },
+      {
+        "source": ".specify/scripts/bash/create-new-feature.sh",
+        "destinations": {
+          "claude-code": ".specify/scripts/bash/create-new-feature.sh",
+          "codex": ".specify/scripts/bash/create-new-feature.sh"
+        },
+        "fingerprint_key": ".specify/scripts/bash/create-new-feature.sh"
+      },
+      {
+        "source": ".specify/scripts/bash/setup-plan.sh",
+        "destinations": {
+          "claude-code": ".specify/scripts/bash/setup-plan.sh",
+          "codex": ".specify/scripts/bash/setup-plan.sh"
+        },
+        "fingerprint_key": ".specify/scripts/bash/setup-plan.sh"
+      },
+      {
+        "source": ".specify/scripts/bash/setup-tasks.sh",
+        "destinations": {
+          "claude-code": ".specify/scripts/bash/setup-tasks.sh",
+          "codex": ".specify/scripts/bash/setup-tasks.sh"
+        },
+        "fingerprint_key": ".specify/scripts/bash/setup-tasks.sh"
+      },
+      {
+        "source": ".specify/templates/checklist-template.md",
+        "destinations": {
+          "claude-code": ".specify/templates/checklist-template.md",
+          "codex": ".specify/templates/checklist-template.md"
+        },
+        "fingerprint_key": ".specify/templates/checklist-template.md"
+      },
+      {
+        "source": ".specify/templates/constitution-template.md",
+        "destinations": {
+          "claude-code": ".specify/templates/constitution-template.md",
+          "codex": ".specify/templates/constitution-template.md"
+        },
+        "fingerprint_key": ".specify/templates/constitution-template.md"
+      },
+      {
+        "source": ".specify/templates/plan-template.md",
+        "destinations": {
+          "claude-code": ".specify/templates/plan-template.md",
+          "codex": ".specify/templates/plan-template.md"
+        },
+        "fingerprint_key": ".specify/templates/plan-template.md"
+      },
+      {
+        "source": ".specify/templates/spec-template.md",
+        "destinations": {
+          "claude-code": ".specify/templates/spec-template.md",
+          "codex": ".specify/templates/spec-template.md"
+        },
+        "fingerprint_key": ".specify/templates/spec-template.md"
+      },
+      {
+        "source": ".specify/templates/tasks-template.md",
+        "destinations": {
+          "claude-code": ".specify/templates/tasks-template.md",
+          "codex": ".specify/templates/tasks-template.md"
+        },
+        "fingerprint_key": ".specify/templates/tasks-template.md"
+      },
+      {
+        "source": ".specify/extensions.yml",
+        "destinations": {
+          "claude-code": ".specify/extensions.yml",
+          "codex": ".specify/extensions.yml"
+        },
+        "fingerprint_key": ".specify/extensions.yml"
+      },
+      {
+        "source": ".specify/extensions/agent-context/extension.yml",
+        "destinations": {
+          "claude-code": ".specify/extensions/agent-context/extension.yml",
+          "codex": ".specify/extensions/agent-context/extension.yml"
+        },
+        "fingerprint_key": ".specify/extensions/agent-context/extension.yml"
+      },
+      {
+        "source": ".specify/extensions/agent-context/README.md",
+        "destinations": {
+          "claude-code": ".specify/extensions/agent-context/README.md",
+          "codex": ".specify/extensions/agent-context/README.md"
+        },
+        "fingerprint_key": ".specify/extensions/agent-context/README.md"
+      },
+      {
+        "source": ".specify/extensions/agent-context/scripts/bash/update-agent-context.sh",
+        "destinations": {
+          "claude-code": ".specify/extensions/agent-context/scripts/bash/update-agent-context.sh",
+          "codex": ".specify/extensions/agent-context/scripts/bash/update-agent-context.sh"
+        },
+        "fingerprint_key": ".specify/extensions/agent-context/scripts/bash/update-agent-context.sh"
+      },
+      {
+        "source": ".specify/extensions/agent-context/scripts/powershell/update-agent-context.ps1",
+        "destinations": {
+          "claude-code": ".specify/extensions/agent-context/scripts/powershell/update-agent-context.ps1",
+          "codex": ".specify/extensions/agent-context/scripts/powershell/update-agent-context.ps1"
+        },
+        "fingerprint_key": ".specify/extensions/agent-context/scripts/powershell/update-agent-context.ps1"
+      },
+      {
+        "source": ".specify/MAINTAINER-SKILLS.md",
+        "destinations": {
+          "claude-code": ".specify/MAINTAINER-SKILLS.md",
+          "codex": ".specify/MAINTAINER-SKILLS.md"
+        },
+        "fingerprint_key": ".specify/MAINTAINER-SKILLS.md"
+      },
+      {
+        "source": ".specify/feature.json",
+        "destinations": {
+          "claude-code": ".specify/feature.json",
+          "codex": ".specify/feature.json"
+        },
+        "fingerprint_key": ".specify/feature.json"
+      }
+    ],
     "entries": [
       {
         "source": "skills/create-skill/SKILL.md",
@@ -206,105 +463,6 @@
         "fingerprint_key": "skills/update-harness/SKILL.md"
       },
       {
-        "source": "skills/speckit-agent-context-update/SKILL.md",
-        "destinations": {
-          "claude-code": ".claude/skills/speckit-agent-context-update/SKILL.md",
-          "codex": ".agents/skills/speckit-agent-context-update/SKILL.md"
-        },
-        "ownership": "release",
-        "fingerprint_key": "skills/speckit-agent-context-update/SKILL.md"
-      },
-      {
-        "source": "skills/speckit-analyze/SKILL.md",
-        "destinations": {
-          "claude-code": ".claude/skills/speckit-analyze/SKILL.md",
-          "codex": ".agents/skills/speckit-analyze/SKILL.md"
-        },
-        "ownership": "release",
-        "fingerprint_key": "skills/speckit-analyze/SKILL.md"
-      },
-      {
-        "source": "skills/speckit-checklist/SKILL.md",
-        "destinations": {
-          "claude-code": ".claude/skills/speckit-checklist/SKILL.md",
-          "codex": ".agents/skills/speckit-checklist/SKILL.md"
-        },
-        "ownership": "release",
-        "fingerprint_key": "skills/speckit-checklist/SKILL.md"
-      },
-      {
-        "source": "skills/speckit-clarify/SKILL.md",
-        "destinations": {
-          "claude-code": ".claude/skills/speckit-clarify/SKILL.md",
-          "codex": ".agents/skills/speckit-clarify/SKILL.md"
-        },
-        "ownership": "release",
-        "fingerprint_key": "skills/speckit-clarify/SKILL.md"
-      },
-      {
-        "source": "skills/speckit-constitution/SKILL.md",
-        "destinations": {
-          "claude-code": ".claude/skills/speckit-constitution/SKILL.md",
-          "codex": ".agents/skills/speckit-constitution/SKILL.md"
-        },
-        "ownership": "release",
-        "fingerprint_key": "skills/speckit-constitution/SKILL.md"
-      },
-      {
-        "source": "skills/speckit-converge/SKILL.md",
-        "destinations": {
-          "claude-code": ".claude/skills/speckit-converge/SKILL.md",
-          "codex": ".agents/skills/speckit-converge/SKILL.md"
-        },
-        "ownership": "release",
-        "fingerprint_key": "skills/speckit-converge/SKILL.md"
-      },
-      {
-        "source": "skills/speckit-implement/SKILL.md",
-        "destinations": {
-          "claude-code": ".claude/skills/speckit-implement/SKILL.md",
-          "codex": ".agents/skills/speckit-implement/SKILL.md"
-        },
-        "ownership": "release",
-        "fingerprint_key": "skills/speckit-implement/SKILL.md"
-      },
-      {
-        "source": "skills/speckit-plan/SKILL.md",
-        "destinations": {
-          "claude-code": ".claude/skills/speckit-plan/SKILL.md",
-          "codex": ".agents/skills/speckit-plan/SKILL.md"
-        },
-        "ownership": "release",
-        "fingerprint_key": "skills/speckit-plan/SKILL.md"
-      },
-      {
-        "source": "skills/speckit-specify/SKILL.md",
-        "destinations": {
-          "claude-code": ".claude/skills/speckit-specify/SKILL.md",
-          "codex": ".agents/skills/speckit-specify/SKILL.md"
-        },
-        "ownership": "release",
-        "fingerprint_key": "skills/speckit-specify/SKILL.md"
-      },
-      {
-        "source": "skills/speckit-tasks/SKILL.md",
-        "destinations": {
-          "claude-code": ".claude/skills/speckit-tasks/SKILL.md",
-          "codex": ".agents/skills/speckit-tasks/SKILL.md"
-        },
-        "ownership": "release",
-        "fingerprint_key": "skills/speckit-tasks/SKILL.md"
-      },
-      {
-        "source": "skills/speckit-taskstoissues/SKILL.md",
-        "destinations": {
-          "claude-code": ".claude/skills/speckit-taskstoissues/SKILL.md",
-          "codex": ".agents/skills/speckit-taskstoissues/SKILL.md"
-        },
-        "ownership": "release",
-        "fingerprint_key": "skills/speckit-taskstoissues/SKILL.md"
-      },
-      {
         "source": "agents/README.md",
         "destinations": {
           "claude-code": ".claude/agents/README.md",
@@ -312,60 +470,11 @@
         },
         "ownership": "client-template",
         "fingerprint_key": "agents/README.md"
-      },
-      {
-        "source": ".specify/templates/constitution-template.md",
-        "destinations": {
-          "claude-code": ".specify/memory/constitution.md",
-          "codex": ".specify/memory/constitution.md"
-        },
-        "ownership": "client-template",
-        "fingerprint_key": ".specify/templates/constitution-template.md"
-      },
-      {
-        "source": ".specify/init-options.json",
-        "destinations": {
-          "claude-code": ".specify/init-options.json",
-          "codex": ".specify/init-options.json"
-        },
-        "ownership": "release",
-        "fingerprint_key": ".specify/init-options.json",
-        "sources": {
-          "claude-code": ".specify/init-options.json",
-          "codex": "update/scaffold/codex-init-options.json"
-        }
-      },
-      {
-        "source": "update/scaffold/codex-agent-context-config.yml",
-        "destinations": {
-          "claude-code": ".specify/extensions/agent-context/agent-context-config.yml",
-          "codex": ".specify/extensions/agent-context/agent-context-config.yml"
-        },
-        "ownership": "release",
-        "fingerprint_key": "update/scaffold/codex-agent-context-config.yml",
-        "sources": {
-          "claude-code": ".specify/extensions/agent-context/agent-context-config.yml",
-          "codex": "update/scaffold/codex-agent-context-config.yml"
-        }
-      },
-      {
-        "source": ".specify/integration.json",
-        "sources": {
-          "claude-code": ".specify/integration.json",
-          "codex": "update/scaffold/codex-integration.json"
-        },
-        "destinations": {
-          "claude-code": ".specify/integration.json",
-          "codex": ".specify/integration.json"
-        },
-        "ownership": "release",
-        "fingerprint_key": ".specify/integration.json"
       }
     ],
     "release_only": [
       "skills/",
       "agents/",
-      ".specify/",
       "specs/",
       "tests/",
       "CLAUDE.md"

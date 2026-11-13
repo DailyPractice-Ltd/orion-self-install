@@ -425,8 +425,8 @@ one:
 
 ## Where the fuller detail lives
 
-- `.specify/memory/constitution.md` — the principles behind these rules, if you want the
-  reasoning, not just the rule.
+- `specs/001-self-install/spec.md` and `specs/002-production-line/spec.md` — the
+  design background behind these rules.
 - `specs/001-self-install/spec.md` — the foundation user-journey spec this repo
   implements; `specs/002-production-line/spec.md` — the wizard, Library, and radio layer
   on top of it.

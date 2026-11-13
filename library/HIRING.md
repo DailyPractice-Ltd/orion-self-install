@@ -535,7 +535,7 @@ trying to happen. Offer the hire path.
   slugs, because the name keys the `packages` map and the Daily Practice shelf.
 - Job titles for role agents, never human names.
 - Reserved: `hire-agent`, `create-skill`, the client's own agent name, anything already
-  under either tool layout (including maintainer `speckit-*` skills), anything in the
+  under either tool layout, anything in the
   `packages` map.
 - **Library slugs are reserved for library installs.** If the requested role matches a
   shelf package — same job, on the same kinds of sources, producing the same kind of

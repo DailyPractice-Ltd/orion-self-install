@@ -42,9 +42,9 @@ node install.mjs --tool claude-code --target /path/to/my-orion
 ```
 
 The target must be a new or empty folder outside this release. The installer creates
-a separate local Git repository, copies all fourteen released skills into your chosen
-tool's layout with their Speckit runtime scaffold and team layout, and records that choice in `status/status.json`. It
-leaves the release sources, tests, and specs behind. Then enter your new folder and
+a separate local Git repository, copies the three Orion skills into your chosen
+tool's layout with its team roster, and records that choice in `status/status.json`.
+It leaves the release sources, tests, and project specifications behind. Then enter your new folder and
 press Start:
 
 ```bash
@@ -293,5 +293,5 @@ alone — that's what it's built for. If it genuinely can't help, reach out to
 ---
 
 *For Daily Practice maintainers evolving this repository itself — not installing it for a
-client — the technical specifications live in `specs/001-self-install/`,
-`specs/002-production-line/`, and `.specify/memory/constitution.md`.*
+client — the technical specifications live in `specs/001-self-install/`
+and `specs/002-production-line/`.*

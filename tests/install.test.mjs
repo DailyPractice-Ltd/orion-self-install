@@ -24,11 +24,8 @@ for (const tool of ['claude-code', 'codex']) {
     for (const name of readdirSync(join(release, 'skills'))) {
       assert.ok(existsSync(join(target, tool === 'codex' ? `.agents/skills/${name}/SKILL.md` : `.claude/skills/${name}/SKILL.md`)), `${name} missing`);
     }
-    for (const path of ['.specify/scripts/bash/check-prerequisites.sh', '.specify/scripts/bash/setup-plan.sh', '.specify/templates/spec-template.md', '.specify/memory/constitution.md']) assert.ok(existsSync(join(target,path)), `${path} missing`);
-    assert.match(read('.specify/memory/constitution.md'), /\[PROJECT_NAME\]/);
-    assert.notEqual(read('.specify/memory/constitution.md'), readFileSync(join(release,'.specify/memory/constitution.md'),'utf8'));
-    assert.equal(JSON.parse(read('.specify/init-options.json')).ai, tool === 'codex' ? 'codex' : 'claude');
-    assert.equal(JSON.parse(read('.specify/integration.json')).integration, tool === 'codex' ? 'codex' : 'claude');
+    assert.equal(existsSync(join(target, '.specify')), false);
+    assert.equal(existsSync(join(target, 'update/scaffold')), false);
     assert.ok(existsSync(join(target,'.git')));
     for (const path of ['skills', 'tests', 'specs', 'CLAUDE.md', tool === 'codex' ? '.claude' : '.agents', ...(tool === 'codex' ? [] : ['agents'])]) {
       assert.equal(existsSync(join(target, path)), false, `${path} leaked into client`);
@@ -79,10 +76,7 @@ test('legacy migration carries personal work into a separate deployed repository
   put('status/shifts/writer.json',JSON.stringify({wake_up:join(legacy,'status/shifts/writer.sh')}));
   put('agent/knowledge-base/01-business-context.md','my business\n');
   put('memory/INDEX.md','my memory\n');
-  put('.specify/memory/constitution.md','# My constitution\n');
-  put('.specify/templates/plan-template.md','my edited plan template\n');
   put('.claude/skills/custom/SKILL.md','my skill\n');
-  put('.claude/skills/speckit-plan/SKILL.md','release only\n');
   put('.claude/agents/README.md','my roster\n');put('.claude/agents/writer.md','my job\n');
   put('client-notes.md','my top-level notes\n');put('docs/my-playbook.md','my playbook\n');
   put('skills/maintainer/SKILL.md','release source\n');put('tests/private.test.mjs','release test\n');
@@ -97,17 +91,16 @@ test('legacy migration carries personal work into a separate deployed repository
   assert.equal(JSON.parse(read('status/status.json')).home.enabled,false);
   assert.equal(read('agent/knowledge-base/01-business-context.md'),'my business\n');
   assert.equal(read('memory/INDEX.md'),'my memory\n');
-  assert.equal(read('.specify/memory/constitution.md'),'# My constitution\n');
-  assert.equal(read('.specify/templates/plan-template.md'),'my edited plan template\n');
   assert.equal(read('.claude/skills/custom/SKILL.md'),'my skill\n');
   assert.equal(read('.claude/agents/README.md'),'my roster\n');
   assert.equal(read('.claude/agents/writer.md'),'my job\n');
   assert.equal(read('client-notes.md'),'my top-level notes\n');
   assert.equal(read('docs/my-playbook.md'),'my playbook\n');
   for(const path of ['skills','tests','n8n']) assert.equal(existsSync(join(target,path)),false);
-  assert.ok(existsSync(join(target,'.claude/skills/speckit-plan/SKILL.md')));
+  assert.equal(existsSync(join(target,'.specify')),false);
+  assert.equal(existsSync(join(target,'.claude/skills/speckit-plan/SKILL.md')),false);
   assert.equal(JSON.parse(read('status/status.json')).schema_version,'2.0.0');
-  assert.match(result.stdout,/Migration collisions \(client edits preserved\)/);
+
   assert.equal(readFileSync(join(legacy,'status/status.json'),'utf8').includes('selected_tool'),false);
 });
 

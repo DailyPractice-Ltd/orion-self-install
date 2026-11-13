@@ -32,7 +32,7 @@ the destination for the tool recorded in status. The current AI app does not cho
 the destination. Codex receives only the explicitly mapped `agents/README.md` from
 the release `agents/` tree; hired job sheets in that folder belong to the client.
 The client folder never receives the release source trees wholesale, tests, specs,
-`CLAUDE.md`, or the other tool's runtime tree. All fourteen released skills and the Speckit scripts, templates, and configuration are mapped explicitly. The client's constitution and specs remain their own; the initial constitution is an unfilled template.
+`CLAUDE.md`, or the other tool's runtime tree. All shipped skills are mapped explicitly. Earlier Spec Kit files are retired only when they still match shipped copies; client edits are preserved. Maintainer specifications stay in the release repository.
 
 A file the client has changed is kept and reported, as is a collision. The client roster and job sheets
 remain client-owned. A retired released file is removed only if it still matches a

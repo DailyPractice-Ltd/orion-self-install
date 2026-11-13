@@ -32,7 +32,7 @@ function update(root,repo,commit) {
     const tool=selectedTool(status,manifest.deployment);
     if (newer(status.template_version,manifest.template_version)) throw new Error('Refusing to roll back the harness version');
     const plan=planForTool(manifest.deployment,tool,{releaseRoot:snapshot,root});
-    const retired=(manifest.deployment.retired||[]).map(e=>({source:e.source,destination:e.destinations?.[tool]||e.destination,ownership:'release',fingerprint_key:e.fingerprint_key||e.source}));
+    const retired=(manifest.deployment.retired||[]).map(e=>({source:e.source,destination:e.destinations?.[tool]||e.destination,ownership:'release',fingerprint_key:e.sources?.[tool]||e.fingerprint_key||e.source}));
     const commonRetired=(manifest.remove||[]).map(path=>({source:path,destination:path,ownership:'release',fingerprint_key:path}));
     const actions=[], report={from:status.template_version,to:manifest.template_version,commit,selected_tool:tool,refreshed:[],added:[],retired:[],kept:[],collisions:[]};
     for (const e of plan) {
@@ -170,7 +170,7 @@ function switchTool(root,repo,commit,to,legacyTool) {
       const walk=(dir,prefix='') => {
         for(const item of readdirSync(dir,{withFileTypes:true})) {
           const rel=prefix?`${prefix}/${item.name}`:item.name, path=join(dir,item.name);
-          if(oldRoot===oldSkill && rel.split('/')[0].startsWith('speckit')) {
+          if(oldRoot===oldSkill && rel.split('/')[0].startsWith('speckit-')) {
             if(item.isDirectory()) walk(path,rel);
             else if(item.isFile()) retire.push(`${oldRoot}/${rel}`);
             else throw new Error(`Source symlink or special file: ${oldRoot}/${rel}`);

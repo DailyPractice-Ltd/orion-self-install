@@ -1,13 +1,16 @@
 # Your team
 
-> **@ summons an agent — a who. / runs a skill — a what.**
+The roster and job sheets in this folder are Orion's record of the team. Read a
+job sheet by name to route work to an agent. On Claude Code, installed job sheets
+also appear through native agent discovery. On Codex, `AGENTS.md` routes you to
+this roster and its job sheets; Codex does not discover them as native agents.
 
-Type `@` in Claude Code and your team appears. Each agent is one file in this folder:
-its job, its limits, its schedule, its report step. You are the manager — you can read
-any job description, ask for a promotion, or fire someone by deleting their file.
+Each agent is one file in this folder: its job, its limits, its schedule, its report
+step. You are the manager — you can read any job description, ask for a promotion,
+or fire someone by deleting their file.
 
 **No one hired yet.** Say **"I want to hire an agent"** and the interview starts —
-you'll be offered the roles teams typically hire ([the bank](../../library/ROLES.md)),
+you'll be offered the roles teams typically hire (the role bank at `library/ROLES.md`),
 or just describe the work in your own words; five questions, then your first team
 member is working the same session.
 
@@ -34,4 +37,4 @@ schedule was chosen, but nothing wakes the agent yet. It works when you ask.
 `status/shift-log.md`; `auto-test:` lines are the hire session's own wiring test and
 never count).
 
-How hiring works, in full: [`library/HIRING.md`](../../library/HIRING.md).
+How hiring works, in full: `library/HIRING.md` at the harness root.

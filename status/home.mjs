@@ -75,6 +75,12 @@ const STATUS_PATH = path.join(STATUS_DIR, 'status.json');
 const KEY_PATH = path.join(STATUS_DIR, RADIO_KEY_FILE);
 const KEY_REL = `status/${RADIO_KEY_FILE}`;
 
+// A release checkout is not a client's home, even if it is itself a git repository.
+if (fs.existsSync(path.join(ROOT, 'skills')) && fs.existsSync(path.join(ROOT, 'agents'))) {
+  console.error('This is the Orion release folder. Run node install.mjs --tool <codex|claude-code> --target <client-folder> first.');
+  process.exit(2);
+}
+
 /**
  * A git call that waits on a network is given a limit, so a shift never hangs
  * on it. Looking is quick or it is broken. Sending may be the whole folder.

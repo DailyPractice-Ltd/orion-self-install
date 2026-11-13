@@ -64,7 +64,7 @@ test('software that cannot start on its own is never given a command', () => {
 // ── The prompt and the job sheet ─────────────────────────────────────────────
 
 test('the shift prompt has no quote characters and is the one HIRING.md gives for rung A', () => {
-  const prompt = shiftPrompt({ folder: '{absolute folder path}', name: '{name}' });
+  const prompt = shiftPrompt({ folder: '{absolute folder path}', name: '{name}', jobRoot: '{job-root}' });
   assert.equal(/['"`%^]/.test(prompt), false, 'the shift prompt has a character a command file cannot carry');
   const hiring = read('library/HIRING.md');
   const at = hiring.indexOf('`Open {absolute folder path} and run the {name} shift:');
@@ -393,15 +393,28 @@ test('whether a schedule is on is asked of the scheduler itself', () => {
 
 // ── The command itself, in a folder of its own ───────────────────────────────
 
-function scratchHarness() {
+function scratchHarness(tool = 'claude-code') {
   const base = mkdtempSync(join(tmpdir(), 'orion-sched-'));
   mkdirSync(join(base, 'status'), { recursive: true });
-  mkdirSync(join(base, '.claude', 'agents'), { recursive: true });
+  const jobRoot = tool === 'codex' ? 'agents' : '.claude/agents';
+  mkdirSync(join(base, jobRoot), { recursive: true });
+  mkdirSync(join(base, 'update'));
+  for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(ROOT, 'update', f), join(base, 'update', f));
   for (const f of ['schedule.mjs', 'shapes.mjs']) copyFileSync(join(ROOT, 'status', f), join(base, 'status', f));
-  writeFileSync(join(base, '.claude', 'agents', 'probe.md'), '---\nname: probe\ntools: Read\nstatus: hired\n---\n\n# Probe\n');
+  writeFileSync(join(base, 'status', 'status.json'), JSON.stringify({ selected_tool: tool }));
+  writeFileSync(join(base, jobRoot, 'probe.md'), '---\nname: probe\ntools: Read\nstatus: hired\n---\n\n# Probe\n');
   const run = (...args) => spawnSync(process.execPath, [join(base, 'status', 'schedule.mjs'), ...args], { encoding: 'utf8' });
   return { base, run };
 }
+
+test('Codex schedule reads the agents/ job sheet and embeds that path in its wake-up', () => {
+  const { base, run } = scratchHarness('codex');
+  try {
+    const r = run('wire', '--agent', 'probe', '--surface', 'codex', '--at', '07:00', '--bin', process.execPath);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(readFileSync(join(base, 'status', 'shifts', 'probe.sh'), 'utf8'), /agents\/probe\.md/);
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
 
 test('wire writes only inside status/shifts/ and switches nothing on', () => {
   const { base, run } = scratchHarness();
@@ -427,14 +440,14 @@ test('wire refuses, and writes nothing, when it cannot build an honest wake-up',
   const { base, run } = scratchHarness();
   try {
     const cases = [
-      [['wire', '--agent', 'nobody', '--surface', 'codex', '--at', '07:00'], /no job sheet/],
-      [['wire', '--agent', 'probe', '--surface', 'cursor', '--at', '07:00'], /cannot be started with nobody watching/],
-      [['wire', '--agent', 'probe', '--surface', 'codex', '--at', '25:00', '--bin', process.execPath], /HH:MM/],
-      [['wire', '--agent', 'probe', '--surface', 'codex', '--at', '07:00', '--bin', join(base, 'not-there')], /--bin needs the full path/],
-      [['wire', '--agent', 'probe', '--surface', 'codex', '--at', '07:00', '--bin', 'codex'], /--bin needs the full path/],
-      [['wire', '--agent', 'probe', '--surface', 'codex', '--at', '07:00', '--bin', base], /--bin needs the full path/],
+      [['wire', '--agent', 'nobody', '--surface', 'claude-code', '--at', '07:00'], /no job sheet/],
+      [['wire', '--agent', 'probe', '--surface', 'cursor', '--at', '07:00'], /must match status.selected_tool/],
+      [['wire', '--agent', 'probe', '--surface', 'claude-code', '--at', '25:00', '--bin', process.execPath], /HH:MM/],
+      [['wire', '--agent', 'probe', '--surface', 'claude-code', '--at', '07:00', '--bin', join(base, 'not-there')], /--bin needs the full path/],
+      [['wire', '--agent', 'probe', '--surface', 'claude-code', '--at', '07:00', '--bin', 'codex'], /--bin needs the full path/],
+      [['wire', '--agent', 'probe', '--surface', 'claude-code', '--at', '07:00', '--bin', base], /--bin needs the full path/],
       // A flag is never taken as another flag's value.
-      [['wire', '--agent', 'probe', '--bin', '--surface', 'codex'], /--bin is not understood/],
+      [['wire', '--agent', 'probe', '--bin', '--surface', 'claude-code'], /--bin is not understood/],
       [['wire', '--agent', 'probe', '--at', '07:00', '--line', 'x'], /Not something schedule.mjs wire takes/],
       [['on', '--agent', 'probe', '--at', '07:00'], /Not something schedule.mjs on takes/],
       // Nothing can be switched on, fired or switched off before it is written.

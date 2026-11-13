@@ -5,6 +5,9 @@ description: Teach the client's team a reusable judgment as a skill. Use when th
 
 Read `library/HIRING.md`, Part C ("Teaching a skill instead"), and follow it exactly.
 
+Resolve `status.selected_tool` before writing the skill: `.claude/skills/` for
+Claude Code or `.agents/skills/` for Codex.
+
 A skill is invoked, not scheduled: no schedule, no report step of its own, no
 probation. When a finished task used the skill, that task's report names it
 (`node status/done.mjs --skill <slug> …`). One screen

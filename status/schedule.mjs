@@ -30,12 +30,10 @@
  *        the wake-up check of HIRING.md step 7.
  * off    Switches the schedule off. The files stay, so on brings it back.
  *
- *   --agent    The roster name of the hired agent. Its job sheet must exist at
- *              .claude/agents/<name>.md.
- *   --surface  The agent software that is running this hire right now. Not what
- *              was recorded on day one: a machine can have two, and the client
- *              may have moved. Only claude-code and codex can be started with
- *              nobody watching. Anything else is refused, plainly.
+ *   --agent    The roster name of the hired agent. Its job sheet must exist in
+ *              the selected tool's job directory.
+ *   --surface  The selected runtime in status/status.json. Only claude-code
+ *              and codex can be started with nobody watching.
  *   --at       The time of day, 24-hour, this machine's own clock.
  *   --days     Which days, as mon,tue,wed,thu,fri,sat,sun. Leave it out for
  *              every day. A schedule finer than a time of day (every 30
@@ -66,6 +64,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, delimiter, isAbsolute, win32, posix } from 'node:path';
 import { homedir } from 'node:os';
 import { labelProblem, unattendedRunner, PROMPT_SLOT, SEND_TOOL, SEND_LEVELS } from './shapes.mjs';
+import { runtimeLayout } from '../update/destination-resolver.mjs';
 
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 /** Windows refuses a scheduled task whose command is longer than this. */
@@ -78,8 +77,8 @@ export const SCHTASKS_TR_MAX = 261;
  * word for word the prompt library/HIRING.md gives for a scheduled task inside
  * the agent software, so both rungs wake the agent the same way.
  */
-export function shiftPrompt({ folder, name }) {
-  return `Open ${folder} and run the ${name} shift: first open the agent/adapters file for the software you are running in, so you know how to reach the radio here; then read .claude/agents/${name}.md, do the job section, then the report section with --shift. Work inside the GO-LIVE scope on your job sheet: write to the CRM where crm_write allows and report it, send only what the risk score allows at your send level and leave the rest waiting; ask no questions.`;
+export function shiftPrompt({ folder, name, jobRoot = '.claude/agents' }) {
+  return `Open ${folder} and run the ${name} shift: first open the agent/adapters file for the software you are running in, so you know how to reach the radio here; then read ${jobRoot}/${name}.md, do the job section, then the report section with --shift. Work inside the GO-LIVE scope on your job sheet: write to the CRM where crm_write allows and report it, send only what the risk score allows at your send level and leave the rest waiting; ask no questions.`;
 }
 
 /** Split on the commas between tools, not the ones inside Bash(a, b). */
@@ -369,7 +368,7 @@ function guardedMacFolder(folder, home) {
  * Everything wire would write, worked out without touching the disk. Returns
  * { problems } when it cannot, or the files, the record, and any notes.
  */
-export function plan({ os, folder, name, surface, at, days, bin, sheetTools, crmWrite = 'standing', sendRisk = 'off', nodeDir = null, home = null }) {
+export function plan({ os, folder, name, surface, at, days, bin, sheetTools, crmWrite = 'standing', sendRisk = 'off', nodeDir = null, home = null, jobRoot = '.claude/agents' }) {
   const problems = [];
   const path = os === 'win32' ? win32 : posix;
 
@@ -385,7 +384,7 @@ export function plan({ os, folder, name, surface, at, days, bin, sheetTools, crm
   // Claude Code is allowed the job sheet's tools and the report's three
   // commands. A sheet with no tools at all is not a finished job sheet.
   if (surface === 'claude-code' && !sheetTools) {
-    problems.push(`The job sheet .claude/agents/${name}.md has no tools: line. An agent that runs with nobody watching is allowed what its job sheet names, so add that line first.`);
+    problems.push(`The job sheet ${jobRoot}/${name}.md has no tools: line. An agent that runs with nobody watching is allowed what its job sheet names, so add that line first.`);
   }
   const tools = sheetTools ? allowedTools(sheetTools, { crmWrite, sendRisk }) : undefined;
   const runner = unattendedRunner(surface, { tools });
@@ -404,7 +403,7 @@ export function plan({ os, folder, name, surface, at, days, bin, sheetTools, crm
   const atPadded = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
   const ordered = DAYS.filter((d) => days.includes(d));
   const shifts = path.join(folder, 'status', 'shifts');
-  const prompt = shiftPrompt({ folder, name });
+  const prompt = shiftPrompt({ folder, name, jobRoot });
   const args = runner.args.map((arg) => (arg === PROMPT_SLOT ? prompt : arg));
   // Where node and the agent command live, so the wake-up can find both.
   const pathDirs = [...new Set([nodeDir, path.dirname(bin)].filter(Boolean))];
@@ -640,13 +639,14 @@ export function rerender({ folder, name }) {
     if (!learned) return { problem: `it was wired before 1.5.0 and its wake-up could not be read; wire it again with  node status/schedule.mjs wire --agent ${name} ...` };
     Object.assign(record, learned);
   }
-  const sheetPath = join(folder, '.claude', 'agents', `${name}.md`);
+  const layout = runtimeLayout(folder);
+  const sheetPath = join(folder, layout.jobRoot, `${name}.md`);
   if (!existsSync(sheetPath)) return { problem: 'its job sheet is gone' };
   const sheetText = readFileSync(sheetPath, 'utf8');
   const sendRisk = effectiveSendRisk({ status: readStatusFile(folder), sheetText });
   const result = plan({
     os: record.os, folder, name, surface: record.surface, at: record.at, days: record.days || [], bin: record.bin,
-    sheetTools: jobSheetTools(sheetText), crmWrite: jobSheetCrmWrite(sheetText), sendRisk, nodeDir: record.node_dir || null, home: homedir(),
+    sheetTools: jobSheetTools(sheetText), crmWrite: jobSheetCrmWrite(sheetText), sendRisk, nodeDir: record.node_dir || null, home: homedir(), jobRoot: layout.jobRoot,
   });
   if (result.problems.length > 0) return { problem: result.problems.join(' ') };
   const wakeUp = result.files.find((f) => f.path === record.wake_up);
@@ -736,9 +736,14 @@ function main(argv) {
     return 0;
   }
 
-  const sheetPath = join(folder, '.claude', 'agents', `${name}.md`);
+  const layout = runtimeLayout(folder);
+  if (flags.surface !== layout.tool) {
+    console.log(`--surface must match status.selected_tool (${layout.tool}). Switch tools through migration first. Nothing was written.`);
+    return 1;
+  }
+  const sheetPath = join(folder, layout.jobRoot, `${name}.md`);
   if (!existsSync(sheetPath)) {
-    console.log(`There is no job sheet at .claude/agents/${name}.md, so there is no agent to schedule. Nothing was written.`);
+    console.log(`There is no job sheet at ${layout.jobRoot}/${name}.md, so there is no agent to schedule. Nothing was written.`);
     return 1;
   }
   const sheetText = readFileSync(sheetPath, 'utf8');
@@ -771,7 +776,7 @@ function main(argv) {
 
   const result = plan({
     os: process.platform, folder, name, surface: flags.surface, at: flags.at, days, bin, sheetTools, crmWrite, sendRisk,
-    nodeDir: dirname(process.execPath), home: homedir(),
+    nodeDir: dirname(process.execPath), home: homedir(), jobRoot: layout.jobRoot,
   });
   if (result.problems.length > 0) {
     for (const problem of result.problems) console.log(problem);

@@ -6,6 +6,10 @@ description: Hire or promote an agent in the client's team. Use when the client 
 Read `library/HIRING.md` and follow it exactly — it is the entire procedure and it wins
 over anything else you have read about hiring.
 
+Resolve `status.selected_tool` first. Claude Code job sheets and roster live in
+`.claude/agents/`; Codex job sheets and roster live in `agents/`. Use the selected
+tool's skill directory, never a path inferred from the current assistant.
+
 Part A is a hire, Part B is a promotion, Part D covers half-done hires and surfaces
 that cannot schedule. Do not improvise steps, do not skip the job-sheet readback, and
 do not ask the client anything their knowledge base already answers.

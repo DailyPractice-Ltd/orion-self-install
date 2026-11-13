@@ -26,6 +26,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   WORK_TAGS, WORK_TAG_RE, isWorkTag, workTagMenu, isLabel, labelProblem, LABEL_MAX,
   countProblem, looksLikeCredential, LINE_MAX,
@@ -35,6 +36,11 @@ import { plainEnv } from './helpers/env.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..');
 const statusDir = join(repo, 'status');
+const fileHash = (path) => existsSync(path)
+  ? createHash('sha256').update(readFileSync(path)).digest('hex')
+  : null;
+const originalStatusHash = fileHash(join(statusDir, 'status.json'));
+const originalShiftLogHash = fileHash(join(statusDir, 'shift-log.md'));
 
 /**
  * A key that is well shaped and opens nothing. Built here, never written out
@@ -61,13 +67,15 @@ function makeHarness(t, { sharing = {}, status = {}, unreachable = false, refuse
   const dir = mkdtempSync(join(tmpdir(), 'orion-done-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, 'status'));
+  mkdirSync(join(dir, 'update'));
+  for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(repo, 'update', f), join(dir, 'update', f));
   // Every script the status folder ships, exactly as it is on disk right now.
   for (const f of readdirSync(statusDir).filter((name) => name.endsWith('.mjs'))) {
     copyFileSync(join(statusDir, f), join(dir, 'status', f));
   }
   if (!noStatus) {
     writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
-      ...BASE_PAYLOAD,
+      ...BASE_PAYLOAD, selected_tool: 'claude-code',
       agent_name: 'Neo',
       memory: { enabled: true, backend: 'folder', remote: null, path: 'memory' },
       ...status,
@@ -712,8 +720,8 @@ test('done: a status file that will not parse costs a shift nothing locally, and
 });
 
 test('nothing in this folder was touched by the cases above', () => {
-  assert.equal(existsSync(join(statusDir, 'status.json')), false, 'the template folder has no status.json');
-  assert.equal(existsSync(join(statusDir, 'shift-log.md')), false, 'and no shift log was written into it');
+  assert.equal(fileHash(join(statusDir, 'status.json')), originalStatusHash, 'status.json was not changed');
+  assert.equal(fileHash(join(statusDir, 'shift-log.md')), originalShiftLogHash, 'shift log was not changed');
 });
 
 // ── The shapes ──────────────────────────────────────────────────────────────
@@ -829,7 +837,7 @@ test('tripwire: the roster legend in library/HIRING.md is the one a new roster s
     assert.ok(from !== -1 && to !== -1, 'the legend should run from "Status legend." to "never count)."');
     return squash(text.slice(from, to + 'never count).'.length).replace(/^> ?/gm, ''));
   };
-  const roster = readFileSync(join(repo, '.claude', 'agents', 'README.md'), 'utf8');
+  const roster = readFileSync(join(repo, 'agents', 'README.md'), 'utf8');
   const hiring = readFileSync(join(repo, 'library', 'HIRING.md'), 'utf8');
   assert.equal(legendOf(hiring), legendOf(roster));
   assert.match(roster, /^\| Agent \| Role \| Job \| Schedule \| Status \| Skill \|$/m);

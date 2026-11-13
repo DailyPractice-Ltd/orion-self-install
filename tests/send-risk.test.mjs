@@ -82,20 +82,23 @@ test('the role line is read the way people write it, and fails closed', () => {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** A harness folder with the real scripts in it, one level, and one hired agent. */
-function makeHarness(t, { level = 'low', sheetExtra = '', status = {} } = {}) {
+function makeHarness(t, { level = 'low', sheetExtra = '', status = {}, tool = 'claude-code' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'orion-send-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, 'status'));
-  mkdirSync(join(dir, '.claude', 'agents'), { recursive: true });
+  const jobRoot = tool === 'codex' ? 'agents' : '.claude/agents';
+  mkdirSync(join(dir, jobRoot), { recursive: true });
+  mkdirSync(join(dir, 'update'));
+  for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(ROOT, 'update', f), join(dir, 'update', f));
   for (const f of readdirSync(join(ROOT, 'status')).filter((n) => n.endsWith('.mjs'))) {
     copyFileSync(join(ROOT, 'status', f), join(dir, 'status', f));
   }
   const scopes = level === null ? { crm_write: true } : { crm_write: true, send_risk: level, send_risk_set_by: 'Priya', send_risk_set_on: '2026-11-01' };
   writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
-    template_version: '1.5.0', agent_name: 'Orion', business_name: 'Northwind', client_name: 'Priya',
+    template_version: '1.5.0', selected_tool: tool, agent_name: 'Orion', business_name: 'Northwind', client_name: 'Priya',
     scopes, sharing: { status_signal_enabled: false }, ...status,
   }, null, 2));
-  writeFileSync(join(dir, '.claude', 'agents', 'follow-up.md'), `---\nname: follow-up\ntools: Read, ${GMAIL_SEARCH}, ${GMAIL_SEND}\ngo_live: true\ncrm_write: standing\n${sheetExtra}---\n# Follow-up\n`);
+  writeFileSync(join(dir, jobRoot, 'follow-up.md'), `---\nname: follow-up\ntools: Read, ${GMAIL_SEARCH}, ${GMAIL_SEND}\ngo_live: true\ncrm_write: standing\n${sheetExtra}---\n# Follow-up\n`);
   const run = (...args) => {
     const r = spawnSync(process.execPath, [join(dir, 'status', 'send.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: plainEnv() });
     return { code: r.status, out: r.stdout + r.stderr };
@@ -107,6 +110,13 @@ function makeHarness(t, { level = 'low', sheetExtra = '', status = {} } = {}) {
 
 const score = (h, { relationship = 'reply', content = 'logistics', channel = 'email', more = [] } = {}) =>
   h.run('score', '--agent', 'follow-up', '--to', 'priya@northwind.example', '--channel', channel, '--relationship', relationship, '--content', content, ...more);
+
+test('Codex send gate reads and changes agents/ job sheets', (t) => {
+  const h = makeHarness(t, { tool: 'codex' });
+  assert.equal(h.run('set-level', 'never', '--agent', 'follow-up').code, 0);
+  assert.match(readFileSync(join(h.dir, 'agents', 'follow-up.md'), 'utf8'), /send_risk: never/);
+  assert.match(score(h).out, /wait|never/i);
+});
 
 test('each level sends at its ceiling and waits at the next score up, with the exact sentence', (t) => {
   // Reachable scores from the matrix: 20 (reply + claim), 25 (known + logistics), 45 (known + claim), 50 (cold), 70 (cold + claim), 75 (cold + money).
@@ -330,11 +340,13 @@ function releasedHarness(t, tag, { hand = null } = {}) {
   execFileSync('tar', ['-xf', join(dir, 'tree.tar'), '-C', dir]);
   rmSync(join(dir, 'tree.tar'));
   for (const f of readdirSync(join(ROOT, 'status')).filter((n) => n.endsWith('.mjs'))) copyFileSync(join(ROOT, 'status', f), join(dir, 'status', f));
+  mkdirSync(join(dir, 'update'), { recursive: true });
+  for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(ROOT, 'update', f), join(dir, 'update', f));
   const def = join(dir, 'agent', 'agent-definition.md');
   writeFileSync(def, readFileSync(def, 'utf8').replaceAll('{{CLIENT_NAME}}', 'Priya').replaceAll('{{AGENT_NAME}}', 'Orion').replaceAll('{{CLIENT_BUSINESS}}', 'Northwind'));
   if (hand) writeFileSync(def, hand(readFileSync(def, 'utf8')));
   const status = JSON.parse(readFileSync(join(dir, 'status', 'status.schema-template.json'), 'utf8'));
-  Object.assign(status, { template_version: tag.slice(1), business_name: 'Northwind', agent_name: 'Orion', client_name: 'Priya' });
+  Object.assign(status, { template_version: tag.slice(1), selected_tool: 'claude-code', business_name: 'Northwind', agent_name: 'Orion', client_name: 'Priya' });
   writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify(status, null, 2));
   // A hired agent, written from that release's hiring template, with the client's own exception.
   mkdirSync(join(dir, '.claude', 'agents'), { recursive: true });
@@ -499,7 +511,7 @@ test('tripwire: the retired sentences are gone from every file that enforces or 
     'library/HIRING.md', 'library/README.md', 'library/ROLES.md',
     'connectors/connector-checklist.md', 'status/status-schema.md', 'validation/validation-tasks.md', 'docs/radio.md', 'docs/updating.md',
     'specs/002-production-line/contracts/agent-anatomy.md', 'specs/002-production-line/contracts/package-shape.md',
-    '.claude/agents/README.md', '.claude/skills/hire-agent/SKILL.md', '.claude/skills/update-harness/SKILL.md', '.claude/skills/create-skill/SKILL.md',
+    'agents/README.md', 'skills/hire-agent/SKILL.md', 'skills/update-harness/SKILL.md', 'skills/create-skill/SKILL.md',
     'specs/002-production-line/contracts/send-risk.md',
   ];
   const packages = (dir) => readdirSync(join(ROOT, dir)).map((d) => `${dir}/${d}/PACKAGE.md`).filter((p) => existsSync(join(ROOT, p)));
@@ -520,9 +532,9 @@ test('tripwire: the status template, the wizard, the manifest and the changelog 
   const template = JSON.parse(read('status/status.schema-template.json'));
   assert.equal(template.scopes.send_risk, 'low');
   assert.equal(template.schema_version, '1.9.0');
-  assert.equal(template.template_version, '1.5.0');
+  assert.equal(template.template_version, '2.0.0');
   const manifest = JSON.parse(read('update/manifest.json'));
-  assert.equal(manifest.template_version, '1.5.0');
+  assert.equal(manifest.template_version, template.template_version);
   for (const f of ['status/send.mjs', 'agent/risk-matrix.md']) assert.ok(manifest.refresh.includes(f), `${f} on the refresh list`);
   const never = Object.keys(manifest.never_touch).join(' ');
   assert.match(never, /status\/send-log\.md/);
@@ -572,8 +584,11 @@ test('tripwire: on a fresh 1.5.0 folder migrate has nothing to change and finds 
   writeFileSync(join(dir, 'tree.tar'), tar);
   execFileSync('tar', ['-xf', join(dir, 'tree.tar'), '-C', dir]);
   // The working tree's own copies, so an uncommitted edit is checked too.
-  for (const rel of ['AGENTS.md', 'agent/agent-definition.md', 'agent/adapters/claude-code.md', 'agent/adapters/claude.md', 'agent/adapters/codex.md', 'agent/adapters/chatgpt.md', 'agent/adapters/copilot.md', 'status/send.mjs', 'status/shapes.mjs', 'status/schedule.mjs']) copyFileSync(join(ROOT, rel), join(dir, rel));
+  for (const rel of ['AGENTS.md', 'agent/agent-definition.md', 'agent/adapters/claude-code.md', 'agent/adapters/claude.md', 'agent/adapters/codex.md', 'agent/adapters/chatgpt.md', 'agent/adapters/copilot.md', 'status/send.mjs', 'status/shapes.mjs', 'status/schedule.mjs', 'update/manifest.json', 'update/destination-resolver.mjs']) copyFileSync(join(ROOT, rel), join(dir, rel));
   copyFileSync(join(dir, 'status', 'status.schema-template.json'), join(dir, 'status', 'status.json'));
+  const freshStatus = JSON.parse(readFileSync(join(dir, 'status', 'status.json'), 'utf8'));
+  freshStatus.selected_tool = 'claude-code';
+  writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify(freshStatus));
   const run = (...args) => spawnSync(process.execPath, [join(dir, 'status', 'send.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: plainEnv() });
   const m = run('migrate');
   assert.equal(m.status, 0, m.stdout + m.stderr);

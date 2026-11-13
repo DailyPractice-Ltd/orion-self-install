@@ -7,11 +7,11 @@ not you opened anything.
 
 The line worth learning once, because everything else hangs off it:
 
-> **@ summons an agent — a who. / runs a skill — a what.**
+> **A job sheet names who does the work; a skill names what procedure to run.**
 
-`@prospecting` is how you talk to your prospecting person. `/meeting-sizing` is how you
-run a procedure. Your roster lives at `.claude/agents/README.md`; type `@` in Claude Code
-and your team appears.
+On Claude Code, `@prospecting` can summon the prospecting agent and `/meeting-sizing` runs a skill. On Codex, read `agents/README.md`, then open `agents/prospecting.md` and run its job and report sections; invoke a skill from `.agents/skills/` by name. Codex does not discover team job sheets through `@`.
+
+**Paths in this procedure come from `status.selected_tool` through `update/destination-resolver.mjs`: Claude Code uses `{job-root}` = `.claude/agents` and `{skill-root}` = `.claude/skills`; Codex uses `{job-root}` = `agents` and `{skill-root}` = `.agents/skills`. Read the selected value before creating or reading a job sheet, roster, or skill. A missing selection requires explicit legacy migration.**
 
 **If any other file in this folder describes hiring differently, this file wins.**
 The shape it produces is contracted in
@@ -34,9 +34,9 @@ schedule are optional.
 
 | Part | Where it lives | Plain words |
 |---|---|---|
-| **The job** | `.claude/agents/<name>.md` | What it does and never does, in your words |
+| **The job** | `{job-root}/<name>.md` | What it does and never does, in your words |
 | **The training** | `agent/knowledge-base/` | Your business, ICP, voice, numbers. Captured once, on Day 1. Shared by the whole team — nobody re-interviews you |
-| **The skill** | `.claude/skills/<name>/` | A reusable judgment this role applies — a rubric, a checklist. Only when the role has one |
+| **The skill** | `{skill-root}/<name>/` | A reusable judgment this role applies — a rubric, a checklist. Only when the role has one |
 | **The tools** | the agent file's `tools:` line | Only what the role needs. The scoring agent reads your CRM; it never touches email |
 | **The schedule (optional)** | a scheduled task on this machine | When it works without being asked: on a clock, or when another agent hands off. Work started this way is called a shift. An agent without a schedule is on call: it works when you ask |
 | **The report** | the last step of every piece of work | One command when the work is finished, whether you asked for it or a schedule started it. It writes one line on this machine and, if your check-ins are on, sends one signal to Daily Practice: the kind of work, how many, and who did it. Never the content. How you know the work was done |
@@ -48,7 +48,7 @@ schedule are optional.
 ### Before the interview (installer: do this silently)
 
 Read `agent/knowledge-base/01–07`, `status/status.json` (agent name, packages,
-machine profile), and the roster at `.claude/agents/README.md`. If the client's folder
+machine profile), and the roster at `{job-root}/README.md`. If the client's folder
 has a team map file, read that too.
 
 **Gate**: if the knowledge base is incomplete, hiring waits — a new hire trains on the
@@ -150,7 +150,7 @@ it (the scheduled task especially) still get their own explicit yes.
 
 ### The job sheet — the agent file template
 
-The one copy of this template in the repo. `.claude/agents/{name}.md`:
+The one copy of this template in the repo. `{job-root}/{name}.md`:
 
 ```markdown
 ---
@@ -199,7 +199,7 @@ Never credentials.
 ## The schedule
 {Q4. On call: "No schedule. I work when {client} asks." Clock: days + time. Handoff:
 "I run when {upstream} finishes. See the last line of
-`.claude/agents/{upstream}.md`."} If a scheduled run is missed, run at the next
+`{job-root}/{upstream}.md`."} If a scheduled run is missed, run at the next
 opening; never double up.
 
 ## The report: the last step of every piece of work, no exceptions
@@ -274,7 +274,7 @@ not the runtime. Both facts are fine, and stated.
 
 1. **Collision check** (naming rules below). Same role exists → this is a promotion,
    go to Part B. Half-created leftovers → resume matrix, Part D.
-2. **Write `.claude/agents/{name}.md`** from the template, every placeholder filled
+2. **Write `{job-root}/{name}.md`** from the template, every placeholder filled
    from the interview and the knowledge base. `status: probation`, `go_live: false`.
    `schedule:` is `on-call` when Q4 chose no schedule, and `schedule_proven: false`
    is written only when there is one. The report's `{tag}` is one tag from the menu
@@ -282,12 +282,12 @@ not the runtime. Both facts are fine, and stated.
 3. **Extract the role skill, if warranted.** The test: *does this job contain a
    reusable judgment — a rubric the client or another agent would want applied
    identically outside this role's schedule?* Yes → write
-   `.claude/skills/{skill}/SKILL.md` (one screen max, the rubric in the client's own
+   `{skill-root}/{skill}/SKILL.md` (one screen max, the rubric in the client's own
    words) and list it in the agent's `skills:`. The rubric lives in the skill file
    only — never duplicated into the agent file. Pure orchestration ("gather, draft,
    report") never earns a skill. If `library/skills/` already has the equivalent,
    install that package instead.
-4. **Append the roster row** to `.claude/agents/README.md`:
+4. **Append the roster row** to `{job-root}/README.md`:
    `@{name} | {role title} | {one-line job} | {schedule} | Probation | /{skill or —}`.
    The schedule cell reads `on call` for an on-call agent. For an agent with a
    schedule it reads the schedule and how far its proof has got, starting at e.g.
@@ -314,7 +314,7 @@ not the runtime. Both facts are fine, and stated.
      The task's prompt, exactly:
      `Open {absolute folder path} and run the {name} shift: first open the
      agent/adapters file for the software you are running in, so you know how to
-     reach the radio here; then read .claude/agents/{name}.md, do the job section,
+     reach the radio here; then read {job-root}/{name}.md, do the job section,
      then the report section with --shift. Work inside the GO-LIVE scope on your job sheet:
      write to the CRM where crm_write allows and report it, send only what the risk
      score allows at your send level and leave the rest waiting; ask no questions.`
@@ -415,7 +415,7 @@ written to the memory log (`memory/agents/{name}/log.md`) when memory is on.
 
 ### The roster
 
-`.claude/agents/README.md` is the view the client reads. Its columns are
+`{job-root}/README.md` is the view the client reads. Its columns are
 `Agent | Role | Job | Schedule | Status | Skill`, and its legend reads, word for word:
 
 > **Status legend.** `Probation`: the hire is still in flight. Its first run has not
@@ -518,10 +518,10 @@ The interview is three questions:
 3. > "Give me one real example from this week. I'll run the new skill on it right now —
    > that's the test."
 
-Execution: collision check → write `.claude/skills/{name}/SKILL.md` (frontmatter
+Execution: collision check → write `{skill-root}/{name}/SKILL.md` (frontmatter
 `name` + `description`; body = the rubric; **one screen max**) → run it on the Q3
 example; pass = the client says "yes, that's my call" → record in `packages` with
-`kind: "skill"` → add a row to the skills table in `.claude/agents/README.md` →
+`kind: "skill"` → add a row to the skills table in `{job-root}/README.md` →
 `node status/radio.mjs report-install --slug {name} --kind skill --version 0.1.0`.
 
 The size bar is a rule, not advice: a skill file longer than a screen is an agent
@@ -535,7 +535,7 @@ trying to happen. Offer the hire path.
   slugs, because the name keys the `packages` map and the Daily Practice shelf.
 - Job titles for role agents, never human names.
 - Reserved: `hire-agent`, `create-skill`, the client's own agent name, anything already
-  under `.claude/agents/` or `.claude/skills/` (including `speckit-*`), anything in the
+  under either tool layout (including maintainer `speckit-*` skills), anything in the
   `packages` map.
 - **Library slugs are reserved for library installs.** If the requested role matches a
   shelf package — same job, on the same kinds of sources, producing the same kind of

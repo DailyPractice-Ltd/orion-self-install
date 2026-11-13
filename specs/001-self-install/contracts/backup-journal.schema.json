@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Update or switch backup journal",
+  "oneOf": [
+    { "$ref": "#/$defs/update" },
+    { "$ref": "#/$defs/switch" }
+  ],
+  "$defs": {
+    "update": {
+      "type": "object", "required": ["kind", "state", "from", "to", "commit", "selected_tool", "actions"],
+      "properties": { "kind": { "const": "update" }, "state": { "enum": ["pending", "complete", "recovered"] }, "from": { "type": "string" }, "to": { "type": "string" }, "commit": { "type": "string" }, "selected_tool": { "enum": ["claude-code", "codex"] }, "actions": { "type": "array", "items": { "type": "object", "required": ["kind", "destination", "installed_hash", "prior_hash"], "properties": { "kind": { "enum": ["add", "replace", "retire"] }, "destination": { "type": "string" }, "installed_hash": { "type": ["string", "null"] }, "prior_hash": { "type": ["string", "null"] } } } } }
+    },
+    "switch": {
+      "type": "object", "required": ["kind", "state", "from", "to", "actions", "retire"],
+      "properties": { "kind": { "const": "switch" }, "state": { "enum": ["pending", "complete", "recovered", "restored"] }, "from": { "enum": ["claude-code", "codex"] }, "to": { "enum": ["claude-code", "codex"] }, "actions": { "type": "array", "items": { "type": "object", "required": ["destination", "hash"], "properties": { "destination": { "type": "string" }, "hash": { "type": "string" } } } }, "retire": { "type": "array", "items": { "type": "string" } } }
+    }
+  }
+}

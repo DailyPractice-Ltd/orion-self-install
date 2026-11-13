@@ -361,6 +361,14 @@ const STAGE_WORDS = {
 // ── The wizard, step by step ────────────────────────────────────────────────
 
 async function main() {
+  if (existsSync(join(__dirname, 'skills')) && existsSync(join(__dirname, 'agents'))) {
+    say('This is the Orion release folder. Create a separate client repository first:');
+    say('  node install.mjs --tool codex --target <your-client-folder>');
+    say('  node install.mjs --tool claude-code --target <your-client-folder>');
+    say('Then run node start.mjs inside that new folder.');
+    process.exitCode = 2;
+    return;
+  }
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
     say('Press Start — the Orion setup wizard. Run it with:  node start.mjs');
     say('Safe to re-run anytime: it resumes from status/status.json, your bookmark file.');
@@ -462,6 +470,12 @@ async function main() {
   // Step 1b — the one fork only a human can pick (US1 edge case: ask exactly one
   // question, and only when there genuinely is a choice).
   const mp = status.machine_profile;
+  // A new deployed harness has already made the one tool choice at install.
+  // Keep the wizard's handoff aligned with the recorded runtime layout.
+  if (!mp.chosen_surface && ['claude-code', 'codex'].includes(status.selected_tool)) {
+    mp.chosen_surface = status.selected_tool;
+    save(status);
+  }
   if (!mp.chosen_surface) {
     if (surfaces.length === 0) {
       mp.chosen_surface = 'website-chat';

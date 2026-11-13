@@ -100,9 +100,11 @@ node install.mjs --tool claude-code --target /path/to/new-client-folder \
 
 Use `--tool codex` only when the legacy status already records Codex. The migration
 copies the client's status and logs, knowledge, memory, skills, roster and job sheets,
-then overlays edited deployed files. Saved computer schedules are invalidated because
+as well as other client-created files such as notes and playbooks, then overlays edited
+deployed files. Release-only source trees, maintainer files, and retired workflows stay
+behind. Saved computer schedules are invalidated because
 their paths refer to the legacy folder; wire them again in the new folder. The new
-private repository becomes the home, while `--local-only` leaves home disabled. It excludes release-only trees. The legacy
+private repository becomes the home, while `--local-only` leaves home disabled. The legacy
 checkout is left intact. The command creates and pushes a private GitHub repository;
 `--remote https://github.com/OWNER/PRIVATE-REPO.git` uses an existing private
 repository, verified through `gh`. `--local-only` creates a local staging repository

@@ -31,7 +31,7 @@ function journey(t, tool) {
   const release = join(base, 'release');
   const client = join(base, 'client');
   git(base, 'clone', '-q', checkout, release);
-  ok(run(release, 'install.mjs', '--tool', tool, '--target', client));
+  ok(run(release, 'install.mjs', '--tool', tool, '--target', client, '--local-only'));
   return { release, client };
 }
 

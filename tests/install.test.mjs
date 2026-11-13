@@ -66,6 +66,9 @@ test('legacy migration carries personal work into a separate deployed repository
   put('.claude/skills/custom/SKILL.md','my skill\n');
   put('.claude/skills/speckit-plan/SKILL.md','release only\n');
   put('.claude/agents/README.md','my roster\n');put('.claude/agents/writer.md','my job\n');
+  put('client-notes.md','my top-level notes\n');put('docs/my-playbook.md','my playbook\n');
+  put('skills/maintainer/SKILL.md','release source\n');put('tests/private.test.mjs','release test\n');
+  put('n8n/old-workflow.json','retired release file\n');
   const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','claude-code','--target',target,'--migrate-from',legacy,'--local-only'],{encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);
   const read=path=>readFileSync(join(target,path),'utf8');
@@ -79,6 +82,9 @@ test('legacy migration carries personal work into a separate deployed repository
   assert.equal(read('.claude/skills/custom/SKILL.md'),'my skill\n');
   assert.equal(read('.claude/agents/README.md'),'my roster\n');
   assert.equal(read('.claude/agents/writer.md'),'my job\n');
+  assert.equal(read('client-notes.md'),'my top-level notes\n');
+  assert.equal(read('docs/my-playbook.md'),'my playbook\n');
+  for(const path of ['skills','tests','n8n']) assert.equal(existsSync(join(target,path)),false);
   assert.equal(existsSync(join(target,'.claude/skills/speckit-plan')),false);
   assert.equal(readFileSync(join(legacy,'status/status.json'),'utf8').includes('selected_tool'),false);
 });

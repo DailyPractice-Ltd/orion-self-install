@@ -33,16 +33,17 @@ months from now.
 ## ▶ Press Start
 
 Download this release, then create your own Orion folder with one command. Choose the
-AI tool that will run your harness:
+AI tool that will run your harness. Sign in to the GitHub CLI (`gh auth login`) first,
+then choose a new private repository name under your account:
 
 ```bash
-node install.mjs --tool codex --target /path/to/my-orion
+node install.mjs --tool codex --target /path/to/my-orion --github-repo YOUR-USERNAME/my-orion
 # or
-node install.mjs --tool claude-code --target /path/to/my-orion
+node install.mjs --tool claude-code --target /path/to/my-orion --github-repo YOUR-USERNAME/my-orion
 ```
 
 The target must be a new or empty folder outside this release. The installer creates
-a separate git repository there, copies the common runtime files and only your chosen
+and pushes a separate private GitHub repository, copies the common runtime files and only your chosen
 tool's skills and team layout, and records that choice in `status/status.json`. It
 leaves the release sources, tests, and specs behind. Then enter your new folder and
 press Start:
@@ -55,10 +56,12 @@ node start.mjs
 The wizard checks your computer, offers the radio choice, and gives you the prompt
 to start working with your AI assistant. Keep this client folder as your business's
 Orion home. The downloaded release folder is only the source for installing and
-updating it. The installer creates a **local** git repository. To keep a private
-copy on GitHub, create an empty private repository under your own account, then run
+updating it. If you already created an empty
+private repository, use `--remote https://github.com/YOUR-USERNAME/my-orion.git`
+instead; the installer verifies that it is private and pushes the new harness.
+If GitHub is not ready, use `--local-only` to stage the harness on this computer.
+Its GitHub home stays off until you set up a private remote with
 `node status/home.mjs prepare --remote <its-address> --yes` in the client folder.
-The installer does not create a GitHub repository or remote for you.
 
 `AGENTS.md` is the shared instruction file in either layout. The installer does not
 copy `CLAUDE.md`. Anthropic's optional `agents-md` plugin can load `AGENTS.md` when
@@ -120,13 +123,14 @@ it outside the downloaded release folder.
 ## Step 3 — Install and Press Start
 
 Open Terminal (Mac) or Windows Terminal (Windows). Type `cd `, drag the extracted
-release folder into the terminal window, and press Enter. Then run the install
-command for the tool you use:
+release folder into the terminal window, and press Enter. Sign in with
+`gh auth login`, then run the install command for the tool you use. Replace
+`YOUR-USERNAME` with your GitHub username:
 
 ```bash
-node install.mjs --tool codex --target /path/to/my-orion
+node install.mjs --tool codex --target /path/to/my-orion --github-repo YOUR-USERNAME/my-orion
 # or
-node install.mjs --tool claude-code --target /path/to/my-orion
+node install.mjs --tool claude-code --target /path/to/my-orion --github-repo YOUR-USERNAME/my-orion
 ```
 
 Replace `/path/to/my-orion` with the location you chose in Step 2. If it contains
@@ -134,7 +138,13 @@ spaces, put the path in quotation marks. The command prints the exact next step:
 enter your new client folder and run `node start.mjs` there. The wizard saves its
 answers in that client's `status/status.json`, never in the release checkout.
 
-If Node.js or git is missing, install it before using the scripted path, or ask your
+If you need to work locally first, replace `--github-repo YOUR-USERNAME/my-orion`
+with `--local-only`. The installer will tell you that private GitHub setup is
+pending. If you have an existing empty private repository, use
+`--remote https://github.com/YOUR-USERNAME/my-orion.git` instead.
+
+If Node.js, git, or the GitHub CLI is missing, install it before using the private
+GitHub path, or use `--local-only` for now. You can also ask your
 AI assistant to help with the manual setup.
 
 ---

@@ -95,31 +95,159 @@
     {
       "from_version": "1.5.0",
       "tool": "claude-code",
-      "steps": [],
+      "starting_layout": "legacy-same-folder",
+      "verification": {
+        "infer_tool": true,
+        "anchors": [
+          {
+            "path": "update/manifest.json",
+            "sha256": "c229136fd20885dacf85191dfccef6236d50d9c75b5d639a934bbddf80db5be1"
+          },
+          {
+            "path": "status/status.schema-template.json",
+            "sha256": "e643c267ea9176d83a659e6f720bdadd6c7b49dda5f31de366e0b810a6dd84c2"
+          },
+          {
+            "path": ".claude/skills/create-skill/SKILL.md",
+            "sha256": "d50714304118add05075dba9613835c61213759594b3d8c3defad2f14f9f1302"
+          },
+          {
+            "path": ".claude/skills/hire-agent/SKILL.md",
+            "sha256": "75c479d9dc00e53579a29972c02262635e0239ceb59075f53d3bf2092ee72f5f"
+          }
+        ],
+        "absent_paths": [
+          "skills",
+          "agents",
+          ".agents/skills",
+          "update/request.mjs"
+        ]
+      },
+      "copy_exclude": [
+        ".git",
+        ".github",
+        ".specify",
+        ".update-backup",
+        ".codex",
+        "node_modules",
+        "status/shifts"
+      ],
+      "steps": [
+        {
+          "from_version": "1.5.0",
+          "to_version": "2.0.0",
+          "script": "update/migrations/v1.5.0-separate-harness.json",
+          "changes": [
+            {
+              "path": "status/status.json",
+              "operation": "replace"
+            }
+          ]
+        }
+      ],
       "required_destinations": [
-        "update/manifest.json",
         "update/request.mjs",
         "update/apply.mjs",
-        "update/published-transaction.mjs"
+        "update/published-transaction.mjs",
+        "update/published-migrations.mjs",
+        "update/manifest.json"
       ],
       "checks": [
-        { "kind": "deployed-layout" },
-        { "kind": "node-syntax", "path": "update/apply.mjs" }
+        {
+          "kind": "deployed-layout"
+        },
+        {
+          "kind": "node-syntax",
+          "path": "update/apply.mjs"
+        }
       ]
     },
     {
-      "from_version": "1.5.0",
-      "tool": "codex",
+      "from_version": "2.0.0",
+      "tool": "claude-code",
+      "starting_layout": "deployed",
+      "verification": {
+        "infer_tool": true,
+        "anchors": [
+          {
+            "path": "start.mjs",
+            "sha256": "eeff9825487085d1b93c558c5efd04a920e4fb682f8c7aa296b65776b60713e4"
+          },
+          {
+            "path": ".claude/skills/update-harness/SKILL.md",
+            "sha256": "1259836634e962d1ead9758b4eceb4dd7bcedf80304366dc22affbb18c3e003a"
+          }
+        ],
+        "absent_paths": [
+          "skills",
+          ".agents/skills"
+        ],
+        "allow_client_edits": [
+          "AGENTS.md",
+          "agent/agent-definition.md",
+          "agent/knowledge-base/README.md"
+        ]
+      },
       "steps": [],
       "required_destinations": [
-        "update/manifest.json",
         "update/request.mjs",
         "update/apply.mjs",
-        "update/published-transaction.mjs"
+        "update/published-transaction.mjs",
+        "update/published-migrations.mjs",
+        "update/manifest.json"
       ],
       "checks": [
-        { "kind": "deployed-layout" },
-        { "kind": "node-syntax", "path": "update/apply.mjs" }
+        {
+          "kind": "deployed-layout"
+        },
+        {
+          "kind": "node-syntax",
+          "path": "update/apply.mjs"
+        }
+      ]
+    },
+    {
+      "from_version": "2.0.0",
+      "tool": "codex",
+      "starting_layout": "deployed",
+      "verification": {
+        "infer_tool": true,
+        "anchors": [
+          {
+            "path": "start.mjs",
+            "sha256": "eeff9825487085d1b93c558c5efd04a920e4fb682f8c7aa296b65776b60713e4"
+          },
+          {
+            "path": ".agents/skills/update-harness/SKILL.md",
+            "sha256": "1259836634e962d1ead9758b4eceb4dd7bcedf80304366dc22affbb18c3e003a"
+          }
+        ],
+        "absent_paths": [
+          "skills",
+          ".claude/skills"
+        ],
+        "allow_client_edits": [
+          "AGENTS.md",
+          "agent/agent-definition.md",
+          "agent/knowledge-base/README.md"
+        ]
+      },
+      "steps": [],
+      "required_destinations": [
+        "update/request.mjs",
+        "update/apply.mjs",
+        "update/published-transaction.mjs",
+        "update/published-migrations.mjs",
+        "update/manifest.json"
+      ],
+      "checks": [
+        {
+          "kind": "deployed-layout"
+        },
+        {
+          "kind": "node-syntax",
+          "path": "update/apply.mjs"
+        }
       ]
     }
   ],
@@ -194,6 +322,7 @@
       "update/published-release.mjs",
       "update/request.mjs",
       "update/published-transaction.mjs",
+      "update/published-migrations.mjs",
       "docs/published-install.md"
     ],
     "retired": [
@@ -800,6 +929,7 @@
       "agents/",
       "specs/",
       "tests/",
+      "update/migrations/",
       "CLAUDE.md"
     ],
     "ownership": {

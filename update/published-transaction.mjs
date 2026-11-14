@@ -10,6 +10,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   rmSync,
   rmdirSync,
@@ -22,7 +23,6 @@ import {
   fingerprint,
   planForTool,
   safePath,
-  selectedTool,
 } from './destination-resolver.mjs';
 import { compareVersions, verifyPinnedRelease } from './published-release.mjs';
 import {
@@ -32,9 +32,15 @@ import {
   readRadioKeyFile,
 } from '../status/shapes.mjs';
 
-const statusFile = 'status/status.json';
+import {
+  cleanInstall,
+  preflightSteps,
+  runSteps,
+  selectPath,
+  statusFile,
+  versionPattern,
+} from './published-migrations.mjs';
 const backups = '.update-backup';
-const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const json = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const serialized = (value) => JSON.stringify(value, null, 2) + '\n';
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -63,11 +69,13 @@ function saveJournal(backup, journal) {
   renameSync(temporary, path);
 }
 
-function runtimePairing(root, status) {
+function runtimePairing(root, status, overrideKey) {
   const where = {
-    keyFile: readRadioKeyFile(dirname(safePath(root, 'status/radio.key')), {
-      readFileSync,
-    }),
+    keyFile:
+      overrideKey ??
+      readRadioKeyFile(dirname(safePath(root, 'status/radio.key')), {
+        readFileSync,
+      }),
   };
   if (!radioOn(status, where))
     throw new Error('Updating requires an enabled, paired radio.');
@@ -77,8 +85,8 @@ function runtimePairing(root, status) {
   };
 }
 
-async function requireWorkingRadio(root, status) {
-  const { url, key } = runtimePairing(root, status);
+async function requireWorkingRadio(root, status, overrideKey) {
+  const { url, key } = runtimePairing(root, status, overrideKey);
   try {
     const response = await fetch(`${url}/library`, {
       headers: keyHeader(key),
@@ -97,6 +105,7 @@ async function requireWorkingRadio(root, status) {
 function recordedRelease(status) {
   const version = status.template_version;
   const prior = status.applied_release;
+  if (prior == null) return null;
   if (
     !versionPattern.test(version) ||
     prior?.tag !== `v${version}` ||
@@ -113,19 +122,7 @@ function recordedRelease(status) {
   return prior;
 }
 
-function compatibility(manifest, version, tool, deployed) {
-  const matches =
-    manifest.update_compatibility?.filter(
-      (entry) => entry.from_version === version && entry.tool === tool,
-    ) || [];
-  if (matches.length !== 1) {
-    throw new Error(
-      `Expected one supported update path from ${version} for ${tool}. A separate clean install is available when no path is declared.`,
-    );
-  }
-  const path = matches[0];
-  if (!Array.isArray(path.steps) || path.steps.length !== 0)
-    throw new Error('The declared migration path is unavailable.');
+function validateChecks(path, deployed) {
   if (
     !Array.isArray(path.required_destinations) ||
     new Set(path.required_destinations).size !==
@@ -182,14 +179,46 @@ function validateDeploymentPath(path) {
     throw new Error(`Invalid or reserved update destination: ${path}`);
 }
 
-function planUpdate({ root, checkout, manifest, status, stage }) {
-  const tool = selectedTool(status, manifest.deployment);
-  const entries = planForTool(manifest.deployment, tool, {
+function updatePath({ root, checkout, manifest, path }) {
+  const entries = planForTool(manifest.deployment, path.tool, {
     releaseRoot: checkout,
     root,
   });
   const deployed = new Map(entries.map((entry) => [entry.destination, entry]));
-  const path = compatibility(manifest, status.template_version, tool, deployed);
+  validateChecks(path, deployed);
+  return {
+    entries,
+    deployed,
+    steps: preflightSteps(checkout, path, manifest.template_version),
+  };
+}
+
+function planUpdate({
+  root,
+  checkout,
+  manifest,
+  path,
+  stage,
+  backfill,
+  pairing,
+  declared,
+}) {
+  const tool = path.tool;
+  const { entries, deployed, steps } = declared;
+  const { files, migrations } = runSteps({
+    steps,
+    read: (destination) => file(safePath(root, destination)),
+    defaults: json(safePath(checkout, 'status/status.schema-template.json')),
+  });
+  let nextStatus = files.get(statusFile);
+  files.delete(statusFile);
+  if (pairing) {
+    if (!nextStatus)
+      throw new Error('Separate migration must declare its status changes.');
+    const status = JSON.parse(nextStatus.bytes);
+    status.sharing = pairing.sharing;
+    nextStatus = { ...nextStatus, bytes: Buffer.from(serialized(status)) };
+  }
   const required = new Set(path.required_destinations);
   const pristine = json(join(checkout, 'update/pristine.json'));
   const actions = [];
@@ -199,7 +228,24 @@ function planUpdate({ root, checkout, manifest, status, stage }) {
     retired: [],
     kept: [],
     collisions: [],
+    ...(migrations.length && { migrations }),
   };
+
+  const allowedEdits = path.verification?.allow_client_edits ?? [];
+  if (
+    backfill &&
+    (!Array.isArray(allowedEdits) ||
+      allowedEdits.some(
+        (destination) =>
+          deployed.get(destination)?.ownership !== 'release' ||
+          required.has(destination) ||
+          path.verification.anchors.some(
+            (anchor) => anchor.path === destination,
+          ),
+      ))
+  ) {
+    throw new Error('Invalid same-version client edit exceptions.');
+  }
 
   function stageAction(destination, prior, incoming) {
     if (incoming) {
@@ -225,6 +271,30 @@ function planUpdate({ root, checkout, manifest, status, stage }) {
     validateDeploymentPath(destination);
     const incoming = file(safePath(checkout, source));
     if (!incoming) throw new Error(`Missing release source: ${source}`);
+    if (backfill) {
+      const prior = file(safePath(root, destination));
+      if (
+        !prior ||
+        (entry.ownership === 'release' &&
+          !prior.bytes.equals(incoming.bytes) &&
+          !allowedEdits.includes(destination))
+      ) {
+        throw new Error(
+          `Cannot verify the exact installed publication at ${destination}. ${cleanInstall}`,
+        );
+      }
+      if (entry.ownership === 'release' && !prior.bytes.equals(incoming.bytes))
+        report.kept.push(destination);
+      continue;
+    }
+    if (files.has(destination)) {
+      const migrated = files.get(destination);
+      if (!migrated)
+        throw new Error(`Migration retired deployed file: ${destination}`);
+      stageAction(destination, file(safePath(root, destination)), migrated);
+      files.delete(destination);
+      continue;
+    }
     const state = destinationState(root, entry, pristine);
     if (state === 'client-owned') {
       report.collisions.push(destination);
@@ -264,12 +334,21 @@ function planUpdate({ root, checkout, manifest, status, stage }) {
     })),
   ];
   const retiredPaths = new Set();
-  for (const entry of retired) {
+  for (const entry of backfill ? [] : retired) {
     const { destination } = entry;
     validateDeploymentPath(destination);
     if (deployed.has(destination) || retiredPaths.has(destination))
       throw new Error(`Conflicting retired destination: ${destination}`);
     retiredPaths.add(destination);
+    if (files.has(destination)) {
+      stageAction(
+        destination,
+        file(safePath(root, destination)),
+        files.get(destination),
+      );
+      files.delete(destination);
+      continue;
+    }
     const state = destinationState(
       root,
       { ...entry, ownership: 'release' },
@@ -278,6 +357,18 @@ function planUpdate({ root, checkout, manifest, status, stage }) {
     if (state === 'owned')
       stageAction(destination, file(safePath(root, destination)), null);
     if (state === 'preserve') report.kept.push(destination);
+  }
+
+  for (const [destination, incoming] of files) {
+    validateDeploymentPath(destination);
+    stageAction(destination, file(safePath(root, destination)), incoming);
+  }
+
+  if (pairing?.key_file) {
+    stageAction('status/radio.key', file(safePath(root, 'status/radio.key')), {
+      bytes: Buffer.from(`${pairing.key_file}\n`),
+      mode: 0o600,
+    });
   }
 
   const stagedPaths = new Set(
@@ -299,7 +390,15 @@ function planUpdate({ root, checkout, manifest, status, stage }) {
     removeChecklistKeys.some((key) => typeof key !== 'string' || !key)
   )
     throw new Error('Invalid retired checklist key declarations.');
-  return { actions, entries, checks: path.checks, removeChecklistKeys, report };
+  return {
+    actions,
+    entries,
+    checks: path.checks,
+    removeChecklistKeys,
+    report,
+    nextStatus,
+    tool,
+  };
 }
 
 function missingDirectories(root, actions) {
@@ -551,7 +650,8 @@ function promote(root, stage, priorStatus, plan, pin) {
       currentMode(root, statusFile) !== journal.status.prior_mode
     )
       throw new Error('Harness status changed during the update.');
-    const status = JSON.parse(priorStatus.bytes);
+    const status = JSON.parse(plan.nextStatus?.bytes ?? priorStatus.bytes);
+    status.selected_tool = plan.tool;
     for (const key of plan.removeChecklistKeys) delete status.checklist?.[key];
     status.template_version = pin.manifest_version;
     status.applied_release = { ...pin, applied_at: new Date().toISOString() };
@@ -585,7 +685,179 @@ function promote(root, stage, priorStatus, plan, pin) {
   };
 }
 
-export async function applyPublishedUpdate({ root, checkout, client, pin }) {
+function pathExists(path) {
+  try {
+    lstatSync(path);
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+function separateTarget(root, migrateTo) {
+  const parent = dirname(realpathSync(root));
+  const requested = resolve(
+    migrateTo ?? join(parent, `${basename(root)}-deployed`),
+  );
+  if (realpathSync(dirname(requested)) !== parent)
+    throw new Error(
+      'Choose a new deployed folder alongside the original harness.',
+    );
+  return join(parent, basename(requested));
+}
+
+function copyLegacyHarness(source, destination, path, manifest) {
+  if (!Array.isArray(path.copy_exclude))
+    throw new Error('Missing separate-folder migration copy exclusions.');
+  const excluded = [
+    '.git',
+    '.update-backup',
+    'status/shifts',
+    ...manifest.deployment.release_only,
+    ...path.copy_exclude,
+  ].map((value) => value.replace(/\/$/, ''));
+  for (const value of excluded)
+    validateDeploymentPath(
+      value === '.git' || value === backups ? `excluded/${value}` : value,
+    );
+  function copy(relativePath) {
+    if (excluded.includes(relativePath)) return;
+    const original = safePath(source, relativePath);
+    const stat = lstatSync(original);
+    if (stat.isDirectory()) {
+      mkdirSync(safePath(destination, relativePath), { mode: 0o700 });
+      for (const name of readdirSync(original)) copy(`${relativePath}/${name}`);
+    } else {
+      const prior = file(original);
+      write(safePath(destination, relativePath), prior.bytes, prior.mode);
+    }
+  }
+  for (const name of readdirSync(source)) copy(name);
+}
+
+function stageSeparateHarness(root, target) {
+  if (pathExists(target))
+    throw new Error('The new deployed folder must not exist.');
+  const prefix = `.${basename(target)}-migration-`;
+  const stage = mkdtempSync(join(dirname(target), `${prefix}${process.pid}-`));
+  try {
+    for (const entry of readdirSync(dirname(target), { withFileTypes: true })) {
+      if (!entry.isDirectory() || !entry.name.startsWith(prefix)) continue;
+      const candidate = join(dirname(target), entry.name);
+      if (candidate === stage) continue;
+      const owner = /^([1-9]\d*)-[a-zA-Z0-9]+$/.exec(
+        entry.name.slice(prefix.length),
+      );
+      if (!owner) continue;
+      try {
+        process.kill(Number(owner[1]), 0);
+      } catch (error) {
+        if (error.code === 'ESRCH') {
+          const marker = safePath(candidate, '.orion-migration.json');
+          if (pathExists(marker) && json(marker).source === root)
+            rmSync(candidate, { recursive: true, force: true });
+          continue;
+        }
+        if (error.code !== 'EPERM') throw error;
+      }
+      throw new Error('Another migration is staging this deployed folder.');
+    }
+    write(
+      join(stage, '.orion-migration.json'),
+      serialized({ source: root }),
+      0o600,
+    );
+    return stage;
+  } catch (error) {
+    rmSync(stage, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function applySeparateMigration({
+  root,
+  priorStatus,
+  checkout,
+  client,
+  pin,
+  manifest,
+  path,
+  stage,
+  migrateTo,
+  pairing,
+  declared,
+}) {
+  const target = separateTarget(root, migrateTo);
+  const destination = stageSeparateHarness(root, target);
+  try {
+    copyLegacyHarness(root, destination, path, manifest);
+    selectPath({
+      root: destination,
+      manifest,
+      status: JSON.parse(priorStatus.bytes),
+      previous: null,
+      read: (directory, relativePath) =>
+        file(safePath(directory, relativePath)),
+    });
+    const copy = file(safePath(destination, statusFile));
+    if (!copy.bytes.equals(priorStatus.bytes) || copy.mode !== priorStatus.mode)
+      throw new Error(
+        'Original harness status changed during migration preflight.',
+      );
+    const plan = planUpdate({
+      root: destination,
+      checkout,
+      manifest,
+      path,
+      stage,
+      pairing,
+      declared,
+    });
+    if (!plan.nextStatus)
+      throw new Error('Separate migration must declare its status changes.');
+    const init = spawnSync(
+      'git',
+      ['-C', destination, 'init', '-q', '-b', 'main'],
+      { encoding: 'utf8' },
+    );
+    if (init.status !== 0)
+      throw new Error('Could not create the local deployed repository.');
+    await verifyPinnedRelease(client, pin, checkout);
+    assertPriorFile(root, {
+      destination: statusFile,
+      prior_hash: digest(priorStatus.bytes),
+      prior_mode: priorStatus.mode,
+    });
+    mkdirSync(safePath(destination, backups), { mode: 0o700 });
+    const result = promote(destination, stage, copy, plan, pin);
+    if (pathExists(target))
+      throw new Error('The new deployed folder must not exist.');
+    assertPriorFile(root, {
+      destination: statusFile,
+      prior_hash: digest(priorStatus.bytes),
+      prior_mode: priorStatus.mode,
+    });
+    unlinkSync(join(destination, '.orion-migration.json'));
+    renameSync(destination, target);
+    return { ...result, deployed_folder: target };
+  } catch (error) {
+    throw new Error(
+      `Migration stopped. The original folder is unchanged. ${error.message.replace(/ Report: \.update-backup\/\S+$/, '')}`,
+    );
+  } finally {
+    rmSync(destination, { recursive: true, force: true });
+  }
+}
+
+export async function applyPublishedUpdate({
+  root,
+  checkout,
+  client,
+  pin,
+  migrateTo,
+  migrationPairing,
+}) {
   root = resolve(root);
   if (!lstatSync(root).isDirectory())
     throw new Error('Expected a deployed harness directory.');
@@ -599,15 +871,24 @@ export async function applyPublishedUpdate({ root, checkout, client, pin }) {
     pin.release_id < 1
   )
     throw new Error('A full published release identity is required.');
+  root = realpathSync(root);
   const statusPath = safePath(root, statusFile);
   const priorStatus = file(statusPath);
   if (!priorStatus) throw new Error('Harness status file is missing.');
   const status = JSON.parse(priorStatus.bytes);
-  await requireWorkingRadio(root, status);
+  const pairing = migrationPairing ? json(migrationPairing) : null;
+  if (
+    pairing &&
+    (!pairing.sharing ||
+      pairing.sharing.radio_choice !== 'accepted' ||
+      (pairing.key_file !== undefined && typeof pairing.key_file !== 'string'))
+  )
+    throw new Error('Invalid pairing staged for the separate migration.');
   const pending = pendingTransactions(root);
   if (pending.some(({ journal }) => journal.state === 'recovery-required'))
     throw new Error('Update requires recovery from a separate pinned source.');
   if (pending.length) {
+    await requireWorkingRadio(root, status);
     await verifyPinnedRelease(client, pin, checkout);
     withUpdateLock(root, () => {
       for (const { backup, journal } of pendingTransactions(root)) {
@@ -630,14 +911,25 @@ export async function applyPublishedUpdate({ root, checkout, client, pin }) {
         }
       }
     });
-    return applyPublishedUpdate({ root, checkout, client, pin });
+    return applyPublishedUpdate({
+      root,
+      checkout,
+      client,
+      pin,
+      migrateTo,
+      migrationPairing,
+    });
   }
 
   const previous = recordedRelease(status);
-  const order = compareVersions(pin.tag, previous.tag);
+  if (!versionPattern.test(status.template_version))
+    throw new Error(`Starting release identity is invalid. ${cleanInstall}`);
+  const priorTag = `v${status.template_version}`;
+  const order = compareVersions(pin.tag, priorTag);
   if (order < 0)
-    throw new Error(`Refusing downgrade from ${previous.tag} to ${pin.tag}.`);
-  if (order === 0) {
+    throw new Error(`Refusing downgrade from ${priorTag} to ${pin.tag}.`);
+  if (order === 0 && previous) {
+    await requireWorkingRadio(root, status);
     await verifyPinnedRelease(client, pin, checkout);
     if (
       previous.commit !== pin.commit ||
@@ -646,10 +938,18 @@ export async function applyPublishedUpdate({ root, checkout, client, pin }) {
       throw new Error(`Release integrity conflict for ${pin.tag}.`);
     if (currentHash(root, statusFile) !== digest(priorStatus.bytes))
       throw new Error('Harness status changed during the request.');
-    return {
-      message: `${pin.tag} already applied.`,
-      applied_release: previous,
-    };
+    if (status.selected_tool != null) {
+      if (migrateTo || pairing)
+        throw new Error(
+          'The selected release is already deployed in this folder.',
+        );
+      if (!['claude-code', 'codex'].includes(status.selected_tool))
+        throw new Error(`Unknown recorded tool. ${cleanInstall}`);
+      return {
+        message: `${pin.tag} already applied.`,
+        applied_release: previous,
+      };
+    }
   }
 
   const manifest = json(safePath(checkout, 'update/manifest.json'));
@@ -657,7 +957,53 @@ export async function applyPublishedUpdate({ root, checkout, client, pin }) {
     throw new Error('Pinned manifest identity changed.');
   const stage = mkdtempSync(join(dirname(checkout), 'orion-update-stage-'));
   try {
-    const plan = planUpdate({ root, checkout, manifest, status, stage });
+    const path = selectPath({
+      root,
+      manifest,
+      status,
+      previous,
+      read: (directory, destination) => file(safePath(directory, destination)),
+    });
+    const changingFolder = path.starting_layout === 'legacy-same-folder';
+    if (!changingFolder && (migrateTo || pairing))
+      throw new Error(
+        'The selected migration path applies to your existing deployed folder.',
+      );
+    if (changingFolder && order === 0)
+      throw new Error(
+        `A same-folder harness cannot verify this exact deployed release. ${cleanInstall}`,
+      );
+    await requireWorkingRadio(
+      root,
+      pairing ? { ...status, sharing: pairing.sharing } : status,
+      pairing?.key_file,
+    );
+    const declared = updatePath({ root, checkout, manifest, path });
+    if (changingFolder) {
+      await verifyPinnedRelease(client, pin, checkout);
+      return await applySeparateMigration({
+        root,
+        priorStatus,
+        checkout,
+        client,
+        pin,
+        manifest,
+        path,
+        stage,
+        migrateTo,
+        pairing,
+        declared,
+      });
+    }
+    const plan = planUpdate({
+      root,
+      checkout,
+      manifest,
+      path,
+      stage,
+      backfill: order === 0,
+      declared,
+    });
     await verifyPinnedRelease(client, pin, checkout);
     return withUpdateLock(root, () => {
       if (pendingTransactions(root).length)

@@ -213,6 +213,21 @@ function readReview(directory) {
   }
 }
 
+function copiesMatch(directory, conflicts, entries) {
+  try {
+    return conflicts.every(({ installed, incoming, prior }, index) => {
+      const names = entries[index];
+      return (
+        (!prior || reviewFile(directory, names.prior).equals(prior.bytes)) &&
+        reviewFile(directory, names.edited).equals(installed.bytes) &&
+        reviewFile(directory, names.incoming).equals(incoming.bytes)
+      );
+    });
+  } catch {
+    return false;
+  }
+}
+
 export function reviewRequiredEdits({ reviewDir, ...context }) {
   const { conflicts } = context;
   if (!conflicts.length) {
@@ -228,7 +243,10 @@ export function reviewRequiredEdits({ reviewDir, ...context }) {
     ...input,
     conflicts: input.conflicts.map((entry) => ({ ...entry, choice: null })),
   };
-  if (!isDeepStrictEqual(evidence, expected)) {
+  if (
+    !isDeepStrictEqual(evidence, expected) ||
+    !copiesMatch(reviewDir, conflicts, expected.conflicts)
+  ) {
     const folder = saveReview(expected, conflicts, context.pairing);
     throw new Error(
       (reviewDir ? 'The earlier review is stale.\n' : '') +

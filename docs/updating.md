@@ -40,14 +40,40 @@ string on its own needs a declared verification migration. If a starting version
 has no supported path, keep the old folder and install into a separate folder.
 
 A file the client has changed is kept and reported when the change is optional.
-If a required change is blocked by a local edit, the update stops before writing
-and names the file. The pinned `update/manifest.json` defines the release
-destinations and required files. The pinned `update/pristine.json` supplies
-historical fingerprints for released files, including retired files. The registry
-itself cannot certify its own earlier contents, so updates use the pinned
-registry and preserve a differing local copy. Orion keeps
-the roster, hired job sheets, and unmapped client files. Maintainer
-specifications stay in the release repository.
+Orion keeps the roster, hired job sheets, and unmapped client files.
+
+### Review a required edit
+
+If a local edit blocks a required fix after any declared migrations, Orion
+pauses and prints the path to a private temporary review folder. Open
+`review.json` there. Each entry links to three local files with the prior
+shipped version, your edited version, and the incoming published version.
+When a file is new in this release, `prior` is `null`. Review the files locally.
+The updater only prints file names and the review location, so your edits can
+stay out of chat and logs.
+
+Set `choice` for every listed file in `review.json`:
+
+- `"replace"` installs the incoming version and saves your edit in the update
+  backup.
+- `"merge"` uses the version you review and save at the listed `merged` path.
+  Include the required fix and resolve any conflict markers. If `merged` is
+  `null`, the file controls the pinned updater and requires replacement.
+
+Run the original update command with the review folder added:
+
+```sh
+node update/request.mjs --resolve-required "/path/from/the/update"
+```
+
+Orion rechecks the publication, the starting harness, and the copies that
+need a decision. If the review has gone stale, use the fresh review or retry
+the original command. To defer, leave the update paused.
+
+If you opted into radio as part of migrating to a separate folder, keep the
+original migration destination and omit `--pair-radio` when continuing a review.
+Orion saves that confirmed pairing in a private file alongside the review.
+Keep the review folder local and delete it when you no longer need its copies.
 
 The updater stages changes, backs up each affected file under `.update-backup/`,
 and then applies them. It records the tag, full commit, Release ID, and
@@ -176,7 +202,15 @@ required `checks`. Include a `deployed-layout` check and any applicable
 migration script, declare `steps: []`.
 
 A migration lists steps in order with `from_version` and `to_version` values
-that connect the starting version to the release. Every step names a pinned
+that connect the starting version to the release. Historical versions in a
+required-edit review come from the recorded release's exact GitHub Release ID,
+tag and commit. For a supported starting state without that record, a pinned
+verification rule can specify `historical_source` with its exact `tag` and
+`commit`. The historical tag must still resolve to that commit. The release
+inventory lists pinned updater control files in
+`deployment.immutable_update_sources`.
+
+Every step names a pinned
 `script` under `update/migrations/` and declares its allowed `changes`, each
 with a relative `path` and an `operation` of `add`, `replace`, or `retire`.
 Scripts are JSON arrays of local file instructions. `write-text` takes `text`,

@@ -370,6 +370,7 @@ try {
     const options = {
       root, checkout,
       migrateTo: arg('--migrate-to'), migrationPairing: arg('--migration-pairing'),
+      reviewDir: arg('--resolve-required'),
       client: createReleaseClient({
         repository: arg('--repository'), apiBase: arg('--api-base'), sourceUrl: arg('--source-url'),
       }),

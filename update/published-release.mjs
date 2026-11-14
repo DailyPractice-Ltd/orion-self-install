@@ -101,9 +101,7 @@ function remoteCommit(client, tag) {
     throw new Error('Published tag unavailable or not a full commit.');
   return commit;
 }
-export async function pinRelease(client, release, checkout) {
-  if (!eligibleRelease(release)) throw new Error('Release is not eligible.');
-  const commit = remoteCommit(client, release.tag_name);
+function checkoutTag(client, tag, checkout, commit) {
   git('init', '-q', checkout);
   git(
     '-C',
@@ -112,7 +110,7 @@ export async function pinRelease(client, release, checkout) {
     '--quiet',
     '--depth=1',
     client.sourceUrl,
-    `refs/tags/${release.tag_name}`,
+    `refs/tags/${tag}`,
   );
   if (git('-C', checkout, 'rev-parse', 'FETCH_HEAD^{commit}') !== commit)
     throw new Error('Published tag changed during download.');
@@ -120,14 +118,44 @@ export async function pinRelease(client, release, checkout) {
   const manifest = JSON.parse(
     readFileSync(join(checkout, 'update/manifest.json'), 'utf8'),
   );
-  if (manifest.template_version !== release.tag_name.slice(1))
+  if (manifest.template_version !== tag.slice(1))
     throw new Error('Published tag and manifest version disagree.');
+  return manifest;
+}
+
+export async function pinRelease(client, release, checkout) {
+  if (!eligibleRelease(release)) throw new Error('Release is not eligible.');
+  const tag = release.tag_name;
+  const commit = remoteCommit(client, tag);
+  const manifest = checkoutTag(client, tag, checkout, commit);
   return {
-    tag: release.tag_name,
+    tag,
     commit,
     release_id: release.id,
     manifest_version: manifest.template_version,
   };
+}
+
+/** Locate exact historical shipped bytes without making an old release eligible for update. */
+export async function checkoutHistoricalRelease(
+  client,
+  pin,
+  checkout,
+  fromVersion,
+) {
+  if (
+    pin?.tag !== `v${fromVersion}` ||
+    !tagPattern.test(pin.tag) ||
+    !/^[a-f0-9]{40}$/.test(pin.commit)
+  )
+    throw new Error('Missing exact historical release evidence.');
+  const manifest = checkoutTag(client, pin.tag, checkout, pin.commit);
+  if (pin.release_id !== undefined) {
+    await verifyPinnedRelease(client, pin, checkout, { rollbackOnly: true });
+  } else if (remoteCommit(client, pin.tag) !== pin.commit) {
+    throw new Error('Historical tag changed during verification.');
+  }
+  return manifest;
 }
 export async function verifyPinnedRelease(
   client,

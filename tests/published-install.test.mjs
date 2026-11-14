@@ -118,14 +118,14 @@ async function fixture(t, tool = 'codex') {
         harness_id: 'fixture-harness',
         install_token: state.requireFresh ? 'fresh-token' : 'fixture-token',
       };
-    else if (req.url.startsWith('/nudges')) {
+    else if (req.url === '/library') {
       if (
         !state.working ||
         (state.requireFresh &&
           req.headers.authorization !== 'Bearer fresh-token')
       )
         res.statusCode = 401;
-      body = { messages: [] };
+      body = { assets: [] };
     } else {
       res.statusCode = 404;
       body = {};

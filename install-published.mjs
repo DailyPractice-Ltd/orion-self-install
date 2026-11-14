@@ -171,7 +171,7 @@ export async function installPublished({
       }
       if (status.sharing.install_token && status.sharing.harness_id) {
         const r = await fetch(
-            `${status.sharing.bridge_url.replace(/\/$/, '')}/nudges?v=1`,
+            `${status.sharing.bridge_url.replace(/\/$/, '')}/library`,
             {
               headers: {
                 Authorization: `Bearer ${status.sharing.install_token}`,
@@ -180,9 +180,7 @@ export async function installPublished({
             },
           ),
           body = r.ok ? await r.json() : null;
-        working =
-          r.ok &&
-          (Array.isArray(body?.messages) || Array.isArray(body?.nudges));
+        working = r.ok && Array.isArray(body?.assets);
       }
     } catch {
       /* Pairing/connectivity failure pauses, never records success. */

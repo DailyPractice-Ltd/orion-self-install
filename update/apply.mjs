@@ -368,6 +368,7 @@ try {
     const tag = arg('--tag');
     const result = await applyPublishedUpdate({
       root, checkout,
+      migrateTo: arg('--migrate-to'), migrationPairing: arg('--migration-pairing'),
       client: createReleaseClient({
         repository: arg('--repository'), apiBase: arg('--api-base'), sourceUrl: arg('--source-url'),
       }),

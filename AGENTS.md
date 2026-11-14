@@ -358,7 +358,10 @@ version"**, **"am I up to date?"**, or **"restore my harness from the backup"** 
 deployed folder. It verifies the latest stable GitHub Release and runs its pinned
 updater. The selected tool in status determines destinations. Report preserved
 edits, blocked changes, and the backup or failure report. **The request is the consent**
-to start the published update procedure.
+to start the published update procedure. If the update pauses for radio pairing,
+explain the [check-in choice](docs/radio.md) and ask the client whether to opt in.
+On their yes, continue the original update using the pairing step in
+`docs/updating.md`.
 For a tool change, follow the same document's `switch` and schedule steps. On Claude
 Code and Codex this is also invocable as `/update-harness`.
 

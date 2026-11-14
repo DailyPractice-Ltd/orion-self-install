@@ -648,7 +648,7 @@ export function assertPublishedUpdateNotBlocked(
   if (blocked) throw new Error(requireRecoveryMessage(blocked.backup));
 }
 
-function withUpdateLock(root, operation) {
+export function withUpdateLock(root, operation) {
   const directory = safePath(root, backups);
   mkdirSync(directory, { mode: 0o700, recursive: true });
   // Claim before inspecting other claims. Simultaneous contenders may both

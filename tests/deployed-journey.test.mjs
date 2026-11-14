@@ -1,7 +1,7 @@
 /** A client journey using a complete release checkout and only deployed commands. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, realpathSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -206,11 +206,18 @@ async function publishedUpdateJourney(t, tool, { customizeCandidate, legacy, dam
   const token = 'orion_' + 'test'.repeat(6);
   const responseFile = join(dirname(client), 'responses.json');
   const mock = join(dirname(client), 'fetch.mjs');
+  const terminal = join(dirname(client), 'terminal.mjs');
+  put(dirname(client), 'terminal.mjs', `
+    Object.defineProperty(process.stdin, 'isTTY', { value: true });
+    Object.defineProperty(process.stderr, 'isTTY', { value: true });
+  `);
   put(dirname(client), 'fetch.mjs', `
     import assert from 'node:assert/strict';
-    import { readFileSync } from 'node:fs';
+    import { readFileSync, writeFileSync } from 'node:fs';
     globalThis.fetch = async (url, init) => {
-      const { releases, withdrawn, identityChanged } = JSON.parse(readFileSync(${JSON.stringify(responseFile)}));
+      const file = ${JSON.stringify(responseFile)};
+      const state = JSON.parse(readFileSync(file));
+      const { releases, withdrawn, identityChanged, pairingRejected, pairingUnavailable, publishAfterPair } = state;
       const path = new URL(url).pathname;
       let body;
       if (path.endsWith('/releases')) body = releases;
@@ -218,9 +225,21 @@ async function publishedUpdateJourney(t, tool, { customizeCandidate, legacy, dam
         body = releases.find(item => item.id === Number(path.split('/').at(-1)));
         if (withdrawn) body.body = '<!-- orion:withdrawn -->';
         if (identityChanged) body.id = 123;
+      } else if (path === '/api/bridge/pair') {
+        assert.equal(init.method, 'POST');
+        assert.deepEqual(JSON.parse(init.body), { code: 'BCDFGHJKLMNP' });
+        if (pairingRejected) return Response.json({ error: 'Expired' }, { status: 404 });
+        body = {
+          install_token: '${token}',
+          harness_id: '9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62',
+          bridge_url: '${url}',
+        };
       } else {
         assert.equal(path, '/api/bridge/library');
+        assert.equal(init.method ?? 'GET', 'GET');
         assert.equal(init.headers.Authorization, 'Bearer ${token}');
+        if (pairingUnavailable) return Response.json({ error: 'Unavailable' }, { status: 503 });
+        if (publishAfterPair) writeFileSync(file, JSON.stringify({ ...state, releases: publishAfterPair, publishAfterPair: null }));
         body = { assets: [] };
       }
       return Response.json(body);
@@ -284,18 +303,31 @@ async function publishedUpdateJourney(t, tool, { customizeCandidate, legacy, dam
     put(client, 'AGENTS.md', 'Personal agent instructions\n');
     launcher = join(checkout, 'update/request.mjs');
   }
-  const execute = (args, env = {}) => new Promise((resolve, reject) => {
-    writeFileSync(responseFile, JSON.stringify({ ...state, releases: state.listed.map(publication) }));
-    const p = spawn(process.execPath, ['--import', pathToFileURL(mock).href, ...args, '--repository', 'fixture/orion',
-      '--api-base', url, '--source-url', release], { cwd: client, env: plainEnv(env) });
+  const execute = (args, env = {}, answers) => new Promise((resolve, reject) => {
+    writeFileSync(responseFile, JSON.stringify({
+      ...state,
+      releases: state.listed.map(publication),
+      publishAfterPair: state.publishAfterPair?.map(publication),
+    }));
+    const preloads = ['--import', pathToFileURL(mock).href];
+    if (answers) preloads.push('--import', pathToFileURL(terminal).href);
+    const p = spawn(process.execPath, [...preloads, ...args, '--repository', 'fixture/orion',
+      '--api-base', url, '--source-url', release], { cwd: client, env: plainEnv({ ORION_BRIDGE_URL: url, ...env }) });
     let stdout = '', stderr = '';
     p.stdout.on('data', data => { stdout += data; });
-    p.stderr.on('data', data => { stderr += data; });
+    p.stderr.on('data', data => {
+      stderr += data;
+      const next = answers?.[0];
+      if (next && stderr.includes(next[0])) {
+        p.stdin.write(answers.shift()[1] + '\n');
+        if (answers.length === 0) p.stdin.end();
+      }
+    });
     p.on('error', reject);
     p.on('close', code => resolve({ code, stdout, stderr }));
   });
-  const request = (env, args = []) => execute([launcher, ...args], env);
-  return { client, release, state, request, execute, commit, newSkill, edit };
+  const request = (env, args = [], answers) => execute([launcher, ...args], env, answers);
+  return { client, release, state, request, execute, commit, newSkill, edit, token };
 }
 
 for (const tool of ['claude-code', 'codex']) {
@@ -322,6 +354,96 @@ for (const tool of ['claude-code', 'codex']) {
     assert.deepEqual(status(f.client).applied_release, applied);
   });
 }
+
+test('a radio-off client can decline or fail pairing without changing the deployed harness', async t => {
+  const f = await publishedUpdateJourney(t, 'codex');
+  const current = status(f.client);
+  current.sharing = { status_signal_enabled: false, radio_choice: 'declined' };
+  put(f.client, 'status/status.json', JSON.stringify(current));
+  const before = read(f.client, 'status/status.json');
+  const code = 'BCDF-GHJK-LMNP';
+  const env = { ORION_PAIRING_CODE: code };
+  const paused = await f.request(env);
+  assert.notEqual(paused.code, 0);
+  assert.match(paused.stderr, /update paused.*radio/i);
+  assert.match(paused.stderr, /--pair-radio/);
+  assert.ok(!paused.stderr.includes(code));
+
+  const declined = await f.request({ ORION_PAIRING_CODE: '' }, [], [
+    ['Turn on check-ins and continue your update?', 'no'],
+  ]);
+  assert.notEqual(declined.code, 0);
+  assert.match(declined.stderr, /radio choice was kept/);
+  assert.equal(read(f.client, 'status/status.json'), before);
+
+  for (const problem of ['pairingRejected', 'pairingUnavailable']) {
+    f.state[problem] = true;
+    const failed = await f.request(env, ['--pair-radio']);
+    assert.notEqual(failed.code, 0);
+    assert.match(failed.stderr, /pairing.*failed/i);
+    assert.ok(!(failed.stdout + failed.stderr).includes(code));
+    assert.equal(read(f.client, 'status/status.json'), before);
+    assert.equal(existsSync(join(f.client, 'status/radio.key')), false);
+    assert.equal(existsSync(join(f.client, f.newSkill)), false);
+    assert.equal(existsSync(join(f.client, '.update-backup')), false);
+    f.state[problem] = false;
+  }
+});
+
+for (const home of [false, true]) {
+  test(`a radio opt-in updates from the publication eligible after pairing (${home ? 'with a home' : 'local only'})`, async t => {
+    const f = await publishedUpdateJourney(t, 'codex');
+    const current = status(f.client);
+    current.sharing = { status_signal_enabled: false, radio_choice: 'declined' };
+    if (home) current.home = { enabled: true, branch: 'main' };
+    put(f.client, 'status/status.json', JSON.stringify(current));
+    f.state.listed = [1];
+    f.state.publishAfterPair = [2, 1];
+    const code = 'BCDF-GHJK-LMNP';
+    const resumed = home
+      ? await f.request({ ORION_PAIRING_CODE: code }, ['--pair-radio'])
+      : await f.request({ ORION_PAIRING_CODE: '' }, [], [
+        ['Turn on check-ins and continue your update?', 'yes'],
+        ['Enter your Daily Practice pairing code', code],
+      ]);
+    assert.equal(resumed.code, 0, resumed.stderr);
+    assert.match(resumed.stderr, /radio pairing confirmed.*continuing/i);
+    assert.ok(!(resumed.stdout + resumed.stderr).includes(f.token));
+    assert.ok(!(resumed.stdout + resumed.stderr).includes(code));
+    assert.equal(read(f.client, f.newSkill), '# Next release skill\n');
+    const after = status(f.client);
+    assert.equal(after.sharing.radio_choice, 'accepted');
+    assert.equal(after.sharing.status_signal_enabled, true);
+    assert.equal(after.sharing.harness_id, '9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62');
+    assert.equal(after.applied_release.commit, f.commit);
+    if (home) {
+      assert.equal(after.sharing.install_token, null);
+      assert.equal(read(f.client, 'status/radio.key'), f.token + '\n');
+      if (process.platform !== 'win32') {
+        assert.equal(statSync(join(f.client, 'status/radio.key')).mode & 0o777, 0o600);
+      }
+    } else {
+      assert.equal(after.sharing.install_token, f.token);
+      assert.equal(existsSync(join(f.client, 'status/radio.key')), false);
+    }
+  });
+}
+
+test('a resumed update still refuses a release withdrawn at the prewrite check', async t => {
+  const f = await publishedUpdateJourney(t, 'claude-code');
+  const current = status(f.client);
+  current.sharing = { status_signal_enabled: false, radio_choice: 'declined' };
+  put(f.client, 'status/status.json', JSON.stringify(current));
+  f.state.withdrawn = true;
+  const result = await f.request({ ORION_PAIRING_CODE: 'BCDF-GHJK-LMNP' }, ['--pair-radio']);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /withdrawn or identity changed/);
+  const after = status(f.client);
+  assert.equal(after.sharing.radio_choice, 'accepted');
+  assert.deepEqual(after.applied_release, current.applied_release);
+  assert.equal(existsSync(join(f.client, f.newSkill)), false);
+  assert.deepEqual(readdirSync(join(f.client, '.update-backup')), []);
+});
 
 test('withdrawal or changed publication identity stops before the first harness write', async t => {
   const f = await publishedUpdateJourney(t, 'codex');
@@ -649,4 +771,27 @@ test('failed rollback blocks updates and recovers through the exact separate pub
   assert.equal(existsSync(join(f.client, f.newSkill)), false);
   assert.equal(JSON.parse(read(f.client, journalPath)).state, 'recovered');
   assert.equal(read(f.client, failurePath), failure);
+});
+
+test('explicit radio opt-in pairs the legacy migration target and preserves the original choice and key file', async t => {
+  const f = await publishedUpdateJourney(t, 'claude-code', { legacy: true });
+  f.state.listed = [1];
+  const legacy = status(f.client);
+  legacy.sharing = { ...legacy.sharing, radio_choice: 'declined', status_signal_enabled: false, install_token: null };
+  legacy.home = { enabled: true, branch: 'main' };
+  put(f.client, 'status/status.json', JSON.stringify(legacy));
+  const previousKey = 'orion_' + 'previous'.repeat(3);
+  put(f.client, 'status/radio.key', previousKey + '\n');
+  const before = read(f.client, 'status/status.json');
+  const destination = join(dirname(f.client), 'separately-deployed');
+  const result = await f.request({ ORION_PAIRING_CODE: 'BCDF-GHJK-LMNP' }, ['--pair-radio', '--migrate-to', destination]);
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stderr, /Radio pairing confirmed/);
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(f.token));
+  assert.equal(read(f.client, 'status/status.json'), before);
+  assert.equal(read(f.client, 'status/radio.key'), previousKey + '\n');
+  assert.equal(status(destination).sharing.radio_choice, 'accepted');
+  assert.equal(status(destination).sharing.install_token, null);
+  assert.equal(read(destination, 'status/radio.key'), f.token + '\n');
+  assert.equal(statSync(join(destination, 'status/radio.key')).mode & 0o777, 0o600);
 });

@@ -361,6 +361,21 @@ function restore(root,backupRel) {
 try {
   const command=process.argv[2], root=arg('--root'); if(!root) throw new Error('--root is required');
   const repo=arg('--release-repo')||dirname(dirname(fileURLToPath(import.meta.url)));
-  const result=command==='update' ? update(root,repo,arg('--commit')) : command==='switch' ? switchTool(root,repo,arg('--commit'),arg('--to'),arg('--legacy-tool')) : command==='restore' ? restore(root,arg('--backup')) : command==='recover' ? {recovered:[...recoverPendingUpdates(root),...recoverPendingSwitches(root)]} : (()=>{throw new Error('Use update, switch, restore or recover');})();
-  console.log(JSON.stringify(result,null,2));
+  if (command === 'update-published') {
+    const { createReleaseClient } = await import('./published-release.mjs');
+    const { applyPublishedUpdate } = await import('./published-transaction.mjs');
+    const checkout = dirname(dirname(fileURLToPath(import.meta.url)));
+    const tag = arg('--tag');
+    const result = await applyPublishedUpdate({
+      root, checkout,
+      client: createReleaseClient({
+        repository: arg('--repository'), apiBase: arg('--api-base'), sourceUrl: arg('--source-url'),
+      }),
+      pin: { tag, commit: arg('--commit'), release_id: Number(arg('--release-id')), manifest_version: tag?.slice(1) },
+    });
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    const result=command==='update' ? update(root,repo,arg('--commit')) : command==='switch' ? switchTool(root,repo,arg('--commit'),arg('--to'),arg('--legacy-tool')) : command==='restore' ? restore(root,arg('--backup')) : command==='recover' ? {recovered:[...recoverPendingUpdates(root),...recoverPendingSwitches(root)]} : (()=>{throw new Error('Use update, switch, restore or recover');})();
+    console.log(JSON.stringify(result,null,2));
+  }
 } catch(error) {console.error(error.message);process.exitCode=2;}

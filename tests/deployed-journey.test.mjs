@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync, spawn } from 'node:child_process';
 import { plainEnv } from './helpers/env.mjs';
 
 const checkout = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -193,3 +193,204 @@ for (const tool of ['claude-code', 'codex']) {
     assert.ok(existsSync(join(client, '.specify/scripts/bash/setup-tasks.sh')));
   });
 }
+
+async function publishedUpdateJourney(t, tool) {
+  const { release, client } = journey(t, tool);
+  const current = status(client);
+  const state = { listed: [2, 1, 3], identityChanged: false };
+  const publication = (id) => ({
+    id: id === 2 && state.replacementId ? state.replacementId : id, tag_name: { 1: 'v2.0.0', 2: 'v2.10.0', 3: 'v9.0.0' }[id],
+    draft: id === 3, prerelease: false, published_at: id === 1 ? '2026-12-01' : '2026-01-01',
+  });
+  const url = 'https://fixture.test/api/bridge';
+  const token = 'orion_' + 'test'.repeat(6);
+  const responseFile = join(dirname(client), 'responses.json');
+  const mock = join(dirname(client), 'fetch.mjs');
+  put(dirname(client), 'fetch.mjs', `
+    import assert from 'node:assert/strict';
+    import { readFileSync } from 'node:fs';
+    globalThis.fetch = async (url, init) => {
+      const { releases, withdrawn, identityChanged } = JSON.parse(readFileSync(${JSON.stringify(responseFile)}));
+      const path = new URL(url).pathname;
+      let body;
+      if (path.endsWith('/releases')) body = releases;
+      else if (path.includes('/releases/')) {
+        body = releases.find(item => item.id === Number(path.split('/').at(-1)));
+        if (withdrawn) body.body = '<!-- orion:withdrawn -->';
+        if (identityChanged) body.id = 123;
+      } else {
+        assert.equal(path, '/api/bridge/library');
+        assert.equal(init.headers.Authorization, 'Bearer ${token}');
+        body = { assets: [] };
+      }
+      return Response.json(body);
+    };
+  `);
+  const originalCommit = git(release, 'rev-parse', 'HEAD');
+  git(release, 'tag', '-f', 'v2.0.0', originalCommit);
+  current.applied_release = {
+    tag: 'v2.0.0', commit: originalCommit, release_id: 1,
+    manifest_version: '2.0.0', applied_at: '2026-01-01T00:00:00.000Z',
+  };
+  current.sharing = {
+    status_signal_enabled: true, radio_choice: 'accepted',
+    install_token: token, bridge_url: url, harness_id: '9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62',
+  };
+  put(client, 'status/status.json', JSON.stringify(current));
+  const manifest = JSON.parse(read(release, 'update/manifest.json'));
+  manifest.template_version = '2.10.0';
+  manifest.update_compatibility = [{
+    from_version: '2.0.0', tool, steps: [], required_destinations: ['update/apply.mjs'],
+    checks: [{ kind: 'deployed-layout' }, { kind: 'node-syntax', path: 'update/apply.mjs' }],
+  }];
+  const newSkill = `${skill(tool)}/next/SKILL.md`;
+  const edit = `${skill(tool)}/hire-agent/SKILL.md`;
+  put(client, edit, '# Client-edited skill\n');
+  manifest.deployment.entries.push({
+    source: 'skills/next/SKILL.md', ownership: 'release', fingerprint_key: 'skills/next/SKILL.md',
+    destinations: { codex: '.agents/skills/next/SKILL.md', 'claude-code': '.claude/skills/next/SKILL.md' },
+  });
+  put(release, 'skills/next/SKILL.md', '# Next release skill\n');
+  put(release, 'skills/hire-agent/SKILL.md', '# Changed upstream\n');
+  put(release, 'update/manifest.json', JSON.stringify(manifest));
+  git(release, 'add', '.');
+  git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'candidate');
+  const commit = git(release, 'rev-parse', 'HEAD');
+  git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'tag', '-a', 'v2.10.0', '-m', 'published');
+  put(release, 'skills/next/SKILL.md', 'Unpublished branch bytes\n');
+  git(release, 'add', '.');
+  git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'after publication');
+
+  const request = (env = {}) => new Promise((resolve, reject) => {
+    writeFileSync(responseFile, JSON.stringify({ ...state, releases: state.listed.map(publication) }));
+    const p = spawn(process.execPath, ['--import', pathToFileURL(mock).href, 'update/request.mjs', '--repository', 'fixture/orion',
+      '--api-base', url, '--source-url', release], { cwd: client, env: plainEnv(env) });
+    let stdout = '', stderr = '';
+    p.stdout.on('data', data => { stdout += data; });
+    p.stderr.on('data', data => { stderr += data; });
+    p.on('error', reject);
+    p.on('close', code => resolve({ code, stdout, stderr }));
+  });
+  return { client, release, state, request, commit, newSkill, edit };
+}
+
+for (const tool of ['claude-code', 'codex']) {
+  test(`${tool} client requests the latest published update and applies it only once`, async t => {
+    const f = await publishedUpdateJourney(t, tool);
+    const result = await f.request();
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(read(f.client, f.newSkill), '# Next release skill\n');
+    assert.equal(read(f.client, f.edit), '# Client-edited skill\n');
+    assert.equal(status(f.client).selected_tool, tool);
+    const applied = status(f.client).applied_release;
+    assert.deepEqual({ ...applied, applied_at: 'TIME' }, {
+      tag: 'v2.10.0', commit: f.commit, release_id: 2, manifest_version: '2.10.0', applied_at: 'TIME',
+    });
+    assert.ok(Date.parse(applied.applied_at));
+    const again = await f.request();
+    assert.equal(again.code, 0, again.stderr);
+    assert.match(again.stdout, /already applied/i);
+    assert.deepEqual(status(f.client).applied_release, applied);
+    f.state.listed = [1];
+    const downgrade = await f.request();
+    assert.notEqual(downgrade.code, 0);
+    assert.match(downgrade.stderr, /downgrade/i);
+    assert.deepEqual(status(f.client).applied_release, applied);
+  });
+}
+
+test('withdrawal or changed publication identity stops before the first harness write', async t => {
+  const f = await publishedUpdateJourney(t, 'codex');
+  const before = read(f.client, 'status/status.json');
+  for (const problem of ['withdrawn', 'identityChanged']) {
+    f.state[problem] = true;
+    const denied = await f.request();
+    assert.notEqual(denied.code, 0);
+    assert.match(denied.stderr, /withdrawn or identity changed/);
+    assert.equal(read(f.client, 'status/status.json'), before);
+    assert.equal(existsSync(join(f.client, f.newSkill)), false);
+    assert.equal(existsSync(join(f.client, '.update-backup')), false);
+    f.state[problem] = false;
+  }
+});
+
+test('client requests refuse same-version replacement identities and version-only status', async t => {
+  const f = await publishedUpdateJourney(t, 'codex');
+  assert.equal((await f.request()).code, 0);
+  const before = read(f.client, 'status/status.json');
+  f.state.replacementId = 20;
+  const different = await f.request();
+  assert.notEqual(different.code, 0);
+  assert.match(different.stderr, /integrity conflict/i);
+  assert.equal(read(f.client, 'status/status.json'), before);
+
+  f.state.replacementId = 0;
+  const versionOnly = status(f.client);
+  delete versionOnly.applied_release;
+  put(f.client, 'status/status.json', JSON.stringify(versionOnly));
+  const legacy = await f.request();
+  assert.notEqual(legacy.code, 0);
+  assert.match(legacy.stderr, /declared verification migration/i);
+  assert.deepEqual(status(f.client), versionOnly);
+});
+
+test('a staged syntax failure writes nothing to the harness', async t => {
+  const f = await publishedUpdateJourney(t, 'codex');
+  const before = status(f.client);
+  git(f.release, 'checkout', '-q', '--detach', f.commit);
+  put(f.release, 'status/done.mjs', 'const invalid =\n');
+  git(f.release, 'add', '.');
+  git(f.release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'broken candidate');
+  git(f.release, 'tag', '-f', 'v2.10.0');
+  const failed = await f.request();
+  assert.notEqual(failed.code, 0);
+  assert.match(failed.stderr, /Invalid script status\/done.mjs/);
+  assert.deepEqual(status(f.client), before);
+  assert.equal(existsSync(join(f.client, f.newSkill)), false);
+  assert.equal(existsSync(join(f.client, '.update-backup')), false);
+});
+
+test('a required destination with a local edit blocks the update before writes', async t => {
+  const f = await publishedUpdateJourney(t, 'codex');
+  git(f.release, 'checkout', '-q', '--detach', f.commit);
+  put(f.release, 'update/apply.mjs', read(f.release, 'update/apply.mjs') + '\n// Required change\n');
+  git(f.release, 'add', '.');
+  git(f.release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'required updater change');
+  git(f.release, 'tag', '-f', 'v2.10.0');
+  const before = status(f.client);
+  put(f.client, 'update/apply.mjs', 'Client customized updater\n');
+  const failed = await f.request();
+  assert.notEqual(failed.code, 0);
+  assert.match(failed.stderr, /Required update is blocked by a local edit: update\/apply\.mjs/);
+  assert.deepEqual(status(f.client), before);
+  assert.equal(read(f.client, 'update/apply.mjs'), 'Client customized updater\n');
+  assert.equal(existsSync(join(f.client, '.update-backup')), false);
+});
+
+test('smoke-check failure restores the prior release and keeps a failure report', async t => {
+  const f = await publishedUpdateJourney(t, 'codex');
+  const before = read(f.client, 'status/status.json');
+  const failed = await f.request({ ORION_UPDATE_SMOKE_FAIL: '1' });
+  assert.notEqual(failed.code, 0);
+  assert.match(failed.stderr, /prior release was restored/);
+  const reportPath = failed.stderr.match(/Report: (\.update-backup\/\S+\/failure\.json)/)[1];
+  const report = JSON.parse(read(f.client, reportPath));
+  assert.match(report.failure, /smoke-check failure/);
+  assert.equal(report.restoration, 'restored');
+  assert.ok(report.affected_files.includes(f.newSkill));
+  assert.equal(read(f.client, 'status/status.json'), before);
+  assert.equal(existsSync(join(f.client, f.newSkill)), false);
+  assert.equal(existsSync(join(f.client, dirname(f.newSkill))), false);
+});
+
+test('retry recovers a process interrupted mid-promotion before applying anew', async t => {
+  const f = await publishedUpdateJourney(t, 'claude-code');
+  const before = read(f.client, 'status/status.json');
+  const interrupted = await f.request({ ORION_UPDATE_INTERRUPT_AFTER: '1' });
+  assert.notEqual(interrupted.code, 0);
+  assert.equal(read(f.client, 'status/status.json'), before);
+  const retried = await f.request();
+  assert.equal(retried.code, 0, retried.stderr);
+  assert.equal(status(f.client).applied_release.commit, f.commit);
+  assert.equal(read(f.client, f.newSkill), '# Next release skill\n');
+});

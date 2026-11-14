@@ -194,7 +194,7 @@ for (const tool of ['claude-code', 'codex']) {
   });
 }
 
-async function publishedUpdateJourney(t, tool, { customizeCandidate, legacy } = {}) {
+async function publishedUpdateJourney(t, tool, { customizeCandidate, legacy, damageUpdater } = {}) {
   const { release, client } = journey(t, tool);
   const current = status(client);
   const state = { listed: [2, 1, 3], identityChanged: false };
@@ -253,6 +253,10 @@ async function publishedUpdateJourney(t, tool, { customizeCandidate, legacy } = 
   put(release, 'skills/next/SKILL.md', '# Next release skill\n');
   put(release, 'skills/hire-agent/SKILL.md', '# Changed upstream\n');
   customizeCandidate?.({ release, client, manifest, current });
+  if (damageUpdater) {
+    const script = read(release, 'update/apply.mjs');
+    put(release, 'update/apply.mjs', `if (process.argv[1] === ${JSON.stringify(join(client, 'update/apply.mjs'))}) throw new Error('Damaged deployed updater');\n${script}`);
+  }
   put(release, 'update/manifest.json', JSON.stringify(manifest));
   git(release, 'add', '.');
   git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'candidate');
@@ -280,9 +284,9 @@ async function publishedUpdateJourney(t, tool, { customizeCandidate, legacy } = 
     put(client, 'AGENTS.md', 'Personal agent instructions\n');
     launcher = join(checkout, 'update/request.mjs');
   }
-  const request = (env = {}) => new Promise((resolve, reject) => {
+  const execute = (args, env = {}) => new Promise((resolve, reject) => {
     writeFileSync(responseFile, JSON.stringify({ ...state, releases: state.listed.map(publication) }));
-    const p = spawn(process.execPath, ['--import', pathToFileURL(mock).href, launcher, '--repository', 'fixture/orion',
+    const p = spawn(process.execPath, ['--import', pathToFileURL(mock).href, ...args, '--repository', 'fixture/orion',
       '--api-base', url, '--source-url', release], { cwd: client, env: plainEnv(env) });
     let stdout = '', stderr = '';
     p.stdout.on('data', data => { stdout += data; });
@@ -290,7 +294,8 @@ async function publishedUpdateJourney(t, tool, { customizeCandidate, legacy } = 
     p.on('error', reject);
     p.on('close', code => resolve({ code, stdout, stderr }));
   });
-  return { client, release, state, request, commit, newSkill, edit };
+  const request = (env, args = []) => execute([launcher, ...args], env);
+  return { client, release, state, request, execute, commit, newSkill, edit };
 }
 
 for (const tool of ['claude-code', 'codex']) {
@@ -408,6 +413,12 @@ test('retry recovers a process interrupted mid-promotion before applying anew', 
   const interrupted = await f.request({ ORION_UPDATE_INTERRUPT_AFTER: '1' });
   assert.notEqual(interrupted.code, 0);
   assert.equal(read(f.client, 'status/status.json'), before);
+  f.state.listed = [1];
+  const changedRelease = await f.request();
+  assert.notEqual(changedRelease.code, 0);
+  assert.match(changedRelease.stderr, /requires recovery from a separate pinned source/);
+  assert.equal(read(f.client, 'status/status.json'), before);
+  f.state.listed = [2, 1, 3];
   const retried = await f.request();
   assert.equal(retried.code, 0, retried.stderr);
   assert.equal(status(f.client).applied_release.commit, f.commit);
@@ -570,4 +581,65 @@ test('a claimed legacy version without its historical layout and pinned anchors 
   assert.match(mixed.stderr, /separate clean install/i);
   assert.equal(read(f.client, 'status/status.json'), before);
   assert.equal(existsSync(join(dirname(f.client), 'client-deployed')), false);
+});
+
+test('failed rollback blocks updates and recovers through the exact separate publication even after withdrawal', async t => {
+  const f = await publishedUpdateJourney(t, 'codex', { damageUpdater: true });
+  const priorStatus = read(f.client, 'status/status.json');
+  const priorUpdater = read(f.client, 'update/apply.mjs');
+  const failed = await f.request({ ORION_UPDATE_SMOKE_FAIL: '1', ORION_UPDATE_RESTORE_FAIL: '1' });
+  assert.notEqual(failed.code, 0);
+  assert.match(failed.stderr, /requires recovery/);
+  const backup = failed.stderr.match(/Evidence: (\.update-backup\/\S+)/)[1];
+  const failurePath = `${backup}/failure.json`;
+  const failure = read(f.client, failurePath);
+  assert.match(JSON.parse(failure).restoration, /Injected restoration failure/);
+  assert.ok(JSON.parse(failure).affected_files.includes('update/apply.mjs'));
+  assert.equal(read(f.client, `${backup}/files/update/apply.mjs`), priorUpdater);
+  const journalPath = `${backup}/journal.json`;
+  const journal = read(f.client, journalPath);
+  assert.equal(JSON.parse(journal).state, 'recovery-required');
+  assert.equal(read(f.client, 'status/status.json'), priorStatus);
+  assert.equal(read(f.client, f.newSkill), '# Next release skill\n');
+
+  const blocked = await f.request();
+  assert.notEqual(blocked.code, 0);
+  assert.match(blocked.stderr, /requires recovery/);
+  assert.equal(read(f.client, journalPath), journal);
+  assert.match(run(f.client, 'update/apply.mjs', 'recover', '--root', f.client).stderr, /Damaged deployed updater/);
+  f.state.listed = [];
+  assert.match((await f.request()).stderr, /requires recovery/);
+  f.state.listed = [2, 1, 3];
+
+  const source = join(dirname(f.client), 'recovery');
+  git(f.release, '-c', 'advice.detachedHead=false', 'clone', '-q', '--branch', 'v2.10.0', f.release, source);
+  const recover = (commit = f.commit) => f.execute([join(source, 'update/apply.mjs'), 'recover-published',
+    '--root', f.client, '--backup', backup, '--tag', 'v2.10.0', '--commit', commit, '--release-id', '2']);
+  const wrong = await recover('a'.repeat(40));
+  assert.notEqual(wrong.code, 0);
+  assert.match(wrong.stderr, /original transaction release/);
+  assert.equal(read(f.client, journalPath), journal);
+
+  put(f.client, f.newSkill, '# Client wrote this after the failed update\n');
+  const collision = await recover();
+  assert.notEqual(collision.code, 0);
+  assert.match(collision.stderr, /recovery collisions/);
+  assert.equal(read(f.client, f.newSkill), '# Client wrote this after the failed update\n');
+  assert.equal(read(f.client, failurePath), failure);
+  assert.equal(JSON.parse(read(f.client, journalPath)).state, 'recovery-required');
+  assert.match(read(f.client, `${backup}/recovery.json`), /recovery collisions/);
+  assert.match((await f.request()).stderr, /requires recovery/);
+
+  put(f.client, 'agent/knowledge-base/01-later.md', '# Unsynced client notes\n');
+  put(f.client, f.newSkill, '# Next release skill\n');
+  f.state.withdrawn = true;
+  const recovered = await recover();
+  assert.equal(recovered.code, 0, recovered.stderr);
+  assert.match(recovered.stdout, /restored/);
+  assert.equal(read(f.client, 'update/apply.mjs'), priorUpdater);
+  assert.equal(read(f.client, 'status/status.json'), priorStatus);
+  assert.equal(read(f.client, 'agent/knowledge-base/01-later.md'), '# Unsynced client notes\n');
+  assert.equal(existsSync(join(f.client, f.newSkill)), false);
+  assert.equal(JSON.parse(read(f.client, journalPath)).state, 'recovered');
+  assert.equal(read(f.client, failurePath), failure);
 });

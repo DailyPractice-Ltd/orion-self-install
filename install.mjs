@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Create a separate, selected-tool client repository from this release. */
+/** Offline maintainer/test primitive. New clients use install-published.mjs. */
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, copyFileSync, existsSync, lstatSync, readdirSync, renameSync, rmdirSync, rmSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve, relative, sep, basename } from 'node:path';

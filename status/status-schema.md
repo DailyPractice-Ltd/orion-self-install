@@ -41,3 +41,13 @@ anything. Its contents ARE the answer to "where did we leave off."
 when a session ends — the client might close their laptop mid-sentence. If a completed
 step isn't written back yet when that happens, it's lost, and the client will be asked
 the same question twice next time. That's the exact failure this file exists to prevent.
+
+## Published release identity
+
+`applied_release` is absent until a published install or update completes. Its
+fields are `tag` (`vX.Y.Z`), `commit` (peeled full 40-character Git commit),
+`release_id` (positive GitHub Release ID), `manifest_version` (`X.Y.Z`), and
+`applied_at` (ISO timestamp). `template_version` alone is not publication proof.
+A private install transaction may prepare this record before directory promotion;
+it becomes applied only when the entire verified harness reaches its final target.
+Paused installs have no applied identity at the target and resume the same pin.

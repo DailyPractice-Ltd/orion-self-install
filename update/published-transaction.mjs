@@ -217,7 +217,7 @@ function planUpdate({
 }) {
   const tool = path.tool;
   const { entries, deployed, steps } = declared;
-  const { files, migrations } = runSteps({
+  const { files, migrations, original } = runSteps({
     steps,
     read: (destination) => file(safePath(root, destination)),
     defaults: json(safePath(checkout, 'status/status.schema-template.json')),
@@ -234,6 +234,8 @@ function planUpdate({
   const required = new Set(path.required_destinations);
   const pristine = json(join(checkout, 'update/pristine.json'));
   const actions = [];
+  const identityFiles = [];
+  const seen = new Set();
   const report = {
     refreshed: [],
     added: [],
@@ -260,6 +262,10 @@ function planUpdate({
   }
 
   function stageAction(destination, prior, incoming) {
+    const key = destination.toLowerCase();
+    if (seen.has(key))
+      throw new Error(`Conflicting update destinations: ${destination}`);
+    seen.add(key);
     if (incoming) {
       const staged = safePath(stage, destination);
       write(staged, incoming.bytes, incoming.mode);
@@ -297,13 +303,18 @@ function planUpdate({
       }
       if (entry.ownership === 'release' && !prior.bytes.equals(incoming.bytes))
         report.kept.push(destination);
+      identityFiles.push({
+        destination,
+        prior_hash: digest(prior.bytes),
+        prior_mode: prior.mode,
+      });
       continue;
     }
     if (files.has(destination)) {
       const migrated = files.get(destination);
       if (!migrated)
         throw new Error(`Migration retired deployed file: ${destination}`);
-      stageAction(destination, file(safePath(root, destination)), migrated);
+      stageAction(destination, original.get(destination), migrated);
       files.delete(destination);
       continue;
     }
@@ -345,17 +356,21 @@ function planUpdate({
         entry.sources?.[tool] || entry.fingerprint_key || entry.source,
     })),
   ];
+  const deployedPaths = new Set(
+    [...deployed.keys()].map((destination) => destination.toLowerCase()),
+  );
   const retiredPaths = new Set();
   for (const entry of backfill ? [] : retired) {
     const { destination } = entry;
     validateDeploymentPath(destination);
-    if (deployed.has(destination) || retiredPaths.has(destination))
+    const canonical = destination.toLowerCase();
+    if (deployedPaths.has(canonical) || retiredPaths.has(canonical))
       throw new Error(`Conflicting retired destination: ${destination}`);
-    retiredPaths.add(destination);
+    retiredPaths.add(canonical);
     if (files.has(destination)) {
       stageAction(
         destination,
-        file(safePath(root, destination)),
+        original.get(destination),
         files.get(destination),
       );
       files.delete(destination);
@@ -373,7 +388,14 @@ function planUpdate({
 
   for (const [destination, incoming] of files) {
     validateDeploymentPath(destination);
-    stageAction(destination, file(safePath(root, destination)), incoming);
+    if (
+      deployedPaths.has(destination.toLowerCase()) ||
+      retiredPaths.has(destination.toLowerCase())
+    )
+      throw new Error(
+        `Migration path spelling differs from the deployment: ${destination}`,
+      );
+    stageAction(destination, original.get(destination), incoming);
   }
 
   if (pairing?.key_file) {
@@ -409,6 +431,7 @@ function planUpdate({
     removeChecklistKeys,
     report,
     nextStatus,
+    identityFiles,
     tool,
   };
 }
@@ -680,6 +703,7 @@ function sameTransactionSource(journal, client, pin) {
 }
 
 function promote(root, stage, priorStatus, plan, pin, client) {
+  for (const identity of plan.identityFiles) assertPriorFile(root, identity);
   const backup = mkdtempSync(join(safePath(root, backups), `${pin.tag}-`));
   const backupRel = `${backups}/${basename(backup)}`;
   const journal = {
@@ -733,6 +757,7 @@ function promote(root, stage, priorStatus, plan, pin, client) {
         process.exit(2);
     }
     postApplyChecks(root, plan);
+    for (const identity of plan.identityFiles) assertPriorFile(root, identity);
     if (
       currentHash(root, statusFile) !== journal.status.prior_hash ||
       currentMode(root, statusFile) !== journal.status.prior_mode

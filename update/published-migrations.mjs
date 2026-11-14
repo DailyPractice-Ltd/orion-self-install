@@ -251,10 +251,15 @@ export function runSteps({ steps, read, defaults }) {
   const files = new Map();
   const original = new Map();
   const migrations = [];
+  const spellings = new Map();
   for (const { step, changes, program } of steps) {
     const before = new Map();
     for (const instruction of program) {
       const path = instruction.path;
+      const key = path.toLowerCase();
+      if (spellings.has(key) && spellings.get(key) !== path)
+        throw new Error(`Inconsistent migration path spelling: ${path}`);
+      spellings.set(key, path);
       if (!original.has(path)) original.set(path, read(path));
       const current = files.has(path) ? files.get(path) : original.get(path);
       if (!before.has(path)) before.set(path, current);
@@ -295,5 +300,5 @@ export function runSteps({ steps, read, defaults }) {
   for (const [path, value] of files) {
     if (isDeepStrictEqual(original.get(path), value)) files.delete(path);
   }
-  return { files, migrations };
+  return { files, migrations, original };
 }

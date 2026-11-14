@@ -1,7 +1,7 @@
 /** A client journey using a complete release checkout and only deployed commands. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -194,7 +194,7 @@ for (const tool of ['claude-code', 'codex']) {
   });
 }
 
-async function publishedUpdateJourney(t, tool, { damageUpdater } = {}) {
+async function publishedUpdateJourney(t, tool, { customizeCandidate, legacy, damageUpdater } = {}) {
   const { release, client } = journey(t, tool);
   const current = status(client);
   const state = { listed: [2, 1, 3], identityChanged: false };
@@ -271,6 +271,7 @@ async function publishedUpdateJourney(t, tool, { damageUpdater } = {}) {
   });
   put(release, 'skills/next/SKILL.md', '# Next release skill\n');
   put(release, 'skills/hire-agent/SKILL.md', '# Changed upstream\n');
+  customizeCandidate?.({ release, client, manifest, current });
   if (damageUpdater) {
     const script = read(release, 'update/apply.mjs');
     put(release, 'update/apply.mjs', `if (process.argv[1] === ${JSON.stringify(join(client, 'update/apply.mjs'))}) throw new Error('Damaged deployed updater');\n${script}`);
@@ -284,6 +285,24 @@ async function publishedUpdateJourney(t, tool, { damageUpdater } = {}) {
   git(release, 'add', '.');
   git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'after publication');
 
+  let launcher = 'update/request.mjs';
+  if (legacy) {
+    // Freeze the historical bytes independently of the candidate and run its
+    // published-update launcher from the old harness, which predates request.mjs.
+    rmSync(client, { recursive: true });
+    mkdirSync(client);
+    const archive = execFileSync('git', ['archive', 'v1.5.0'], { cwd: release, maxBuffer: 32 * 1024 * 1024 });
+    execFileSync('tar', ['-xf', '-'], { cwd: client, input: archive, env: plainEnv({ LC_ALL: 'C' }) });
+    const old = JSON.parse(read(client, 'status/status.schema-template.json'));
+    old.sharing = current.sharing;
+    old.business_name = 'Original client';
+    old.checklist.n8n_wf01_imported = true;
+    put(client, 'status/status.json', JSON.stringify(old));
+    put(client, '.claude/agents/follow-up.md', 'Hired job sheet\n');
+    put(client, 'agent/knowledge-base/01-business-context.md', 'Personal business context\n');
+    put(client, 'AGENTS.md', 'Personal agent instructions\n');
+    launcher = join(checkout, 'update/request.mjs');
+  }
   const execute = (args, env = {}, answers) => new Promise((resolve, reject) => {
     writeFileSync(responseFile, JSON.stringify({
       ...state,
@@ -307,7 +326,7 @@ async function publishedUpdateJourney(t, tool, { damageUpdater } = {}) {
     p.on('error', reject);
     p.on('close', code => resolve({ code, stdout, stderr }));
   });
-  const request = (env, args = [], answers) => execute(['update/request.mjs', ...args], env, answers);
+  const request = (env, args = [], answers) => execute([launcher, ...args], env, answers);
   return { client, release, state, request, execute, commit, newSkill, edit, token };
 }
 
@@ -528,6 +547,171 @@ test('retry recovers a process interrupted mid-promotion before applying anew', 
   assert.equal(read(f.client, f.newSkill), '# Next release skill\n');
 });
 
+test('ordered published migrations promote only declared changes and back up edited client files', async t => {
+  const f = await publishedUpdateJourney(t, 'codex', {
+    customizeCandidate({ release, client, manifest }) {
+      put(client, 'agent/client.txt', 'Client notes\n');
+      manifest.update_compatibility[0].steps = [
+        {
+          from_version: '2.0.0', to_version: '2.4.0', script: 'update/migrations/first.json',
+          changes: [{ path: 'agent/client.txt', operation: 'replace' }],
+        },
+        {
+          from_version: '2.4.0', to_version: '2.10.0', script: 'update/migrations/second.json',
+          changes: [{ path: 'agent/client.txt', operation: 'replace' }],
+        },
+      ];
+      const program = (find, replace) => [{ op: 'replace-text', path: 'agent/client.txt', find, replace }];
+      put(release, 'update/migrations/first.json', JSON.stringify(program('Client', 'Team')));
+      put(release, 'update/migrations/second.json', JSON.stringify(program('Team notes', 'Team playbook')));
+    },
+  });
+  const failed = await f.request({ ORION_UPDATE_SMOKE_FAIL: '1' });
+  assert.match(failed.stderr, /prior release was restored/);
+  assert.equal(read(f.client, 'agent/client.txt'), 'Client notes\n');
+  assert.equal(status(f.client).template_version, '2.0.0');
+
+  const result = await f.request();
+  assert.equal(result.code, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(read(f.client, 'agent/client.txt'), 'Team playbook\n');
+  assert.equal(read(f.client, `${report.backup}/files/agent/client.txt`), 'Client notes\n');
+  assert.deepEqual(report.migrations.map(step => step.changed), [
+    [{ path: 'agent/client.txt', operation: 'replace' }],
+    [{ path: 'agent/client.txt', operation: 'replace' }],
+  ]);
+  assert.equal(status(f.client).template_version, '2.10.0');
+  assert.equal(status(f.client).sharing.radio_choice, 'accepted');
+});
+
+test('a real v1.5.0 same-folder harness migrates into a new deployed folder', async t => {
+  const f = await publishedUpdateJourney(t, 'claude-code', { legacy: true });
+  f.state.listed = [1];
+  const pinned = git(f.release, 'rev-parse', 'v2.0.0');
+  const before = read(f.client, 'status/status.json');
+  const bad = await f.request({ ORION_UPDATE_SMOKE_FAIL: '1' });
+  assert.notEqual(bad.code, 0);
+  const failedReport = bad.stderr.trim().match(/Report: (.*\/failure\.json)$/)[1];
+  assert.match(readFileSync(failedReport, 'utf8'), /smoke-check failure/);
+  assert.equal(read(f.client, 'status/status.json'), before);
+  assert.equal(existsSync(join(dirname(f.client), 'client-deployed')), false);
+
+  const interrupted = await f.request({ ORION_UPDATE_INTERRUPT_AFTER: '1' });
+  assert.notEqual(interrupted.code, 0);
+  assert.equal(read(f.client, 'status/status.json'), before);
+  assert.equal(existsSync(join(dirname(f.client), 'client-deployed')), false);
+
+  const result = await f.request();
+  assert.equal(result.code, 0, result.stderr);
+  const { deployed_folder: destination, backup } = JSON.parse(result.stdout);
+  assert.equal(destination, join(realpathSync(dirname(f.client)), 'client-deployed'));
+  assert.equal(read(f.client, 'status/status.json'), before);
+  assert.equal(existsSync(join(f.client, 'update/request.mjs')), false);
+  assert.equal(read(destination, '.claude/agents/follow-up.md'), 'Hired job sheet\n');
+  assert.equal(read(destination, 'agent/knowledge-base/01-business-context.md'), 'Personal business context\n');
+  assert.equal(read(destination, 'AGENTS.md'), 'Personal agent instructions\n');
+  assert.equal(read(destination, `${backup}/files/status/status.json`), before);
+  assert.equal(status(destination).selected_tool, 'claude-code');
+  assert.equal(status(destination).applied_release.commit, pinned);
+  assert.equal(status(destination).applied_release.release_id, 1);
+  assert.equal(status(destination).sharing.radio_choice, 'accepted');
+  assert.equal(status(destination).checklist.n8n_wf01_imported, undefined);
+  for (const excluded of ['tests', 'specs', '.github', '.specify', 'skills', 'agents']) {
+    assert.equal(existsSync(join(destination, excluded)), false, excluded);
+  }
+});
+
+for (const tool of ['claude-code', 'codex']) {
+  test(`${tool} same-version backfill requires exact pinned runtime and verified layout`, async t => {
+    const f = await publishedUpdateJourney(t, tool);
+    f.state.listed = [1];
+    // The fixture helper appends a separate candidate's edit after the fresh
+    // install. Restore the exact tag bytes rather than trusting the version.
+    const shipped = execFileSync('git', ['show', 'v2.0.0:skills/hire-agent/SKILL.md'], { cwd: f.release });
+    put(f.client, f.edit, shipped);
+    put(f.client, 'AGENTS.md', 'Customized agent instructions\n');
+    const before = status(f.client);
+    const forged = status(f.client);
+    delete forged.applied_release;
+    delete forged.selected_tool;
+    put(f.client, 'status/status.json', JSON.stringify(forged));
+    const runtime = 'status/done.mjs';
+    const original = read(f.client, runtime);
+    put(f.client, runtime, original + '\n// Other bytes for the same version.\n');
+    const denied = await f.request();
+    assert.notEqual(denied.code, 0);
+    assert.match(denied.stderr, /exact installed publication at status\/done\.mjs/);
+    assert.deepEqual(status(f.client), forged);
+    assert.equal(existsSync(join(f.client, '.update-backup')), false);
+
+    put(f.client, runtime, original);
+    const applied = await f.request();
+    assert.equal(applied.code, 0, applied.stderr);
+    const after = status(f.client);
+    assert.equal(after.selected_tool, before.selected_tool);
+    assert.equal(after.applied_release.commit, before.applied_release.commit);
+    assert.equal(after.applied_release.release_id, 1);
+    assert.equal(read(f.client, 'AGENTS.md'), 'Customized agent instructions\n');
+    const unchanged = await f.request();
+    assert.match(unchanged.stdout, /already applied/);
+    assert.deepEqual(status(f.client), after);
+  });
+}
+
+test('missing or ambiguous migration declarations and undeclared writes leave the harness untouched', async t => {
+  for (const problem of ['duplicate', 'gap', 'missing-checks', 'undeclared-write']) {
+    const f = await publishedUpdateJourney(t, 'codex', {
+      customizeCandidate({ release, client, manifest }) {
+        put(client, 'agent/client.txt', 'Client bytes\n');
+        const path = manifest.update_compatibility[0];
+        path.steps = [{
+          from_version: problem === 'gap' ? '2.1.0' : '2.0.0',
+          to_version: '2.10.0',
+          script: 'update/migrations/change.json',
+          changes: [{ path: 'agent/client.txt', operation: 'replace' }],
+        }];
+        put(release, 'update/migrations/change.json', JSON.stringify([{
+          op: 'write-text', path: problem === 'undeclared-write' ? 'agent/other.txt' : 'agent/client.txt', text: 'New text',
+        }]));
+        if (problem === 'duplicate') manifest.update_compatibility.push(structuredClone(path));
+        if (problem === 'missing-checks') delete path.checks;
+      },
+    });
+    const messages = {
+      duplicate: /expected one supported update path/i,
+      gap: /out-of-order migration step/i,
+      'missing-checks': /missing or invalid required post-apply checks/i,
+      'undeclared-write': /undeclared or unsupported migration operation/i,
+    };
+    const before = read(f.client, 'status/status.json');
+    const denied = await f.request();
+    assert.notEqual(denied.code, 0, problem);
+    assert.match(denied.stderr, messages[problem]);
+    assert.equal(read(f.client, 'status/status.json'), before);
+    assert.equal(read(f.client, 'agent/client.txt'), 'Client bytes\n');
+    assert.equal(existsSync(join(f.client, 'agent/other.txt')), false);
+    assert.equal(existsSync(join(f.client, '.update-backup')), false);
+  }
+});
+
+test('a claimed legacy version without its historical layout and pinned anchors stops at clean-install guidance', async t => {
+  const f = await publishedUpdateJourney(t, 'claude-code', { legacy: true });
+  f.state.listed = [1];
+  const before = read(f.client, 'status/status.json');
+  const manifest = read(f.client, 'update/manifest.json');
+  put(f.client, 'update/manifest.json', manifest + '  ');
+  const forged = await f.request();
+  assert.notEqual(forged.code, 0);
+  assert.match(forged.stderr, /separate clean install/i);
+  put(f.client, 'update/manifest.json', manifest);
+  put(f.client, 'skills/foreign/SKILL.md', 'Layout from another version\n');
+  const mixed = await f.request();
+  assert.notEqual(mixed.code, 0);
+  assert.match(mixed.stderr, /separate clean install/i);
+  assert.equal(read(f.client, 'status/status.json'), before);
+  assert.equal(existsSync(join(dirname(f.client), 'client-deployed')), false);
+});
+
 test('failed rollback blocks updates and recovers through the exact separate publication even after withdrawal', async t => {
   const f = await publishedUpdateJourney(t, 'codex', { damageUpdater: true });
   const priorStatus = read(f.client, 'status/status.json');
@@ -587,4 +771,27 @@ test('failed rollback blocks updates and recovers through the exact separate pub
   assert.equal(existsSync(join(f.client, f.newSkill)), false);
   assert.equal(JSON.parse(read(f.client, journalPath)).state, 'recovered');
   assert.equal(read(f.client, failurePath), failure);
+});
+
+test('explicit radio opt-in pairs the legacy migration target and preserves the original choice and key file', async t => {
+  const f = await publishedUpdateJourney(t, 'claude-code', { legacy: true });
+  f.state.listed = [1];
+  const legacy = status(f.client);
+  legacy.sharing = { ...legacy.sharing, radio_choice: 'declined', status_signal_enabled: false, install_token: null };
+  legacy.home = { enabled: true, branch: 'main' };
+  put(f.client, 'status/status.json', JSON.stringify(legacy));
+  const previousKey = 'orion_' + 'previous'.repeat(3);
+  put(f.client, 'status/radio.key', previousKey + '\n');
+  const before = read(f.client, 'status/status.json');
+  const destination = join(dirname(f.client), 'separately-deployed');
+  const result = await f.request({ ORION_PAIRING_CODE: 'BCDF-GHJK-LMNP' }, ['--pair-radio', '--migrate-to', destination]);
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stderr, /Radio pairing confirmed/);
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(f.token));
+  assert.equal(read(f.client, 'status/status.json'), before);
+  assert.equal(read(f.client, 'status/radio.key'), previousKey + '\n');
+  assert.equal(status(destination).sharing.radio_choice, 'accepted');
+  assert.equal(status(destination).sharing.install_token, null);
+  assert.equal(read(destination, 'status/radio.key'), f.token + '\n');
+  assert.equal(statSync(join(destination, 'status/radio.key')).mode & 0o777, 0o600);
 });

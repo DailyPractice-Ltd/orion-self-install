@@ -145,42 +145,54 @@ For a harness that still uses the sending rule from before 1.5.0,
 `node status/send.mjs migrate` is the separate local sending-rule command.
 It backs up the files it changes.
 
-Older folders that used the release checkout as their business folder must first be
-migrated into a separate deployed repository with an explicit selected tool. From a
-fresh release checkout, run:
+A supported older same-folder harness moves into a separate deployed folder.
+The updater verifies the historical layout and shipped files before carrying
+over the client's status, radio choice, team, knowledge, memory, and other local
+work. It keeps the original folder available. Saved computer schedules point to
+the old path and need to be wired again in the new folder.
+
+If the old harness has no `update/request.mjs`, use the official **Source code**
+download for a published release that contains the launcher. Extract it outside
+the old harness. From the old harness run the launcher from that download:
 
 ```sh
-node install.mjs --tool claude-code --target /path/to/new-client-folder \
-  --migrate-from /path/to/legacy-checkout --github-repo OWNER/PRIVATE-REPO
+cd /path/to/older-orion
+node /path/to/published-orion/update/request.mjs
 ```
 
-Use `--tool codex` only when the legacy status already records Codex. The migration
-copies the client's status and logs, knowledge, memory, skills, roster and job sheets,
-as well as other client-created files such as notes and playbooks, then overlays edited
-deployed files. Release-only source trees, maintainer files, and retired workflows stay
-behind. Saved computer schedules are invalidated because
-their paths refer to the legacy folder; wire them again in the new folder. The new
-private repository becomes the home, while `--local-only` leaves home disabled. The legacy
-checkout is left intact. The command creates and pushes a private GitHub repository;
-`--remote https://github.com/OWNER/PRIVATE-REPO.git` uses an existing private
-repository, verified through `gh`. With no GitHub option, installation creates a local Git repository; `--local-only` is the explicit equivalent. A private remote can be connected later with `node status/home.mjs prepare --remote <address> --yes`.
-
-The manifest's legacy `refresh` list remains for old same-path updaters, but no longer
-lists the three `.claude/skills/` source files removed from the release. An older
-same-path updater can still refresh the other listed files; it will leave those
-three installed skills as they are. To receive current skill definitions, migrate
-the harness into a separate client folder with `install.mjs --migrate-from` above,
-or run the pinned updater in an already deployed folder. That updater maps the
-`skills/` sources to the chosen runtime paths and recognizes historical Claude
-copies by fingerprint. `deployment` is the contract for separate client folders.
-Maintainers run
-`node tests/helpers/pristine.mjs --write` after release edits and before tagging.
+The new folder is created alongside the old one, with `-deployed` added to its
+name. To choose another new folder alongside the original, add
+`--migrate-to /path/to/new-orion`. The command reports the new folder and update
+backup once checks pass. If verification fails, keep the old folder and follow
+the published fresh-install instructions into a separate folder.
 
 ## Declare a supported starting version
 
-In `update/manifest.json`, add exactly one `update_compatibility` entry for each
-supported `from_version` and `tool`. An ordinary update declares `steps: []`,
-names its `required_destinations` from the selected deployment map, and lists
-`checks`. Include a `deployed-layout` check and any applicable `node-syntax`
-checks with their mapped `path`. Optional files use the shipped fingerprints
-to distinguish released copies from local edits.
+In `update/manifest.json`, add one unambiguous `update_compatibility` path for
+each starting version and tool layout you support. Name the
+`required_destinations` from the selected deployment map, and list the
+required `checks`. Include a `deployed-layout` check and any applicable
+`node-syntax` checks with their mapped `path`. For a release that needs no
+migration script, declare `steps: []`.
+
+A migration lists steps in order with `from_version` and `to_version` values
+that connect the starting version to the release. Every step names a pinned
+`script` under `update/migrations/` and declares its allowed `changes`, each
+with a relative `path` and an `operation` of `add`, `replace`, or `retire`.
+Scripts are JSON arrays of local file instructions. `write-text` takes `text`,
+`replace-text` takes a unique `find` string and a `replace` string, and `remove`
+retires a file. Each instruction supplies its target `path`. The updater
+reports the actual effects by step and backs up the prior bytes of changed
+files. Running the script does not invoke shells or connect to external
+accounts.
+
+A path that verifies older state must declare `verification.anchors` with
+shipped `path` and `sha256` fingerprints, and `verification.absent_paths` to
+distinguish the layout. With `verification.infer_tool: true`, Orion can record
+the tool if the evidence identifies a single path. For same-version backfill,
+the installed release files must also match the pinned publication. Explicitly
+list which release destinations accept client edits in
+`verification.allow_client_edits`. A path with
+`starting_layout: "legacy-same-folder"` stages a copy using the pinned
+`copy_exclude` declaration and `prepare-separate-harness-status` migration
+instruction. The default starting layout is `deployed`.

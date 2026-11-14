@@ -287,7 +287,7 @@ export async function requestPublishedUpdate({
     );
     const env = { ...process.env };
     delete env.ORION_PAIRING_CODE;
-    return await new Promise((resolve, reject) => {
+    return await new Promise((complete, reject) => {
       const updater = spawn(
         process.execPath,
         [
@@ -316,7 +316,7 @@ export async function requestPublishedUpdate({
         { stdio: 'inherit', env },
       );
       updater.once('error', reject);
-      updater.once('close', (code) => resolve(code ?? 2));
+      updater.once('close', (code) => complete(code ?? 2));
     });
   } finally {
     rmSync(temporary, { recursive: true, force: true });

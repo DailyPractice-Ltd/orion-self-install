@@ -4,14 +4,13 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** complete
+**Status:** completed
 
 - [x] Rank valid vX.Y.Z GitHub Releases by semantic version regardless of publication date or GitHub's latest designation. Exclude drafts, prereleases, and withdrawn releases.
 - [x] Pin the GitHub Release ID, tag, peeled full commit hash, and manifest version. Install from the verified pinned source and recheck publication and identity immediately before the first install write.
 - [x] A failed lookup, unavailable source, identity mismatch, or withdrawal before the first write stops installation. There is no branch, cache, or installed-code fallback.
 - [x] Installation pauses if the enabled radio cannot be paired and confirmed working. The client can resume when pairing becomes available.
 - [x] Successful installation records the tag, full commit hash, Release ID, and application time. A paused or failed install has no successful application record.
-
 
 ## Implementation evidence
 
@@ -31,9 +30,7 @@
   HTTP servers. Covers both tools, pagination, semantic ordering, eligibility,
   prewrite outage/withdrawal/retag/missing source/manifest mismatch, pairing resume,
   staged tampering and interrupted promotion recovery.
-- Validation: complete `node --test tests/*.test.mjs` passed **267/267**. New source
-  files must be staged for the existing deployed-journey Git-diff fixtures to include
-  them; the first unstaged full run failed only those six fixture missing-source
-  checks. Source files were staged and the complete suite then passed.
-- Integration base merged: `de58554` (ticket 01 inventory repairs). No published
-  tag, release, live radio, live client state, or external account was changed.
+- Validation on integration merge `62afc8d`: `node --test tests/*.test.mjs` passed
+  **274/274** with loopback access for the HTTP fixtures. `git diff --check` passed,
+  and `node tests/helpers/pristine.mjs` confirmed the release fingerprints were up to
+  date. All install journeys used disposable local fixtures.

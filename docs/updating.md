@@ -53,9 +53,44 @@ The updater stages changes, backs up each affected file under `.update-backup/`,
 and then applies them. It records the tag, full commit, Release ID, and
 application time only after local smoke checks succeed. A failed smoke check
 restores the prior files and leaves a failure report in the backup. If the
-process is interrupted, retry the same update command to recover first. Report
-the resulting version, changes, preserved edits and collisions, and backup or
-failure report path.
+process is interrupted, retry the same update command. Automatic resumption
+requires the same published release to still be available. Report the resulting
+version, changes, preserved edits and collisions, and backup or failure report
+path.
+
+### Recover an unfinished update from a separate checkout
+
+If Orion says recovery is required, keep the backup directory identified in the
+message. It contains the prior files and `journal.json`. A failed automatic
+restoration also records the cause and affected files in `failure.json`.
+Orion blocks updates until recovery succeeds.
+
+Read `release.tag`, `release.commit`, and `release.release_id` from the
+backup's `journal.json`. Use those exact values to fill in the command below.
+It downloads the same publication into a fresh temporary checkout, checks the
+commit before running its recovery code, then verifies the release identity and
+clean checkout against the transaction. This recovery uses the original backup
+even if the publication has since been withdrawn.
+
+```sh
+(
+  set -eu
+  cd /path/to/my-orion
+  backup=.update-backup/TRANSACTION
+  release_tag=TAG
+  release_commit=FULL_COMMIT
+  release_id=RELEASE_ID
+  recovery_tmp=$(mktemp -d)
+  trap 'rm -rf "$recovery_tmp"' EXIT
+  git clone --quiet --depth 1 --branch "$release_tag" https://github.com/DailyPractice-Ltd/orion-self-install.git "$recovery_tmp/release"
+  test "$(git -C "$recovery_tmp/release" rev-parse HEAD)" = "$release_commit"
+  node "$recovery_tmp/release/update/apply.mjs" recover-published --root "$PWD" --backup "$backup" --tag "$release_tag" --commit "$release_commit" --release-id "$release_id"
+)
+```
+
+If recovery reports a collision, keep a separate copy of the affected work and
+ask Daily Practice for help reconciling it. Recovery keeps the backup, the
+original failure report, and the latest attempt's `recovery.json` together.
 
 ## Switch the selected tool
 
@@ -91,7 +126,8 @@ before trying again. The temporary checkout is removed automatically.
 
 ## Restore
 
-Use the backup path printed by update or switch:
+For a completed offline update or tool switch, use the backup path printed by
+the command:
 
 ```sh
 node update/apply.mjs restore --root . --backup .update-backup/VERSION-TIMESTAMP

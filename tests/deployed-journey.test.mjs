@@ -1,7 +1,7 @@
 /** A client journey using a complete release checkout and only deployed commands. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -194,7 +194,7 @@ for (const tool of ['claude-code', 'codex']) {
   });
 }
 
-async function publishedUpdateJourney(t, tool) {
+async function publishedUpdateJourney(t, tool, { damageUpdater } = {}) {
   const { release, client } = journey(t, tool);
   const current = status(client);
   const state = { listed: [2, 1, 3], identityChanged: false };
@@ -206,6 +206,11 @@ async function publishedUpdateJourney(t, tool) {
   const token = 'orion_' + 'test'.repeat(6);
   const responseFile = join(dirname(client), 'responses.json');
   const mock = join(dirname(client), 'fetch.mjs');
+  const terminal = join(dirname(client), 'terminal.mjs');
+  put(dirname(client), 'terminal.mjs', `
+    Object.defineProperty(process.stdin, 'isTTY', { value: true });
+    Object.defineProperty(process.stderr, 'isTTY', { value: true });
+  `);
   put(dirname(client), 'fetch.mjs', `
     import assert from 'node:assert/strict';
     import { readFileSync, writeFileSync } from 'node:fs';
@@ -266,6 +271,10 @@ async function publishedUpdateJourney(t, tool) {
   });
   put(release, 'skills/next/SKILL.md', '# Next release skill\n');
   put(release, 'skills/hire-agent/SKILL.md', '# Changed upstream\n');
+  if (damageUpdater) {
+    const script = read(release, 'update/apply.mjs');
+    put(release, 'update/apply.mjs', `if (process.argv[1] === ${JSON.stringify(join(client, 'update/apply.mjs'))}) throw new Error('Damaged deployed updater');\n${script}`);
+  }
   put(release, 'update/manifest.json', JSON.stringify(manifest));
   git(release, 'add', '.');
   git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'candidate');
@@ -275,21 +284,31 @@ async function publishedUpdateJourney(t, tool) {
   git(release, 'add', '.');
   git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'after publication');
 
-  const request = (env = {}, args = []) => new Promise((resolve, reject) => {
+  const execute = (args, env = {}, answers) => new Promise((resolve, reject) => {
     writeFileSync(responseFile, JSON.stringify({
       ...state,
       releases: state.listed.map(publication),
       publishAfterPair: state.publishAfterPair?.map(publication),
     }));
-    const p = spawn(process.execPath, ['--import', pathToFileURL(mock).href, 'update/request.mjs', '--repository', 'fixture/orion',
-      '--api-base', url, '--source-url', release, ...args], { cwd: client, env: plainEnv({ ORION_BRIDGE_URL: url, ...env }) });
+    const preloads = ['--import', pathToFileURL(mock).href];
+    if (answers) preloads.push('--import', pathToFileURL(terminal).href);
+    const p = spawn(process.execPath, [...preloads, ...args, '--repository', 'fixture/orion',
+      '--api-base', url, '--source-url', release], { cwd: client, env: plainEnv({ ORION_BRIDGE_URL: url, ...env }) });
     let stdout = '', stderr = '';
     p.stdout.on('data', data => { stdout += data; });
-    p.stderr.on('data', data => { stderr += data; });
+    p.stderr.on('data', data => {
+      stderr += data;
+      const next = answers?.[0];
+      if (next && stderr.includes(next[0])) {
+        p.stdin.write(answers.shift()[1] + '\n');
+        if (answers.length === 0) p.stdin.end();
+      }
+    });
     p.on('error', reject);
     p.on('close', code => resolve({ code, stdout, stderr }));
   });
-  return { client, release, state, request, commit, newSkill, edit, token };
+  const request = (env, args = [], answers) => execute(['update/request.mjs', ...args], env, answers);
+  return { client, release, state, request, execute, commit, newSkill, edit, token };
 }
 
 for (const tool of ['claude-code', 'codex']) {
@@ -331,6 +350,13 @@ test('a radio-off client can decline or fail pairing without changing the deploy
   assert.match(paused.stderr, /--pair-radio/);
   assert.ok(!paused.stderr.includes(code));
 
+  const declined = await f.request({ ORION_PAIRING_CODE: '' }, [], [
+    ['Turn on check-ins and continue your update?', 'no'],
+  ]);
+  assert.notEqual(declined.code, 0);
+  assert.match(declined.stderr, /radio choice was kept/);
+  assert.equal(read(f.client, 'status/status.json'), before);
+
   for (const problem of ['pairingRejected', 'pairingUnavailable']) {
     f.state[problem] = true;
     const failed = await f.request(env, ['--pair-radio']);
@@ -355,7 +381,12 @@ for (const home of [false, true]) {
     f.state.listed = [1];
     f.state.publishAfterPair = [2, 1];
     const code = 'BCDF-GHJK-LMNP';
-    const resumed = await f.request({ ORION_PAIRING_CODE: code }, ['--pair-radio']);
+    const resumed = home
+      ? await f.request({ ORION_PAIRING_CODE: code }, ['--pair-radio'])
+      : await f.request({ ORION_PAIRING_CODE: '' }, [], [
+        ['Turn on check-ins and continue your update?', 'yes'],
+        ['Enter your Daily Practice pairing code', code],
+      ]);
     assert.equal(resumed.code, 0, resumed.stderr);
     assert.match(resumed.stderr, /radio pairing confirmed.*continuing/i);
     assert.ok(!(resumed.stdout + resumed.stderr).includes(f.token));
@@ -392,7 +423,7 @@ test('a resumed update still refuses a release withdrawn at the prewrite check',
   assert.equal(after.sharing.radio_choice, 'accepted');
   assert.deepEqual(after.applied_release, current.applied_release);
   assert.equal(existsSync(join(f.client, f.newSkill)), false);
-  assert.equal(existsSync(join(f.client, '.update-backup')), false);
+  assert.deepEqual(readdirSync(join(f.client, '.update-backup')), []);
 });
 
 test('withdrawal or changed publication identity stops before the first harness write', async t => {
@@ -485,8 +516,75 @@ test('retry recovers a process interrupted mid-promotion before applying anew', 
   const interrupted = await f.request({ ORION_UPDATE_INTERRUPT_AFTER: '1' });
   assert.notEqual(interrupted.code, 0);
   assert.equal(read(f.client, 'status/status.json'), before);
+  f.state.listed = [1];
+  const changedRelease = await f.request();
+  assert.notEqual(changedRelease.code, 0);
+  assert.match(changedRelease.stderr, /requires recovery from a separate pinned source/);
+  assert.equal(read(f.client, 'status/status.json'), before);
+  f.state.listed = [2, 1, 3];
   const retried = await f.request();
   assert.equal(retried.code, 0, retried.stderr);
   assert.equal(status(f.client).applied_release.commit, f.commit);
   assert.equal(read(f.client, f.newSkill), '# Next release skill\n');
+});
+
+test('failed rollback blocks updates and recovers through the exact separate publication even after withdrawal', async t => {
+  const f = await publishedUpdateJourney(t, 'codex', { damageUpdater: true });
+  const priorStatus = read(f.client, 'status/status.json');
+  const priorUpdater = read(f.client, 'update/apply.mjs');
+  const failed = await f.request({ ORION_UPDATE_SMOKE_FAIL: '1', ORION_UPDATE_RESTORE_FAIL: '1' });
+  assert.notEqual(failed.code, 0);
+  assert.match(failed.stderr, /requires recovery/);
+  const backup = failed.stderr.match(/Evidence: (\.update-backup\/\S+)/)[1];
+  const failurePath = `${backup}/failure.json`;
+  const failure = read(f.client, failurePath);
+  assert.match(JSON.parse(failure).restoration, /Injected restoration failure/);
+  assert.ok(JSON.parse(failure).affected_files.includes('update/apply.mjs'));
+  assert.equal(read(f.client, `${backup}/files/update/apply.mjs`), priorUpdater);
+  const journalPath = `${backup}/journal.json`;
+  const journal = read(f.client, journalPath);
+  assert.equal(JSON.parse(journal).state, 'recovery-required');
+  assert.equal(read(f.client, 'status/status.json'), priorStatus);
+  assert.equal(read(f.client, f.newSkill), '# Next release skill\n');
+
+  const blocked = await f.request();
+  assert.notEqual(blocked.code, 0);
+  assert.match(blocked.stderr, /requires recovery/);
+  assert.equal(read(f.client, journalPath), journal);
+  assert.match(run(f.client, 'update/apply.mjs', 'recover', '--root', f.client).stderr, /Damaged deployed updater/);
+  f.state.listed = [];
+  assert.match((await f.request()).stderr, /requires recovery/);
+  f.state.listed = [2, 1, 3];
+
+  const source = join(dirname(f.client), 'recovery');
+  git(f.release, '-c', 'advice.detachedHead=false', 'clone', '-q', '--branch', 'v2.10.0', f.release, source);
+  const recover = (commit = f.commit) => f.execute([join(source, 'update/apply.mjs'), 'recover-published',
+    '--root', f.client, '--backup', backup, '--tag', 'v2.10.0', '--commit', commit, '--release-id', '2']);
+  const wrong = await recover('a'.repeat(40));
+  assert.notEqual(wrong.code, 0);
+  assert.match(wrong.stderr, /original transaction release/);
+  assert.equal(read(f.client, journalPath), journal);
+
+  put(f.client, f.newSkill, '# Client wrote this after the failed update\n');
+  const collision = await recover();
+  assert.notEqual(collision.code, 0);
+  assert.match(collision.stderr, /recovery collisions/);
+  assert.equal(read(f.client, f.newSkill), '# Client wrote this after the failed update\n');
+  assert.equal(read(f.client, failurePath), failure);
+  assert.equal(JSON.parse(read(f.client, journalPath)).state, 'recovery-required');
+  assert.match(read(f.client, `${backup}/recovery.json`), /recovery collisions/);
+  assert.match((await f.request()).stderr, /requires recovery/);
+
+  put(f.client, 'agent/knowledge-base/01-later.md', '# Unsynced client notes\n');
+  put(f.client, f.newSkill, '# Next release skill\n');
+  f.state.withdrawn = true;
+  const recovered = await recover();
+  assert.equal(recovered.code, 0, recovered.stderr);
+  assert.match(recovered.stdout, /restored/);
+  assert.equal(read(f.client, 'update/apply.mjs'), priorUpdater);
+  assert.equal(read(f.client, 'status/status.json'), priorStatus);
+  assert.equal(read(f.client, 'agent/knowledge-base/01-later.md'), '# Unsynced client notes\n');
+  assert.equal(existsSync(join(f.client, f.newSkill)), false);
+  assert.equal(JSON.parse(read(f.client, journalPath)).state, 'recovered');
+  assert.equal(read(f.client, failurePath), failure);
 });

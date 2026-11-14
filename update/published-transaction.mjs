@@ -10,13 +10,22 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   rmSync,
   rmdirSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from 'node:path';
 import {
   destinationState,
   fingerprint,
@@ -56,11 +65,15 @@ function write(path, bytes, mode) {
   chmodSync(path, mode);
 }
 
-function saveJournal(backup, journal) {
-  const path = join(backup, 'journal.json');
-  const temporary = `${path}.tmp`;
-  write(temporary, serialized(journal), 0o600);
+function saveEvidence(backup, name, value) {
+  const path = safePath(backup, name);
+  const temporary = safePath(backup, `${name}.tmp`);
+  write(temporary, serialized(value), 0o600);
   renameSync(temporary, path);
+}
+
+function saveJournal(backup, journal) {
+  saveEvidence(backup, 'journal.json', journal);
 }
 
 function runtimePairing(root, status) {
@@ -353,23 +366,69 @@ function postApplyChecks(root, plan) {
 }
 
 function replaceFromBackup(backup, path, source, mode) {
-  const temporary = join(backup, 'promote.tmp');
+  const temporary = safePath(backup, 'promote.tmp');
   copyFileSync(source, temporary);
   chmodSync(temporary, mode);
   mkdirSync(dirname(path), { recursive: true });
   renameSync(temporary, path);
 }
 
-function rollback(root, backup, journal) {
+function sameFile(snapshot, hash, mode) {
+  return (
+    (snapshot && digest(snapshot.bytes)) === hash && snapshot?.mode === mode
+  );
+}
+
+function matchesPriorOrInstalled(root, action) {
+  const target = file(safePath(root, action.destination));
+  if (sameFile(target, action.prior_hash, action.prior_mode)) return 'prior';
+  if (sameFile(target, action.installed_hash, action.installed_mode))
+    return 'installed';
+  return 'collision';
+}
+
+function validateRollbackJournal(journal) {
+  const hashes = /^[a-f0-9]{64}$/;
+  const validState = (hash, mode) =>
+    hash == null
+      ? mode == null
+      : hashes.test(hash) &&
+        Number.isInteger(mode) &&
+        mode >= 0 &&
+        mode <= 0o777;
+  const affected = [...journal.actions, journal.status];
+  const added = journal.actions.filter((action) => action.prior_hash === null);
+  if (
+    journal.status.destination !== statusFile ||
+    !hashes.test(journal.status.prior_hash) ||
+    new Set(affected.map((action) => action.destination.toLowerCase())).size !==
+      affected.length ||
+    affected.some(
+      (action) =>
+        !validState(action.prior_hash, action.prior_mode) ||
+        !validState(action.installed_hash, action.installed_mode),
+    )
+  )
+    throw new Error('Invalid published update journal.');
+  for (const { destination } of journal.actions)
+    validateDeploymentPath(destination);
+  for (const directory of journal.created_directories) {
+    validateDeploymentPath(directory);
+    if (
+      !added.some(({ destination }) => destination.startsWith(`${directory}/`))
+    )
+      throw new Error(`Invalid recovery directory: ${directory}`);
+  }
+}
+
+function rollback(root, backup, journal, { automatic = false } = {}) {
+  validateRollbackJournal(journal);
+  if (automatic && process.env.ORION_UPDATE_RESTORE_FAIL === '1')
+    throw new Error('Injected restoration failure');
   const affected = [...journal.actions, journal.status];
   const collisions = affected.filter((action) => {
     try {
-      const now = currentHash(root, action.destination);
-      const mode = currentMode(root, action.destination);
-      return (
-        !(now === action.prior_hash && mode === action.prior_mode) &&
-        !(now === action.installed_hash && mode === action.installed_mode)
-      );
+      return matchesPriorOrInstalled(root, action) === 'collision';
     } catch {
       return true;
     }
@@ -379,21 +438,25 @@ function rollback(root, backup, journal) {
       `Update recovery collisions: ${collisions.map((action) => action.destination).join(', ')}`,
     );
 
+  for (const action of affected.filter((action) => action.prior_hash)) {
+    const original = file(safePath(backup, `files/${action.destination}`));
+    if (!sameFile(original, action.prior_hash, action.prior_mode))
+      throw new Error(`Backup verification failed: ${action.destination}`);
+  }
   for (const action of affected.reverse()) {
     const target = safePath(root, action.destination);
-    if (
-      action.prior_hash === currentHash(root, action.destination) &&
-      action.prior_mode === currentMode(root, action.destination)
-    )
-      continue;
+    const match = matchesPriorOrInstalled(root, action);
+    if (match === 'prior') continue;
+    if (match === 'collision')
+      throw new Error(`Update recovery collisions: ${action.destination}`);
     if (action.prior_hash) {
-      const source = safePath(backup, `files/${action.destination}`);
-      if (digest(readFileSync(source)) !== action.prior_hash)
-        throw new Error(`Backup verification failed: ${action.destination}`);
-      replaceFromBackup(backup, target, source, action.prior_mode);
-    } else {
-      unlinkSync(target);
-    }
+      replaceFromBackup(
+        backup,
+        target,
+        safePath(backup, `files/${action.destination}`),
+        action.prior_mode,
+      );
+    } else unlinkSync(target);
   }
   for (const directory of journal.created_directories) {
     try {
@@ -406,29 +469,24 @@ function rollback(root, backup, journal) {
 }
 
 function recordFailure(backup, journal, failure, restoration) {
-  write(
-    join(backup, 'failure.json'),
-    serialized({
-      failure,
-      restoration: restoration || 'restored',
-      affected_files: [
-        ...journal.actions.map((a) => a.destination),
-        statusFile,
-      ],
-    }),
-    0o600,
-  );
+  saveEvidence(backup, 'failure.json', {
+    failure,
+    restoration: restoration || 'restored',
+    affected_files: [...journal.actions.map((a) => a.destination), statusFile],
+  });
 }
 
 function restoreInterrupted(root, backup, journal, failure) {
+  const backupRel = `${backups}/${basename(backup)}`;
+  journal.state = 'recovery-required';
+  saveJournal(backup, journal);
+  recordFailure(backup, journal, failure, 'restoration started');
   try {
-    rollback(root, backup, journal);
+    rollback(root, backup, journal, { automatic: true });
   } catch (error) {
     recordFailure(backup, journal, failure, error.message);
-    journal.state = 'recovery-required';
-    saveJournal(backup, journal);
     throw new Error(
-      `Update requires recovery. Evidence: ${backup}. ${error.message}`,
+      `Update requires recovery from a separate pinned source. Evidence: ${backupRel}\n${error.message}`,
     );
   }
   recordFailure(backup, journal, failure);
@@ -455,7 +513,21 @@ function pendingTransactions(root) {
     });
 }
 
-function withUpdateLock(root, operation) {
+function requireRecoveryMessage(backup) {
+  return `Update requires recovery from a separate pinned source. Evidence: ${backups}/${basename(backup)}`;
+}
+
+export function assertPublishedUpdateNotBlocked(
+  root,
+  { includePending = false } = {},
+) {
+  const blocked = pendingTransactions(root).find(
+    ({ journal }) => includePending || journal.state === 'recovery-required',
+  );
+  if (blocked) throw new Error(requireRecoveryMessage(blocked.backup));
+}
+
+export function withUpdateLock(root, operation) {
   const directory = safePath(root, backups);
   mkdirSync(directory, { mode: 0o700, recursive: true });
   // Claim before inspecting other claims. Simultaneous contenders may both
@@ -493,13 +565,30 @@ function assertPriorFile(root, action) {
   return prior;
 }
 
-function promote(root, stage, priorStatus, plan, pin) {
+function releaseOrigin(client) {
+  const { repository, apiBase, sourceUrl } = client;
+  return { repository, apiBase, sourceUrl };
+}
+
+function sameTransactionSource(journal, client, pin) {
+  return (
+    ['tag', 'commit', 'release_id', 'manifest_version'].every(
+      (key) => journal.release?.[key] === pin[key],
+    ) &&
+    Object.entries(releaseOrigin(client)).every(
+      ([key, value]) => journal.source?.[key] === value,
+    )
+  );
+}
+
+function promote(root, stage, priorStatus, plan, pin, client) {
   const backup = mkdtempSync(join(safePath(root, backups), `${pin.tag}-`));
   const backupRel = `${backups}/${basename(backup)}`;
   const journal = {
     kind: 'published-update',
     state: 'pending',
     release: pin,
+    source: releaseOrigin(client),
     actions: plan.actions,
     created_directories: missingDirectories(root, plan.actions),
     status: {
@@ -585,10 +674,14 @@ function promote(root, stage, priorStatus, plan, pin) {
   };
 }
 
-export async function applyPublishedUpdate({ root, checkout, client, pin }) {
+function requireDeployedRoot(root) {
   root = resolve(root);
   if (!lstatSync(root).isDirectory())
     throw new Error('Expected a deployed harness directory.');
+  return root;
+}
+
+function requireReleasePin(pin) {
   if (
     typeof pin?.tag !== 'string' ||
     !/^v/.test(pin.tag) ||
@@ -599,23 +692,113 @@ export async function applyPublishedUpdate({ root, checkout, client, pin }) {
     pin.release_id < 1
   )
     throw new Error('A full published release identity is required.');
-  const statusPath = safePath(root, statusFile);
-  const priorStatus = file(statusPath);
-  if (!priorStatus) throw new Error('Harness status file is missing.');
-  const status = JSON.parse(priorStatus.bytes);
-  await requireWorkingRadio(root, status);
+}
+
+export async function recoverPublishedUpdate({
+  root,
+  checkout,
+  client,
+  pin,
+  backupRel,
+}) {
+  root = requireDeployedRoot(root);
+  requireReleasePin(pin);
+  const separation = relative(realpathSync(root), realpathSync(checkout));
+  if (
+    !separation ||
+    !(
+      separation === '..' ||
+      separation.startsWith(`..${sep}`) ||
+      isAbsolute(separation)
+    )
+  )
+    throw new Error(
+      'Recovery requires a separate checkout outside the deployed harness.',
+    );
+  const entry = pendingTransactions(root).find(
+    ({ backup }) => backupRel === `${backups}/${basename(backup)}`,
+  );
+  if (!entry)
+    throw new Error('Choose the backup for an unfinished published update.');
+  const { backup, journal } = entry;
+  if (!sameTransactionSource(journal, client, pin))
+    throw new Error(
+      'Recovery requires the original transaction release and source recorded in its journal.',
+    );
+  await verifyPinnedRelease(client, pin, checkout, { rollbackOnly: true });
+
+  return withUpdateLock(root, () => {
+    const latest = pendingTransactions(root).find(
+      (entry) => entry.backup === backup,
+    );
+    if (!latest || serialized(latest.journal) !== serialized(journal))
+      throw new Error('The transaction changed during recovery verification.');
+    journal.state = 'recovery-required';
+    saveJournal(backup, journal);
+    const report = {
+      backup: backupRel,
+      release: pin,
+      affected_files: [
+        ...journal.actions.map((action) => action.destination),
+        statusFile,
+      ],
+      attempted_at: new Date().toISOString(),
+    };
+    saveEvidence(backup, 'recovery.json', {
+      ...report,
+      restoration: 'started',
+    });
+    try {
+      rollback(root, backup, journal);
+    } catch (error) {
+      saveEvidence(backup, 'recovery.json', {
+        ...report,
+        restoration: error.message,
+      });
+      throw new Error(`${requireRecoveryMessage(backup)}\n${error.message}`);
+    }
+    const result = { ...report, restoration: 'restored' };
+    saveEvidence(backup, 'recovery.json', result);
+    journal.state = 'recovered';
+    saveJournal(backup, journal);
+    return result;
+  });
+}
+
+export async function applyPublishedUpdate({ root, checkout, client, pin }) {
+  root = requireDeployedRoot(root);
+  requireReleasePin(pin);
+  assertPublishedUpdateNotBlocked(root);
   const pending = pendingTransactions(root);
-  if (pending.some(({ journal }) => journal.state === 'recovery-required'))
-    throw new Error('Update requires recovery from a separate pinned source.');
   if (pending.length) {
+    const requireOriginalSource = ({ backup, journal }) => {
+      if (
+        journal.state === 'recovery-required' ||
+        !sameTransactionSource(journal, client, pin)
+      )
+        throw new Error(requireRecoveryMessage(backup));
+    };
+    for (const entry of pending) requireOriginalSource(entry);
     await verifyPinnedRelease(client, pin, checkout);
     withUpdateLock(root, () => {
-      for (const { backup, journal } of pendingTransactions(root)) {
-        if (journal.state === 'recovery-required')
-          throw new Error(`Update requires recovery. Evidence: ${backup}`);
+      const unfinished = pendingTransactions(root);
+      for (const entry of unfinished) requireOriginalSource(entry);
+      for (const { backup, journal } of unfinished) {
+        validateRollbackJournal(journal);
         if (
           journal.state === 'verified' &&
-          currentHash(root, statusFile) === journal.status.installed_hash
+          sameFile(
+            file(safePath(root, statusFile)),
+            journal.status.installed_hash,
+            journal.status.installed_mode,
+          ) &&
+          journal.actions.every((action) =>
+            sameFile(
+              file(safePath(root, action.destination)),
+              action.installed_hash,
+              action.installed_mode,
+            ),
+          )
         ) {
           journal.state = 'complete';
           saveJournal(backup, journal);
@@ -630,8 +813,12 @@ export async function applyPublishedUpdate({ root, checkout, client, pin }) {
         }
       }
     });
-    return applyPublishedUpdate({ root, checkout, client, pin });
   }
+  const statusPath = safePath(root, statusFile);
+  const priorStatus = file(statusPath);
+  if (!priorStatus) throw new Error('Harness status file is missing.');
+  const status = JSON.parse(priorStatus.bytes);
+  await requireWorkingRadio(root, status);
 
   const previous = recordedRelease(status);
   const order = compareVersions(pin.tag, previous.tag);
@@ -664,7 +851,7 @@ export async function applyPublishedUpdate({ root, checkout, client, pin }) {
         throw new Error(
           'An interrupted update is pending. Retry your request to recover it.',
         );
-      return promote(root, stage, priorStatus, plan, pin);
+      return promote(root, stage, priorStatus, plan, pin, client);
     });
   } finally {
     rmSync(stage, { recursive: true, force: true });

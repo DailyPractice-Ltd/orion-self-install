@@ -931,8 +931,27 @@ async function applySeparateMigration({
     renameSync(destination, target);
     return { ...result, deployed_folder: target };
   } catch (error) {
+    const failure = error.message.match(
+      /(?:Report|Evidence): (\.update-backup\/[^\s]+)/,
+    )?.[1];
+    if (failure) {
+      const retained = mkdtempSync(
+        join(dirname(target), `.${basename(target)}-migration-failure-`),
+      );
+      const location = safePath(destination, failure);
+      const source = lstatSync(location).isDirectory()
+        ? location
+        : dirname(location);
+      for (const name of ['journal.json', 'failure.json']) {
+        const record = file(safePath(source, name));
+        if (record) write(join(retained, name), record.bytes, 0o600);
+      }
+      throw new Error(
+        `Migration stopped. The original folder is unchanged. Report: ${join(retained, 'failure.json')}`,
+      );
+    }
     throw new Error(
-      `Migration stopped. The original folder is unchanged. ${error.message.replace(/ Report: \.update-backup\/\S+$/, '')}`,
+      `Migration stopped. The original folder is unchanged. ${error.message}`,
     );
   } finally {
     rmSync(destination, { recursive: true, force: true });

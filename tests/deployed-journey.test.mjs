@@ -469,6 +469,13 @@ test('a real v1.5.0 same-folder harness migrates into a new deployed folder', as
   const before = read(f.client, 'status/status.json');
   const bad = await f.request({ ORION_UPDATE_SMOKE_FAIL: '1' });
   assert.notEqual(bad.code, 0);
+  const failedReport = bad.stderr.trim().match(/Report: (.*\/failure\.json)$/)[1];
+  assert.match(readFileSync(failedReport, 'utf8'), /smoke-check failure/);
+  assert.equal(read(f.client, 'status/status.json'), before);
+  assert.equal(existsSync(join(dirname(f.client), 'client-deployed')), false);
+
+  const interrupted = await f.request({ ORION_UPDATE_INTERRUPT_AFTER: '1' });
+  assert.notEqual(interrupted.code, 0);
   assert.equal(read(f.client, 'status/status.json'), before);
   assert.equal(existsSync(join(dirname(f.client), 'client-deployed')), false);
 

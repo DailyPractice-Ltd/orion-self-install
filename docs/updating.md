@@ -11,7 +11,22 @@ node update/request.mjs
 ```
 
 The request is the consent to start. The updater needs an enabled, paired,
-working radio. The command checks for the highest stable GitHub Release,
+working radio so Orion can receive release and withdrawal notices.
+
+If your radio is off or hasn't been paired, Orion explains the requirement and
+asks whether to turn on check-ins. Read [what radio check-ins share](radio.md)
+before you decide. If you opt in, use the one-time pairing code from Daily
+Practice. A successful pairing continues the update you already requested. If
+you decline or pairing fails, your existing radio choice and applied release
+are kept.
+
+If an assistant runs the command without a terminal, tell it whether to opt in.
+After you opt in, add `--pair-radio` to the original command and provide the code
+locally through the `ORION_PAIRING_CODE` environment variable. In a terminal,
+`--pair-radio` can also pair again if Daily Practice replaces your code. Ask
+Daily Practice for a fresh code if your radio credentials were revoked.
+
+The command checks for the highest stable GitHub Release,
 excluding drafts, prereleases, and withdrawals. It downloads the published tag
 into a temporary checkout and runs that exact commit's updater, manifest,
 fingerprints, and shipped sources. It verifies publication and identity again

@@ -97,6 +97,10 @@
       "tool": "claude-code",
       "starting_layout": "legacy-same-folder",
       "verification": {
+        "historical_source": {
+          "tag": "v1.5.0",
+          "commit": "acf65a7e37f65d67d7f4d9f342a5da01427e8156"
+        },
         "infer_tool": true,
         "anchors": [
           {
@@ -146,11 +150,16 @@
         }
       ],
       "required_destinations": [
-        "update/request.mjs",
+        "status/shapes.mjs",
         "update/apply.mjs",
-        "update/published-transaction.mjs",
+        "update/destination-resolver.mjs",
+        "update/manifest.json",
+        "update/pristine.json",
+        "update/published-conflicts.mjs",
         "update/published-migrations.mjs",
-        "update/manifest.json"
+        "update/published-release.mjs",
+        "update/published-transaction.mjs",
+        "update/request.mjs"
       ],
       "checks": [
         {
@@ -190,11 +199,16 @@
       },
       "steps": [],
       "required_destinations": [
-        "update/request.mjs",
+        "status/shapes.mjs",
         "update/apply.mjs",
-        "update/published-transaction.mjs",
+        "update/destination-resolver.mjs",
+        "update/manifest.json",
+        "update/pristine.json",
+        "update/published-conflicts.mjs",
         "update/published-migrations.mjs",
-        "update/manifest.json"
+        "update/published-release.mjs",
+        "update/published-transaction.mjs",
+        "update/request.mjs"
       ],
       "checks": [
         {
@@ -234,11 +248,16 @@
       },
       "steps": [],
       "required_destinations": [
-        "update/request.mjs",
+        "status/shapes.mjs",
         "update/apply.mjs",
-        "update/published-transaction.mjs",
+        "update/destination-resolver.mjs",
+        "update/manifest.json",
+        "update/pristine.json",
+        "update/published-conflicts.mjs",
         "update/published-migrations.mjs",
-        "update/manifest.json"
+        "update/published-release.mjs",
+        "update/published-transaction.mjs",
+        "update/request.mjs"
       ],
       "checks": [
         {
@@ -323,7 +342,20 @@
       "update/request.mjs",
       "update/published-transaction.mjs",
       "update/published-migrations.mjs",
+      "update/published-conflicts.mjs",
       "docs/published-install.md"
+    ],
+    "immutable_update_sources": [
+      "status/shapes.mjs",
+      "update/apply.mjs",
+      "update/destination-resolver.mjs",
+      "update/manifest.json",
+      "update/pristine.json",
+      "update/published-conflicts.mjs",
+      "update/published-migrations.mjs",
+      "update/published-release.mjs",
+      "update/published-transaction.mjs",
+      "update/request.mjs"
     ],
     "retired": [
       {

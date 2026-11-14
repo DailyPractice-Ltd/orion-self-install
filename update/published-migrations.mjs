@@ -230,6 +230,8 @@ function updatedValue(current, instruction, defaults) {
   const next = {
     ...defaults,
     ...old,
+    selected_tool: old.selected_tool,
+    applied_release: old.applied_release,
     schema_version: defaults.schema_version,
     checklist: { ...defaults.checklist, ...old.checklist },
     scopes: { ...defaults.scopes, ...old.scopes },

@@ -39,7 +39,6 @@ import {
   radioOn,
   readRadioKeyFile,
 } from '../status/shapes.mjs';
-
 import {
   cleanInstall,
   preflightSteps,
@@ -48,6 +47,7 @@ import {
   statusFile,
   versionPattern,
 } from './published-migrations.mjs';
+
 const backups = '.update-backup';
 const json = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const serialized = (value) => JSON.stringify(value, null, 2) + '\n';
@@ -801,6 +801,7 @@ function copyLegacyHarness(source, destination, path, manifest) {
   const excluded = [
     '.git',
     '.update-backup',
+    '.orion-migration.json',
     'status/shifts',
     ...manifest.deployment.release_only,
     ...path.copy_exclude,

@@ -38,8 +38,7 @@ once rather than assuming the abbreviation is familiar.
    period, and where they'll track it — and agree the number out loud before writing it
    down; it drives pacing later.
 5. **Short is fine.** A thin, true section beats a padded one. If you don't have enough to
-   go on, ask — don't invent detail to fill space (this is also a constitutional rule, not
-   just good practice — see Article I / Article III in `.specify/memory/constitution.md`).
+   go on, ask — don't invent detail to fill space (this is also a core harness rule).
 6. **Update `status/status.json`** after each file is complete — set the matching
    `checklist` key (`kb_business_context`, `kb_icp_vocabulary`, etc.) so a resumed session
    knows exactly where to pick back up.

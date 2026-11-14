@@ -20,7 +20,7 @@
  *
  *   node status/radio.mjs library --install <slug> --yes
  *       Collect a skill Daily Practice has put on the radio (GET /library/<slug>),
- *       write its folder to .claude/skills/<slug>/, and report it to the shelf.
+ *       write its folder to the selected tool's skills directory, and report it to the shelf.
  *       What the skill lists under "Fill at install" is filled from status.json
  *       as it lands (the business name, the agent's name); the rest is printed
  *       for the assistant to ask. Never overwrites a skill already there. Their
@@ -87,6 +87,7 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, lstatS
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { runtimeLayout } from '../update/destination-resolver.mjs';
 import {
   radioOn as radioIsOn, radioKey, readRadioKeyFile, keyHeader, wantsEnvProxy, envProxyEnv, isCloudRun,
   parseInstallDirective, isWorkTag, workTagMenu, labelProblem, countProblem,
@@ -95,6 +96,8 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status.json');
+const ROOT = join(__dirname, '..');
+const skillRoot = () => runtimeLayout(ROOT).skillRoot;
 
 // A cloud machine reaches the radio only through its proxy, and Node has to be
 // started knowing that (status/shapes.mjs, wantsEnvProxy). So this script starts
@@ -472,7 +475,7 @@ if (command === 'library') {
   const toWrite = fill.files;
   const landing = toWrite.find((f) => f.path === SKILL_ENTRY_FILE).content;
 
-  const dir = join(__dirname, '..', '.claude', 'skills', slug);
+  const dir = join(ROOT, skillRoot(), slug);
 
   // Their skill, their machine. A skill they have already taught or edited is
   // never overwritten by something arriving over the radio — the whole folder
@@ -491,7 +494,7 @@ if (command === 'library') {
       console.log(`Needs: ${asset.tools_required.join(', ')}`);
     }
     console.log('');
-    console.log(`It would be written to .claude/skills/${slug}/ as ${incoming.length} file${incoming.length === 1 ? '' : 's'}:`);
+    console.log(`It would be written to ${skillRoot()}/${slug}/ as ${incoming.length} file${incoming.length === 1 ? '' : 's'}:`);
     for (const p of incoming) console.log(`  ${p}`);
     console.log('');
     if (fill.filled.length > 0) {
@@ -530,7 +533,7 @@ if (command === 'library') {
     console.log(`Could not write "${slug}" (${err?.code || err?.message || 'unknown'}). Nothing was changed on this machine.`);
     process.exit(0);
   }
-  console.log(`Written: ${incoming.length} file${incoming.length === 1 ? '' : 's'} to .claude/skills/${slug}/`);
+  console.log(`Written: ${incoming.length} file${incoming.length === 1 ? '' : 's'} to ${skillRoot()}/${slug}/`);
   for (const f of fill.filled) console.log(`Filled in: ${f.question} (${f.value})`);
   // A skill is text in its own folder and nothing else (K3). The send level lives in
   // status/status.json and on each job sheet; no skill can set or move it.
@@ -553,7 +556,7 @@ if (command === 'library') {
     console.log('This skill is not ready until these are filled. Ask the client, one at a time:');
     for (const o of fill.open) console.log(`  {{${o.token}}}: ${o.question}`);
     console.log('The answer is the client\'s, in their words: never take one from status.json or any other file.');
-    console.log(`Write each answer in place of its token in every file under .claude/skills/${slug}/,`);
+    console.log(`Write each answer in place of its token in every file under ${skillRoot()}/${slug}/,`);
     console.log('and change its line under "Fill at install" in SKILL.md to "- TOKEN: answer".');
   }
   console.log('Record it under packages in status/status.json, then try it on something real');
@@ -571,9 +574,9 @@ if (command === 'contribute') {
     process.exit(1);
   }
 
-  const dir = join(__dirname, '..', '.claude', 'skills', slug);
+  const dir = join(ROOT, skillRoot(), slug);
   if (!existsSync(join(dir, SKILL_ENTRY_FILE))) {
-    console.log(`No skill called "${slug}" on this machine (looked for .claude/skills/${slug}/SKILL.md).`);
+    console.log(`No skill called "${slug}" on this machine (looked for ${skillRoot()}/${slug}/SKILL.md).`);
     process.exit(0);
   }
   // The whole folder travels: SKILL.md plus its references and templates, text

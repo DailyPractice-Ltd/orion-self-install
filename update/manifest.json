@@ -1,12 +1,9 @@
 {
-  "_read_first": "Read this before you use the lists below. The procedure that goes with this manifest is docs/updating.md at the same commit you fetched this manifest from. If you are following a copy of docs/updating.md that was already in the client's folder, it is older than this manifest: fetch docs/updating.md from that same commit now and continue from its step 2. Two rules in it replace anything older you have read. One: never stop to ask the client anything. Their request to update is the consent. There is no merge to approve and no difference to show. Two: never replace a file the client has changed. update/pristine.json at the same commit lists the fingerprint of every copy of each file Daily Practice has shipped. A local file whose fingerprint is not listed there is the client's now: keep it exactly as it is and name it in your final report.",
-  "_what": "The authoritative lists of Daily Practice's files in this folder. 'update my harness' refreshes exactly the refresh paths and prunes exactly the remove paths from the template's main branch, and touches nothing else. Contract: docs/updating.md.",
-  "_regenerate": "git ls-files, minus specs/, .specify/, tests/, .claude/skills/speckit*, docs/img/, .claude/agents/README.md, agent/knowledge-base/0*.md — then bump template_version here and in status/status.schema-template.json together. CLAUDE.md IS on the list: it is what the assistant auto-loads, so it is the file that decides whether a session reads AGENTS.md and checks the radio at all. It was excluded once, which meant an installed harness could never be taught to listen. Then run node tests/helpers/pristine.mjs --write, last, after every other edit of the release: update/pristine.json must hold the fingerprint of every file as it ships (node --test fails if it is stale).",
-  "template_version": "1.5.0",
+  "_read_first": "Read docs/updating.md and update/pristine.json from the pinned release commit. Run that commit's update/apply.mjs, not the older client copy. The deployment plan selects the tool recorded in status. The request is the consent: never stop to ask; never replace a file the client has changed, except executable status/*.mjs scripts, which are backed up and replaced together. Report collisions.",
+  "_what": "Legacy refresh/remove lists remain for older harnesses, except their three retired .claude skill sources. deployment is the source-to-destination and ownership contract for separate client repositories; select exactly one recorded tool. Contract: docs/updating.md and deployment._contract.",
+  "_regenerate": "Maintain deployment entries for every skills/*/SKILL.md. Historical Spec Kit paths are retired only when they still match shipped fingerprints. Run node tests/helpers/pristine.mjs --write after release edits.",
+  "template_version": "2.0.0",
   "refresh": [
-    ".claude/skills/create-skill/SKILL.md",
-    ".claude/skills/hire-agent/SKILL.md",
-    ".claude/skills/update-harness/SKILL.md",
     ".gitignore",
     "AGENTS.md",
     "CHANGELOG.md",
@@ -66,22 +63,23 @@
     "status/status.schema-template.json",
     "update/manifest.json",
     "update/pristine.json",
+    "update/apply.mjs",
     "validation/validation-tasks.md"
   ],
   "never_touch": {
-    "status/status.json": "the client's own record — pairing, stages, packages, choices. An update edits exactly three things in it by hand: template_version, one appended notes line, and deleting keys named in remove_status_checklist_keys — nothing else, ever. The one script an update runs, node status/send.mjs migrate (since 1.5.0), writes scopes.send_risk: low when no level is recorded and touches nothing else in it",
+    "status/status.json": "the client's own record \u2014 pairing, stages, packages, choices. An update edits exactly three things in it by hand: template_version, one appended notes line, and deleting keys named in remove_status_checklist_keys \u2014 nothing else, ever. The one script an update runs, node status/send.mjs migrate (since 1.5.0), writes scopes.send_risk: low when no level is recorded and touches nothing else in it",
     "status/send-log.md": "the client's own record of every send decision and verdict, content-free (since 1.5.0)",
     "status/no-contact.md": "the client's own no-contact list, for good (since 1.5.0)",
     "status/waiting.md": "the client's list of messages waiting for them, rewritten by every run (since 1.5.0)",
     "status/shift-log.md": "the client's work history",
     "status/work-log.md": "the client's work history: one line per finished task they asked for (since 1.1.0)",
     "status/shifts/": "the wake-up files written for this machine by status/schedule.mjs: full paths and schedules that only make sense here (since 1.2.0)",
-    "memory/ (everything but README.md)": "the client's own memory — facts, logs, lessons, the index; an update improves the notebook's binding, never its pages",
+    "memory/ (everything but README.md)": "the client's own memory \u2014 facts, logs, lessons, the index; an update improves the notebook's binding, never its pages",
     "agent/knowledge-base/01..07*.md": "the client's business, captured in their words",
-    ".claude/agents/ (everything but nothing — the whole directory)": "the client's hired team; the roster README carries their rows",
+    ".claude/agents/ (everything but nothing \u2014 the whole directory)": "the client's hired team; the roster README carries their rows",
     ".claude/skills/ (any skill not in the refresh list)": "skills the client taught",
     ".update-backup/": "prior updates' safety copies",
-    "anything not in the refresh or remove lists": "refresh may write its paths, remove may delete its paths — nothing else may be touched at all. The two lists are the whole permission"
+    "anything not in the refresh or remove lists": "refresh may write its paths, remove may delete its paths \u2014 nothing else may be touched at all. The two lists are the whole permission"
   },
   "_remove": "Paths pruned on update, with the same backup-first safety as refresh (docs/updating.md steps 3 and 4b). A path lands here when a release retires it; it never returns to refresh. A directory the prune empties is deleted too.",
   "remove": [
@@ -92,5 +90,410 @@
   "remove_status_checklist_keys": [
     "n8n_wf01_imported",
     "n8n_wf02_imported"
-  ]
+  ],
+  "deployment": {
+    "_contract": "Pinned release sources and destinations are the install, migration, and update contract. Every skills/*/SKILL.md has one mapping for each supported tool. Maintainer specs remain release-only; retired Spec Kit files are removed only when unedited.",
+    "tools": [
+      "claude-code",
+      "codex"
+    ],
+    "common_sources": [
+      ".gitignore",
+      "AGENTS.md",
+      "CHANGELOG.md",
+      "LICENSE",
+      "NON-TECHNICAL-DRY-RUN.md",
+      "README.md",
+      "SHOTLIST.md",
+      "agent/adapters/chatgpt.md",
+      "agent/adapters/claude-code.md",
+      "agent/adapters/claude.md",
+      "agent/adapters/codex.md",
+      "agent/adapters/copilot.md",
+      "agent/agent-definition.md",
+      "agent/knowledge-base/README.md",
+      "agent/risk-matrix.md",
+      "connectors/connector-checklist.md",
+      "crm/README.md",
+      "crm/attio/README.md",
+      "crm/attio/apply-attio-template.mjs",
+      "crm/attio/attio-template.json",
+      "crm/hubspot/README.md",
+      "crm/hubspot/apply-hubspot-template.mjs",
+      "crm/hubspot/hubspot-template.json",
+      "crm/other-crm-manual-setup.md",
+      "docs/intelligence-library-opt-in.md",
+      "docs/memory.md",
+      "docs/radio.md",
+      "docs/self-serve-learnings.md",
+      "docs/simulated-dry-run-example.md",
+      "docs/updating.md",
+      "library/HIRING.md",
+      "library/README.md",
+      "library/ROLES.md",
+      "library/agents/call-planner/PACKAGE.md",
+      "library/agents/call-planner/build-call-plan.mjs",
+      "library/agents/call-planner/call-data.template.json",
+      "library/agents/dream/PACKAGE.md",
+      "library/agents/friday-report/PACKAGE.md",
+      "library/agents/prospecting/PACKAGE.md",
+      "library/programs/revenue-operating-cadence/PACKAGE.md",
+      "library/skills/meeting-sizing/PACKAGE.md",
+      "library/workflows/post-call-debrief/PACKAGE.md",
+      "library/workflows/prospect-research-outreach/PACKAGE.md",
+      "memory/README.md",
+      "notion/project-tracker-template.md",
+      "start.mjs",
+      "status/done.mjs",
+      "status/emit-status.mjs",
+      "status/home.mjs",
+      "status/memory.mjs",
+      "status/radio.mjs",
+      "status/schedule.mjs",
+      "status/send.mjs",
+      "status/shapes.mjs",
+      "status/status-schema.md",
+      "status/status.schema-template.json",
+      "update/manifest.json",
+      "update/pristine.json",
+      "update/apply.mjs",
+      "update/release-contract.mjs",
+      "update/destination-resolver.mjs",
+      "validation/validation-tasks.md"
+    ],
+    "retired": [
+      {
+        "source": "skills/speckit-agent-context-update/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-agent-context-update/SKILL.md",
+          "codex": ".agents/skills/speckit-agent-context-update/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-agent-context-update/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-analyze/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-analyze/SKILL.md",
+          "codex": ".agents/skills/speckit-analyze/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-analyze/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-checklist/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-checklist/SKILL.md",
+          "codex": ".agents/skills/speckit-checklist/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-checklist/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-clarify/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-clarify/SKILL.md",
+          "codex": ".agents/skills/speckit-clarify/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-clarify/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-constitution/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-constitution/SKILL.md",
+          "codex": ".agents/skills/speckit-constitution/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-constitution/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-converge/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-converge/SKILL.md",
+          "codex": ".agents/skills/speckit-converge/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-converge/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-implement/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-implement/SKILL.md",
+          "codex": ".agents/skills/speckit-implement/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-implement/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-plan/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-plan/SKILL.md",
+          "codex": ".agents/skills/speckit-plan/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-plan/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-specify/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-specify/SKILL.md",
+          "codex": ".agents/skills/speckit-specify/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-specify/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-tasks/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-tasks/SKILL.md",
+          "codex": ".agents/skills/speckit-tasks/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-tasks/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": "skills/speckit-taskstoissues/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/speckit-taskstoissues/SKILL.md",
+          "codex": ".agents/skills/speckit-taskstoissues/SKILL.md"
+        },
+        "fingerprint_key": "skills/speckit-taskstoissues/SKILL.md",
+        "sources": {}
+      },
+      {
+        "source": ".specify/init-options.json",
+        "destinations": {
+          "claude-code": ".specify/init-options.json",
+          "codex": ".specify/init-options.json"
+        },
+        "fingerprint_key": ".specify/init-options.json",
+        "sources": {
+          "claude-code": ".specify/init-options.json",
+          "codex": "update/scaffold/codex-init-options.json"
+        }
+      },
+      {
+        "source": "update/scaffold/codex-agent-context-config.yml",
+        "destinations": {
+          "claude-code": ".specify/extensions/agent-context/agent-context-config.yml",
+          "codex": ".specify/extensions/agent-context/agent-context-config.yml"
+        },
+        "fingerprint_key": "update/scaffold/codex-agent-context-config.yml",
+        "sources": {
+          "claude-code": ".specify/extensions/agent-context/agent-context-config.yml",
+          "codex": "update/scaffold/codex-agent-context-config.yml"
+        }
+      },
+      {
+        "source": ".specify/integration.json",
+        "destinations": {
+          "claude-code": ".specify/integration.json",
+          "codex": ".specify/integration.json"
+        },
+        "fingerprint_key": ".specify/integration.json",
+        "sources": {
+          "claude-code": ".specify/integration.json",
+          "codex": "update/scaffold/codex-integration.json"
+        }
+      },
+      {
+        "source": ".specify/scripts/bash/check-prerequisites.sh",
+        "destinations": {
+          "claude-code": ".specify/scripts/bash/check-prerequisites.sh",
+          "codex": ".specify/scripts/bash/check-prerequisites.sh"
+        },
+        "fingerprint_key": ".specify/scripts/bash/check-prerequisites.sh"
+      },
+      {
+        "source": ".specify/scripts/bash/common.sh",
+        "destinations": {
+          "claude-code": ".specify/scripts/bash/common.sh",
+          "codex": ".specify/scripts/bash/common.sh"
+        },
+        "fingerprint_key": ".specify/scripts/bash/common.sh"
+      },
+      {
+        "source": ".specify/scripts/bash/create-new-feature.sh",
+        "destinations": {
+          "claude-code": ".specify/scripts/bash/create-new-feature.sh",
+          "codex": ".specify/scripts/bash/create-new-feature.sh"
+        },
+        "fingerprint_key": ".specify/scripts/bash/create-new-feature.sh"
+      },
+      {
+        "source": ".specify/scripts/bash/setup-plan.sh",
+        "destinations": {
+          "claude-code": ".specify/scripts/bash/setup-plan.sh",
+          "codex": ".specify/scripts/bash/setup-plan.sh"
+        },
+        "fingerprint_key": ".specify/scripts/bash/setup-plan.sh"
+      },
+      {
+        "source": ".specify/scripts/bash/setup-tasks.sh",
+        "destinations": {
+          "claude-code": ".specify/scripts/bash/setup-tasks.sh",
+          "codex": ".specify/scripts/bash/setup-tasks.sh"
+        },
+        "fingerprint_key": ".specify/scripts/bash/setup-tasks.sh"
+      },
+      {
+        "source": ".specify/templates/checklist-template.md",
+        "destinations": {
+          "claude-code": ".specify/templates/checklist-template.md",
+          "codex": ".specify/templates/checklist-template.md"
+        },
+        "fingerprint_key": ".specify/templates/checklist-template.md"
+      },
+      {
+        "source": ".specify/templates/constitution-template.md",
+        "destinations": {
+          "claude-code": ".specify/templates/constitution-template.md",
+          "codex": ".specify/templates/constitution-template.md"
+        },
+        "fingerprint_key": ".specify/templates/constitution-template.md"
+      },
+      {
+        "source": ".specify/templates/plan-template.md",
+        "destinations": {
+          "claude-code": ".specify/templates/plan-template.md",
+          "codex": ".specify/templates/plan-template.md"
+        },
+        "fingerprint_key": ".specify/templates/plan-template.md"
+      },
+      {
+        "source": ".specify/templates/spec-template.md",
+        "destinations": {
+          "claude-code": ".specify/templates/spec-template.md",
+          "codex": ".specify/templates/spec-template.md"
+        },
+        "fingerprint_key": ".specify/templates/spec-template.md"
+      },
+      {
+        "source": ".specify/templates/tasks-template.md",
+        "destinations": {
+          "claude-code": ".specify/templates/tasks-template.md",
+          "codex": ".specify/templates/tasks-template.md"
+        },
+        "fingerprint_key": ".specify/templates/tasks-template.md"
+      },
+      {
+        "source": ".specify/extensions.yml",
+        "destinations": {
+          "claude-code": ".specify/extensions.yml",
+          "codex": ".specify/extensions.yml"
+        },
+        "fingerprint_key": ".specify/extensions.yml"
+      },
+      {
+        "source": ".specify/extensions/agent-context/extension.yml",
+        "destinations": {
+          "claude-code": ".specify/extensions/agent-context/extension.yml",
+          "codex": ".specify/extensions/agent-context/extension.yml"
+        },
+        "fingerprint_key": ".specify/extensions/agent-context/extension.yml"
+      },
+      {
+        "source": ".specify/extensions/agent-context/README.md",
+        "destinations": {
+          "claude-code": ".specify/extensions/agent-context/README.md",
+          "codex": ".specify/extensions/agent-context/README.md"
+        },
+        "fingerprint_key": ".specify/extensions/agent-context/README.md"
+      },
+      {
+        "source": ".specify/extensions/agent-context/scripts/bash/update-agent-context.sh",
+        "destinations": {
+          "claude-code": ".specify/extensions/agent-context/scripts/bash/update-agent-context.sh",
+          "codex": ".specify/extensions/agent-context/scripts/bash/update-agent-context.sh"
+        },
+        "fingerprint_key": ".specify/extensions/agent-context/scripts/bash/update-agent-context.sh"
+      },
+      {
+        "source": ".specify/extensions/agent-context/scripts/powershell/update-agent-context.ps1",
+        "destinations": {
+          "claude-code": ".specify/extensions/agent-context/scripts/powershell/update-agent-context.ps1",
+          "codex": ".specify/extensions/agent-context/scripts/powershell/update-agent-context.ps1"
+        },
+        "fingerprint_key": ".specify/extensions/agent-context/scripts/powershell/update-agent-context.ps1"
+      },
+      {
+        "source": ".specify/MAINTAINER-SKILLS.md",
+        "destinations": {
+          "claude-code": ".specify/MAINTAINER-SKILLS.md",
+          "codex": ".specify/MAINTAINER-SKILLS.md"
+        },
+        "fingerprint_key": ".specify/MAINTAINER-SKILLS.md"
+      },
+      {
+        "source": ".specify/feature.json",
+        "destinations": {
+          "claude-code": ".specify/feature.json",
+          "codex": ".specify/feature.json"
+        },
+        "fingerprint_key": ".specify/feature.json"
+      }
+    ],
+    "entries": [
+      {
+        "source": "skills/create-skill/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/create-skill/SKILL.md",
+          "codex": ".agents/skills/create-skill/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/create-skill/SKILL.md"
+      },
+      {
+        "source": "skills/hire-agent/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/hire-agent/SKILL.md",
+          "codex": ".agents/skills/hire-agent/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/hire-agent/SKILL.md"
+      },
+      {
+        "source": "skills/update-harness/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/update-harness/SKILL.md",
+          "codex": ".agents/skills/update-harness/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/update-harness/SKILL.md"
+      },
+      {
+        "source": "agents/README.md",
+        "destinations": {
+          "claude-code": ".claude/agents/README.md",
+          "codex": "agents/README.md"
+        },
+        "ownership": "client-template",
+        "fingerprint_key": "agents/README.md"
+      }
+    ],
+    "release_only": [
+      "skills/",
+      "agents/",
+      "specs/",
+      "tests/",
+      "CLAUDE.md"
+    ],
+    "ownership": {
+      "release": "Install only into an absent destination. On update replace only when the destination fingerprint is a known shipped copy for this fingerprint_key; preserve and report edits and collisions. Back up before replacement or retirement.",
+      "client-template": "Install only into an absent destination. Thereafter the destination belongs to the client; never refresh or retire personalized roster rows or job sheets.",
+      "unlisted": "Any destination absent from this selected-tool plan belongs to the client. Never write or retire it."
+    },
+    "fingerprints": {
+      "algorithm": "sha256-utf8-lf",
+      "registry": "update/pristine.json",
+      "key": "source path (fingerprint_key), independent of destination",
+      "legacy_aliases": {
+        "skills/create-skill/SKILL.md": ".claude/skills/create-skill/SKILL.md",
+        "skills/hire-agent/SKILL.md": ".claude/skills/hire-agent/SKILL.md",
+        "skills/update-harness/SKILL.md": ".claude/skills/update-harness/SKILL.md",
+        "agents/README.md": ".claude/agents/README.md"
+      }
+    }
+  }
 }

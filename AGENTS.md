@@ -2,7 +2,7 @@
 
 You are about to help someone install **Orion** — a personal, agentic sales harness — into
 their own workflow. There is no coach in this session. You are the installer. This file is
-the first thing to read, regardless of which AI product you are (Claude, ChatGPT, Copilot,
+the canonical shared instruction file, regardless of which AI product you are (Claude, ChatGPT, Copilot,
 Claude Code, or anything else that can read this repo).
 
 ## Which harness you are, and staying in its own folder
@@ -315,9 +315,9 @@ exactly. On Claude Code the same procedures are invocable as `/hire-agent` and
 `/create-skill`; on every other surface this paragraph is the trigger.
 
 Teach the client the line once, at their first hire, and never lecture it again:
-**@ summons an agent — a who. / runs a skill — a what.**
+**A job sheet names who does the work; a skill names what procedure to run.**
 
-The roster lives at `.claude/agents/README.md`. At session start, scan it. An agent
+Resolve `status.selected_tool` through `update/destination-resolver.mjs` before reading or writing a job or skill. Claude Code uses `.claude/agents/README.md` and `.claude/skills/`; Codex uses `agents/README.md` and `.agents/skills/`. On Codex, read the team job sheet and run its job and report sections; `@` discovery is specific to Claude Code. The roster for the selected tool is the one to scan. At session start, scan it. An agent
 that has a schedule which is not yet proven (or not yet wired) gets exactly one plain
 sentence ("your {name} agent hasn't yet fired on its own. Want me to check the
 schedule?"), never more. An on-call agent needs no mention. A row still marked
@@ -354,15 +354,14 @@ the work belong in memory/, and the private store holds at most pointers into it
 
 When the client says anything like **"update my harness"**, **"get the latest
 version"**, **"am I up to date?"**, or **"restore my harness from the backup"** — read
-`docs/updating.md` and follow it exactly. The short version you may never shorten
-further: the allowlist is `update/manifest.json` fetched fresh from main; nothing
-outside it is ever written; back up before replacing; never roll back; end with the
-plain-words report that the client's knowledge base, agents, skills, status and logs
-were not touched. **The request is the consent**: the procedure runs start to finish
-without asking the client anything. No "apply the merge?", no diff to approve, no
-"shall I continue?". A file the client has changed is kept as it is and named in the
-report, never replaced and never asked about. On Claude Code this is also invocable as
-`/update-harness`.
+`docs/updating.md` and follow it exactly. Obtain the current release as a temporary
+checkout, resolve its full commit, and run that commit's `update/apply.mjs` with its
+pinned manifest and source files. The selected tool in status determines destinations.
+Back up before replacing or retiring; report preserved edits and collisions. Released
+`status/*.mjs` scripts are the documented backed-up exception that update together.
+**The request is the consent**: run start to finish without an extra confirmation.
+For a tool change, follow the same document's `switch` and schedule steps. On Claude
+Code and Codex this is also invocable as `/update-harness`.
 
 ## The Library — adding capabilities after (or during) the install
 
@@ -385,7 +384,7 @@ one:
    `node status/radio.mjs library --install <slug>`. With no `--yes` that command only
    shows what the skill is, what it needs, and where it would go. Tell the client that
    in your own plain words, and run it again with `--yes` only if they want it. It
-   writes the skill's folder under `.claude/skills/<slug>/`, never overwrites a skill
+   writes the skill's folder under the selected tool's skills directory, never overwrites a skill
    they already have, and reports the shelf itself. Then smoke-test it on something
    real before saying it works.
 
@@ -426,8 +425,8 @@ one:
 
 ## Where the fuller detail lives
 
-- `.specify/memory/constitution.md` — the principles behind these rules, if you want the
-  reasoning, not just the rule.
+- `specs/001-self-install/spec.md` and `specs/002-production-line/spec.md` — the
+  design background behind these rules.
 - `specs/001-self-install/spec.md` — the foundation user-journey spec this repo
   implements; `specs/002-production-line/spec.md` — the wizard, Library, and radio layer
   on top of it.

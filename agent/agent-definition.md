@@ -192,7 +192,7 @@ When the work ended at one of these, that signal is the report. Do not also run
 so the same work is never counted twice.
 
 A hired agent reports its own work, as the last step in its own job file
-(`.claude/agents/<name>.md`). When it has, send nothing more for that task. Work it
+(`.claude/agents/<name>.md` on Claude Code; `agents/<name>.md` on Codex). When it has, send nothing more for that task. Work it
 does on its schedule is a shift. A shift reports as `routine_completed` ("routine"
 is only the wire name for a shift), under the standing yes {{CLIENT_NAME}} gave on
 its job sheet at hire.

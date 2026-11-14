@@ -1,0 +1,4 @@
+interface:
+  display_name: "Call Planner Control Tower"
+  short_description: "Maintain the call queue or run approved closeout"
+  default_prompt: "Use $call-planner-control-tower for the requested intake, maintenance or explicitly authorised closeout; preserve human controls and do not execute outcomes during queue planning."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lifecycle Governance"
+  short_description: "Guard HubSpot lifecycle transitions and corrections"
+  default_prompt: "Use $lifecycle-governance to validate and safely apply this HubSpot lifecycle change."

@@ -9,6 +9,13 @@ own thin adapter, `codex.md`, for its sandbox specifics). This is the
 **fastest** path, because it can do mechanically what the other three adapters have to talk
 a human through by hand.
 
+Open the **deployed client folder** and read `AGENTS.md`, the shared instructions.
+The installer does not add `CLAUDE.md`. Anthropic's `agents-md` plugin can load
+`AGENTS.md` when no `CLAUDE.md` is in scope, but this depends on that setup. If this
+Claude Code installation does not load it, create a client-folder `CLAUDE.md` whose
+only content is `@AGENTS.md`. Do not duplicate the instructions in that pointer.
+Team job sheets are in `.claude/agents/`; installed skills are in `.claude/skills/`.
+
 ## What you can do directly, that the chat-surface adapters can't
 
 - Read and write `status/status.json` yourself — the resumability mechanism becomes fully
@@ -114,6 +121,3 @@ works when asked, and its schedule reads "not yet wired" (HIRING.md, Part D).
   don't need for anything else.
 - Both CRM apply scripts and `emit-status.mjs` are dependency-free (`node:fs` + global
   `fetch` only) — there's no `npm install` step to walk anyone through.
-- If the client is on Claude Code specifically, `.claude/skills/speckit-*` are available to
-  *you* for evolving this repository's own spec over time — they are not part of the
-  client's install conversation and shouldn't be mentioned to them.

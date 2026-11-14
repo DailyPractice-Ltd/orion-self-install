@@ -47,12 +47,15 @@ import {
   RISK_MATRIX, SEND_TOOL, riskLabel, riskScore, lowestLevelFor, levelSends, labelProblem, countProblem,
 } from './shapes.mjs';
 import { jobSheetSendRisk, jobSheetGoLive, jobSheetTools, rerender } from './schedule.mjs';
+import { runtimeLayout } from '../update/destination-resolver.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FOLDER = join(here, '..');
 const STATUS_PATH = join(here, 'status.json');
 const LOG_PATH = join(here, 'send-log.md');
 const NO_CONTACT_PATH = join(here, 'no-contact.md');
+const jobRoot = () => runtimeLayout(FOLDER).jobRoot;
+const jobRel = (name) => `${jobRoot()}/${name}.md`;
 
 const USAGE = [
   'Usage: node status/send.mjs score --agent <name> --to <address> --channel <c> --relationship <r> --content <l> [--customer] [--replied]',
@@ -98,7 +101,7 @@ function frontValue(lines, key) {
 
 /** The role's own send line and go-live flag, read the way the scheduler reads them; a name with no sheet is the harness's own agent. */
 function roleOf(name) {
-  const path = join(FOLDER, '.claude', 'agents', `${name}.md`);
+  const path = join(FOLDER, jobRel(name));
   if (!existsSync(path)) return { sheet: null, sendRisk: 'harness', live: true };
   const text = readFileSync(path, 'utf8');
   return { sheet: path, text, sendRisk: jobSheetSendRisk(text), live: jobSheetGoLive(text) };
@@ -356,7 +359,7 @@ function rerenderShifts() {
 
 /** A job sheet that allows all of Bash can send from the shell with nothing at the tool boundary: say so, once per sheet. */
 function bareShellWarnings() {
-  const agents = join(FOLDER, '.claude', 'agents');
+  const agents = join(FOLDER, jobRoot());
   if (!existsSync(agents)) return [];
   const found = [];
   for (const f of readdirSync(agents).filter((n) => n.endsWith('.md') && n !== 'README.md').sort()) {
@@ -407,12 +410,12 @@ function setLevel(rest) {
   if (forRole) {
     const role = roleOf(flags.agent);
     if (!role.sheet) {
-      console.log(`There is no job sheet at .claude/agents/${flags.agent}.md, so there is no role to set. The harness level is set without --agent.`);
+      console.log(`There is no job sheet at ${jobRel(flags.agent)}, so there is no role to set. The harness level is set without --agent.`);
       return 1;
     }
     const rewritten = setSheetLine(role.text, 'send_risk', word);
     if (rewritten === null) {
-      console.log(`The job sheet .claude/agents/${flags.agent}.md has no frontmatter block to write the line into. Add one (library/HIRING.md gives the template), then set it again. Nothing was written.`);
+      console.log(`The job sheet ${jobRel(flags.agent)} has no frontmatter block to write the line into. Add one (library/HIRING.md gives the template), then set it again. Nothing was written.`);
       return 1;
     }
     writeFileSync(role.sheet, rewritten);
@@ -626,9 +629,9 @@ export function retiredRe(oldWords) {
 
 function keptFiles() {
   const files = ['agent/agent-definition.md', 'AGENTS.md', 'agent/adapters/claude-code.md', 'agent/adapters/claude.md', 'agent/adapters/codex.md', 'agent/adapters/chatgpt.md', 'agent/adapters/copilot.md'];
-  const agents = join(FOLDER, '.claude', 'agents');
+  const agents = join(FOLDER, jobRoot());
   if (existsSync(agents)) {
-    for (const f of readdirSync(agents).filter((n) => n.endsWith('.md') && n !== 'README.md').sort()) files.push(`.claude/agents/${f}`);
+    for (const f of readdirSync(agents).filter((n) => n.endsWith('.md') && n !== 'README.md').sort()) files.push(`${jobRoot()}/${f}`);
   }
   return files.filter((rel) => existsSync(join(FOLDER, rel)));
 }
@@ -638,7 +641,7 @@ function migrateText(rel, text) {
   let out = text;
   let changed = 0;
   for (const [where, oldWords, newWords] of RETIRED) {
-    const applies = where.endsWith('*.md') ? rel.startsWith(where.slice(0, -4)) : rel === where;
+    const applies = where.endsWith('*.md') ? rel.startsWith(where.startsWith('.claude/agents/') ? `${jobRoot()}/` : where.slice(0, -4)) : rel === where;
     if (!applies) continue;
     out = out.replace(retiredRe(oldWords), (...m) => {
       changed++;
@@ -664,7 +667,7 @@ function residue(files = keptFiles()) {
 /** The client's own lines about sending on a hired agent's sheet: left alone, and named. */
 function ownSendLines(files) {
   const found = [];
-  for (const rel of files.filter((f) => f.startsWith('.claude/agents/'))) {
+  for (const rel of files.filter((f) => f.startsWith(`${jobRoot()}/`))) {
     const lines = readFileSync(join(FOLDER, rel), 'utf8').split(/\r?\n/);
     lines.forEach((line, i) => {
       if (/^\s*[-*]\s/.test(line) && /\bsend/i.test(line) && !/rule 1 of the agent definition/.test(line) && !RESIDUE_RE.test(line)) found.push({ file: rel, line: i + 1, text: line.trim() });

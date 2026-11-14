@@ -10,6 +10,7 @@ import {
   discoverRelease,
   pinRelease,
 } from './published-release.mjs';
+import { assertPublishedUpdateNotBlocked } from './published-transaction.mjs';
 
 export async function requestPublishedUpdate({
   root,
@@ -17,6 +18,7 @@ export async function requestPublishedUpdate({
   apiBase,
   sourceUrl,
 } = {}) {
+  assertPublishedUpdateNotBlocked(root);
   const client = createReleaseClient({ repository, apiBase, sourceUrl });
   const temporary = mkdtempSync(join(tmpdir(), 'orion-update-source-'));
   const checkout = join(temporary, 'source');

@@ -4,14 +4,19 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 const tagPattern = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 export const WITHDRAWAL_MARKER = '<!-- orion:withdrawn -->';
-export function eligibleRelease(r) {
+function stablePublication(r) {
   return (
     Number.isSafeInteger(r?.id) &&
     r.id > 0 &&
     tagPattern.test(r.tag_name) &&
     r.draft === false &&
     r.prerelease === false &&
-    !!r.published_at &&
+    !!r.published_at
+  );
+}
+export function eligibleRelease(r) {
+  return (
+    stablePublication(r) &&
     !r.withdrawn &&
     !String(r.body || '').includes(WITHDRAWAL_MARKER)
   );
@@ -124,10 +129,15 @@ export async function pinRelease(client, release, checkout) {
     manifest_version: manifest.template_version,
   };
 }
-export async function verifyPinnedRelease(client, pin, checkout) {
+export async function verifyPinnedRelease(
+  client,
+  pin,
+  checkout,
+  { rollbackOnly = false } = {},
+) {
   const r = await client.get(`/releases/${pin.release_id}`);
   if (
-    !eligibleRelease(r) ||
+    !(rollbackOnly ? stablePublication(r) : eligibleRelease(r)) ||
     r.id !== pin.release_id ||
     r.tag_name !== pin.tag ||
     remoteCommit(client, pin.tag) !== pin.commit

@@ -327,6 +327,7 @@ function rollbackSwitch(root,backup,journal) {
 }
 function restore(root,backupRel) {
   const backup=safe(root,backupRel); const journal=json(join(backup,'journal.json'));
+  if(journal.kind==='published-update') throw new Error('Use the documented published recovery procedure for this backup.');
   if(journal.kind==='switch') {
     if(journal.state!=='complete') throw new Error(`Switch backup is ${journal.state}; only completed switches can be restored`);
     const conflicts=journal.actions.filter(a=>{
@@ -361,20 +362,25 @@ function restore(root,backupRel) {
 try {
   const command=process.argv[2], root=arg('--root'); if(!root) throw new Error('--root is required');
   const repo=arg('--release-repo')||dirname(dirname(fileURLToPath(import.meta.url)));
-  if (command === 'update-published') {
+  if (command === 'update-published' || command === 'recover-published') {
     const { createReleaseClient } = await import('./published-release.mjs');
-    const { applyPublishedUpdate } = await import('./published-transaction.mjs');
+    const { applyPublishedUpdate, recoverPublishedUpdate } = await import('./published-transaction.mjs');
     const checkout = dirname(dirname(fileURLToPath(import.meta.url)));
     const tag = arg('--tag');
-    const result = await applyPublishedUpdate({
+    const options = {
       root, checkout,
       client: createReleaseClient({
         repository: arg('--repository'), apiBase: arg('--api-base'), sourceUrl: arg('--source-url'),
       }),
       pin: { tag, commit: arg('--commit'), release_id: Number(arg('--release-id')), manifest_version: tag?.slice(1) },
-    });
+    };
+    const result = command === 'recover-published'
+      ? await recoverPublishedUpdate({ ...options, backupRel: arg('--backup') })
+      : await applyPublishedUpdate(options);
     console.log(JSON.stringify(result, null, 2));
   } else {
+    const { assertPublishedUpdateNotBlocked } = await import('./published-transaction.mjs');
+    assertPublishedUpdateNotBlocked(root, { includePending: true });
     const result=command==='update' ? update(root,repo,arg('--commit')) : command==='switch' ? switchTool(root,repo,arg('--commit'),arg('--to'),arg('--legacy-tool')) : command==='restore' ? restore(root,arg('--backup')) : command==='recover' ? {recovered:[...recoverPendingUpdates(root),...recoverPendingSwitches(root)]} : (()=>{throw new Error('Use update, switch, restore or recover');})();
     console.log(JSON.stringify(result,null,2));
   }

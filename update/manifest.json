@@ -1,5 +1,5 @@
 {
-  "_read_first": "Read docs/updating.md and update/pristine.json from the pinned release commit. Run that commit's update/apply.mjs, not the older client copy. The deployment plan selects the tool recorded in status. The request is the consent: never stop to ask; never replace a file the client has changed, except executable status/*.mjs scripts, which are backed up and replaced together. Report collisions.",
+  "_read_first": "Use docs/updating.md to request a published update. The request starts verified release selection. The deployed layout comes from the recorded tool. Read update/pristine.json from the pinned release. The published updater preserves optional client edits and stops on required collisions. Older same-folder updaters use the legacy refresh lists: never stop to ask and never replace a file the client has changed under those lists.",
   "_what": "Legacy refresh/remove lists remain for older harnesses, except their three retired .claude skill sources. deployment is the source-to-destination and ownership contract for separate client repositories; select exactly one recorded tool. Contract: docs/updating.md and deployment._contract.",
   "_regenerate": "Maintain deployment entries for every skills/*/SKILL.md. Historical Spec Kit paths are retired only when they still match shipped fingerprints. Run node tests/helpers/pristine.mjs --write after release edits.",
   "template_version": "2.0.0",
@@ -66,7 +66,7 @@
     "validation/validation-tasks.md"
   ],
   "never_touch": {
-    "status/status.json": "the client's own record \u2014 pairing, stages, packages, choices. An update edits exactly three things in it by hand: template_version, one appended notes line, and deleting keys named in remove_status_checklist_keys \u2014 nothing else, ever. The one script an update runs, node status/send.mjs migrate (since 1.5.0), writes scopes.send_risk: low when no level is recorded and touches nothing else in it",
+    "status/status.json": "the client's own record for pairing, stages, packages, and choices. On success the published updater records template_version, applied_release, an appended note, and any explicitly retired checklist keys.",
     "status/send-log.md": "the client's own record of every send decision and verdict, content-free (since 1.5.0)",
     "status/no-contact.md": "the client's own no-contact list, for good (since 1.5.0)",
     "status/waiting.md": "the client's list of messages waiting for them, rewritten by every run (since 1.5.0)",
@@ -90,6 +90,38 @@
   "remove_status_checklist_keys": [
     "n8n_wf01_imported",
     "n8n_wf02_imported"
+  ],
+  "update_compatibility": [
+    {
+      "from_version": "1.5.0",
+      "tool": "claude-code",
+      "steps": [],
+      "required_destinations": [
+        "update/manifest.json",
+        "update/request.mjs",
+        "update/apply.mjs",
+        "update/published-transaction.mjs"
+      ],
+      "checks": [
+        { "kind": "deployed-layout" },
+        { "kind": "node-syntax", "path": "update/apply.mjs" }
+      ]
+    },
+    {
+      "from_version": "1.5.0",
+      "tool": "codex",
+      "steps": [],
+      "required_destinations": [
+        "update/manifest.json",
+        "update/request.mjs",
+        "update/apply.mjs",
+        "update/published-transaction.mjs"
+      ],
+      "checks": [
+        { "kind": "deployed-layout" },
+        { "kind": "node-syntax", "path": "update/apply.mjs" }
+      ]
+    }
   ],
   "deployment": {
     "_contract": "Pinned release sources and destinations are the install, migration, and update contract. Every skills/*/SKILL.md has one mapping for each supported tool. Maintainer specs remain release-only; retired Spec Kit files are removed only when unedited.",
@@ -160,6 +192,8 @@
       "update/destination-resolver.mjs",
       "validation/validation-tasks.md",
       "update/published-release.mjs",
+      "update/request.mjs",
+      "update/published-transaction.mjs",
       "docs/published-install.md"
     ],
     "retired": [

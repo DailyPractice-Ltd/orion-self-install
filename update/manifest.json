@@ -158,7 +158,9 @@
       "update/apply.mjs",
       "update/release-contract.mjs",
       "update/destination-resolver.mjs",
-      "validation/validation-tasks.md"
+      "validation/validation-tasks.md",
+      "update/published-release.mjs",
+      "docs/published-install.md"
     ],
     "retired": [
       {

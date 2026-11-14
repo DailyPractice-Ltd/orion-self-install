@@ -213,3 +213,29 @@ accepted — including `install_checkpoint` — and `report-install --kind progr
 row on the shelf. Radio-off → all commands refuse locally, zero requests. Revoked
 token → 401. The radio round trip (quickstart §"Radio round trip") is complete in both
 directions against the deployed server.
+
+## Published release notices
+
+A paired harness with radio check-ins enabled can send a notice check to
+`POST /releases`. The body is `{ check_ins_enabled: true, selected_tool,
+applied_release }`, where the selected tool is `codex` or `claude-code` and the
+applied identity contains `tag`, `commit`, `release_id`, `manifest_version`,
+and `applied_at` from a successful deployment. The bearer token supplies the
+harness identity. A radio-off client makes neither release call.
+
+The response is `{ version: 1, notice }`. `notice` is null or
+`{ kind: 'release', version, tag, commit, release_id, summary, notes_url }`.
+Offer the highest stable, current, non-withdrawn published version strictly
+newer than the applied release with one declared deployed update path from
+that version for the recorded tool. The summary comes from the changelog at
+the tagged commit. A source failure leaves the conversation available and
+returns no offer. No older notice replaces an already displayed newest offer.
+
+Once the radio command has written the notice lines to stdout, it records a
+local display receipt and posts
+`{ kind: 'release' }` to `/releases/:id/display`. Acknowledgment is idempotent
+(204), affects only the authenticated harness's offered notice, and returns
+404 for a notice it was never offered. A lost acknowledgment is retried
+without displaying the notice again. If the command stops after writing the
+notice but before saving its receipt, the next check may show the notice again.
+This flow has no reply or update action.

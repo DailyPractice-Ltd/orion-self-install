@@ -211,6 +211,7 @@ function keyInFile() {
 
 const NEVER_SAVED = [
   KEY_REL,                          // the radio key
+  'status/release-notices/',         // display receipts for this machine
   'status/shifts/',                 // wake-up files: full paths that only mean something on one machine
   '.update-backup/',                // an update's safety copies, older keys among them
   '.DS_Store',

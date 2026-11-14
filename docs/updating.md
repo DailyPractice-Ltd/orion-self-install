@@ -13,6 +13,11 @@ node update/request.mjs
 The request is the consent to start. The updater needs an enabled, paired,
 working radio so Orion can receive release and withdrawal notices.
 
+When you ask for an update after a radio notice, use the version named in the
+notice. For a notice about Orion 2.1.0, run `node update/request.mjs --tag v2.1.0`.
+Orion verifies that release again before applying it. The command without a tag
+requests the highest stable published release.
+
 If your radio is off or hasn't been paired, Orion explains the requirement and
 asks whether to turn on check-ins. Read [what radio check-ins share](radio.md)
 before you decide. If you opt in, use the one-time pairing code from Daily

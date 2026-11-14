@@ -93,6 +93,7 @@ export function selectPath({ root, manifest, status, previous, read }) {
     (entry) =>
       entry?.from_version === version &&
       manifest.deployment.tools.includes(entry.tool) &&
+      (verificationNeeded || entry.starting_layout !== 'legacy-same-folder') &&
       (tool == null
         ? entry.verification?.infer_tool === true
         : entry.tool === tool) &&

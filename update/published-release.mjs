@@ -69,17 +69,19 @@ export function createReleaseClient({
     },
   };
 }
-export async function discoverRelease(client) {
+export async function discoverRelease(client, { tag } = {}) {
+  if (tag !== undefined && !tagPattern.test(tag))
+    throw new Error('Expected a stable published release tag (vX.Y.Z).');
   const releases = [];
   for (let page = 1; ; page++) {
     const batch = await client.get(`/releases?per_page=100&page=${page}`);
     if (!Array.isArray(batch)) throw new Error('Invalid release listing.');
-    releases.push(...batch.filter(eligibleRelease));
+    releases.push(...batch.filter((release) => eligibleRelease(release) && (tag === undefined || release.tag_name === tag)));
     if (batch.length < 100) break;
   }
   releases.sort((a, b) => compareVersions(b.tag_name, a.tag_name));
   if (!releases.length)
-    throw new Error('No eligible published stable release.');
+    throw new Error(tag ? `Published release ${tag} is unavailable.` : 'No eligible published stable release.');
   if (releases[1]?.tag_name === releases[0].tag_name)
     throw new Error('Ambiguous publication identity.');
   return releases[0];

@@ -16,7 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, rmSync, existsSync,
+  mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, rmSync, existsSync, readdirSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -88,7 +88,7 @@ test('parses the directive exactly as the server formats it', () => {
  * status.json it left behind, every call the bridge received, and the skill
  * file it wrote, if any.
  */
-function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, skills = {}, tool = 'claude-code' } = {}) {
+function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, skills = {}, tool = 'claude-code', applied, notices = [] } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'orion-radio-'));
   try {
     mkdirSync(join(dir, 'status'));
@@ -101,7 +101,8 @@ function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, s
       writeFileSync(join(dir, skillRoot, 'skills', slug, 'SKILL.md'), content);
     }
     writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
-      template_version: '0.6.4',
+      template_version: applied?.manifest_version ?? '0.6.4',
+      ...(applied ? { applied_release: applied } : {}),
       selected_tool: tool,
       sharing: {
         status_signal_enabled: true,
@@ -114,9 +115,10 @@ function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, s
     const log = join(dir, 'fetch.log');
     const mock = join(dir, 'fetch.mjs');
     writeFileSync(mock, `
-      import { appendFileSync } from 'node:fs';
+      import { appendFileSync, readFileSync } from 'node:fs';
       const thread = ${JSON.stringify(thread)};
       const skill = ${JSON.stringify(SKILL)};
+      const notices = ${JSON.stringify(notices)};
       const answer = (status, body) => new Response(JSON.stringify(body), {
         status, headers: { 'content-type': 'application/json' },
       });
@@ -127,6 +129,15 @@ function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, s
           method: init.method || 'GET', path, body: init.body ? JSON.parse(init.body) : null,
         }) + '\\n');
         if (path.startsWith('/api/bridge/nudges')) return answer(200, thread);
+        const calls = readFileSync(${JSON.stringify(log)}, 'utf8').split('\\n').filter(Boolean).map(JSON.parse);
+        const polls = calls.filter((call) => call.path === '/api/bridge/releases').length;
+        if (path === '/api/bridge/releases') return answer(200, { version: 1, notice: notices[polls - 1] ?? null });
+        if (path.startsWith('/api/bridge/releases/') && path.endsWith('/display')) {
+          if (calls.filter((call) => call.path.endsWith('/display')).length === 1) {
+            return answer(503, { error: 'Database unavailable' });
+          }
+          return new Response(null, { status: 204 });
+        }
         if (path === '/api/bridge/library/' + skill.slug) return answer(200, skill);
         if (path.startsWith('/api/bridge/library/')) return answer(404, { error: 'Unknown asset' });
         if (path === '/api/bridge/assets') return answer(201, { asset_id: 'a1', reported_at: new Date().toISOString(), replay: false });
@@ -134,18 +145,22 @@ function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, s
         return answer(404, { error: 'no such door' });
       };
     `);
-    const r = spawnSync(
+    const checks = Array.from({ length: Math.max(notices.length, 1) }, () => spawnSync(
       process.execPath,
       ['--import', pathToFileURL(mock).href, join(dir, 'status', 'radio.mjs'), ...args],
       { encoding: 'utf8', env: plainEnv() },
-    );
+    ));
+    const [r] = checks;
+    const receipts = existsSync(join(dir, 'status', 'release-notices'))
+      ? readdirSync(join(dir, 'status', 'release-notices')).sort()
+      : [];
     const status = JSON.parse(readFileSync(join(dir, 'status', 'status.json'), 'utf8'));
     const calls = existsSync(log)
       ? readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
       : [];
     const skillFile = join(dir, tool === 'codex' ? '.agents' : '.claude', 'skills', SKILL.slug, 'SKILL.md');
     const written = existsSync(skillFile) ? readFileSync(skillFile, 'utf8') : null;
-    return { code: r.status, out: r.stdout, err: r.stderr, status, calls, written };
+    return { code: r.status, out: r.stdout, err: r.stderr, status, calls, written, checks, receipts };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -260,4 +275,78 @@ test('contribute shows what would be sent and sends nothing without --yes', () =
   assert.match(out, /You would offer "meeting-sizing"/);
   assert.match(out, /contribute --slug meeting-sizing --yes/);
   assert.deepEqual(calls, [], 'nothing leaves the machine before the yes');
+});
+
+
+const APPLIED = {
+  tag: 'v2.0.0',
+  commit: 'a'.repeat(40),
+  release_id: 1001,
+  manifest_version: '2.0.0',
+  applied_at: '2026-11-12T14:00:00Z',
+};
+const NOTICE = {
+  kind: 'release',
+  version: '2.3.0',
+  tag: 'v2.3.0',
+  commit: 'c'.repeat(40),
+  release_id: 1023,
+  summary: 'Your weekly report now includes finished work.',
+  notes_url: 'https://github.com/DailyPractice-Ltd/orion-self-install/releases/tag/v2.3.0',
+};
+
+test('a release is shown once and acknowledged again when the first acknowledgment fails', () => {
+  const { checks, calls, status, receipts } = runRadio(['check'], {
+    applied: APPLIED,
+    notices: [NOTICE, NOTICE, {
+      ...NOTICE, tag: 'v2.4.0', version: '2.4.0', release_id: 1024,
+      notes_url: NOTICE.notes_url.replace('v2.3.0', 'v2.4.0'),
+    }],
+  });
+  for (const check of checks) assert.equal(check.status, 0, check.stderr);
+  assert.match(checks[0].stdout, /Orion 2\.3\.0 is available/);
+  assert.match(checks[0].stdout, /Your weekly report now includes finished work\./);
+  assert.ok(checks[0].stdout.includes(NOTICE.notes_url));
+  assert.match(checks[0].stdout, /Say 'update my harness' when you're ready\./);
+  assert.doesNotMatch(checks[0].stdout, /1023|c{40}|reply --nudge|node update|Radio quiet/);
+  assert.doesNotMatch(checks[1].stdout, /2\.3\.0 is available/);
+  assert.match(checks[2].stdout, /Orion 2\.4\.0 is available/);
+  assert.deepEqual(calls.filter((call) => call.path === '/api/bridge/releases').map((call) => call.body),
+    Array(3).fill({ check_ins_enabled: true, selected_tool: 'claude-code', applied_release: APPLIED }));
+  assert.deepEqual(calls.filter((call) => call.path.endsWith('/display')).map((call) => [call.path, call.body]), [
+    ['/api/bridge/releases/1023/display', { kind: 'release' }],
+    ['/api/bridge/releases/1023/display', { kind: 'release' }],
+    ['/api/bridge/releases/1024/display', { kind: 'release' }],
+  ]);
+  assert.equal(status.template_version, APPLIED.manifest_version);
+  assert.deepEqual(status.applied_release, APPLIED);
+  assert.equal(status.sharing.radio_seen_through, undefined);
+  assert.deepEqual(receipts.map((name) => name.split('-').slice(-2).join('-')), ['release-1023', 'release-1024']);
+});
+
+test('a radio-off or unpaired harness never checks for a release', () => {
+  for (const sharing of [{ status_signal_enabled: false }, { harness_id: null }]) {
+    const { out, calls } = runRadio(['check'], { applied: APPLIED, notices: [NOTICE], sharing });
+    assert.match(out, /Radio is off/);
+    assert.deepEqual(calls, []);
+  }
+});
+
+
+test('an acknowledgment survives a skipped offer on the next check', () => {
+  const { checks, calls } = runRadio(['check'], { applied: APPLIED, notices: [NOTICE, null] });
+  assert.match(checks[0].stdout, /Orion 2\.3\.0 is available/);
+  assert.doesNotMatch(checks[1].stdout, /2\.3\.0 is available/);
+  assert.equal(calls.filter((call) => call.path.endsWith('/1023/display')).length, 2);
+});
+
+test('an invalid notice does not get displayed or interfere with an ordinary message', () => {
+  const { out, calls } = runRadio(['check'], {
+    applied: APPLIED,
+    notices: [{ ...NOTICE, notes_url: 'https://example.com/releases/v2.3.0' }],
+    thread: { version: 1, messages: [fromUs({ body: 'Hi Kira, Oliver here.' })] },
+  });
+  assert.match(out, /Hi Kira, Oliver here\./);
+  assert.doesNotMatch(out, /2\.3\.0 is available|example\.com/);
+  assert.equal(calls.filter((call) => call.path.endsWith('/display')).length, 0);
 });

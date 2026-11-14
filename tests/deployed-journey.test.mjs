@@ -158,6 +158,9 @@ for (const tool of ['claude-code', 'codex']) {
     const release = join(base, 'release');
     const client = join(base, 'client');
     git(base, 'clone', '-q', checkout, release);
+    // Use the actual last release tree containing Spec Kit, independent of HEAD.
+    const candidate = git(release, 'rev-parse', 'HEAD');
+    git(release, 'checkout', '-q', '77f8a99356ae52f5e9c71b00f78c7a29c1986461');
     ok(run(release, 'install.mjs', '--tool', tool, '--target', client, '--local-only'));
     const oldSkill = `${skill(tool)}/speckit-tasks/SKILL.md`;
     const editedSkill = `${skill(tool)}/speckit-plan/SKILL.md`;
@@ -166,12 +169,15 @@ for (const tool of ['claude-code', 'codex']) {
     put(client, editedSkill, '# Client edited plan skill\n');
     put(client, '.specify/memory/constitution.md', '# Client constitution\n');
 
+    git(release, 'checkout', '-q', candidate);
     const changes = execFileSync('git', ['diff', '--binary', 'HEAD'], { cwd: checkout });
-    execFileSync('git', ['apply', '--binary', '-'], { cwd: release, input: changes });
-    git(release, 'add', '-A');
-    git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'without Spec Kit');
+    if (changes.length) {
+      execFileSync('git', ['apply', '--binary', '-'], { cwd: release, input: changes });
+      git(release, 'add', '-A');
+      git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'without Spec Kit');
+    }
     const pinned = git(release, 'rev-parse', 'HEAD');
-    const result = run(client, 'update/apply.mjs', 'update', '--root', client, '--release-repo', release, '--commit', pinned);
+    const result = run(release, 'update/apply.mjs', 'update', '--root', client, '--release-repo', release, '--commit', pinned);
     ok(result);
     const report = JSON.parse(result.stdout);
     assert.equal(existsSync(join(client, oldSkill)), false);

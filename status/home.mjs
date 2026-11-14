@@ -77,7 +77,7 @@ const KEY_REL = `status/${RADIO_KEY_FILE}`;
 
 // A release checkout is not a client's home, even if it is itself a git repository.
 if (fs.existsSync(path.join(ROOT, 'skills')) && fs.existsSync(path.join(ROOT, 'agents'))) {
-  console.error('This is the Orion release folder. Run node install.mjs --tool <codex|claude-code> --target <client-folder> first.');
+  console.error('This is the Orion release folder. Run node install-published.mjs --tool <codex|claude-code> --target <client-folder> first.');
   process.exit(2);
 }
 

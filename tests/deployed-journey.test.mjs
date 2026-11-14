@@ -629,8 +629,16 @@ test('an approved required-edit review cannot be reused after the local bytes or
 
   refreshed.review.conflicts[0].choice = 'replace';
   put(refreshed.directory, 'review.json', JSON.stringify(refreshed.review));
+  put(refreshed.directory, refreshed.review.conflicts[0].incoming, 'A different incoming copy\n');
+  const tampered = await f.request({}, ['--resolve-required', refreshed.directory]);
+  assert.notEqual(tampered.code, 0);
+  assert.match(tampered.stderr, /earlier review is stale/);
+  const reviewed = readRequiredReview(t, tampered);
+  assert.equal(read(reviewed.directory, reviewed.review.conflicts[0].incoming), '# Changed upstream\n');
+  reviewed.review.conflicts[0].choice = 'replace';
+  put(reviewed.directory, 'review.json', JSON.stringify(reviewed.review));
   f.state.replacementId = 5;
-  const republished = await f.request({}, ['--resolve-required', refreshed.directory]);
+  const republished = await f.request({}, ['--resolve-required', reviewed.directory]);
   assert.notEqual(republished.code, 0);
   assert.match(republished.stderr, /earlier review is stale/);
   assert.equal(readRequiredReview(t, republished).review.pin.release_id, 5);

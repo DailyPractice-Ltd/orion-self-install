@@ -64,12 +64,12 @@ export function destinationState(root, entry, pristine) {
 /** The sole source-to-destination mapper for release and deployed harnesses. */
 export function planForTool(deployment, tool, { releaseRoot = RELEASE_ROOT, root } = {}) {
   if (!deployment.tools.includes(tool)) throw new Error(`Unsupported selected tool: ${tool || '(missing)'}`);
-  const actualSkills = (existsSync(join(releaseRoot, 'skills')) ? readdirSync(join(releaseRoot, 'skills'), { withFileTypes: true }) : [])
-    .filter((item) => item.isDirectory() && existsSync(join(releaseRoot, 'skills', item.name, 'SKILL.md')))
-    .map((item) => `skills/${item.name}/SKILL.md`).sort();
+  const actualSkills = (existsSync(join(releaseRoot, 'skills')) ? readdirSync(join(releaseRoot, 'skills'), { recursive: true, withFileTypes: true }) : [])
+    .filter((item) => item.isFile())
+    .map((item) => relative(releaseRoot, join(item.parentPath, item.name)).split(sep).join('/')).sort();
   const mappedSkills = deployment.entries.filter((entry) => entry.source.startsWith('skills/'));
   const skillSources = mappedSkills.map((entry) => entry.source).sort();
-  if (JSON.stringify(actualSkills) !== JSON.stringify(skillSources)) throw new Error('Deployment skill mappings must cover every skills/*/SKILL.md exactly once');
+  if (JSON.stringify(actualSkills) !== JSON.stringify(skillSources)) throw new Error('Deployment skill mappings must cover every file under skills/ exactly once');
   for (const entry of mappedSkills) for (const selected of deployment.tools) {
     const expected = `${selected === 'codex' ? '.agents' : '.claude'}/skills/${entry.source.slice('skills/'.length)}`;
     if (entry.destinations?.[selected] !== expected) throw new Error(`Invalid skill mapping for ${entry.source} (${selected})`);

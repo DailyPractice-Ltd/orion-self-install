@@ -22,3 +22,7 @@
   collision, then restores the prior updater and release status after withdrawal.
   It verifies a separate client note survives. The Claude Code interruption
   journey verifies automatic retry requires the original release.
+- Validation on integration merge `7499688` passed all **283 tests** with
+  `node --test tests/*.test.mjs` and loopback access for disposable HTTP fixtures.
+  `git diff --check` passed, and `node tests/helpers/pristine.mjs` confirmed the
+  release fingerprints are current.

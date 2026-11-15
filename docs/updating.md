@@ -76,10 +76,17 @@ Orion rechecks the publication, the starting harness, and the copies that
 need a decision. If the review has gone stale, use the fresh review or retry
 the original command. To defer, leave the update paused.
 
-If you opted into radio as part of migrating to a separate folder, keep the
-original migration destination and omit `--pair-radio` when continuing a review.
-Orion saves that confirmed pairing in a private file alongside the review.
+If you opted into radio, omit `--pair-radio` when continuing a review. Keep the
+same migration destination if you specified one. Orion saves the confirmed
+pairing in a private file alongside the review and applies it when the update
+succeeds.
 Keep the review folder local and delete it when you no longer need its copies.
+
+If Orion confirms pairing but the publication or radio check stops the update
+before a review opens, it gives you a private continuation folder. Retry the
+same request with `--resume-pairing "/path/from/the-update"` in place of
+`--pair-radio`. This uses the pairing you already approved. Delete that folder
+if you decide to abandon the update.
 
 The updater stages changes, backs up each affected file under `.update-backup/`,
 and then applies them. It records the tag, full commit, Release ID, and

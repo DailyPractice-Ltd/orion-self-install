@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -61,11 +62,18 @@ export async function historicalFiles({ client, previous, path, stage, file }) {
 
 const pairingRecord = '.migration-pairing.json';
 
-function preserveReviewPairing(directory, pairing) {
-  writeFileSync(join(directory, pairingRecord), JSON.stringify(pairing), {
-    mode: 0o600,
-    flag: 'wx',
-  });
+export function savePairingContinuation(pairing) {
+  const folder = mkdtempSync(join(tmpdir(), 'orion-radio-pairing-'));
+  try {
+    writeFileSync(join(folder, pairingRecord), JSON.stringify(pairing), {
+      mode: 0o600,
+      flag: 'wx',
+    });
+    return folder;
+  } catch (error) {
+    rmSync(folder, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 export function resumeReviewPairing(directory, binding) {
@@ -73,14 +81,12 @@ export function resumeReviewPairing(directory, binding) {
     const record = JSON.parse(
       privateReviewFile(directory, pairingRecord, { secret: true }),
     );
-    if (!isDeepStrictEqual(record.binding, binding)) {
-      throw new Error();
-    }
-    return record;
+    if (!isDeepStrictEqual(record.binding, binding)) throw new Error();
+    return { path: safePath(directory, pairingRecord), record };
   } catch (error) {
     if (error.code === 'ENOENT') return null;
     throw new Error(
-      'Saved radio pairing belongs to a different migration or the source harness changed. Check the original command before continuing.',
+      'Saved radio pairing belongs to a different harness or the harness changed. Check the original command before continuing.',
     );
   }
 }
@@ -138,7 +144,7 @@ function reviewManifest({
   };
 }
 
-function saveReview(manifest, conflicts, pairing) {
+function saveReview(manifest, conflicts, pairingFile) {
   const directory = mkdtempSync(join(tmpdir(), 'orion-required-review-'));
   const privateFile = { mode: 0o600, flag: 'wx' };
   try {
@@ -170,7 +176,8 @@ function saveReview(manifest, conflicts, pairing) {
       JSON.stringify(manifest, null, 2) + '\n',
       privateFile,
     );
-    if (pairing) preserveReviewPairing(directory, pairing);
+    if (pairingFile)
+      renameSync(pairingFile, safePath(directory, pairingRecord));
     return directory;
   } catch (error) {
     rmSync(directory, { recursive: true, force: true });
@@ -247,7 +254,7 @@ export function reviewRequiredEdits({ reviewDir, ...context }) {
     !isDeepStrictEqual(evidence, expected) ||
     !copiesMatch(reviewDir, conflicts, expected.conflicts)
   ) {
-    const folder = saveReview(expected, conflicts, context.pairing);
+    const folder = saveReview(expected, conflicts, context.pairingFile);
     throw new Error(
       (reviewDir ? 'The earlier review is stale.\n' : '') +
         `Required update is blocked by a local edit: ${conflicts.map(({ destination }) => destination).join(', ')}\n` +

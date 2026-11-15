@@ -369,7 +369,7 @@ try {
     const tag = arg('--tag');
     const options = {
       root, checkout,
-      migrateTo: arg('--migrate-to'), migrationPairing: arg('--migration-pairing'),
+      migrateTo: arg('--migrate-to'), stagedPairing: arg('--staged-pairing') || arg('--migration-pairing'),
       reviewDir: arg('--resolve-required'),
       client: createReleaseClient({
         repository: arg('--repository'), apiBase: arg('--api-base'), sourceUrl: arg('--source-url'),
@@ -381,9 +381,17 @@ try {
       : await applyPublishedUpdate(options);
     console.log(JSON.stringify(result, null, 2));
   } else {
-    const { assertPublishedUpdateNotBlocked } = await import('./published-transaction.mjs');
-    assertPublishedUpdateNotBlocked(root, { includePending: true });
-    const result=command==='update' ? update(root,repo,arg('--commit')) : command==='switch' ? switchTool(root,repo,arg('--commit'),arg('--to'),arg('--legacy-tool')) : command==='restore' ? restore(root,arg('--backup')) : command==='recover' ? {recovered:[...recoverPendingUpdates(root),...recoverPendingSwitches(root)]} : (()=>{throw new Error('Use update, switch, restore or recover');})();
+    const { assertPublishedUpdateNotBlocked, withUpdateLock } = await import('./published-transaction.mjs');
+    const result = await withUpdateLock(root, () => {
+      assertPublishedUpdateNotBlocked(root, { includePending: true });
+      switch (command) {
+        case 'update': return update(root, repo, arg('--commit'));
+        case 'switch': return switchTool(root, repo, arg('--commit'), arg('--to'), arg('--legacy-tool'));
+        case 'restore': return restore(root, arg('--backup'));
+        case 'recover': return { recovered: [...recoverPendingUpdates(root), ...recoverPendingSwitches(root)] };
+        default: throw new Error('Use update, switch, restore or recover');
+      }
+    });
     console.log(JSON.stringify(result,null,2));
   }
 } catch(error) {console.error(error.message);process.exitCode=2;}

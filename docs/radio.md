@@ -29,7 +29,7 @@ Three tiers, by how your yes is given — and nothing besides:
    Daily Practice can tell whether an update reached you. A label about this folder,
    never about your work. Release checks also report your selected tool and the
    exact release recorded after a successful install or update. Orion sends a
-   receipt when it shows you a release or withdrawal notice.
+   receipt after the radio command prints a release or withdrawal notice.
 5. **Messages arriving from Daily Practice** — the inbound half (see "What comes
    in"). Reading a message out sends nothing back.
 

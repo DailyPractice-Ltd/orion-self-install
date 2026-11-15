@@ -90,6 +90,9 @@ async function fixture(t, tool = 'codex') {
       release(6, 'v02.0.0'),
     ],
     working: true,
+    pairRequests: 0,
+    libraryRequests: 0,
+    redirectsFollowed: 0,
   };
   const server = createServer(async (req, res) => {
     res.setHeader('content-type', 'application/json');
@@ -113,19 +116,29 @@ async function fixture(t, tool = 'codex') {
       );
       if (state.withdraw) body.body = '<!-- orion:withdrawn -->';
       if (state.retag) git('tag', '-f', 'v2.10.0', commits['2.9.0']);
-    } else if (req.url === '/pair')
+    } else if ((req.url === '/pair' && state.redirectPair) ||
+      (req.url === '/library' && state.redirectProbe)) {
+      res.writeHead(307, { Location: '/redirected' });
+      res.end();
+      return;
+    } else if (req.url === '/redirected') {
+      state.redirectsFollowed++;
+      body = {};
+    } else if (req.url === '/pair') {
+      state.pairRequests++;
       body = {
-        harness_id: 'fixture-harness',
-        install_token: state.requireFresh ? 'fresh-token' : 'fixture-token',
+        harness_id: state.malformedPair ? 'invalid-id' : '9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62',
+        install_token: 'orion_' + (state.requireFresh ? 'fresh' : 'fixture').repeat(5),
+        ...(state.foreignBridge ? { bridge_url: 'https://other.test' } : {}),
       };
-    else if (req.url === '/library') {
-      if (
-        !state.working ||
-        (state.requireFresh &&
-          req.headers.authorization !== 'Bearer fresh-token')
-      )
+    } else if (req.url === '/library' || req.url === '/releases') {
+      if (req.url === '/library') state.libraryRequests++;
+      if (!state.working || (state.requireFresh &&
+          req.headers.authorization !== 'Bearer orion_' + 'fresh'.repeat(5))) {
         res.statusCode = 401;
-      body = { assets: [] };
+      }
+      if (req.url === '/releases' && state.noticeUnavailable) res.statusCode = 503;
+      body = req.url === '/library' ? { assets: [] } : { version: 1, release_notices: true };
     } else {
       res.statusCode = 404;
       body = {};
@@ -135,9 +148,21 @@ async function fixture(t, tool = 'codex') {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   t.after(() => new Promise((r) => server.close(r)));
   const url = `http://127.0.0.1:${server.address().port}`;
+  const bridge = 'https://fixture-bridge.test';
+  const preload = join(base, 'bridge-fetch.mjs');
+  writeFileSync(preload, `
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (input, options) => {
+      const url = new URL(input);
+      if (url.origin === '${bridge}') return originalFetch('${url}' + url.pathname, options);
+      if (url.origin === 'https://other.test') throw new Error('Foreign bridge reached');
+      return originalFetch(input, options);
+    };
+  `);
   const run = (...extra) =>
     new Promise((resolve) => {
       const p = spawn(process.execPath, [
+        '--import', preload,
         join(root, 'install-published.mjs'),
         '--repository',
         'fixture/orion',
@@ -146,7 +171,7 @@ async function fixture(t, tool = 'codex') {
         '--source-url',
         repo,
         '--bridge-url',
-        url,
+        bridge,
         '--target',
         target,
         '--tool',
@@ -308,3 +333,39 @@ test('Claude Code published installation retains its chosen layout across pagina
     'claude-code',
   );
 });
+
+test('a valid one-time pairing resumes only after release notices become available', async t => {
+  const f = await fixture(t);
+  f.state.noticeUnavailable = true;
+  const paused = await f.run('--code', 'BCDF-GHJK-LMNP');
+  assert.equal(paused.code, 3, paused.output);
+  assert.equal(existsSync(f.target), false);
+  f.state.noticeUnavailable = false;
+  const resumed = await f.run();
+  assert.equal(resumed.code, 0, resumed.output);
+  assert.equal(f.state.pairRequests, 1);
+});
+
+for (const problem of ['malformedPair', 'foreignBridge']) {
+  test(`published install pauses before authenticating a ${problem} response`, async t => {
+    const f = await fixture(t);
+    f.state[problem] = true;
+    const result = await f.run('--code', 'BCDF-GHJK-LMNP');
+    assert.equal(result.code, 3, result.output);
+    assert.equal(f.state.libraryRequests, 0);
+    assert.equal(existsSync(f.target), false);
+    const pending = join(dirname(f.target), '.client-published-install/harness/status/status.json');
+    assert.equal(JSON.parse(readFileSync(pending)).sharing.install_token, null);
+  });
+}
+
+for (const problem of ['redirectPair', 'redirectProbe']) {
+  test(`published install stops at a ${problem} response`, async t => {
+    const f = await fixture(t);
+    f.state[problem] = true;
+    const paused = await f.run('--code', 'BCDF-GHJK-LMNP');
+    assert.equal(paused.code, 3, paused.output);
+    assert.equal(f.state.redirectsFollowed, 0);
+    assert.equal(existsSync(f.target), false);
+  });
+}

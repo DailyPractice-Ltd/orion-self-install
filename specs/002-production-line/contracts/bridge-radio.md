@@ -216,6 +216,9 @@ directions against the deployed server.
 
 ## Published release notices
 
+Authenticated `GET /releases` returns `{ version: 1, release_notices: true }`
+without reporting applied identity or requesting a notice.
+
 A paired harness with radio check-ins enabled can send a notice check to
 `POST /releases`. The body is `{ check_ins_enabled: true, selected_tool,
 applied_release }`, where the selected tool is `codex` or `claude-code` and the
@@ -224,15 +227,16 @@ and `applied_at` from a successful deployment. The bearer token supplies the
 harness identity. A radio-off client makes neither release call.
 
 The response is `{ version: 1, notice }`. `notice` is null or
-`{ kind: 'release', version, tag, commit, release_id, summary, notes_url }`.
+`{ kind: 'release', version, tag, commit, release_id, summary, notes_url, claim_id, claim_expires_at }`.
 Offer the highest stable, current, non-withdrawn published version strictly
 newer than the applied release with one declared deployed update path from
 that version for the recorded tool. The summary comes from the changelog at
 the tagged commit. A source failure leaves the conversation available and
-returns no offer. No older notice replaces an already displayed newest offer.
+returns no offer. Paths that require inspecting local layout are left for the
+direct update command to verify. No older notice replaces an already displayed newest offer.
 
 A withdrawal is `{ kind: 'withdrawal', version, tag, commit, release_id,
-notes_url, application }`. The bridge verifies the GitHub release's withdrawal
+notes_url, application, claim_id, claim_expires_at }`. The bridge verifies the GitHub release's withdrawal
 marker and exact tagged commit before returning it. `application` is
 `currently_applied` when the harness reports that release, `previously_applied`
 when the bridge recorded a prior application, or `notified_only` when the
@@ -242,11 +246,18 @@ withdrawn releases and prioritizes unacknowledged withdrawal notices. The
 radio reports the appropriate next step and awaits the client's decision
 before any recovery.
 
-Once the radio command has written the notice lines to stdout, it records a
-local display receipt and posts
-`{ kind: 'release' }` or `{ kind: 'withdrawal' }` to `/releases/:id/display`. Acknowledgment is idempotent
-(204), affects only the authenticated harness's offered notice, and returns
-404 for a notice it was never offered. A lost acknowledgment is retried
-without displaying the notice again. If the command stops after writing the
-notice but before saving its receipt, the next check may show the notice again.
+Before returning an offer, the bridge grants a short, exclusive display lease
+for the harness, release and kind. The notice includes an opaque `claim_id`
+and `claim_expires_at`. Until expiry, concurrent checks cannot claim that
+notice. If the process does not acknowledge, another check can claim it after
+expiry. A check for another harness has its own lease.
+
+After stdout accepts the notice lines, the radio records a local receipt and
+posts `{ kind, claim_id }` to `/releases/:id/display`. Acknowledgment is
+idempotent for the same claim (204), returns 404 for an unknown notice and
+409 if another check replaced the claim. An expired claim can still acknowledge
+if no check replaced it. A lost acknowledgment retries from the durable local
+receipt. A process that stops between stdout and saving that receipt can
+display again after the lease expires. The CLI can observe stdout completion;
+it cannot observe a separate assistant relaying those lines to a person.
 This flow has no reply or update action.

@@ -165,6 +165,61 @@ export function keyHeader(key) {
   return key?.token ? { Authorization: `Bearer ${key.token}` } : {};
 }
 
+const pairingTimeout = 10000;
+
+function pairingAddress(value) {
+  const url = new URL(value);
+  if (url.protocol !== 'https:' || url.username || url.password || url.hash || url.search)
+    throw new Error('Invalid radio address.');
+  return url;
+}
+
+export async function exchangeRadioCode(base, code, previousId) {
+  const origin = pairingAddress(base).origin;
+  const response = await fetch(`${base.replace(/\/+$/, '')}/pair`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: normalizePairingCode(code) }),
+    redirect: 'error',
+    signal: AbortSignal.timeout(pairingTimeout),
+  });
+  if (!response.ok) throw new Error('Pairing unavailable.');
+  const pair = await response.json();
+  const bridgeUrl = (pair?.bridge_url ?? base).replace(/\/+$/, '');
+  if (typeof pair?.install_token !== 'string' || !INSTALL_TOKEN_RE.test(pair.install_token) ||
+    typeof pair.harness_id !== 'string' || !HARNESS_ID_RE.test(pair.harness_id) ||
+    (HARNESS_ID_RE.test(previousId ?? '') && pair.harness_id !== previousId) ||
+    pairingAddress(bridgeUrl).origin !== origin) {
+    throw new Error('Invalid radio pairing response.');
+  }
+  return {
+    bridge_url: bridgeUrl,
+    harness_id: pair.harness_id,
+    install_token: pair.install_token,
+    paired_at: new Date().toISOString(),
+  };
+}
+
+export async function probeReleaseRadio(base, key, trustedOrigin = base) {
+  const url = pairingAddress(base);
+  if (url.origin !== pairingAddress(trustedOrigin).origin)
+    throw new Error('Radio address changed origin.');
+  const options = {
+    method: 'GET',
+    headers: keyHeader(key),
+    redirect: 'error',
+    signal: AbortSignal.timeout(pairingTimeout),
+  };
+  const address = base.replace(/\/+$/, '');
+  const library = await fetch(`${address}/library`, options);
+  if (!library.ok || !Array.isArray((await library.json())?.assets))
+    throw new Error('Radio library unavailable.');
+  const response = await fetch(`${address}/releases`, options);
+  const capability = response.ok && await response.json();
+  if (capability?.version !== 1 || capability.release_notices !== true)
+    throw new Error('Radio release notices unavailable.');
+}
+
 /**
  * Shape, not mere presence. Anything that doesn't match counts as unconfigured,
  * which is what re-opens the pairing step on the next run instead of leaving a

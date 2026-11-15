@@ -1,4 +1,5 @@
 /** Transaction for updating an already deployed harness from a verified publication. */
+import { isDeepStrictEqual } from 'node:util';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -42,7 +43,9 @@ import {
   reviewRequiredEdits,
 } from './published-conflicts.mjs';
 import {
-  keyHeader,
+  probeReleaseRadio,
+  HARNESS_ID_RE,
+  INSTALL_TOKEN_RE,
   radioKey,
   radioOn,
   readRadioKeyFile,
@@ -109,12 +112,8 @@ function runtimePairing(root, status, overrideKey) {
 async function requireWorkingRadio(root, status, overrideKey) {
   const { url, key } = runtimePairing(root, status, overrideKey);
   try {
-    const response = await fetch(`${url}/library`, {
-      headers: keyHeader(key),
-      signal: AbortSignal.timeout(10000),
-    });
-    const body = response.ok && (await response.json());
-    if (Array.isArray(body?.assets)) return;
+    await probeReleaseRadio(url, key);
+    return;
   } catch {
     // A working radio is required before any update writes.
   }
@@ -240,11 +239,12 @@ async function planUpdate({
   let nextStatus = files.get(statusFile);
   files.delete(statusFile);
   if (pairing) {
-    if (!nextStatus)
+    if (!nextStatus && path.starting_layout === 'legacy-same-folder')
       throw new Error('Separate migration must declare its status changes.');
-    const status = JSON.parse(nextStatus.bytes);
-    status.sharing = pairing.sharing;
-    nextStatus = { ...nextStatus, bytes: Buffer.from(serialized(status)) };
+    const base = nextStatus ?? file(safePath(root, statusFile));
+    const status = JSON.parse(base.bytes);
+    status.sharing = { ...status.sharing, ...pairing.sharing };
+    nextStatus = { ...base, bytes: Buffer.from(serialized(status)) };
   }
   const conflicts = [];
   let historical;
@@ -704,7 +704,7 @@ export function assertPublishedUpdateNotBlocked(
   if (blocked) throw new Error(requireRecoveryMessage(blocked.backup));
 }
 
-export function withUpdateLock(root, operation) {
+export async function withUpdateLock(root, operation) {
   const directory = safePath(root, backups);
   mkdirSync(directory, { mode: 0o700, recursive: true });
   // Claim before inspecting other claims. Simultaneous contenders may both
@@ -724,7 +724,7 @@ export function withUpdateLock(root, operation) {
       }
       throw new Error('Another Orion update is running.');
     }
-    return operation();
+    return await operation();
   } finally {
     rmdirSync(claim);
   }
@@ -768,6 +768,7 @@ function promote(root, stage, priorStatus, plan, pin, client) {
     release: pin,
     source: releaseOrigin(client),
     actions: plan.actions,
+    ...(plan.pairingOnly && { pairing_only: true }),
     created_directories: missingDirectories(root, plan.actions),
     status: {
       destination: statusFile,
@@ -826,19 +827,25 @@ function promote(root, stage, priorStatus, plan, pin, client) {
     );
     for (const key of plan.removeChecklistKeys) delete status.checklist?.[key];
     status.template_version = pin.manifest_version;
-    status.applied_release = { ...pin, applied_at: new Date().toISOString() };
+    if (!plan.pairingOnly) {
+      status.applied_release = { ...pin, applied_at: new Date().toISOString() };
+      status.notes = [
+        status.notes,
+        `updated to ${pin.tag}; backup in ${backupRel}`,
+      ].filter(Boolean).join('\n');
+    }
     journal.applied_at = status.applied_release.applied_at;
     journal.installed_tool = plan.tool;
-    status.notes = [
-      status.notes,
-      `updated to ${pin.tag}; backup in ${backupRel}`,
-    ]
-      .filter(Boolean)
-      .join('\n');
     const next = serialized(status);
     journal.status.installed_hash = digest(next);
     journal.status.installed_mode = priorStatus.mode;
     journal.state = 'verified';
+    if (!plan.pairingOnly) {
+      // Keep the committed side of the three-way restore even after staging
+      // cleanup. The journal verifies its bytes before they are used.
+      write(safePath(backup, 'installed-status.json'), next, 0o600);
+      journal.installed_status_snapshot = true;
+    }
     const stagedStatus = safePath(backup, `stage/${statusFile}`);
     write(stagedStatus, next, priorStatus.mode);
     saveJournal(backup, journal);
@@ -989,7 +996,7 @@ async function applySeparateMigration({
       stage,
       pairing,
       declared,
-      review: { ...review, pairing },
+      review,
     });
     if (!plan.nextStatus)
       throw new Error('Separate migration must declare its status changes.');
@@ -1078,7 +1085,7 @@ function completedBackup(root, backupRel, current, client) {
   const snapshot = file(safePath(backup, 'journal.json'));
   if (!snapshot) throw new Error('The published backup journal is missing.');
   const journal = JSON.parse(snapshot.bytes);
-  if (journal.kind !== 'published-update' || journal.state !== 'complete')
+  if (journal.kind !== 'published-update' || journal.state !== 'complete' || journal.pairing_only)
     throw new Error('Choose the backup for a completed published update.');
   const status = JSON.parse(current.bytes);
   const applied = recordedRelease(status);
@@ -1127,32 +1134,68 @@ function originalBackupFile(backup, action) {
   return saved;
 }
 
+function reverseStatusFields(before, installed, current, report, prefix = '') {
+  const next = { __proto__: null, ...current };
+  const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+  for (const key of new Set([...Object.keys(before), ...Object.keys(installed)])) {
+    if (!prefix && ['applied_release', 'template_version', 'selected_tool', 'sharing'].includes(key))
+      continue;
+    const old = Object.hasOwn(before, key) ? before[key] : undefined;
+    const applied = Object.hasOwn(installed, key) ? installed[key] : undefined;
+    if (isDeepStrictEqual(old, applied)) continue;
+    const value = Object.hasOwn(current, key) ? current[key] : undefined;
+    const field = /^[A-Za-z0-9_-]+$/.test(key)
+      ? [prefix, key].filter(Boolean).join('.')
+      : `${prefix}[${JSON.stringify(key)}]`;
+    if (isDeepStrictEqual(value, applied)) {
+      if (old === undefined) delete next[key];
+      else next[key] = old;
+      report.restore.push(field);
+    } else if ((old === undefined || isObject(old)) && isObject(applied) && isObject(value)) {
+      next[key] = reverseStatusFields(old ?? {}, applied, value, report, field);
+    } else {
+      report.keep.push(field);
+    }
+  }
+  return next;
+}
+
 function restorePlan(root, backupRel, current, context) {
   const { backup, journal, status, applied, journalHash } = context;
   const before = JSON.parse(originalBackupFile(backup, journal.status).bytes);
   if (!versionPattern.test(before.template_version))
     throw new Error('Invalid prior release version in the backup.');
   recordedRelease(before);
-  const next = { ...status, template_version: before.template_version };
+  const restore = [];
+  const remove = [];
+  const keep = [];
+  const statusChanges = { restore: [], keep: [] };
+  let next;
+  if (journal.installed_status_snapshot) {
+    const saved = file(safePath(backup, 'installed-status.json'));
+    if (!saved || digest(saved.bytes) !== journal.status.installed_hash)
+      throw new Error('Backup verification failed: installed status snapshot.');
+    next = reverseStatusFields(before, JSON.parse(saved.bytes), status, statusChanges);
+  } else if (sameFile(current, journal.status.installed_hash, journal.status.installed_mode)) {
+    next = reverseStatusFields(before, status, status, statusChanges);
+  } else {
+    // Earlier backups recorded only a status hash and removed checklist keys.
+    next = { ...status };
+    for (const key of journal.removed_checklist_keys ?? []) {
+      if (!Object.hasOwn(before.checklist ?? {}, key)) continue;
+      if (!status.checklist || Object.hasOwn(status.checklist, key)) {
+        statusChanges.keep.push(`checklist.${key}`);
+        continue;
+      }
+      next.checklist = { ...next.checklist, [key]: before.checklist[key] };
+      statusChanges.restore.push(`checklist.${key}`);
+    }
+  }
+  next.template_version = before.template_version;
   if (Object.hasOwn(before, 'applied_release'))
     next.applied_release = before.applied_release;
   else delete next.applied_release;
-
-  const restore = [],
-    remove = [],
-    keep = [],
-    statusRestore = [],
-    statusKeep = [];
-  for (const key of journal.removed_checklist_keys ?? []) {
-    if (!Object.hasOwn(before.checklist ?? {}, key)) continue;
-    if (!status.checklist || Object.hasOwn(status.checklist, key)) {
-      statusKeep.push(`checklist.${key}`);
-      continue;
-    }
-    next.checklist = { ...next.checklist, [key]: before.checklist[key] };
-    statusRestore.push(`checklist.${key}`);
-  }
-  next.notes = [status.notes, `restored from ${backupRel}`]
+  next.notes = [next.notes, `restored from ${backupRel}`]
     .filter(Boolean)
     .join('\n');
   const actions = [];
@@ -1216,8 +1259,8 @@ function restorePlan(root, backupRel, current, context) {
     restore,
     remove,
     keep,
-    status_restore: statusRestore,
-    status_keep: statusKeep,
+    status_restore: statusChanges.restore,
+    status_keep: statusChanges.keep,
   };
   const confirm = digest(
     serialized([
@@ -1512,7 +1555,7 @@ export async function applyPublishedUpdate({
   client,
   pin,
   migrateTo,
-  migrationPairing,
+  stagedPairing,
   reviewDir,
 }) {
   root = realpathSync(requireDeployedRoot(root));
@@ -1533,7 +1576,7 @@ export async function applyPublishedUpdate({
     };
     for (const entry of pending) requireOriginalSource(entry);
     await verifyPinnedRelease(client, pin, checkout);
-    withUpdateLock(root, () => {
+    await withUpdateLock(root, () => {
       const unfinished = pendingTransactions(root);
       for (const entry of unfinished) requireOriginalSource(entry);
       for (const { backup, journal } of unfinished) {
@@ -1571,14 +1614,25 @@ export async function applyPublishedUpdate({
   const priorStatus = file(statusPath);
   if (!priorStatus) throw new Error('Harness status file is missing.');
   const status = JSON.parse(priorStatus.bytes);
-  const pairing = migrationPairing ? json(migrationPairing) : null;
-  if (
-    pairing &&
-    (!pairing.sharing ||
-      pairing.sharing.radio_choice !== 'accepted' ||
-      (pairing.key_file !== undefined && typeof pairing.key_file !== 'string'))
-  )
-    throw new Error('Invalid pairing staged for the separate migration.');
+  const pairing = stagedPairing ? json(stagedPairing) : null;
+  const keyPath = 'status/radio.key';
+  const sharing = pairing?.sharing;
+  function assertPairingBinding(target) {
+    const savedKey = file(safePath(root, keyPath));
+    if (
+      !pairing.binding ||
+      pairing.binding.source !== root ||
+      pairing.binding.target !== target ||
+      pairing.binding.status !== digest(priorStatus.bytes) ||
+      pairing.binding.key !== (savedKey && digest(savedKey.bytes)) ||
+      sharing?.radio_choice !== 'accepted' ||
+      sharing?.status_signal_enabled !== true ||
+      !HARNESS_ID_RE.test(sharing.harness_id ?? '') ||
+      !INSTALL_TOKEN_RE.test(pairing.key_file ?? sharing.install_token ?? '')
+    ) throw new Error('Staged radio pairing no longer matches your harness.');
+    return savedKey;
+  }
+  const pairedStatus = pairing ? { ...status, sharing } : status;
 
   const previous = recordedRelease(status);
   if (!versionPattern.test(status.template_version))
@@ -1592,7 +1646,8 @@ export async function applyPublishedUpdate({
       throw new Error(
         'This required-edit review is stale. Request the update again.',
       );
-    await requireWorkingRadio(root, status);
+    if (pairing) assertPairingBinding(root);
+    await requireWorkingRadio(root, pairedStatus, pairing?.key_file);
     await verifyPinnedRelease(client, pin, checkout);
     if (
       previous.commit !== pin.commit ||
@@ -1602,16 +1657,49 @@ export async function applyPublishedUpdate({
     if (currentHash(root, statusFile) !== digest(priorStatus.bytes))
       throw new Error('Harness status changed during the request.');
     if (status.selected_tool != null) {
-      if (migrateTo || pairing)
+      if (migrateTo)
         throw new Error(
           'The selected release is already deployed in this folder.',
         );
       if (!['claude-code', 'codex'].includes(status.selected_tool))
         throw new Error(`Unknown recorded tool. ${cleanInstall}`);
-      return {
+      const result = {
         message: `${pin.tag} already applied.`,
         applied_release: previous,
       };
+      if (!pairing) return result;
+      const stage = mkdtempSync(join(dirname(checkout), 'orion-pairing-stage-'));
+      try {
+        return await withUpdateLock(root, () => {
+          assertPublishedUpdateNotBlocked(root, { includePending: true });
+          const savedKey = assertPairingBinding(root);
+          const bytes = pairing.key_file && Buffer.from(`${pairing.key_file}\n`);
+          const actions = [];
+          if (bytes) {
+            write(safePath(stage, keyPath), bytes, 0o600);
+            actions.push({
+              destination: keyPath,
+              kind: savedKey ? 'replace' : 'add',
+              prior_hash: savedKey && digest(savedKey.bytes),
+              prior_mode: savedKey?.mode,
+              installed_hash: digest(bytes),
+              installed_mode: 0o600,
+            });
+          }
+          return promote(root, stage, priorStatus, {
+            pairingOnly: true,
+            actions,
+            identityFiles: [],
+            checks: [],
+            removeChecklistKeys: [],
+            nextStatus: { ...priorStatus, bytes: Buffer.from(serialized(pairedStatus)) },
+            tool: status.selected_tool,
+            report: result,
+          }, pin, client);
+        });
+      } finally {
+        rmSync(stage, { recursive: true, force: true });
+      }
     }
   }
 
@@ -1631,7 +1719,7 @@ export async function applyPublishedUpdate({
       manifest,
     });
     const changingFolder = path.starting_layout === 'legacy-same-folder';
-    if (!changingFolder && (migrateTo || pairing))
+    if (!changingFolder && migrateTo)
       throw new Error(
         'The selected migration path applies to your existing deployed folder.',
       );
@@ -1639,11 +1727,9 @@ export async function applyPublishedUpdate({
       throw new Error(
         `A same-folder harness cannot verify this exact deployed release. ${cleanInstall}`,
       );
-    await requireWorkingRadio(
-      root,
-      pairing ? { ...status, sharing: pairing.sharing } : status,
-      pairing?.key_file,
-    );
+    const pairingTarget = changingFolder ? separateTarget(root, migrateTo) : root;
+    if (pairing) assertPairingBinding(pairingTarget);
+    await requireWorkingRadio(root, pairedStatus, pairing?.key_file);
     const declared = updatePath({ root, checkout, manifest, path });
     await verifyPinnedRelease(client, pin, checkout);
     const review = {
@@ -1654,6 +1740,7 @@ export async function applyPublishedUpdate({
       priorStatus,
       reviewDir,
       migrateTo,
+      pairingFile: stagedPairing,
     };
     if (changingFolder) {
       return await applySeparateMigration({
@@ -1678,11 +1765,13 @@ export async function applyPublishedUpdate({
       path,
       stage,
       backfill: order === 0,
+      pairing,
       declared,
       review,
     });
     await verifyPinnedRelease(client, pin, checkout);
     return withUpdateLock(root, () => {
+      if (pairing) assertPairingBinding(root);
       if (pendingTransactions(root).length)
         throw new Error(
           'An interrupted update is pending. Retry your request to recover it.',

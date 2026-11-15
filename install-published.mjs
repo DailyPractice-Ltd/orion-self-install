@@ -25,7 +25,10 @@ import {
 import { planForTool, safePath } from './update/destination-resolver.mjs';
 import {
   bridgeBase,
-  normalizePairingCode,
+  exchangeRadioCode,
+  HARNESS_ID_RE,
+  INSTALL_TOKEN_RE,
+  probeReleaseRadio,
   pairingCodeProblem,
 } from './status/shapes.mjs';
 const read = (path) => JSON.parse(readFileSync(path, 'utf8'));
@@ -151,36 +154,18 @@ export async function installPublished({
     try {
       if (code) {
         if (pairingCodeProblem(code)) throw new Error('Invalid pairing code.');
-        const r = await fetch(`${bridgeUrl.replace(/\/$/, '')}/pair`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: normalizePairingCode(code) }),
-          signal: AbortSignal.timeout(10000),
-        });
-        if (!r.ok) throw new Error('Pairing unavailable.');
-        const pack = await r.json();
-        if (!pack.install_token || !pack.harness_id)
-          throw new Error('Incomplete pairing response.');
-        Object.assign(status.sharing, {
-          install_token: pack.install_token,
-          harness_id: pack.harness_id,
-          bridge_url: pack.bridge_url || bridgeUrl,
-          paired_at: new Date().toISOString(),
-        });
+        Object.assign(status.sharing, await exchangeRadioCode(
+          bridgeUrl, code, status.sharing.harness_id,
+        ));
+        // Keep a valid one-use credential in this private pending install.
         save(statusPath, status);
       }
-      if (status.sharing.install_token && status.sharing.harness_id) {
-        const r = await fetch(
-            `${status.sharing.bridge_url.replace(/\/$/, '')}/library`,
-            {
-              headers: {
-                Authorization: `Bearer ${status.sharing.install_token}`,
-              },
-              signal: AbortSignal.timeout(10000),
-            },
-          ),
-          body = r.ok ? await r.json() : null;
-        working = r.ok && Array.isArray(body?.assets);
+      if (INSTALL_TOKEN_RE.test(status.sharing.install_token ?? '') &&
+          HARNESS_ID_RE.test(status.sharing.harness_id ?? '')) {
+        await probeReleaseRadio(status.sharing.bridge_url, {
+          token: status.sharing.install_token,
+        }, bridgeUrl);
+        working = true;
       }
     } catch {
       /* Pairing/connectivity failure pauses, never records success. */

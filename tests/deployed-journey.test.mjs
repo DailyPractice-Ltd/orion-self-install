@@ -222,7 +222,11 @@ async function publishedUpdateJourney(t, tool, { customizeCandidate, legacy, dam
       const { releases, withdrawn, identityChanged, pairingRejected, pairingUnavailable, publishAfterPair } = state;
       const path = new URL(url).pathname;
       let body;
-      if (path.endsWith('/releases')) body = releases;
+      if (path === '/api/bridge/releases') {
+        assert.equal(init.method, 'GET');
+        assert.equal(init.headers.Authorization, 'Bearer ${token}');
+        body = { version: 1, release_notices: true };
+      } else if (path.endsWith('/releases')) body = releases;
       else if (path.includes('/releases/')) {
         body = releases.find(item => item.id === Number(path.split('/').at(-1)));
         if (withdrawn) body.body = '<!-- orion:withdrawn -->';
@@ -404,7 +408,9 @@ test('a radio-off client can decline or fail pairing without changing the deploy
     f.state[problem] = true;
     const failed = await f.request(env, ['--pair-radio']);
     assert.notEqual(failed.code, 0);
-    assert.match(failed.stderr, /pairing.*failed/i);
+    assert.match(failed.stderr, problem === 'pairingRejected' ? /pairing.*failed/i : /radio could not be confirmed/i);
+    const continuation = failed.stderr.match(/--resume-pairing "([^"]+)"/)?.[1];
+    if (continuation) t.after(() => rmSync(continuation, { recursive: true, force: true }));
     assert.ok(!(failed.stdout + failed.stderr).includes(code));
     assert.equal(read(f.client, 'status/status.json'), before);
     assert.equal(existsSync(join(f.client, 'status/radio.key')), false);
@@ -463,10 +469,69 @@ test('a resumed update still refuses a release withdrawn at the prewrite check',
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /withdrawn or identity changed/);
   const after = status(f.client);
-  assert.equal(after.sharing.radio_choice, 'accepted');
-  assert.deepEqual(after.applied_release, current.applied_release);
+  assert.deepEqual(after, current);
   assert.equal(existsSync(join(f.client, f.newSkill)), false);
-  assert.deepEqual(readdirSync(join(f.client, '.update-backup')), []);
+  assert.equal(existsSync(join(f.client, '.update-backup')), false);
+
+  const continuation = result.stderr.match(/--resume-pairing "([^"]+)"/)?.[1];
+  assert.ok(continuation, result.stderr);
+  t.after(() => rmSync(continuation, { recursive: true, force: true }));
+  f.state.withdrawn = false;
+  f.state.pairingRejected = true;
+  const resumed = await f.request({}, ['--resume-pairing', continuation]);
+  assert.equal(resumed.code, 0, resumed.stderr);
+  assert.equal(status(f.client).sharing.radio_choice, 'accepted');
+  assert.equal(status(f.client).applied_release.tag, 'v2.10.0');
+  assert.equal(existsSync(continuation), false);
+});
+
+test('radio opt-in waits at a required edit and resumes without reusing the code', async t => {
+  const f = await publishedUpdateJourney(t, 'codex');
+  const current = status(f.client);
+  current.sharing = { status_signal_enabled: false, radio_choice: 'declined' };
+  put(f.client, 'status/status.json', JSON.stringify(current));
+  put(f.client, 'update/apply.mjs', 'Client edited the updater.');
+  const paused = await f.request({ ORION_PAIRING_CODE: 'BCDF-GHJK-LMNP' }, ['--pair-radio']);
+  const { directory, review } = readRequiredReview(t, paused);
+  assert.deepEqual(status(f.client), current);
+  assert.equal(existsSync(join(f.client, '.update-backup')), false);
+  review.conflicts[0].choice = 'replace';
+  put(directory, 'review.json', JSON.stringify(review));
+  f.state.pairingRejected = true;
+  const resumed = await f.request({}, ['--resolve-required', directory]);
+  assert.equal(resumed.code, 0, resumed.stderr);
+  assert.equal(status(f.client).sharing.radio_choice, 'accepted');
+  assert.equal(status(f.client).applied_release.tag, 'v2.10.0');
+});
+
+test('verified exact no-op records radio opt-in without changing applied identity', async t => {
+  const f = await publishedUpdateJourney(t, 'codex');
+  f.state.listed = [1];
+  const current = status(f.client);
+  current.sharing = { status_signal_enabled: false, radio_choice: 'declined' };
+  current.home = { enabled: true, branch: 'main' };
+  put(f.client, 'status/status.json', JSON.stringify(current));
+  const resumed = await f.request({ ORION_PAIRING_CODE: 'BCDF-GHJK-LMNP' }, ['--pair-radio']);
+  assert.equal(resumed.code, 0, resumed.stderr);
+  assert.match(resumed.stdout, /already applied/);
+  assert.deepEqual(status(f.client).applied_release, current.applied_release);
+  assert.equal(status(f.client).sharing.radio_choice, 'accepted');
+  assert.equal(read(f.client, 'status/radio.key'), f.token + '\n');
+});
+
+test('legacy switch and update share the lock that protects published promotion', t => {
+  const { release, client } = journey(t, 'codex');
+  const commit = git(release, 'rev-parse', 'HEAD');
+  const before = read(client, 'status/status.json');
+  mkdirSync(join(client, '.update-backup', `claim-${process.pid}-fixture`), { recursive: true });
+  for (const args of [['update'], ['switch', '--to', 'claude-code']]) {
+    const result = run(client, 'update/apply.mjs', ...args, '--root', client,
+      '--commit', commit, '--release-repo', release);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /another orion update is running/i);
+    assert.equal(read(client, 'status/status.json'), before);
+    assert.equal(existsSync(join(client, '.claude')), false);
+  }
 });
 
 test('withdrawal or changed publication identity stops before the first harness write', async t => {
@@ -1015,6 +1080,7 @@ function publishCorrection(f, fromVersion) {
   const manifest = JSON.parse(read(f.release, 'update/manifest.json'));
   manifest.template_version = '3.0.0';
   manifest.update_compatibility[0].from_version = fromVersion;
+  manifest.update_compatibility[0].steps = [];
   put(f.release, 'update/manifest.json', JSON.stringify(manifest));
   const pristine = JSON.parse(read(f.release, 'update/pristine.json'));
   pristine.files['skills/next/SKILL.md'] = [createHash('sha256').update('# Next release skill\n').digest('hex')];
@@ -1033,11 +1099,21 @@ test('a client previews and elects backup restoration when a corrected release l
     customizeCandidate({ release, manifest }) {
       put(release, changed, read(release, changed) + '\nPublished change.\n');
       manifest.remove_status_checklist_keys = ['retired_setting', 'later_setting'];
+      manifest.update_compatibility[0].steps = [{
+        from_version: '2.0.0', to_version: '2.10.0',
+        script: 'update/migrations/restore-status.json',
+        changes: [{ path: 'status/status.json', operation: 'replace' }],
+      }];
+      put(release, 'update/migrations/restore-status.json', JSON.stringify([
+        { op: 'replace-text', path: 'status/status.json', find: '"settings":{"first":"old","second":"old"}',
+          replace: '"settings":{"first":"new","second":"new","added":true}' },
+      ]));
     },
   });
   const before = status(f.client);
   before.checklist.retired_setting = true;
   before.checklist.later_setting = true;
+  before.settings = { first: "old", second: "old" };
   put(f.client, 'status/status.json', JSON.stringify(before));
   const originalManifest = read(f.client, 'update/manifest.json');
   const update = await f.request();
@@ -1047,6 +1123,8 @@ test('a client previews and elects backup restoration when a corrected release l
   later.sharing.status_signal_enabled = false;
   later.sharing.radio_choice = 'declined';
   later.checklist.later_setting = false;
+  later.settings.second = "client";
+  later.settings.client_added = true;
   later.notes += '\nWork completed after the update.';
   put(f.client, 'status/status.json', JSON.stringify(later));
   put(f.client, changed, '# Later client instructions\n');
@@ -1071,6 +1149,8 @@ test('a client previews and elects backup restoration when a corrected release l
   assert.ok(plan.remove.includes(f.newSkill));
   assert.ok(plan.restore.includes('update/manifest.json'));
   assert.ok(plan.keep.includes(changed));
+  assert.ok(plan.status_restore.includes("settings.first"));
+  assert.ok(plan.status_keep.includes("settings.second"));
   assert.deepEqual(status(f.client), later);
 
   put(f.client, f.newSkill, '# Later client skill\n');
@@ -1091,6 +1171,7 @@ test('a client previews and elects backup restoration when a corrected release l
   assert.deepEqual(after.applied_release, before.applied_release);
   assert.deepEqual(after.sharing, later.sharing);
   assert.equal(after.checklist.retired_setting, true);
+  assert.deepEqual(after.settings, { first: "old", second: "client", client_added: true });
   assert.equal(after.checklist.later_setting, false);
   assert.match(after.notes, /Work completed after the update/);
   assert.equal(read(f.client, changed), '# Later client instructions\n');

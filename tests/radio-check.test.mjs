@@ -88,7 +88,7 @@ test('parses the directive exactly as the server formats it', () => {
  * status.json it left behind, every call the bridge received, and the skill
  * file it wrote, if any.
  */
-function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, skills = {}, tool = 'claude-code', applied, notices = [] } = {}) {
+function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, skills = {}, tool = 'claude-code', applied, notices = [], acknowledgmentFailure = 503 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'orion-radio-'));
   try {
     mkdirSync(join(dir, 'status'));
@@ -134,7 +134,7 @@ function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, s
         if (path === '/api/bridge/releases') return answer(200, { version: 1, notice: notices[polls - 1] ?? null });
         if (path.startsWith('/api/bridge/releases/') && path.endsWith('/display')) {
           if (calls.filter((call) => call.path.endsWith('/display')).length === 1) {
-            return answer(503, { error: 'Database unavailable' });
+            return answer(${acknowledgmentFailure}, { error: 'Acknowledgment not accepted' });
           }
           return new Response(null, { status: 204 });
         }
@@ -291,6 +291,8 @@ const NOTICE = {
   tag: 'v2.3.0',
   commit: 'c'.repeat(40),
   release_id: 1023,
+  claim_id: '3d784eb4-4939-4d1d-9b64-494dcd764a71',
+  claim_expires_at: '2099-01-01T00:00:00Z',
   summary: 'Your weekly report now includes finished work.',
   notes_url: 'https://github.com/DailyPractice-Ltd/orion-self-install/releases/tag/v2.3.0',
 };
@@ -298,7 +300,7 @@ const NOTICE = {
 test('a release is shown once and acknowledged again when the first acknowledgment fails', () => {
   const { checks, calls, status, receipts } = runRadio(['check'], {
     applied: APPLIED,
-    notices: [NOTICE, NOTICE, {
+    notices: [NOTICE, null, {
       ...NOTICE, tag: 'v2.4.0', version: '2.4.0', release_id: 1024,
       notes_url: NOTICE.notes_url.replace('v2.3.0', 'v2.4.0'),
     }],
@@ -314,9 +316,9 @@ test('a release is shown once and acknowledged again when the first acknowledgme
   assert.deepEqual(calls.filter((call) => call.path === '/api/bridge/releases').map((call) => call.body),
     Array(3).fill({ check_ins_enabled: true, selected_tool: 'claude-code', applied_release: APPLIED }));
   assert.deepEqual(calls.filter((call) => call.path.endsWith('/display')).map((call) => [call.path, call.body]), [
-    ['/api/bridge/releases/1023/display', { kind: 'release' }],
-    ['/api/bridge/releases/1023/display', { kind: 'release' }],
-    ['/api/bridge/releases/1024/display', { kind: 'release' }],
+    ['/api/bridge/releases/1023/display', { kind: 'release', claim_id: NOTICE.claim_id }],
+    ['/api/bridge/releases/1023/display', { kind: 'release', claim_id: NOTICE.claim_id }],
+    ['/api/bridge/releases/1024/display', { kind: 'release', claim_id: NOTICE.claim_id }],
   ]);
   assert.equal(status.template_version, APPLIED.manifest_version);
   assert.deepEqual(status.applied_release, APPLIED);
@@ -363,7 +365,7 @@ test('a withdrawal explains whether the harness applied it without applying or r
     ['currently_applied', withdrawnApplied, /Your harness is running this release/, /restore a backup or move to a corrected release/],
   ]) {
     const notice = { ...identity, kind: 'withdrawal', application };
-    const { checks, calls, status, receipts } = runRadio(['check'], { applied, notices: [notice, notice, NOTICE] });
+    const { checks, calls, status, receipts } = runRadio(['check'], { applied, notices: [notice, null, NOTICE] });
     assert.equal(checks[0].status, 0, checks[0].stderr);
     assert.match(checks[0].stdout, /Orion 2\.3\.0 was withdrawn/);
     assert.match(checks[0].stdout, message);
@@ -375,7 +377,20 @@ test('a withdrawal explains whether the harness applied it without applying or r
     assert.equal(status.template_version, applied.manifest_version);
     assert.deepEqual(status.applied_release, applied);
     assert.deepEqual(calls.filter((call) => call.path.endsWith('/display')).map((call) => call.body),
-      [{ kind: 'withdrawal' }, { kind: 'withdrawal' }]);
+      [{ kind: 'withdrawal', claim_id: NOTICE.claim_id }, { kind: 'withdrawal', claim_id: NOTICE.claim_id }]);
     assert.deepEqual(receipts.map((name) => name.split('-').slice(-2).join('-')), ['withdrawal-1023']);
   }
+});
+
+test('an already displayed notice acknowledges a replacement lease without printing twice', () => {
+  const newClaim = '045dc76b-c17d-4867-bedc-c1f3bf2d8ee7';
+  const { checks, calls } = runRadio(['check'], {
+    applied: APPLIED,
+    notices: [NOTICE, { ...NOTICE, claim_id: newClaim }],
+    acknowledgmentFailure: 409,
+  });
+  assert.match(checks[0].stdout, /Orion 2\.3\.0 is available/);
+  assert.doesNotMatch(checks[1].stdout, /2\.3\.0 is available/);
+  assert.deepEqual(calls.filter((call) => call.path.endsWith('/1023/display')).map((call) => call.body.claim_id),
+    [NOTICE.claim_id, newClaim]);
 });

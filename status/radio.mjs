@@ -310,6 +310,7 @@ function rememberHeard(at) {
 
 const releaseVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const releaseCommit = /^[a-f0-9]{40}$/;
+const releaseClaim = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 const validReleaseId = (id) => Number.isSafeInteger(id) && id > 0;
 const receiptPrefix = `${sharing.harness_id}-`;
 const receiptDirectory = () => safePath(ROOT, 'status/release-notices');
@@ -318,6 +319,8 @@ function releaseNoticeLines(notice, applied) {
   if (typeof notice.version !== 'string' || !releaseVersion.test(notice.version) ||
     typeof notice.commit !== 'string' || notice.tag !== `v${notice.version}` || !releaseCommit.test(notice.commit) ||
     !validReleaseId(notice.release_id) || typeof notice.notes_url !== 'string' ||
+    typeof notice.claim_id !== 'string' || !releaseClaim.test(notice.claim_id) ||
+    typeof notice.claim_expires_at !== 'string' || !(Date.parse(notice.claim_expires_at) > Date.now()) ||
     !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/tag\/v[0-9.]+$/.test(notice.notes_url) ||
     !notice.notes_url.endsWith(`/${notice.tag}`)) return null;
 
@@ -366,15 +369,13 @@ async function showReleaseNotice(notice, lines) {
   }
   const name = `${receiptPrefix}${notice.kind}-${notice.release_id}`;
   const marker = safePath(directory, name);
-  const pending = `${marker}.pending`;
-  const displayed = () => existsSync(marker) || existsSync(pending);
-  if (displayed()) return false;
+  const pending = safePath(directory, `${name}.pending`);
+
   // Make a claim visible before inspecting other claims. A dead process cannot
   // block the next check and a parallel check cannot print the same notice.
   const prefix = `${name}-claim-`;
   const claim = mkdtempSync(join(directory, `${prefix}${process.pid}-`));
   try {
-    if (displayed()) return false;
     for (const entry of readdirSync(directory)) {
       if (!entry.startsWith(prefix) || join(directory, entry) === claim) continue;
       const owner = /^([1-9]\d*)-[\w]+$/.exec(entry.slice(prefix.length));
@@ -387,24 +388,35 @@ async function showReleaseNotice(notice, lines) {
       }
       return false;
     }
-    await new Promise((resolve, reject) => process.stdout.write(
-      `${lines.join('\n')}\n`, (error) => error ? reject(error) : resolve(),
-    ));
+    if (Date.parse(notice.claim_expires_at) <= Date.now()) return false;
+    const alreadyDisplayed = existsSync(marker) || existsSync(pending);
+    if (!alreadyDisplayed) {
+      await new Promise((resolve, reject) => process.stdout.write(
+        `${lines.join('\n')}\n`, (error) => error ? reject(error) : resolve(),
+      ));
+    }
     const receipt = join(claim, 'displayed');
-    writeFileSync(receipt, '', { flag: 'wx', mode: 0o600, flush: true });
+    writeFileSync(receipt, notice.claim_id + '\n', { flag: 'wx', mode: 0o600, flush: true });
     renameSync(receipt, pending);
-    return true;
+    return !alreadyDisplayed;
   } finally {
     rmSync(claim, { recursive: true, force: true });
   }
 }
 
 async function acknowledgeReleaseNotice(kind, id) {
-  const marker = safePath(receiptDirectory(), `${receiptPrefix}${kind}-${id}`);
-  const pending = `${marker}.pending`;
+  const directory = receiptDirectory();
+  const name = `${receiptPrefix}${kind}-${id}`;
+  const marker = safePath(directory, name);
+  const pending = safePath(directory, `${name}.pending`);
   if (!existsSync(pending)) return;
-  const res = await call('POST', `/releases/${id}/display`, { kind }, { optional: true });
-  if (res?.status === 204) renameSync(pending, marker);
+  const claim_id = readFileSync(pending, 'utf8').trim();
+  if (!releaseClaim.test(claim_id)) return;
+  const res = await call('POST', `/releases/${id}/display`, { kind, claim_id }, { optional: true });
+  // A superseded claim cannot be acknowledged, but its local display still
+  // counts if this copy receives another lease for the same notice.
+  if ([204, 409].includes(res?.status) && readFileSync(pending, 'utf8').trim() === claim_id)
+    renameSync(pending, marker);
 }
 
 async function retryReleaseAcknowledgments() {
@@ -442,7 +454,7 @@ async function checkReleaseNotice() {
   if (!lines) return false;
   try {
     const shown = await showReleaseNotice(notice, lines);
-    if (shown) await acknowledgeReleaseNotice(notice.kind, notice.release_id).catch(() => {});
+    await acknowledgeReleaseNotice(notice.kind, notice.release_id).catch(() => {});
     return shown;
   } catch {
     // A local write failure leaves no receipt to acknowledge.

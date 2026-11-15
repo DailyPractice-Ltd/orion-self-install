@@ -3,13 +3,13 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  existsSync,
   lstatSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
-  renameSync,
   rmSync,
-  writeFileSync,
+  rmdirSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -18,12 +18,10 @@ import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import {
   bridgeBase,
-  HARNESS_ID_RE,
+  exchangeRadioCode,
   homeOn,
-  INSTALL_TOKEN_RE,
-  keyHeader,
-  normalizePairingCode,
   pairingCodeProblem,
+  probeReleaseRadio,
   radioKey,
   radioOn,
 } from '../status/shapes.mjs';
@@ -31,6 +29,7 @@ import { safePath } from './destination-resolver.mjs';
 import {
   removeReviewPairing,
   resumeReviewPairing,
+  savePairingContinuation,
 } from './published-conflicts.mjs';
 import {
   createReleaseClient,
@@ -42,12 +41,10 @@ import {
   assertPublishedUpdateNotBlocked,
   preflightWithdrawnUpdate,
   restoreCompletedPublishedUpdate,
-  withUpdateLock,
 } from './published-transaction.mjs';
 
 const statusFile = 'status/status.json';
 const keyFile = 'status/radio.key';
-const networkTimeout = 10000;
 const pairingOffer =
   'Published updates require a working radio so Orion can receive release and withdrawal notices. ' +
   'Turning it on enables the check-ins described in docs/radio.md.';
@@ -65,10 +62,6 @@ function readLocalFile(root, relative, { optional = false } = {}) {
     if (optional && error.code === 'ENOENT') return null;
     throw error;
   }
-}
-
-function sameBytes(first, second) {
-  return first === null ? second === null : first.equals(second);
 }
 
 function openLegacyLayout(root) {
@@ -119,72 +112,22 @@ async function offerPairing(explicit, code) {
   }
 }
 
-function pairingAddress(value) {
-  const url = new URL(value);
-  if (
-    url.protocol !== 'https:' ||
-    url.username ||
-    url.password ||
-    url.hash ||
-    url.search
-  )
-    throw new Error('Invalid radio address.');
-  return url;
-}
-
 async function exchangePairingCode(status, savedKey, code) {
   const problem = pairingCodeProblem(code);
   if (problem) throw new Error(`Update paused. Pairing failed. ${problem}`);
-  if (
-    radioKey(status, { keyFile: savedKey?.toString() }).source === 'environment'
-  ) {
-    throw new Error(
-      'Update paused. Pair from a session without the ORION_INSTALL_TOKEN override.',
-    );
-  }
   const base = bridgeBase();
   try {
-    const origin = pairingAddress(base).origin;
-    const response = await fetch(`${base}/pair`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: normalizePairingCode(code) }),
-      redirect: 'error',
-      signal: AbortSignal.timeout(networkTimeout),
-    });
-    if (!response.ok) throw new Error();
-    const pair = await response.json();
-    const bridgeUrl = (pair?.bridge_url || base).replace(/\/+$/, '');
-    const previousId = status.sharing?.harness_id;
-    if (
-      typeof pair?.install_token !== 'string' ||
-      !INSTALL_TOKEN_RE.test(pair.install_token) ||
-      typeof pair.harness_id !== 'string' ||
-      !HARNESS_ID_RE.test(pair.harness_id) ||
-      (HARNESS_ID_RE.test(previousId || '') &&
-        pair.harness_id !== previousId) ||
-      pairingAddress(bridgeUrl).origin !== origin
-    ) {
-      throw new Error();
-    }
-    const probe = await fetch(`${bridgeUrl}/library`, {
-      method: 'GET',
-      headers: keyHeader({ token: pair.install_token }),
-      redirect: 'error',
-      signal: AbortSignal.timeout(networkTimeout),
-    });
-    if (!probe.ok || !Array.isArray((await probe.json())?.assets))
-      throw new Error();
+    const pair = await exchangeRadioCode(base, code, status.sharing?.harness_id);
     const keyApart = homeOn(status) || savedKey !== null;
     return {
       sharing: {
         ...status.sharing,
         status_signal_enabled: true,
         radio_choice: 'accepted',
-        bridge_url: bridgeUrl,
+        bridge_url: pair.bridge_url,
         harness_id: pair.harness_id,
         install_token: keyApart ? null : pair.install_token,
-        paired_at: new Date().toISOString(),
+        paired_at: pair.paired_at,
       },
       ...(keyApart ? { key_file: pair.install_token } : {}),
     };
@@ -193,50 +136,6 @@ async function exchangePairingCode(status, savedKey, code) {
       'Update paused. Pairing failed or the radio could not be confirmed. ' +
         'Check the connection and ask Daily Practice for a fresh pairing code to continue.',
     );
-  }
-}
-
-function persistPairing(root, status, before, savedKey, pairing) {
-  const statusPath = safePath(root, statusFile);
-  const keyPath = safePath(root, keyFile);
-  // Stage beside the harness files on the same filesystem. This directory
-  // is ignored by home saves, including if the pairing process is interrupted.
-  const privateDir = safePath(root, '.update-backup');
-  const staging = mkdtempSync(join(privateDir, 'radio-pairing-'));
-  try {
-    const nextStatus = join(staging, 'status.json');
-    const nextKey = join(staging, 'radio.key');
-    const priorKey = join(staging, 'previous.key');
-    const privateFile = { mode: 0o600, flag: 'wx' };
-    writeFileSync(
-      nextStatus,
-      JSON.stringify({ ...status, sharing: pairing.sharing }, null, 2) + '\n',
-      privateFile,
-    );
-    if (pairing.key_file) {
-      writeFileSync(nextKey, pairing.key_file + '\n', privateFile);
-      if (savedKey) writeFileSync(priorKey, savedKey, privateFile);
-    }
-    if (
-      !sameBytes(before, readLocalFile(root, statusFile)) ||
-      !sameBytes(savedKey, readLocalFile(root, keyFile, { optional: true }))
-    ) {
-      throw new Error(
-        'The harness radio settings changed during pairing. Check the radio and continue the update.',
-      );
-    }
-    if (pairing.key_file) renameSync(nextKey, keyPath);
-    try {
-      renameSync(nextStatus, statusPath);
-    } catch (error) {
-      if (pairing.key_file) {
-        if (savedKey) renameSync(priorKey, keyPath);
-        else rmSync(keyPath);
-      }
-      throw error;
-    }
-  } finally {
-    rmSync(staging, { recursive: true, force: true });
   }
 }
 
@@ -249,6 +148,7 @@ export async function requestPublishedUpdate({
   migrateTo,
   reviewDir,
   pairRadio = false,
+  resumePairing,
   pairingCode = process.env.ORION_PAIRING_CODE,
 } = {}) {
   root = resolve(root);
@@ -259,30 +159,32 @@ export async function requestPublishedUpdate({
   const status = JSON.parse(before);
   const savedKey = readLocalFile(root, keyFile, { optional: true });
   const client = createReleaseClient({ repository, apiBase, sourceUrl });
-  const needsPairing =
-    pairRadio || !radioOn(status, { keyFile: savedKey?.toString() });
+  if (pairRadio && resumePairing)
+    throw new Error('Choose either a new pairing code or a saved pairing.');
+  const localKey = { keyFile: savedKey?.toString() };
+  const needsPairing = pairRadio || Boolean(resumePairing) || !radioOn(status, localKey);
+  if (needsPairing && radioKey(status, localKey).source === 'environment')
+    throw new Error(
+      'Update paused. Pair from a session without the ORION_INSTALL_TOKEN override.',
+    );
   const legacyMigration = needsPairing && (migrateTo || openLegacyLayout(root));
   const digest = (content) =>
     content && createHash('sha256').update(content).digest('hex');
   const source = realpathSync(root);
+  const requestedTarget = migrateTo && resolve(migrateTo);
   const binding = {
     source,
-    target: resolve(
-      migrateTo ?? join(dirname(source), `${basename(source)}-deployed`),
-    ),
+    target: !legacyMigration ? source : requestedTarget
+      ? join(realpathSync(dirname(requestedTarget)), basename(requestedTarget))
+      : join(dirname(source), `${basename(source)}-deployed`),
     status: digest(before),
     key: digest(savedKey),
   };
   const temporary = mkdtempSync(join(tmpdir(), 'orion-update-source-'));
   const checkout = join(temporary, 'source');
-  let migrationPairing;
-  function stageMigrationPairing(pairing) {
-    migrationPairing = join(temporary, 'migration-pairing.json');
-    writeFileSync(migrationPairing, JSON.stringify({ ...pairing, binding }), {
-      mode: 0o600,
-      flag: 'wx',
-    });
-  }
+  let continuation;
+  let stagedPairing;
+  let result;
   try {
     let pin;
     const pinCandidate = async () =>
@@ -297,12 +199,14 @@ export async function requestPublishedUpdate({
       pin = await pinCandidate();
       await preflightWithdrawnUpdate({ root, checkout, pin, client });
     }
-    const savedPairing =
-      reviewDir && legacyMigration && !pairRadio
-        ? resumeReviewPairing(resolve(reviewDir), binding)
-        : null;
-    if (savedPairing) stageMigrationPairing(savedPairing);
-    else if (needsPairing) {
+    const savedFrom = resumePairing ?? (needsPairing && !pairRadio ? reviewDir : null);
+    if (savedFrom) {
+      continuation = resolve(savedFrom);
+      stagedPairing = resumeReviewPairing(continuation, binding);
+      if (resumePairing && !stagedPairing)
+        throw new Error('No saved radio pairing found in that folder.');
+    }
+    if (needsPairing && !stagedPairing) {
       const code = await offerPairing(pairRadio, pairingCode);
       if (code === null) {
         console.error('Update paused. Your radio choice was kept.');
@@ -310,21 +214,22 @@ export async function requestPublishedUpdate({
       }
       assertPublishedUpdateNotBlocked(root, { includePending: true });
       const pairing = await exchangePairingCode(status, savedKey, code);
-      if (legacyMigration) {
-        // Pairing for a same-folder migration is promoted only to the new harness.
-        stageMigrationPairing(pairing);
-      } else {
-        withUpdateLock(root, () => {
-          assertPublishedUpdateNotBlocked(root, { includePending: true });
-          persistPairing(root, status, before, savedKey, pairing);
-        });
+      continuation = savePairingContinuation({ ...pairing, binding });
+      stagedPairing = resumeReviewPairing(continuation, binding);
+    }
+    if (stagedPairing) {
+      const { sharing, key_file } = stagedPairing.record;
+      try {
+        await probeReleaseRadio(sharing.bridge_url, { token: key_file ?? sharing.install_token }, bridgeBase());
+      } catch {
+        throw new Error('Update paused. The pairing succeeded, but the radio could not be confirmed.');
       }
       console.error('Radio pairing confirmed. Continuing your update.');
     }
     pin ??= await pinCandidate();
     const env = { ...process.env };
     delete env.ORION_PAIRING_CODE;
-    const result = await new Promise((complete, reject) => {
+    result = await new Promise((complete, reject) => {
       const updater = spawn(
         process.execPath,
         [
@@ -347,8 +252,8 @@ export async function requestPublishedUpdate({
           client.sourceUrl,
           ...(migrateTo ? ['--migrate-to', resolve(migrateTo)] : []),
           ...(reviewDir ? ['--resolve-required', resolve(reviewDir)] : []),
-          ...(migrationPairing
-            ? ['--migration-pairing', migrationPairing]
+          ...(stagedPairing
+            ? ['--staged-pairing', stagedPairing.path]
             : []),
         ],
         { stdio: 'inherit', env },
@@ -356,9 +261,18 @@ export async function requestPublishedUpdate({
       updater.once('error', reject);
       updater.once('close', (code) => complete(code ?? 2));
     });
-    if (result === 0 && savedPairing) removeReviewPairing(resolve(reviewDir));
     return result;
   } finally {
+    if (stagedPairing) {
+      if (result === 0) removeReviewPairing(continuation);
+      if (!existsSync(stagedPairing.path)) {
+        if (/^orion-radio-pairing-[\w]+$/.test(basename(continuation))) {
+          try { rmdirSync(continuation); } catch { /* Keep other files. */ }
+        }
+      } else if (!reviewDir || resolve(reviewDir) !== continuation) {
+        console.error(`Radio pairing is saved privately. Retry the update with --resume-pairing "${continuation}".`);
+      }
+    }
     rmSync(temporary, { recursive: true, force: true });
   }
 }
@@ -383,7 +297,7 @@ if (
     };
     if (process.argv.includes('--restore-backup')) {
       if (
-        ['--tag', '--pair-radio', '--migrate-to', '--resolve-required'].some(
+        ['--tag', '--pair-radio', '--resume-pairing', '--migrate-to', '--resolve-required'].some(
           (flag) => process.argv.includes(flag),
         )
       )
@@ -406,12 +320,16 @@ if (
         throw new Error(
           'Specify --restore-backup when confirming restoration.',
         );
+      const resumePairing = arg('--resume-pairing');
+      if (process.argv.includes('--resume-pairing') && !resumePairing)
+        throw new Error('--resume-pairing requires the private pairing folder.');
       process.exitCode = await requestPublishedUpdate({
         ...options,
         tag,
         migrateTo: arg('--migrate-to'),
         reviewDir: arg('--resolve-required'),
         pairRadio: process.argv.includes('--pair-radio'),
+        resumePairing,
       });
     }
   } catch (error) {

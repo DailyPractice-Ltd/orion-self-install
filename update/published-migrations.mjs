@@ -202,6 +202,8 @@ export function preflightSteps(checkout, path, version) {
   return steps;
 }
 
+class TextFragmentConflict extends Error {}
+
 function updatedValue(current, instruction, defaults) {
   const { path, op } = instruction;
   if (op === 'remove') return null;
@@ -217,7 +219,9 @@ function updatedValue(current, instruction, defaults) {
       index < 0 ||
       text.indexOf(instruction.find, index + 1) >= 0
     )
-      throw new Error(`Migration needs one matching text fragment: ${path}`);
+      throw new TextFragmentConflict(
+        `Migration needs one matching text fragment: ${path}`,
+      );
     return {
       bytes: Buffer.from(
         text.slice(0, index) +
@@ -248,10 +252,11 @@ function updatedValue(current, instruction, defaults) {
   return { bytes: Buffer.from(JSON.stringify(next, null, 2) + '\n'), mode };
 }
 
-export function runSteps({ steps, read, defaults }) {
+export function runSteps({ steps, read, defaults, reviewable = new Set() }) {
   const files = new Map();
   const original = new Map();
   const migrations = [];
+  const blocked = new Map();
   const spellings = new Map();
   for (const { step, changes, program } of steps) {
     const before = new Map();
@@ -261,10 +266,23 @@ export function runSteps({ steps, read, defaults }) {
       if (spellings.has(key) && spellings.get(key) !== path)
         throw new Error(`Inconsistent migration path spelling: ${path}`);
       spellings.set(key, path);
+      if (blocked.has(path)) continue;
       if (!original.has(path)) original.set(path, read(path));
       const current = files.has(path) ? files.get(path) : original.get(path);
       if (!before.has(path)) before.set(path, current);
-      files.set(path, updatedValue(current, instruction, defaults));
+      try {
+        files.set(path, updatedValue(current, instruction, defaults));
+      } catch (error) {
+        if (
+          !(error instanceof TextFragmentConflict) ||
+          !reviewable.has(path) ||
+          changes.get(key).operation !== 'replace'
+        )
+          throw error;
+        blocked.set(path, error);
+        files.delete(path);
+        before.delete(path);
+      }
     }
     const changed = [];
     for (const [path, prior] of before) {
@@ -301,5 +319,10 @@ export function runSteps({ steps, read, defaults }) {
   for (const [path, value] of files) {
     if (isDeepStrictEqual(original.get(path), value)) files.delete(path);
   }
-  return { files, migrations, original };
+  for (const migration of migrations) {
+    migration.changed = migration.changed.filter(
+      ({ path }) => !blocked.has(path),
+    );
+  }
+  return { files, migrations, original, blocked };
 }

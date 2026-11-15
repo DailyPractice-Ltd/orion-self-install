@@ -518,20 +518,172 @@ test('a staged syntax failure writes nothing to the harness', async t => {
   assert.equal(existsSync(join(f.client, '.update-backup')), false);
 });
 
-test('a required destination with a local edit blocks the update before writes', async t => {
-  const f = await publishedUpdateJourney(t, 'codex');
-  git(f.release, 'checkout', '-q', '--detach', f.commit);
-  put(f.release, 'update/apply.mjs', read(f.release, 'update/apply.mjs') + '\n// Required change\n');
-  git(f.release, 'add', '.');
-  git(f.release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'required updater change');
-  git(f.release, 'tag', '-f', 'v2.10.0');
-  const before = status(f.client);
-  put(f.client, 'update/apply.mjs', 'Client customized updater\n');
-  const failed = await f.request();
-  assert.notEqual(failed.code, 0);
-  assert.match(failed.stderr, /Required update is blocked by a local edit: update\/apply\.mjs/);
-  assert.deepEqual(status(f.client), before);
-  assert.equal(read(f.client, 'update/apply.mjs'), 'Client customized updater\n');
+function readRequiredReview(t, result) {
+  const directory = result.stderr.match(/^Private review folder: (.+)$/m)?.[1];
+  assert.ok(directory, result.stderr);
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  return { directory, review: JSON.parse(read(directory, 'review.json')) };
+}
+
+test('a required updater edit can be deferred, then replaced after reviewing all three versions', async t => {
+  const destination = 'update/apply.mjs';
+  const privateEdit = 'Local notes containing a private credential\n';
+  const f = await publishedUpdateJourney(t, 'codex', {
+    customizeCandidate({ release }) {
+      put(release, destination, read(release, destination) + '\n// Required change\n');
+    },
+  });
+  const before = read(f.client, 'status/status.json');
+  put(f.client, destination, privateEdit);
+  const deferred = await f.request();
+  assert.notEqual(deferred.code, 0);
+  assert.match(deferred.stderr, /Required update is blocked by a local edit: update\/apply\.mjs/);
+  assert.ok(!(deferred.stdout + deferred.stderr).includes(privateEdit.trim()));
+  assert.ok(!(deferred.stdout + deferred.stderr).includes(f.token));
+  assert.equal(read(f.client, 'status/status.json'), before);
+  assert.equal(read(f.client, destination), privateEdit);
+  assert.equal(existsSync(join(f.client, '.update-backup')), false);
+
+  const { directory, review } = readRequiredReview(t, deferred);
+  assert.equal(statSync(directory).mode & 0o777, 0o700);
+  const [conflict] = review.conflicts;
+  assert.equal(conflict.destination, destination);
+  assert.equal(conflict.choice, null);
+  assert.equal(read(directory, conflict.prior), git(f.release, 'show', 'v2.0.0:' + destination) + '\n');
+  assert.equal(read(directory, conflict.edited), privateEdit);
+  assert.equal(statSync(join(directory, conflict.edited)).mode & 0o777, 0o600);
+  assert.match(read(directory, conflict.incoming), /Required change/);
+
+  conflict.choice = 'replace';
+  put(directory, 'review.json', JSON.stringify(review));
+  const continued = await f.request({}, ['--resolve-required', directory]);
+  assert.equal(continued.code, 0, continued.stderr);
+  const report = JSON.parse(continued.stdout);
+  assert.deepEqual(report.resolved_required, [{ destination, choice: 'replace' }]);
+  assert.equal(read(f.client, destination), read(directory, conflict.incoming));
+  assert.equal(read(f.client, `${report.backup}/files/${destination}`), privateEdit);
+  assert.equal(read(f.client, f.edit), '# Client-edited skill\n');
+  assert.ok(report.kept.includes(f.edit));
+  assert.equal(status(f.client).applied_release.commit, f.commit);
+});
+
+test('a reviewed required merge retains the local text and must pass update smoke checks', async t => {
+  const f = await publishedUpdateJourney(t, 'claude-code', {
+    customizeCandidate({ manifest }) {
+      manifest.update_compatibility[0].required_destinations.push('.claude/skills/hire-agent/SKILL.md');
+    },
+  });
+  const before = read(f.client, 'status/status.json');
+  const first = await f.request();
+  const { directory, review } = readRequiredReview(t, first);
+  const [conflict] = review.conflicts;
+  assert.equal(conflict.destination, f.edit);
+  const merged = '# Changed upstream\n\nClient-edited skill\n';
+  conflict.choice = 'merge';
+  put(directory, conflict.merged, merged);
+  put(directory, 'review.json', JSON.stringify(review));
+
+  const failing = await f.request({ ORION_UPDATE_SMOKE_FAIL: '1' }, ['--resolve-required', directory]);
+  assert.match(failing.stderr, /prior release was restored/);
+  assert.equal(read(f.client, f.edit), '# Client-edited skill\n');
+  assert.equal(read(f.client, 'status/status.json'), before);
+
+  const resumed = await f.request({}, ['--resolve-required', directory]);
+  assert.equal(resumed.code, 0, resumed.stderr);
+  const report = JSON.parse(resumed.stdout);
+  assert.deepEqual(report.resolved_required, [{ destination: f.edit, choice: 'merge' }]);
+  assert.equal(read(f.client, f.edit), merged);
+  assert.equal(read(f.client, `${report.backup}/files/${f.edit}`), '# Client-edited skill\n');
+  assert.equal(status(f.client).applied_release.commit, f.commit);
+});
+
+test('a failed declared text migration for an edited required file can be resolved by review', async t => {
+  const f = await publishedUpdateJourney(t, 'codex', {
+    customizeCandidate({ release, manifest }) {
+      const destination = '.agents/skills/hire-agent/SKILL.md';
+      const script = 'update/migrations/skill-text.json';
+      manifest.update_compatibility[0].required_destinations.push(destination);
+      manifest.update_compatibility[0].steps = [{
+        from_version: '2.0.0', to_version: '2.10.0', script,
+        changes: [{ path: destination, operation: 'replace' }],
+      }];
+      put(release, script, JSON.stringify([{
+        op: 'replace-text', path: destination,
+        find: 'A heading the client replaced', replace: '# Changed upstream',
+      }]));
+    },
+  });
+  const deferred = await f.request();
+  const { directory, review } = readRequiredReview(t, deferred);
+  const [conflict] = review.conflicts;
+  assert.equal(conflict.destination, f.edit);
+  assert.equal(read(f.client, f.edit), '# Client-edited skill\n');
+  assert.equal(existsSync(join(f.client, '.update-backup')), false);
+
+  conflict.choice = 'replace';
+  put(directory, 'review.json', JSON.stringify(review));
+  const continued = await f.request({}, ['--resolve-required', directory]);
+  assert.equal(continued.code, 0, continued.stderr);
+  assert.equal(read(f.client, f.edit), '# Changed upstream\n');
+  assert.equal(status(f.client).applied_release.commit, f.commit);
+});
+
+test('an approved required-edit review cannot be reused after the local bytes or publication change', async t => {
+  const f = await publishedUpdateJourney(t, 'codex', {
+    customizeCandidate({ manifest }) {
+      manifest.update_compatibility[0].required_destinations.push('.agents/skills/hire-agent/SKILL.md');
+    },
+  });
+  const before = read(f.client, 'status/status.json');
+  const first = readRequiredReview(t, await f.request());
+  first.review.conflicts[0].choice = 'replace';
+  put(first.directory, 'review.json', JSON.stringify(first.review));
+
+  put(f.client, f.edit, 'Changed after review\n');
+  const changed = await f.request({}, ['--resolve-required', first.directory]);
+  assert.notEqual(changed.code, 0);
+  assert.match(changed.stderr, /earlier review is stale/);
+  const refreshed = readRequiredReview(t, changed);
+  assert.equal(refreshed.review.conflicts[0].choice, null);
+  assert.equal(read(refreshed.directory, refreshed.review.conflicts[0].edited), 'Changed after review\n');
+  assert.equal(read(f.client, 'status/status.json'), before);
+  assert.equal(read(f.client, f.edit), 'Changed after review\n');
+
+  refreshed.review.conflicts[0].choice = 'replace';
+  put(refreshed.directory, 'review.json', JSON.stringify(refreshed.review));
+  put(refreshed.directory, refreshed.review.conflicts[0].incoming, 'A different incoming copy\n');
+  const tampered = await f.request({}, ['--resolve-required', refreshed.directory]);
+  assert.notEqual(tampered.code, 0);
+  assert.match(tampered.stderr, /earlier review is stale/);
+  const reviewed = readRequiredReview(t, tampered);
+  assert.equal(read(reviewed.directory, reviewed.review.conflicts[0].incoming), '# Changed upstream\n');
+  reviewed.review.conflicts[0].choice = 'replace';
+  put(reviewed.directory, 'review.json', JSON.stringify(reviewed.review));
+  f.state.replacementId = 5;
+  const republished = await f.request({}, ['--resolve-required', reviewed.directory]);
+  assert.notEqual(republished.code, 0);
+  assert.match(republished.stderr, /earlier review is stale/);
+  assert.equal(readRequiredReview(t, republished).review.pin.release_id, 5);
+  assert.equal(read(f.client, 'status/status.json'), before);
+  assert.equal(read(f.client, f.edit), 'Changed after review\n');
+  assert.equal(existsSync(join(f.client, f.newSkill)), false);
+  assert.equal(existsSync(join(f.client, '.update-backup')), false);
+});
+
+test('a moved historical tag stops a required-edit review without using local or current release files as the prior version', async t => {
+  const f = await publishedUpdateJourney(t, 'codex', {
+    customizeCandidate({ manifest }) {
+      manifest.update_compatibility[0].required_destinations.push('.agents/skills/hire-agent/SKILL.md');
+    },
+  });
+  git(f.release, 'tag', '-f', 'v2.0.0', f.commit);
+  const before = read(f.client, 'status/status.json');
+  const stopped = await f.request();
+  assert.notEqual(stopped.code, 0);
+  assert.match(stopped.stderr, /cannot verify the exact prior shipped release/i);
+  assert.doesNotMatch(stopped.stderr, /Private review folder/);
+  assert.equal(read(f.client, f.edit), '# Client-edited skill\n');
+  assert.equal(read(f.client, 'status/status.json'), before);
   assert.equal(existsSync(join(f.client, '.update-backup')), false);
 });
 
@@ -714,6 +866,44 @@ test('missing or ambiguous migration declarations and undeclared writes leave th
     assert.equal(existsSync(join(f.client, 'agent/other.txt')), false);
     assert.equal(existsSync(join(f.client, '.update-backup')), false);
   }
+});
+
+test('a separately migrating client can continue a required-edit review after their single radio opt-in', async t => {
+  const f = await publishedUpdateJourney(t, 'claude-code', { legacy: true });
+  const legacy = status(f.client);
+  legacy.sharing = { status_signal_enabled: false, radio_choice: 'declined' };
+  put(f.client, 'status/status.json', JSON.stringify(legacy));
+  const before = read(f.client, 'status/status.json');
+  const destination = join(dirname(f.client), 'new-deployed');
+  const path = 'status/shapes.mjs';
+  put(f.client, path, 'My prior updater edits\n');
+  f.state.listed = [1];
+  const paused = await f.request({ ORION_PAIRING_CODE: 'BCDF-GHJK-LMNP' }, [
+    '--pair-radio', '--migrate-to', destination,
+  ]);
+  const { directory, review } = readRequiredReview(t, paused);
+  const [conflict] = review.conflicts;
+  assert.equal(conflict.destination, path);
+  assert.equal(read(directory, conflict.prior), git(f.release, 'show', 'v1.5.0:' + path) + '\n');
+  for (const displayed of ['prior', 'edited', 'incoming']) {
+    assert.ok(!read(directory, conflict[displayed]).includes(f.token));
+  }
+  assert.ok(!(paused.stdout + paused.stderr).includes(f.token));
+  assert.ok(!read(directory, 'review.json').includes(f.token));
+  assert.equal(existsSync(destination), false);
+  assert.equal(read(f.client, 'status/status.json'), before);
+  assert.equal(existsSync(join(f.client, '.update-backup')), false);
+
+  conflict.choice = 'replace';
+  put(directory, 'review.json', JSON.stringify(review));
+  f.state.pairingRejected = true;
+  const resumed = await f.request({}, ['--resolve-required', directory, '--migrate-to', destination]);
+  assert.equal(resumed.code, 0, resumed.stderr);
+  assert.ok(!(resumed.stdout + resumed.stderr).includes(f.token));
+  assert.equal(read(f.client, 'status/status.json'), before);
+  assert.equal(read(f.client, path), 'My prior updater edits\n');
+  assert.equal(status(destination).sharing.radio_choice, 'accepted');
+  assert.equal(status(destination).applied_release.tag, 'v2.0.0');
 });
 
 test('a claimed legacy version without its historical layout and pinned anchors stops at clean-install guidance', async t => {

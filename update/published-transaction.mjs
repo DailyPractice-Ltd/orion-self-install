@@ -34,6 +34,10 @@ import {
 } from './destination-resolver.mjs';
 import { compareVersions, verifyPinnedRelease } from './published-release.mjs';
 import {
+  historicalFiles,
+  reviewRequiredEdits,
+} from './published-conflicts.mjs';
+import {
   keyHeader,
   radioKey,
   radioOn,
@@ -169,7 +173,7 @@ function syntaxCheck(path, displayPath) {
   });
   if (result.status !== 0)
     throw new Error(
-      `Invalid script ${displayPath}: ${result.stderr?.trim() || result.error?.message}`,
+      `Invalid script ${displayPath}. Check it locally for syntax errors.`,
     );
 }
 
@@ -205,7 +209,7 @@ function updatePath({ root, checkout, manifest, path }) {
   };
 }
 
-function planUpdate({
+async function planUpdate({
   root,
   checkout,
   manifest,
@@ -214,13 +218,19 @@ function planUpdate({
   backfill,
   pairing,
   declared,
+  review,
 }) {
   const tool = path.tool;
   const { entries, deployed, steps } = declared;
-  const { files, migrations, original } = runSteps({
+  const required = new Set(path.required_destinations);
+  const immutableSources = new Set(
+    manifest.deployment.immutable_update_sources,
+  );
+  const { files, migrations, original, blocked } = runSteps({
     steps,
     read: (destination) => file(safePath(root, destination)),
     defaults: json(safePath(checkout, 'status/status.schema-template.json')),
+    reviewable: backfill ? undefined : required,
   });
   let nextStatus = files.get(statusFile);
   files.delete(statusFile);
@@ -231,7 +241,8 @@ function planUpdate({
     status.sharing = pairing.sharing;
     nextStatus = { ...nextStatus, bytes: Buffer.from(serialized(status)) };
   }
-  const required = new Set(path.required_destinations);
+  const conflicts = [];
+  let historical;
   const pristine = json(join(checkout, 'update/pristine.json'));
   const actions = [];
   const identityFiles = [];
@@ -314,9 +325,24 @@ function planUpdate({
       const migrated = files.get(destination);
       if (!migrated)
         throw new Error(`Migration retired deployed file: ${destination}`);
-      stageAction(destination, original.get(destination), migrated);
       files.delete(destination);
-      continue;
+      if (
+        !immutableSources.has(source) ||
+        migrated.bytes.equals(incoming.bytes)
+      ) {
+        stageAction(destination, original.get(destination), migrated);
+        continue;
+      }
+      if (!required.has(destination))
+        throw new Error(
+          `Migration changed immutable release source: ${destination}`,
+        );
+      // A migration cannot substitute other bytes for a pinned update control file.
+      for (const migration of migrations) {
+        migration.changed = migration.changed.filter(
+          (change) => change.path !== destination,
+        );
+      }
     }
     const state = destinationState(root, entry, pristine);
     if (state === 'client-owned') {
@@ -333,12 +359,26 @@ function planUpdate({
         `Deployment destination is not a regular file: ${destination}`,
       );
     const prior = file(installed);
-    if (fingerprint(prior.bytes) === fingerprint(incoming.bytes)) continue;
-    if (state === 'preserve') {
-      if (required.has(destination))
-        throw new Error(
-          `Required update is blocked by a local edit: ${destination}`,
-        );
+    const sameContents = (first, second) =>
+      immutableSources.has(source)
+        ? first.equals(second)
+        : fingerprint(first) === fingerprint(second);
+    if (sameContents(prior.bytes, incoming.bytes)) continue;
+    if (required.has(destination)) {
+      historical ??= await historicalFiles({ ...review, path, stage, file });
+      const shipped = historical.at(destination);
+      if (!shipped || !sameContents(shipped.bytes, prior.bytes)) {
+        conflicts.push({
+          destination,
+          prior: shipped,
+          installed: prior,
+          incoming,
+          replaceOnly: immutableSources.has(source),
+        });
+        continue;
+      }
+      if (blocked.has(destination)) throw blocked.get(destination);
+    } else if (state === 'preserve') {
       report.kept.push(destination);
       continue;
     }
@@ -403,6 +443,17 @@ function planUpdate({
       bytes: Buffer.from(`${pairing.key_file}\n`),
       mode: 0o600,
     });
+  }
+
+  const resolutions = reviewRequiredEdits({
+    ...review,
+    path,
+    historical,
+    conflicts,
+  });
+  for (const { destination, choice, installed, result } of resolutions) {
+    stageAction(destination, installed, result);
+    (report.resolved_required ??= []).push({ destination, choice });
   }
 
   const stagedPaths = new Set(
@@ -901,6 +952,7 @@ async function applySeparateMigration({
   migrateTo,
   pairing,
   declared,
+  review,
 }) {
   const target = separateTarget(root, migrateTo);
   const destination = stageSeparateHarness(root, target);
@@ -919,7 +971,7 @@ async function applySeparateMigration({
       throw new Error(
         'Original harness status changed during migration preflight.',
       );
-    const plan = planUpdate({
+    const plan = await planUpdate({
       root: destination,
       checkout,
       manifest,
@@ -927,6 +979,7 @@ async function applySeparateMigration({
       stage,
       pairing,
       declared,
+      review: { ...review, pairing },
     });
     if (!plan.nextStatus)
       throw new Error('Separate migration must declare its status changes.');
@@ -1081,12 +1134,17 @@ export async function applyPublishedUpdate({
   pin,
   migrateTo,
   migrationPairing,
+  reviewDir,
 }) {
   root = realpathSync(requireDeployedRoot(root));
   requireReleasePin(pin);
   assertPublishedUpdateNotBlocked(root);
   const pending = pendingTransactions(root);
   if (pending.length) {
+    if (reviewDir)
+      throw new Error(
+        'Recover the interrupted update before resolving a required edit.',
+      );
     const requireOriginalSource = ({ backup, journal }) => {
       if (
         journal.state === 'recovery-required' ||
@@ -1151,6 +1209,10 @@ export async function applyPublishedUpdate({
   if (order < 0)
     throw new Error(`Refusing downgrade from ${priorTag} to ${pin.tag}.`);
   if (order === 0 && previous) {
+    if (reviewDir)
+      throw new Error(
+        'This required-edit review is stale. Request the update again.',
+      );
     await requireWorkingRadio(root, status);
     await verifyPinnedRelease(client, pin, checkout);
     if (
@@ -1201,8 +1263,17 @@ export async function applyPublishedUpdate({
       pairing?.key_file,
     );
     const declared = updatePath({ root, checkout, manifest, path });
+    await verifyPinnedRelease(client, pin, checkout);
+    const review = {
+      root,
+      pin,
+      client,
+      previous,
+      priorStatus,
+      reviewDir,
+      migrateTo,
+    };
     if (changingFolder) {
-      await verifyPinnedRelease(client, pin, checkout);
       return await applySeparateMigration({
         root,
         priorStatus,
@@ -1215,9 +1286,10 @@ export async function applyPublishedUpdate({
         migrateTo,
         pairing,
         declared,
+        review,
       });
     }
-    const plan = planUpdate({
+    const plan = await planUpdate({
       root,
       checkout,
       manifest,
@@ -1225,6 +1297,7 @@ export async function applyPublishedUpdate({
       stage,
       backfill: order === 0,
       declared,
+      review,
     });
     await verifyPinnedRelease(client, pin, checkout);
     return withUpdateLock(root, () => {

@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 /** Deployed entry point. Pairing is separate from the pinned release update. */
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   lstatSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +28,10 @@ import {
   radioOn,
 } from '../status/shapes.mjs';
 import { safePath } from './destination-resolver.mjs';
+import {
+  removeReviewPairing,
+  resumeReviewPairing,
+} from './published-conflicts.mjs';
 import {
   createReleaseClient,
   discoverRelease,
@@ -74,9 +80,7 @@ function openLegacyLayout(root) {
 async function offerPairing(explicit, code) {
   if (!process.stdin.isTTY || !process.stderr.isTTY) {
     if (!explicit)
-      throw new Error(
-        `Update paused. ${pairingOffer}\n${pairingContinuation}`,
-      );
+      throw new Error(`Update paused. ${pairingOffer}\n${pairingContinuation}`);
     return code;
   }
   console.error(pairingOffer);
@@ -129,8 +133,7 @@ async function exchangePairingCode(status, savedKey, code) {
   const problem = pairingCodeProblem(code);
   if (problem) throw new Error(`Update paused. Pairing failed. ${problem}`);
   if (
-    radioKey(status, { keyFile: savedKey?.toString() }).source ===
-    'environment'
+    radioKey(status, { keyFile: savedKey?.toString() }).source === 'environment'
   ) {
     throw new Error(
       'Update paused. Pair from a session without the ORION_INSTALL_TOKEN override.',
@@ -204,8 +207,7 @@ function persistPairing(root, status, before, savedKey, pairing) {
     const privateFile = { mode: 0o600, flag: 'wx' };
     writeFileSync(
       nextStatus,
-      JSON.stringify({ ...status, sharing: pairing.sharing }, null, 2) +
-        '\n',
+      JSON.stringify({ ...status, sharing: pairing.sharing }, null, 2) + '\n',
       privateFile,
     );
     if (pairing.key_file) {
@@ -242,6 +244,7 @@ export async function requestPublishedUpdate({
   sourceUrl,
   tag,
   migrateTo,
+  reviewDir,
   pairRadio = false,
   pairingCode = process.env.ORION_PAIRING_CODE,
 } = {}) {
@@ -253,26 +256,47 @@ export async function requestPublishedUpdate({
   const status = JSON.parse(before);
   const savedKey = readLocalFile(root, keyFile, { optional: true });
   const client = createReleaseClient({ repository, apiBase, sourceUrl });
+  const needsPairing =
+    pairRadio || !radioOn(status, { keyFile: savedKey?.toString() });
+  const legacyMigration = needsPairing && (migrateTo || openLegacyLayout(root));
+  const digest = (content) =>
+    content && createHash('sha256').update(content).digest('hex');
+  const source = realpathSync(root);
+  const binding = {
+    source,
+    target: resolve(
+      migrateTo ?? join(dirname(source), `${basename(source)}-deployed`),
+    ),
+    status: digest(before),
+    key: digest(savedKey),
+  };
   const temporary = mkdtempSync(join(tmpdir(), 'orion-update-source-'));
   const checkout = join(temporary, 'source');
   let migrationPairing;
+  function stageMigrationPairing(pairing) {
+    migrationPairing = join(temporary, 'migration-pairing.json');
+    writeFileSync(migrationPairing, JSON.stringify({ ...pairing, binding }), {
+      mode: 0o600,
+      flag: 'wx',
+    });
+  }
   try {
-    if (pairRadio || !radioOn(status, { keyFile: savedKey?.toString() })) {
+    const savedPairing =
+      reviewDir && legacyMigration && !pairRadio
+        ? resumeReviewPairing(resolve(reviewDir), binding)
+        : null;
+    if (savedPairing) stageMigrationPairing(savedPairing);
+    else if (needsPairing) {
       const code = await offerPairing(pairRadio, pairingCode);
       if (code === null) {
         console.error('Update paused. Your radio choice was kept.');
         return 2;
       }
-      const legacyMigration = migrateTo || openLegacyLayout(root);
       assertPublishedUpdateNotBlocked(root, { includePending: true });
       const pairing = await exchangePairingCode(status, savedKey, code);
       if (legacyMigration) {
         // Pairing for a same-folder migration is promoted only to the new harness.
-        migrationPairing = join(temporary, 'migration-pairing.json');
-        writeFileSync(migrationPairing, JSON.stringify(pairing), {
-          mode: 0o600,
-          flag: 'wx',
-        });
+        stageMigrationPairing(pairing);
       } else {
         withUpdateLock(root, () => {
           assertPublishedUpdateNotBlocked(root, { includePending: true });
@@ -288,7 +312,7 @@ export async function requestPublishedUpdate({
     );
     const env = { ...process.env };
     delete env.ORION_PAIRING_CODE;
-    return await new Promise((complete, reject) => {
+    const result = await new Promise((complete, reject) => {
       const updater = spawn(
         process.execPath,
         [
@@ -310,6 +334,7 @@ export async function requestPublishedUpdate({
           '--source-url',
           client.sourceUrl,
           ...(migrateTo ? ['--migrate-to', resolve(migrateTo)] : []),
+          ...(reviewDir ? ['--resolve-required', resolve(reviewDir)] : []),
           ...(migrationPairing
             ? ['--migration-pairing', migrationPairing]
             : []),
@@ -319,6 +344,8 @@ export async function requestPublishedUpdate({
       updater.once('error', reject);
       updater.once('close', (code) => complete(code ?? 2));
     });
+    if (result === 0 && savedPairing) removeReviewPairing(resolve(reviewDir));
+    return result;
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }
@@ -342,6 +369,7 @@ if (
       sourceUrl: arg('--source-url'),
       tag,
       migrateTo: arg('--migrate-to'),
+      reviewDir: arg('--resolve-required'),
       pairRadio: process.argv.includes('--pair-radio'),
     });
   } catch (error) {

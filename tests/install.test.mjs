@@ -20,9 +20,10 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(JSON.parse(read('status/status.json')).selected_tool, tool);
     assert.ok(existsSync(join(target, 'AGENTS.md')));
     const skillRoot = tool === 'codex' ? '.agents/skills' : '.claude/skills';
-    for (const name of ['prospecting', 'call-planner', 'friday-report', 'memory-consolidation']) {
+    for (const name of ['prospecting', 'call-planner', 'friday-report', 'memory-consolidation', 'prospect-research-outreach', 'post-call-debrief']) {
       assert.ok(existsSync(join(target, skillRoot, name, 'SKILL.md')));
     }
+    assert.equal(existsSync(join(target, 'library')), false);
     assert.equal(existsSync(join(target, skillRoot, 'hire-agent')), false);
     assert.equal(existsSync(join(target, skillRoot, 'report-bug')), false);
     assert.equal(existsSync(join(target, tool === 'codex' ? 'agents' : '.claude/agents')), false);

@@ -164,7 +164,7 @@ you're never asked again.
   radio entirely — every message in the table above, all three tiers, outbound and
   inbound alike.
 
-**What changes when the radio is off: nothing else.** Every agent, package, workflow,
+**What changes when the radio is off: nothing else.** Every agent, skill, program,
 and validation task works identically. The only difference is that Daily Practice can't
 see your system running — so if you want help, you reach out first
 (support@dailypractice.world).

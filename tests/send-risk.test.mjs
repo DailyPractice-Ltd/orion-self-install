@@ -498,10 +498,19 @@ test('tripwire: every template carries the words migrate writes into a kept file
   for (const [where, oldWords, newWords] of RETIRED) {
     if (where.endsWith('*.md') || !existsSync(join(ROOT, where)) ||
         ['AGENTS.md', 'agent/adapters/claude-code.md', 'agent/adapters/codex.md'].includes(where)) continue;
+    // Migration still patches older customized prompts in place. Fresh prompts
+    // route these task bodies to skills that apply the shared rule at run time.
+    if (where === 'agent/agent-definition.md' &&
+        /^(Label the draft clearly|\(b\) CRM Update|\(c\) Follow-up Draft)/.test(oldWords)) continue;
     const shipped = spawnSync('git', ['show', `v1.4.1:${where}`], { cwd: ROOT, encoding: 'utf8' });
     if (shipped.status !== 0) continue;
     if (!retiredRe(oldWords).test(shipped.stdout)) continue; // an older wording, already gone from the template
     assert.ok(squash(read(where)).includes(squash(newWords)), `${where} should carry: ${newWords.slice(0, 60)}`);
+  }
+  const definition = read('agent/agent-definition.md');
+  for (const slug of ['prospect-research-outreach', 'post-call-debrief']) {
+    assert.ok(definition.includes(`${slug}/SKILL.md`));
+    assert.match(read(`skills/${slug}/SKILL.md`), /rule 1/);
   }
 });
 
@@ -511,14 +520,13 @@ test('tripwire: the retired sentences are gone from every file that enforces or 
   const files = [
     'agent/agent-definition.md', 'AGENTS.md', 'README.md', 'CLAUDE.md',
     'agent/adapters/claude-code.md', 'agent/adapters/claude.md', 'agent/adapters/codex.md', 'agent/adapters/chatgpt.md', 'agent/adapters/copilot.md',
-    'library/README.md',
     'connectors/connector-checklist.md', 'status/status-schema.md', 'validation/validation-tasks.md', 'docs/radio.md', 'docs/updating.md',
     'specs/002-production-line/contracts/agent-anatomy.md', 'specs/002-production-line/contracts/package-shape.md',
     'skills/update-harness/SKILL.md', 'skills/create-skill/SKILL.md',
+    'skills/prospect-research-outreach/SKILL.md', 'skills/post-call-debrief/SKILL.md',
     'specs/002-production-line/contracts/send-risk.md',
   ];
-  const packages = (dir) => readdirSync(join(ROOT, dir)).map((d) => `${dir}/${d}/PACKAGE.md`).filter((p) => existsSync(join(ROOT, p)));
-  for (const f of [...files, ...packages('library/workflows'), ...packages('library/programs'), ...packages('library/skills')]) {
+  for (const f of files) {
     const hit = RETIRED_WORDS.exec(squash(read(f)));
     assert.equal(hit, null, `${f} still says: ${hit && hit[0]}`);
   }

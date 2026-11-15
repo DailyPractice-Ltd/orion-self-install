@@ -125,6 +125,17 @@ function update(root,repo,commit) {
         else {mkdirSync(dirname(a.dest),{recursive:true});renameSync(join(backup,'stage',a.e.destination),a.dest);report[a.kind==='add'?'added':'refreshed'].push(a.e.destination);}
         if(process.env.ORION_UPDATE_FAIL_AFTER && ++count===Number(process.env.ORION_UPDATE_FAIL_AFTER)) throw new Error('Injected update interruption');
       }
+      for (const path of report.retired.filter(path => path.startsWith('library/'))) {
+        let parent = dirname(path);
+        while (parent !== '.') {
+          const directory = safe(root, parent);
+          if (existsSync(directory)) {
+            if (readdirSync(directory).length > 0) break;
+            rmdirSync(directory);
+          }
+          parent = dirname(parent);
+        }
+      }
       renameSync(join(backup,'stage/status/status.json'),statusPath);
       journal.state='complete';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
     } catch(error) {

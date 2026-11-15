@@ -14,8 +14,10 @@ organisation.
    (placeholders filled). Copilot's instruction field is length-limited — same rule as
    the ChatGPT adapter: rules and task list stay verbatim, business detail lives only in
    the knowledge files.
-3. **Knowledge**: upload the seven knowledge-base files (or point the agent at a dedicated
-   SharePoint/OneDrive folder containing exactly those seven files).
+3. **Knowledge**: add the seven knowledge-base files and both core skill files named in
+   the agent definition's setup notes. Name the skill files
+   `prospect-research-outreach.md` and `post-call-debrief.md` when adding them. Use file
+   uploads or a dedicated SharePoint/OneDrive folder containing these nine files.
 4. **Actions/plugins**: only the connectors the checklist names (CRM read-and-write, email read, draft and
    send, calendar read). Verified 4 November 2026: the agent scores by hand from
    `agent/risk-matrix.md`, says so, and the waiting list is `status/waiting.md`, handed
@@ -29,9 +31,10 @@ organisation.
 
 ## Fallback (no agent-creation rights in the tenant)
 
-Run in a standard Copilot chat pinned with the system prompt as the first message + the
-knowledge-base files attached per session. Weaker persistence — tell the client this
-plainly and log it as a known limitation.
+Run in a standard Copilot chat pinned with the system prompt as the first message.
+Supply the knowledge-base files and both core skills per session. If attachments are
+unavailable, paste each file's text with its name above it. Tell the client to supply
+the files again when starting a new chat.
 
 ## Known quirks
 

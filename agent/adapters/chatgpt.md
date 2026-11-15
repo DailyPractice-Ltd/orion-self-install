@@ -15,7 +15,8 @@ use the fallback below).
    rules and task list verbatim and move the "Who you work for" details fully into the
    knowledge files (they're already there — just remove the duplicated lines).
 3. **Knowledge**: upload the seven completed knowledge-base files with numbered filenames
-   intact.
+   intact. Attach both core skill files named in the agent definition's setup notes.
+   Name the attachments `prospect-research-outreach.md` and `post-call-debrief.md`.
 4. **Capabilities**: enable web browsing (prospect research needs it). Connect only the
    connectors the checklist names (CRM read-and-write, email read, draft and send,
    calendar read). Verified 4 November 2026: the agent scores by hand from
@@ -30,7 +31,8 @@ use the fallback below).
 ## Fallback (no custom-GPT plan)
 
 Use a persistent chat: paste the system prompt as the first message with "these are your
-standing instructions," then paste each knowledge-base file. Tell the client this is
+standing instructions," then paste each knowledge-base file and both core skills, with
+the skill name above each pasted block. Tell the client this is
 slightly weaker — instructions can drift over a long conversation, so re-paste them if the
 agent starts sounding generic again.
 

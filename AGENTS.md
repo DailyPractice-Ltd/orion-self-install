@@ -1,7 +1,7 @@
 # Agent brief — read this first
 
 You are about to help someone install **Orion** — a personal, agentic sales harness — into
-their own workflow. There is no coach in this session. You are the installer. This file is
+their own sales practice. There is no coach in this session. You are the installer. This file is
 the canonical shared instruction file, regardless of which AI product you are (Claude, ChatGPT, Copilot,
 Claude Code, or anything else that can read this repo).
 
@@ -127,7 +127,7 @@ available, and that promise is made to every reader in `README.md` — keep it.
    `node status/radio.mjs send --message "…" --yes` — same rule, their words, their
    yes. **`send` and `reply` carry a person's words and nothing else — never a skill,
    a file, or the contents of one. If the client wants to send a skill to Daily
-   Practice or the library, that is `contribute` (step 3c), never `send`.**
+   Practice or the library, that is `contribute` (see Skills from Daily Practice), never `send`.**
    **A wish is worth sending.** When your human wishes Orion did something it does not
    do yet ("I wish it could...", "it would be great if it..."), offer once, in one plain
    sentence: "Want me to send that to Daily Practice as a request? They look at requests
@@ -278,8 +278,7 @@ know why, just that the names are load-bearing; don't rename them.
 One Orion serves this business. It uses the connected tools and the same knowledge
 base, memory, and permissions across tasks. Add reusable procedures as skills.
 For "teach Orion" or an equivalent request, follow the `create-skill` procedure
-from the selected tool's skills directory. Find shipped capabilities through
-`library/README.md`.
+from the selected tool's skills directory. The [README](README.md) lists the built-in skills.
 
 For recurring work, follow `docs/scheduled-work.md` and use Codex scheduled tasks
 or Claude Routines. If a legacy prompt requests a roster or job sheet run, refer
@@ -303,29 +302,19 @@ Back up before replacing or retiring; report preserved edits and collisions. Rel
 For a tool change, follow the same document's `switch` and schedule steps. On Claude
 Code and Codex this is also invocable as `/update-harness`.
 
-## The Library — adding capabilities after (or during) the install
+## Skills from Daily Practice
 
-`library/` holds installable packages — **Skills** (reusable procedures), **Workflows** (an automated hand-off chain), **Programs** (an
-operating rhythm). The client usually arrives with a pasted install prompt from a
-package page; you can also offer one when it genuinely fits. The rules when installing
-one:
-
-1. The package's `PACKAGE.md` is the whole recipe: read it (or have it pasted), fill
-   every `{{PLACEHOLDER}}` **in conversation** before the client sees rendered output,
-   one question at a time.
-2. **Run the smoke test on the client's own live data** — a package isn't installed
-   because its files are in place; it's installed when its "you'll know it worked when…"
-   line is true.
-3. Only then record it in `status/status.json` under `packages.<slug>` (`kind`,
-   `version`, `installed_at`, `smoke_test_passed: true`).
-3b. **When Daily Practice offers a skill over the radio**, `check` says so in plain
+1. **When Daily Practice offers a skill over the radio**, `check` says so in plain
    words (which skill, which version) and prints the exact command under its fence:
    `node status/radio.mjs library --install <slug>`. With no `--yes` that command only
    shows what the skill is, what it needs, and where it would go. Tell the client that
    in your own plain words, and run it again with `--yes` only if they want it. It
    writes the skill's folder under the selected tool's skills directory, never overwrites a skill
    they already have, and reports the shelf itself. Then smoke-test it on something
-   real before saying it works.
+   real after filling any remaining placeholders. Record a successful smoke test in
+   `status/status.json` under `packages.<slug>` with its kind, version, install date,
+   and `smoke_test_passed: true`. Skills use Orion's send level and CRM scope, and
+   can further limit what Orion does while running that procedure.
 
    A library skill is written for any business. Where the business is named it carries
    a token such as `{{CLIENT_BUSINESS}}`, and its `SKILL.md` lists under **Fill at
@@ -339,7 +328,7 @@ one:
    double braces is the skill's own working text (a message template's blanks) and
    stays exactly as written.
 
-3c. **When the client wants to send a skill up to Daily Practice or the library** —
+2. **When the client wants to send a skill up to Daily Practice or the library** —
    "send this skill to Daily Practice", "send it to the library", "push this to the
    library", "contribute this skill", "offer this skill up", "give this skill back",
    or any wording that means a skill (not a message) going *to* the library — the
@@ -351,13 +340,6 @@ one:
    yes. The whole skill folder travels: `SKILL.md` plus its reference and template
    files. Only text files go; a script or binary in the folder stays behind, and the
    preview names what stays so you can tell the client.
-
-4. If the radio is on and you can run scripts, report it to the shelf:
-   `node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>` —
-   that's how Daily Practice knows what this machine runs when improvements ship. Radio
-   off → skip, say nothing, all is well. Skills use Orion's send level and CRM
-   scope, and can further limit what Orion does while running that procedure.
-
 
 ## Where the fuller detail lives
 

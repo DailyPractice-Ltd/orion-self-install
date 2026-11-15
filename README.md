@@ -9,9 +9,8 @@ nothing sends above it.
 
 Nobody sits with you for this. Your own AI assistant — Claude, ChatGPT,
 Copilot, Codex, whichever you already use — installs it with you, using the files in
-this folder. This page is the control panel: **Press Start** below gets you going in
-three small moves; **the Library** underneath it is where you add capabilities, today or
-months from now.
+this folder. **Press Start** below gets you going in three small moves, and the
+skills section shows what Orion can do for you.
 
 **Three things worth knowing before you start:**
 
@@ -70,32 +69,21 @@ only `@AGENTS.md`. Keep the shared instructions in one place.
 
 ---
 
-## 📚 The Library — add capabilities anytime
+## Built-in skills
 
-Honest mechanics: on this website a "button" is a link. Each one opens a package page
-whose **first block is the exact text to paste into your AI** — your AI installs it
-from there, fits it to your business, and proves it works on your real data.
-
-**Skills** let one Orion use your connected tools for different jobs. The installer includes
+The installer includes
 [Prospecting](skills/prospecting/SKILL.md), [Call Planner](skills/call-planner/SKILL.md), and
-[Friday Report](skills/friday-report/SKILL.md). Tell Orion which task to do or teach it a new procedure.
-For a meeting brief, use [Meeting Sizing](library/skills/meeting-sizing/PACKAGE.md).
+[Friday Report](skills/friday-report/SKILL.md), and these two skills:
+
+- **[Prospect Research → Outreach](skills/prospect-research-outreach/SKILL.md)** — give Orion
+  a prospect to research, prepare outreach, and record the next step in your CRM.
+- **[Post-Call Debrief](skills/post-call-debrief/SKILL.md)** — give Orion call notes for a
+  summary, CRM update, and follow-up draft.
+
+In an installed harness, find these files in `.agents/skills/` for Codex or
+`.claude/skills/` for Claude Code. Tell Orion which task to do or teach it a new procedure.
 Use [Codex scheduled tasks or Claude Routines](docs/scheduled-work.md) for recurring work.
-
-**Workflows** — automated chains, gated on your yes:
-
-- **[Prospect Research → Outreach](library/workflows/prospect-research-outreach/PACKAGE.md)**
-  — a prospect's name in, researched draft out, waiting in your Drafts.
-- **[Post-Call Debrief](library/workflows/post-call-debrief/PACKAGE.md)** — call notes
-  in; summary, CRM update and follow-up draft out.
-
-**Programs**, the operating rhythms your agent runs with you:
-
-- **[Revenue Operating Cadence](library/programs/revenue-operating-cadence/PACKAGE.md)**
-  — the daily/weekly/monthly beat that moves revenue from attention to collected cash.
-
-More about how packages work (and what "installed" honestly means):
-[the Library's own page](library/README.md).
+Daily Practice can offer additional skills [over the radio](docs/radio.md).
 
 ---
 

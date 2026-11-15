@@ -35,11 +35,6 @@
     "docs/self-serve-learnings.md",
     "docs/simulated-dry-run-example.md",
     "docs/updating.md",
-    "library/README.md",
-    "library/programs/revenue-operating-cadence/PACKAGE.md",
-    "library/skills/meeting-sizing/PACKAGE.md",
-    "library/workflows/post-call-debrief/PACKAGE.md",
-    "library/workflows/prospect-research-outreach/PACKAGE.md",
     "memory/README.md",
     "start.mjs",
     "status/done.mjs",
@@ -121,11 +116,6 @@
       "docs/self-serve-learnings.md",
       "docs/simulated-dry-run-example.md",
       "docs/updating.md",
-      "library/README.md",
-      "library/programs/revenue-operating-cadence/PACKAGE.md",
-      "library/skills/meeting-sizing/PACKAGE.md",
-      "library/workflows/post-call-debrief/PACKAGE.md",
-      "library/workflows/prospect-research-outreach/PACKAGE.md",
       "memory/README.md",
       "start.mjs",
       "status/done.mjs",
@@ -146,6 +136,30 @@
       "validation/validation-tasks.md"
     ],
     "retired": [
+      {
+        "source": "library/README.md",
+        "destinations": {
+          "claude-code": "library/README.md",
+          "codex": "library/README.md"
+        },
+        "fingerprint_key": "library/README.md"
+      },
+      {
+        "source": "library/programs/revenue-operating-cadence/PACKAGE.md",
+        "destinations": {
+          "claude-code": "library/programs/revenue-operating-cadence/PACKAGE.md",
+          "codex": "library/programs/revenue-operating-cadence/PACKAGE.md"
+        },
+        "fingerprint_key": "library/programs/revenue-operating-cadence/PACKAGE.md"
+      },
+      {
+        "source": "library/skills/meeting-sizing/PACKAGE.md",
+        "destinations": {
+          "claude-code": "library/skills/meeting-sizing/PACKAGE.md",
+          "codex": "library/skills/meeting-sizing/PACKAGE.md"
+        },
+        "fingerprint_key": "library/skills/meeting-sizing/PACKAGE.md"
+      },
       {
         "source": "skills/speckit-agent-context-update/SKILL.md",
         "destinations": {
@@ -504,6 +518,22 @@
           "codex": "notion/project-tracker-template.md"
         },
         "fingerprint_key": "notion/project-tracker-template.md"
+      },
+      {
+        "source": "library/workflows/post-call-debrief/PACKAGE.md",
+        "destinations": {
+          "claude-code": "library/workflows/post-call-debrief/PACKAGE.md",
+          "codex": "library/workflows/post-call-debrief/PACKAGE.md"
+        },
+        "fingerprint_key": "library/workflows/post-call-debrief/PACKAGE.md"
+      },
+      {
+        "source": "library/workflows/prospect-research-outreach/PACKAGE.md",
+        "destinations": {
+          "claude-code": "library/workflows/prospect-research-outreach/PACKAGE.md",
+          "codex": "library/workflows/prospect-research-outreach/PACKAGE.md"
+        },
+        "fingerprint_key": "library/workflows/prospect-research-outreach/PACKAGE.md"
       }
     ],
     "entries": [
@@ -578,6 +608,24 @@
         },
         "ownership": "release",
         "fingerprint_key": "skills/memory-consolidation/SKILL.md"
+      },
+      {
+        "source": "skills/post-call-debrief/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/post-call-debrief/SKILL.md",
+          "codex": ".agents/skills/post-call-debrief/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/post-call-debrief/SKILL.md"
+      },
+      {
+        "source": "skills/prospect-research-outreach/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/prospect-research-outreach/SKILL.md",
+          "codex": ".agents/skills/prospect-research-outreach/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/prospect-research-outreach/SKILL.md"
       }
     ],
     "release_only": [

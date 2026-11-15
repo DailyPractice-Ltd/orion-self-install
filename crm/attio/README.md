@@ -75,9 +75,8 @@ ATTIO_API_KEY=<the key you just generated> node apply-attio-template.mjs
 ```
 </details>
 
-Once it's validated and working (either way), delete the API key from wherever you pasted
-it — the ongoing workflows use their own separate credential (see
-`connectors/connector-checklist.md`).
+Once the setup works, delete the API key from wherever you pasted it. Orion uses the
+CRM connector for ongoing work. See `connectors/connector-checklist.md`.
 
 **Person vs company pipeline**: the template defaults to `"parent_object": "people"` —
 right for a founder or individual seller selling to individuals. For a B2B motion, change

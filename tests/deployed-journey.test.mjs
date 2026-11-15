@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { plainEnv } from './helpers/env.mjs';
+import { planForTool } from '../update/destination-resolver.mjs';
 
 const checkout = join(dirname(fileURLToPath(import.meta.url)), '..');
 const other = tool => tool === 'codex' ? 'claude-code' : 'codex';
@@ -34,6 +35,12 @@ function journey(t, tool) {
   const changes = execFileSync('git', ['diff', '--binary', 'HEAD'], { cwd: checkout });
   if (changes.length) {
     execFileSync('git', ['apply', '--binary', '-'], { cwd: release, input: changes });
+  }
+  const manifest = JSON.parse(read(checkout, 'update/manifest.json'));
+  for (const { source } of planForTool(manifest.deployment, tool, { releaseRoot: checkout })) {
+    if (!existsSync(join(release, source))) put(release, source, read(checkout, source));
+  }
+  if (git(release, 'status', '--porcelain')) {
     git(release, 'add', '-A');
     git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'working release');
   }
@@ -62,6 +69,20 @@ for (const tool of ['claude-code', 'codex']) {
     put(client, `${skill(tool)}/prospecting/SKILL.md`, edited);
     put(client, `${skill(tool)}/hire-agent/SKILL.md`, 'Custom legacy instructions\n');
     put(client, `${skill(tool)}/personal/SKILL.md`, '# Personal skill\n');
+    const retiredPage = 'library/workflows/prospect-research-outreach/PACKAGE.md';
+    const editedPage = 'library/workflows/post-call-debrief/PACKAGE.md';
+    const oldPage = git(release, 'show', `c933b9ff05ce5825f09a2ec2adc2d6d8e38b1e7a:${retiredPage}`) + '\n';
+    put(client, retiredPage, oldPage);
+    put(client, editedPage, '# Client debrief instructions\n');
+    const retiredMeetingPackage = 'library/skills/meeting-sizing/PACKAGE.md';
+    const oldMeetingPackage = git(release, 'show', `c933b9ff05ce5825f09a2ec2adc2d6d8e38b1e7a:${retiredMeetingPackage}`) + '\n';
+    put(client, retiredMeetingPackage, oldMeetingPackage);
+    const prior = status(client);
+    const packageHistory = { 'post-call-debrief': { kind: 'workflow', version: '2.0.0', smoke_test_passed: true } };
+    put(client, 'status/status.json', JSON.stringify({ ...prior, packages: packageHistory }));
+    for (const slug of ['prospect-research-outreach', 'post-call-debrief']) {
+      rmSync(join(client, skill(tool), slug, 'SKILL.md'));
+    }
     const manifest = JSON.parse(read(release, 'update/manifest.json'));
     assert.equal(existsSync(join(client, '.specify')), false);
     manifest.deployment.entries.push({
@@ -85,6 +106,18 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(read(client, `${skill(tool)}/personal/SKILL.md`), '# Personal skill\n');
     assert.equal(read(client, `${skill(tool)}/new-release/SKILL.md`), '# New release skill\n');
     assert.ok(report.kept.includes(`${skill(tool)}/prospecting/SKILL.md`));
+    assert.ok(report.retired.includes(retiredPage));
+    assert.ok(report.retired.includes(retiredMeetingPackage));
+    assert.equal(existsSync(join(client, 'library/skills')), false);
+    assert.equal(read(client, `${report.backup}/files/${retiredMeetingPackage}`), oldMeetingPackage);
+    assert.ok(report.kept.includes(editedPage));
+    assert.equal(existsSync(join(client, retiredPage)), false);
+    assert.equal(read(client, editedPage), '# Client debrief instructions\n');
+    assert.equal(read(client, `${report.backup}/files/${retiredPage}`), oldPage);
+    assert.deepEqual(status(client).packages, packageHistory);
+    for (const slug of ['prospect-research-outreach', 'post-call-debrief']) {
+      assert.ok(report.added.includes(`${skill(tool)}/${slug}/SKILL.md`));
+    }
     assert.equal(read(client, 'legacy/hire-agent/SKILL.md'), 'Custom legacy instructions\n');
     assert.equal(existsSync(join(client, `${skill(tool)}/hire-agent/SKILL.md`)), false);
     if (tool === 'claude-code') assert.match(read(client, 'legacy/claude-agents/follow-up.md'), /send_risk: never/);
@@ -93,6 +126,7 @@ for (const tool of ['claude-code', 'codex']) {
       assert.equal(existsSync(join(client, forbidden)), false, `${forbidden} after update`);
     }
     ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
+    assert.equal(read(client, retiredMeetingPackage), oldMeetingPackage);
     assert.equal(read(client, 'AGENTS.md'), original);
     assert.equal(read(client, `${skill(tool)}/hire-agent/SKILL.md`), 'Custom legacy instructions\n');
     assert.equal(existsSync(join(client, `${skill(tool)}/new-release/SKILL.md`)), false);

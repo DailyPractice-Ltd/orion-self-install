@@ -66,23 +66,12 @@ test('release contract rejects an unsupported tool and keeps historical ownershi
 test('all release skills have exactly one mapping for both tools', () => {
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
   const names = readdirSync(join(repo, 'skills')).sort();
-<<<<<<< HEAD
-  assert.deepEqual(names, [
-    'apollo-enrich-phone', 'call-planner-control-tower', 'closeout-spreadsheet',
-    'create-skill', 'hire-agent', 'lifecycle-governance', 'prospect-call-list',
-    'prospect-enrichment', 'report-bug', 'task-planner', 'update-harness',
-  ]);
-  assert.deepEqual(manifest.deployment.entries.filter(entry => entry.source.startsWith('skills/') && entry.source.endsWith('/SKILL.md')).map(entry => entry.source).sort(),
-    names.map(name => `skills/${name}/SKILL.md`));
-  for(const name of names) for(const tool of ['codex','claude-code']) assert.equal(manifest.deployment.entries.filter(e=>e.source===`skills/${name}/SKILL.md` && e.destinations?.[tool]===`${tool==='codex'?'.agents':'.claude'}/skills/${name}/SKILL.md`).length,1);
-=======
   const mapped = manifest.deployment.entries.filter(entry => entry.source.startsWith('skills/') && entry.source.endsWith('/SKILL.md'));
   assert.deepEqual([...mapped.map(entry => entry.source), ...manifest.deployment.local_skills].sort(),
     names.map(name => `skills/${name}/SKILL.md`).sort());
   for (const entry of mapped) for (const tool of ['codex', 'claude-code']) {
     assert.equal(entry.destinations[tool], `${tool === 'codex' ? '.agents' : '.claude'}/${entry.source}`);
   }
->>>>>>> feature/remove-multiple-agents
   for (const name of names) assert.ok(existsSync(join(repo, 'skills', name, 'SKILL.md')));
   assert.equal(existsSync(join(repo, '.claude')), false, 'release must not track or generate a second skill tree');
   for (const path of manifest.refresh) assert.ok(existsSync(join(repo, path)), `legacy refresh source missing: ${path}`);

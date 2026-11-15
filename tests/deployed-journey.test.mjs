@@ -206,7 +206,6 @@ for (const tool of ['claude-code', 'codex']) {
       git(release, 'show', `${historical}:.specify/scripts/bash/setup-tasks.sh`) + '\n');
     put(client, editedSkill, '# Client edited plan skill\n');
     put(client, '.specify/memory/constitution.md', '# Client constitution\n');
-<<<<<<< HEAD
 
     git(release, 'checkout', '-q', candidate);
     const changes = execFileSync('git', ['diff', '--binary', 'HEAD'], { cwd: checkout });
@@ -215,8 +214,6 @@ for (const tool of ['claude-code', 'codex']) {
       git(release, 'add', '-A');
       git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'without Spec Kit');
     }
-=======
->>>>>>> feature/remove-multiple-agents
     const pinned = git(release, 'rev-parse', 'HEAD');
     const result = run(release, 'update/apply.mjs', 'update', '--root', client, '--release-repo', release, '--commit', pinned);
     ok(result);

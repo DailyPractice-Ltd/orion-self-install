@@ -68,13 +68,8 @@ export function planForTool(deployment, tool, { releaseRoot = RELEASE_ROOT, root
     .filter((item) => item.isFile())
     .map((item) => relative(releaseRoot, join(item.parentPath, item.name)).split(sep).join('/')).sort();
   const mappedSkills = deployment.entries.filter((entry) => entry.source.startsWith('skills/'));
-<<<<<<< HEAD
   const skillSources = mappedSkills.map((entry) => entry.source).sort();
   if (JSON.stringify(actualSkills) !== JSON.stringify(skillSources)) throw new Error('Deployment skill mappings must cover every file under skills/ exactly once');
-=======
-  const skillSources = [...mappedSkills.filter((entry) => entry.source.endsWith('/SKILL.md')).map((entry) => entry.source), ...(deployment.local_skills || [])].sort();
-  if (JSON.stringify(actualSkills) !== JSON.stringify(skillSources)) throw new Error('Deployment skill mappings must cover every skills/*/SKILL.md exactly once');
->>>>>>> feature/remove-multiple-agents
   for (const entry of mappedSkills) for (const selected of deployment.tools) {
     const expected = `${selected === 'codex' ? '.agents' : '.claude'}/skills/${entry.source.slice('skills/'.length)}`;
     if (entry.destinations?.[selected] !== expected) throw new Error(`Invalid skill mapping for ${entry.source} (${selected})`);

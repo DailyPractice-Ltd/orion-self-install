@@ -127,37 +127,9 @@ even if the publication has since been withdrawn.
 )
 ```
 
-<<<<<<< HEAD
 If recovery reports a collision, keep a separate copy of the affected work and
 ask Daily Practice for help reconciling it. Recovery keeps the backup, the
 original failure report, and the latest attempt's `recovery.json` together.
-=======
-If clone or update fails, inspect the error. The temporary checkout is removed on
-success or failure. Never fall back to the older local script or an unpinned `main` path.
-The update reads `update/manifest.json`, `update/pristine.json`, and all released
-files from that one commit. Its `deployment` plan maps portable release sources into
-the destination for the tool recorded in status. The current AI app does not choose
-the destination. The release installs Orion and the mapped skills.
-The client folder never receives the release source trees wholesale, tests, specs,
-`CLAUDE.md`, or the other tool's runtime tree. All shipped skills are mapped explicitly. Earlier Spec Kit files are retired only when they still match shipped copies; client edits are preserved. Maintainer specifications stay in the release repository.
-
-A file the client has changed is kept and reported, as is a collision. Legacy job sheets remain client-owned. A retired released file is removed only if it still matches a
-historical shipped fingerprint. Before changing files, the updater backs up status
-and each file it will replace or retire under `.update-backup/`. Executable
-`status/*.mjs` scripts are the narrow exception: they are backed up and replaced as a
-version-consistent set even when edited. The updater changes only
-`template_version`, one notes line, and named retired checklist keys in status.
-The update preserves Codex legacy job sheets in place and archives Claude job sheets
-under `legacy/claude-agents/`. Turn off any active legacy computer schedules listed
-by the updater and rerun it. Review `legacy_schedules`
-in the update report. See [Migrate a legacy schedule](scheduled-work.md#migrate-a-legacy-schedule)
-for both computer schedules and native tasks that still reference a job sheet.
-
-When applicable, run `node status/send.mjs migrate` for the older sending-rule
-migration. Then run `node status/radio.mjs check`. Report the pinned commit, version
-change, refreshed, added, retired, kept and collided files, replaced edited scripts,
-radio result, and backup path.
->>>>>>> feature/remove-multiple-agents
 
 ## Switch the selected tool
 
@@ -182,19 +154,12 @@ that the download matches that commit before running its switch operation:
 Use `--to claude-code` to move the other way. For an older Claude harness with no
 `selected_tool`, add `--legacy-tool claude-code` to migrate it explicitly. The switch
 requires the harness version, manifest, and common runtime scripts to match the pinned
-<<<<<<< HEAD
 release. Run the published update command above first if it reports an older version.
 It checks collisions, backs up, stages and validates the new layout, then records the
 new selection. It retires released files from the old layout while preserving edited
 skills, hired job sheets and roster rows. Active computer schedules must first be
 turned off with `node status/schedule.mjs off --agent <name>`; saved schedules are
 invalidated by the switch and must be rewired for the new tool. The switch reports
-=======
-release. Run the pinned update command above first if it reports an older version.
-The switch backs up, stages and validates the new skill layout, then records the new
-selection. Active legacy computer schedules must be turned off first. Review native
-tasks in the scheduler before switching. The switch reports
->>>>>>> feature/remove-multiple-agents
 its backup. If interrupted, run the pinned release script with `recover --root "$PWD"`
 before trying again. The temporary checkout is removed automatically.
 
@@ -272,13 +237,11 @@ cd /path/to/older-orion
 node /path/to/published-orion/update/request.mjs
 ```
 
-<<<<<<< HEAD
 The new folder is created alongside the old one, with `-deployed` added to its
 name. To choose another new folder alongside the original, add
 `--migrate-to /path/to/new-orion`. The command reports the new folder and update
 backup once checks pass. If verification fails, keep the old folder and follow
 the published fresh-install instructions into a separate folder.
-=======
 Use `--tool codex` only when the legacy status already records Codex. The migration
 copies the client's status and logs, knowledge, memory, skills, roster and job sheets,
 as well as other client-created files such as notes and playbooks, then overlays edited
@@ -289,7 +252,6 @@ private repository becomes the home, while `--local-only` leaves home disabled. 
 checkout is left intact. The command creates and pushes a private GitHub repository;
 `--remote https://github.com/OWNER/PRIVATE-REPO.git` uses an existing private
 repository, verified through `gh`. With no GitHub option, installation creates a local Git repository; `--local-only` is the explicit equivalent. A private remote can be connected later with `node status/home.mjs prepare --remote <address> --yes`.
->>>>>>> feature/remove-multiple-agents
 
 ## Declare a supported starting version
 

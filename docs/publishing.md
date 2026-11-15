@@ -48,3 +48,19 @@ The CLI prints `{tag, commit, release_id, manifest_version}` after creation. The
 GitHub Release is the authoritative catalog input: downstream importers must read its
 current published/withdrawn state and pinned manifest, not treat this console record
 as an independent publication. No bridge credentials are needed by the publisher.
+
+## Withdraw a published release
+
+Dispatch **Withdraw release** on `main` with the exact published tag, full
+commit, and numeric GitHub Release ID. The same protected `release`
+environment authorizes the edit. The workflow verifies the published release
+and peeled tag, adds a withdrawal notice above the original notes, and reads
+back the resulting body and identity. Re-running the same nomination verifies
+the withdrawal without editing again.
+
+GitHub permits [release-note edits on immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases).
+Keep the original release and its tag for audit and backup verification. Keep
+the `<!-- orion:withdrawn -->` marker in the notes and publish any correction
+under a new version. The bridge reads the marker on radio check and surfaces a
+withdrawal to paired harnesses that acknowledged the offer or recorded applying
+the release. A fresh install or update rejects the withdrawn release.

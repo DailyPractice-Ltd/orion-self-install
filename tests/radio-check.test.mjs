@@ -350,3 +350,32 @@ test('an invalid notice does not get displayed or interfere with an ordinary mes
   assert.doesNotMatch(out, /2\.3\.0 is available|example\.com/);
   assert.equal(calls.filter((call) => call.path.endsWith('/display')).length, 0);
 });
+
+test('a withdrawal explains whether the harness applied it without applying or restoring anything', () => {
+  const { summary, ...identity } = NOTICE;
+  const withdrawnApplied = {
+    tag: NOTICE.tag, commit: NOTICE.commit, release_id: NOTICE.release_id,
+    manifest_version: NOTICE.version, applied_at: APPLIED.applied_at,
+  };
+  for (const [application, applied, message, next] of [
+    ['notified_only', APPLIED, /Your harness never applied this release/, /Skip this version/],
+    ['previously_applied', APPLIED, /Your harness applied this release previously/, /Keep using your current version/],
+    ['currently_applied', withdrawnApplied, /Your harness is running this release/, /restore a backup or move to a corrected release/],
+  ]) {
+    const notice = { ...identity, kind: 'withdrawal', application };
+    const { checks, calls, status, receipts } = runRadio(['check'], { applied, notices: [notice, notice, NOTICE] });
+    assert.equal(checks[0].status, 0, checks[0].stderr);
+    assert.match(checks[0].stdout, /Orion 2\.3\.0 was withdrawn/);
+    assert.match(checks[0].stdout, message);
+    assert.match(checks[0].stdout, next);
+    assert.ok(checks[0].stdout.includes(NOTICE.notes_url));
+    assert.doesNotMatch(checks[0].stdout, /Orion 2\.3\.0 is available|reply --nudge|node update|1023|c{40}/);
+    assert.doesNotMatch(checks[1].stdout, /was withdrawn/);
+    assert.doesNotMatch(checks[2].stdout, /Orion 2\.3\.0 is available/);
+    assert.equal(status.template_version, applied.manifest_version);
+    assert.deepEqual(status.applied_release, applied);
+    assert.deepEqual(calls.filter((call) => call.path.endsWith('/display')).map((call) => call.body),
+      [{ kind: 'withdrawal' }, { kind: 'withdrawal' }]);
+    assert.deepEqual(receipts.map((name) => name.split('-').slice(-2).join('-')), ['withdrawal-1023']);
+  }
+});

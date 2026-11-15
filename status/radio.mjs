@@ -314,14 +314,41 @@ const validReleaseId = (id) => Number.isSafeInteger(id) && id > 0;
 const receiptPrefix = `${sharing.harness_id}-`;
 const receiptDirectory = () => safePath(ROOT, 'status/release-notices');
 
-function releaseNoticeLines(notice) {
-  if (notice.kind !== 'release' || !releaseVersion.test(notice.version) ||
-    notice.tag !== `v${notice.version}` || !releaseCommit.test(notice.commit) ||
-    !validReleaseId(notice.release_id) || typeof notice.summary !== 'string' ||
-    !notice.summary.trim() || notice.summary.length > 300 || /[\p{Cc}\p{Cf}]/u.test(notice.summary) ||
-    typeof notice.notes_url !== 'string' ||
+function releaseNoticeLines(notice, applied) {
+  if (typeof notice.version !== 'string' || !releaseVersion.test(notice.version) ||
+    typeof notice.commit !== 'string' || notice.tag !== `v${notice.version}` || !releaseCommit.test(notice.commit) ||
+    !validReleaseId(notice.release_id) || typeof notice.notes_url !== 'string' ||
     !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/tag\/v[0-9.]+$/.test(notice.notes_url) ||
     !notice.notes_url.endsWith(`/${notice.tag}`)) return null;
+
+  if (notice.kind === 'withdrawal') {
+    const current = notice.release_id === applied.release_id && notice.tag === applied.tag &&
+      notice.commit === applied.commit;
+    const guidance = {
+      currently_applied: [
+        'Your harness is running this release.',
+        'Ask Orion to help you choose whether to restore a backup or move to a corrected release when one is available.',
+      ],
+      previously_applied: [
+        'Your harness applied this release previously.',
+        'Keep using your current version.',
+      ],
+      notified_only: [
+        'Your harness never applied this release.',
+        'Skip this version and wait for another release notice.',
+      ],
+    };
+    if (typeof notice.application !== 'string' || !Object.hasOwn(guidance, notice.application) ||
+      current !== (notice.application === 'currently_applied')) return null;
+    return [
+      `Orion ${notice.version} was withdrawn.`,
+      ...guidance[notice.application],
+      `Full release notes: ${notice.notes_url}`,
+    ];
+  }
+
+  if (notice.kind !== 'release' || typeof notice.summary !== 'string' ||
+    !notice.summary.trim() || notice.summary.length > 300 || /[\p{Cc}\p{Cf}]/u.test(notice.summary)) return null;
   return [
     `Orion ${notice.version} is available.`,
     notice.summary,
@@ -333,6 +360,10 @@ function releaseNoticeLines(notice) {
 async function showReleaseNotice(notice, lines) {
   const directory = receiptDirectory();
   mkdirSync(directory, { recursive: true, mode: 0o700 });
+  if (notice.kind === 'release') {
+    const withdrawn = safePath(directory, `${receiptPrefix}withdrawal-${notice.release_id}`);
+    if (existsSync(withdrawn) || existsSync(`${withdrawn}.pending`)) return false;
+  }
   const name = `${receiptPrefix}${notice.kind}-${notice.release_id}`;
   const marker = safePath(directory, name);
   const pending = `${marker}.pending`;
@@ -407,7 +438,7 @@ async function checkReleaseNotice() {
   const data = await res.json().catch(() => null);
   if (data?.version !== 1 || !data.notice) return false;
   const notice = data.notice;
-  const lines = releaseNoticeLines(notice);
+  const lines = releaseNoticeLines(notice, applied);
   if (!lines) return false;
   try {
     const shown = await showReleaseNotice(notice, lines);

@@ -109,6 +109,11 @@ available, and that promise is made to every reader in `README.md` — keep it.
    and invitation before other work.** Wait for the client to request an update.
    A release notice needs no reply.
 
+   **If Orion prints a withdrawal notice, tell the client the version, whether this
+   harness is still running it, and the next step shown.** If this harness is running
+   the withdrawn release, wait for the client to choose recovery before changing anything.
+   A withdrawal notice needs no reply.
+
    **If a message is waiting, deliver it as a message, not as a report.** Someone at
    Daily Practice wrote it to this client. Say who it is from and what they said, in
    full, before other work. Never show the client a message id, a URL, a status code,

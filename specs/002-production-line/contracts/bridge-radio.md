@@ -231,9 +231,20 @@ that version for the recorded tool. The summary comes from the changelog at
 the tagged commit. A source failure leaves the conversation available and
 returns no offer. No older notice replaces an already displayed newest offer.
 
+A withdrawal is `{ kind: 'withdrawal', version, tag, commit, release_id,
+notes_url, application }`. The bridge verifies the GitHub release's withdrawal
+marker and exact tagged commit before returning it. `application` is
+`currently_applied` when the harness reports that release, `previously_applied`
+when the bridge recorded a prior application, or `notified_only` when the
+harness acknowledged the original release notice. A pending offer by itself
+does not qualify a harness for withdrawal. The bridge skips offers for
+withdrawn releases and prioritizes unacknowledged withdrawal notices. The
+radio reports the appropriate next step and awaits the client's decision
+before any recovery.
+
 Once the radio command has written the notice lines to stdout, it records a
 local display receipt and posts
-`{ kind: 'release' }` to `/releases/:id/display`. Acknowledgment is idempotent
+`{ kind: 'release' }` or `{ kind: 'withdrawal' }` to `/releases/:id/display`. Acknowledgment is idempotent
 (204), affects only the authenticated harness's offered notice, and returns
 404 for a notice it was never offered. A lost acknowledgment is retried
 without displaying the notice again. If the command stops after writing the

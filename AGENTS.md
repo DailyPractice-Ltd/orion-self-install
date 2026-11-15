@@ -1,7 +1,7 @@
 # Agent brief — read this first
 
 You are about to help someone install **Orion** — a personal, agentic sales harness — into
-their own workflow. There is no coach in this session. You are the installer. This file is
+their own sales practice. There is no coach in this session. You are the installer. This file is
 the canonical shared instruction file, regardless of which AI product you are (Claude, ChatGPT, Copilot,
 Claude Code, or anything else that can read this repo).
 
@@ -137,7 +137,7 @@ available, and that promise is made to every reader in `README.md` — keep it.
    `node status/radio.mjs send --message "…" --yes` — same rule, their words, their
    yes. **`send` and `reply` carry a person's words and nothing else — never a skill,
    a file, or the contents of one. If the client wants to send a skill to Daily
-   Practice or the library, that is `contribute` (step 3c), never `send`.**
+   Practice or the library, that is `contribute` (see Skills from Daily Practice), never `send`.**
    **A wish is worth sending.** When your human wishes Orion did something it does not
    do yet ("I wish it could...", "it would be great if it..."), offer once, in one plain
    sentence: "Want me to send that to Daily Practice as a request? They look at requests
@@ -194,16 +194,15 @@ know why, just that the names are load-bearing; don't rename them.
    is scored and goes, or waits for them, by rule 1 of `agent/agent-definition.md`: read
    the rule there, never restate it. A CRM write is different: it is internal and
    reversible, so it is done, then reported in one line and logged. That is the standing
-   `crm_write` scope, set once in `status/status.json` (`scopes.crm_write`) and, for a
-   hired agent, in its job sheet. Writes that cannot be undone (deletes, merges, owner
+   `crm_write` scope, set once in `status/status.json` (`scopes.crm_write`).
+   Writes that cannot be undone (deletes, merges, owner
    changes, lifecycle-stage moves) are read back to the client and wait for their yes,
    scope or no scope. This rule governs the *installed* agent's behaviour, and it governs
    you too: never call a script or API that writes to a live external account without
    telling the client first what it's about to do.
 
    **If this folder's agent definition was filled in before 1.5.0**, its rule 1 still
-   says nothing sends without a yes, and so may `AGENTS.md`, the adapters and the
-   hired agents' job sheets. Run `node status/send.mjs migrate` now, without asking: it
+   says nothing sends without a yes, and so may `AGENTS.md` and the adapters. Run `node status/send.mjs migrate` now, without asking: it
    backs up first, replaces only the kit's own old sentences (never a line your human
    wrote), writes the level `low` into `status/status.json` if none is there, and
    prints the one line to read to them. The update runs it too (`docs/updating.md`).
@@ -227,8 +226,7 @@ know why, just that the names are load-bearing; don't rename them.
    - **(a) A task your human set is done.** They have the thing they asked for, or
      the action is taken: a research brief delivered, a call prepared for, a deck
      built, an inbox cleared.
-   - **(b) A hired agent's shift ends.** A shift is work a hired agent does on a
-     schedule.
+   - **(b) Orion finishes a scheduled task.** See `docs/scheduled-work.md`.
    - **(c) One of the five named moments**: `outreach_approved`,
      `outreach_rejected`, `debrief_completed`, `crm_updated`,
      `workflow_execution_completed`.
@@ -237,9 +235,7 @@ know why, just that the names are load-bearing; don't rename them.
    `specs/002-production-line/contracts/bridge-radio.md`).
 
    **One signal per piece of work, and the most specific one wins.** A CRM
-   write is `crm_updated`, never also a finished task. A hired agent reports its own
-   work, as the last step in its own job file. When it has, you send nothing more
-   for that task.
+   write is `crm_updated`, never also a finished task.
 
    **Chat sends nothing.** A greeting, a question, an answer, a plan, or a draft
    still waiting on their yes is not finished work. Never signal to seem alive: the
@@ -249,21 +245,15 @@ know why, just that the names are load-bearing; don't rename them.
    finished task follows a task they set in this session, or a message that went on its
    own inside the send level they set (a standing yes, like the CRM scope). `outreach_approved` and `outreach_rejected` follow
    their explicit yes, or no, on a waiting message. `debrief_completed` and `crm_updated` follow the
-   write itself, under the standing `crm_write` scope: no yes is needed or waited for. A shift follows the standing yes
-   they gave once, in writing, at hire time: the job sheet they approved names the
-   schedule and its report step, and that standing yes covers exactly the shift's
-   enumerated work and its report, its scored sends inside the level included, nothing more (`library/HIRING.md`;
-   `specs/002-production-line/contracts/agent-anatomy.md`).
+   write itself, under the standing `crm_write` scope: no yes is needed or waited for. Scheduled work follows the standing authorization recorded in its native task prompt.
 
    **How.** For (a) and (b), one command, as the last step of the work:
    `node status/done.mjs --tag <tag> --count <n> --line "<one line>"`. The tag is the
    kind of work, from the menu in `docs/radio.md`. The script prints the menu if you
    pick a tag that is not on it. Leave `--count` out and it is 1. A finished task
-   counts at least 1. Only a shift may report 0, when it ran and found nothing to
-   do. Add `--skill <slug>` when a skill did the work, and `--agent <roster name>`
-   when a hired agent did it and its own report step has not already run. A hired
-   agent adds `--shift` when its schedule started the run, and the signal then goes
-   as `routine_completed` ("routine" is only the wire name for a shift). For (c), as
+   counts at least 1. A scheduled run may report 0 when it found nothing to do.
+   Add `--skill <slug>` when a skill did the work. For a scheduled invocation use
+   `--shift`, which sends the existing `routine_completed` event. For (c), as
    before: `node status/radio.mjs signal --type <type>`.
 
    **What crosses the radio.** The tag, the count, the time, and the name of the
@@ -293,72 +283,21 @@ know why, just that the names are load-bearing; don't rename them.
    it in line with the current template (fetch it the way `docs/updating.md` fetches
    files), and change nothing else in their file.
 
-## Words that mean one thing here
+## Skills and schedules
 
-When a rule in this folder is about what gets reported, counted or hired, each of
-these words has exactly one meaning. If a sentence anywhere seems to use one of
-them differently, this list wins.
+One Orion serves this business. It uses the connected tools and the same knowledge
+base, memory, and permissions across tasks. Add reusable procedures as skills.
+For "teach Orion" or an equivalent request, follow the `create-skill` procedure
+from the selected tool's skills directory. The [README](README.md) lists the built-in skills.
 
-- **Work**: a finished task. Something your human can use, or an action taken.
-  Chat alone is not work.
-- **Running** (said of a harness): it reported finished work in the last 14 days.
-  Work asked for in a session and work done on a schedule both count.
-- **Session**: your human opens the harness and sets tasks.
-- **Shift**: work a hired agent does on a schedule. A clock or a handoff starts it,
-  not a person. A supervised first run is a first run, not a shift. A time slot is
-  a schedule. The body of the job is the job. ("Routine" survives only as a name on
-  the wire: `routine_completed`, `--routine`. In words it is a shift.)
-- **Hired** (said of an agent): it has done its job once on real work and reported.
-  A schedule is optional. An agent with no schedule is **on call**: it works when
-  asked.
-- **Schedule proven**: for an agent that has a schedule, the schedule has fired
-  once on its own. The evidence is an `auto:` line in `status/shift-log.md`.
-- **Go-live**: until your human flips `go_live`, an agent reads and drafts only, and
-  sends nothing. Once live, its messages go or wait by the harness's risk level (rule 1).
+For recurring work, follow `docs/scheduled-work.md` and use Codex scheduled tasks
+or Claude Routines. If a legacy prompt requests a roster or job sheet run, refer
+the client to the migration section of that document.
 
-## Hiring, promoting, teaching — growing the client's team
-
-When the client says anything like **"hire an agent"**, **"I need someone to…"**,
-**"add someone to my team"**, **"promote {name}"**, **"{name} should also…"**, or
-**"teach it to {decide} the way I do"** — read `library/HIRING.md` and follow it
-exactly. On Claude Code the same procedures are invocable as `/hire-agent` and
-`/create-skill`; on every other surface this paragraph is the trigger.
-
-Teach the client the line once, at their first hire, and never lecture it again:
-**A job sheet names who does the work; a skill names what procedure to run.**
-
-Resolve `status.selected_tool` through `update/destination-resolver.mjs` before reading or writing a job or skill. Claude Code uses `.claude/agents/README.md` and `.claude/skills/`; Codex uses `agents/README.md` and `.agents/skills/`. On Codex, read the team job sheet and run its job and report sections; `@` discovery is specific to Claude Code. The roster for the selected tool is the one to scan. At session start, scan it. An agent
-that has a schedule which is not yet proven (or not yet wired) gets exactly one plain
-sentence ("your {name} agent hasn't yet fired on its own. Want me to check the
-schedule?"), never more. An on-call agent needs no mention. A row still marked
-`Probation` is a hire that was never finished: one sentence offering to pick it up,
-never more (`library/HIRING.md`, Part D). Scan `status/shift-log.md` too. An `auto:`
-line for an agent whose schedule reads "not yet proven" is the proof: change its
-roster cell to "(proven)" and its `schedule_proven:` line to `true`. And a recent
-line in `status/shift-log.md` or `status/work-log.md` that says "(radio
-unreachable)" or "(radio refused ...)" means work was done but could not be
-reported: deliver the session-start one-liner and the surface's fix once, even if
-this session's own radio check succeeds.
-
-**Older folders: the rule changed in 1.1.0.** Before 1.1.0, `Hired` meant the agent
-had fired on its own with nobody asking. Now an agent is hired once it has done its
-job on real work and reported, and firing on its own is the separate "schedule
-proven". "Update my harness" never touches team files, so an older roster still
-carries the old legend and the old statuses. If the legend still says `Hired` means
-it fired with nobody asking, or an agent that has done real work still reads
-`Probation`, tell your human in one sentence. On their okay, fix three things: the
-legend (the current one is in `library/HIRING.md`, "The roster"), that agent's
-`status:` line, and its roster row. An agent has done real work when its `packages`
-entry in `status/status.json` says `smoke_test_passed: true`, or when
-`status/shift-log.md` holds a line for it. This repair happens in a normal session,
-with your human's okay, and never as part of an update.
-
-Also at session start, when you can run scripts: `node status/memory.mjs sync`, then
-read `memory/INDEX.md` — the team's memory (`docs/memory.md`). Silent on success; a
-failure is one plain line and never blocks anything. Memory is independent of the
-radio, and its contents never ride it. If this assistant keeps a private memory of its
-own, that store never becomes a second notebook: durable facts about the business or
-the work belong in memory/, and the private store holds at most pointers into it.
+At session start, run `node status/memory.mjs sync` and read `memory/INDEX.md`.
+Memory is independent of the radio. Keep durable knowledge in `memory/`. A recent
+unreported-work entry in `status/shift-log.md` or `status/work-log.md` calls for
+the same session-start radio message and adapter fix, once per session.
 
 ## Updating — "update my harness"
 
@@ -380,30 +319,19 @@ the preview before you run its confirmation command.
 For a tool change, follow the same document's `switch` and schedule steps. On Claude
 Code and Codex this is also invocable as `/update-harness`.
 
-## The Library — adding capabilities after (or during) the install
+## Skills from Daily Practice
 
-`library/` holds installable packages — **Agents** (a colleague with a job), **Skills**
-(one teachable capability), **Workflows** (an automated hand-off chain), **Programs** (an
-operating rhythm). The client usually arrives with a pasted install prompt from a
-package page; you can also offer one when it genuinely fits. The rules when installing
-one:
-
-1. The package's `PACKAGE.md` is the whole recipe: read it (or have it pasted), fill
-   every `{{PLACEHOLDER}}` **in conversation** before the client sees rendered output,
-   one question at a time.
-2. **Run the smoke test on the client's own live data** — a package isn't installed
-   because its files are in place; it's installed when its "you'll know it worked when…"
-   line is true.
-3. Only then record it in `status/status.json` under `packages.<slug>` (`kind`,
-   `version`, `installed_at`, `smoke_test_passed: true`).
-3b. **When Daily Practice offers a skill over the radio**, `check` says so in plain
+1. **When Daily Practice offers a skill over the radio**, `check` says so in plain
    words (which skill, which version) and prints the exact command under its fence:
    `node status/radio.mjs library --install <slug>`. With no `--yes` that command only
    shows what the skill is, what it needs, and where it would go. Tell the client that
    in your own plain words, and run it again with `--yes` only if they want it. It
    writes the skill's folder under the selected tool's skills directory, never overwrites a skill
    they already have, and reports the shelf itself. Then smoke-test it on something
-   real before saying it works.
+   real after filling any remaining placeholders. Record a successful smoke test in
+   `status/status.json` under `packages.<slug>` with its kind, version, install date,
+   and `smoke_test_passed: true`. Skills use Orion's send level and CRM scope, and
+   can further limit what Orion does while running that procedure.
 
    A library skill is written for any business. Where the business is named it carries
    a token such as `{{CLIENT_BUSINESS}}`, and its `SKILL.md` lists under **Fill at
@@ -417,7 +345,7 @@ one:
    double braces is the skill's own working text (a message template's blanks) and
    stays exactly as written.
 
-3c. **When the client wants to send a skill up to Daily Practice or the library** —
+2. **When the client wants to send a skill up to Daily Practice or the library** —
    "send this skill to Daily Practice", "send it to the library", "push this to the
    library", "contribute this skill", "offer this skill up", "give this skill back",
    or any wording that means a skill (not a message) going *to* the library — the
@@ -429,16 +357,6 @@ one:
    yes. The whole skill folder travels: `SKILL.md` plus its reference and template
    files. Only text files go; a script or binary in the folder stays behind, and the
    preview names what stays so you can tell the client.
-
-4. If the radio is on and you can run scripts, report it to the shelf:
-   `node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>` —
-   that's how Daily Practice knows what this machine runs when improvements ship. Radio
-   off → skip, say nothing, all is well. (Bespoke hires and taught skills record and
-   report the same way — `specs/002-production-line/contracts/agent-anatomy.md`.)
-5. Every agent package's safety rails are non-negotiable rules 3 and 4 above, restated —
-   sending by rule 1 of the agent definition, refusal line intact, no exceptions because
-   a package "needs" one. A package or a skill never carries a send level: the level
-   lives in `status/status.json` and on the job sheet, and nowhere else.
 
 ## Where the fuller detail lives
 

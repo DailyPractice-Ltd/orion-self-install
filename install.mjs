@@ -69,6 +69,7 @@ function install() {
       const pristine=JSON.parse(readFileSync(join(release,'update/pristine.json'),'utf8'));
       const planned=new Map(plan.map(entry=>[entry.destination,entry]));
       const excluded=['.git','.github','.codex','node_modules','install.mjs','n8n','.specify','update/scaffold',...(tool==='codex'?['team']:[]),...manifest.deployment.release_only.filter(path=>!path.includes('*')).map(path=>path.replace(/\/$/,'')),...(manifest.remove||[])];
+      const retired = new Map((manifest.deployment.retired || []).map(entry => [entry.destinations?.[tool], entry.fingerprint_key]));
       const skillRoot=tool==='codex'?'.agents/skills':'.claude/skills';
       const otherRoot=tool==='codex'?'.claude':'.agents';
       const excludedPath=path=>excluded.some(prefix=>path===prefix || path.startsWith(`${prefix}/`)) ||
@@ -80,12 +81,17 @@ function install() {
       const collisions=[];
       const copyTree=(path)=>{
         if(excludedPath(path)) return;
-        const source=safePath(migration,path), dest=safePath(stage,path);
+        let archive = path;
+        if (path.startsWith('.claude/agents/')) archive = `legacy/claude-agents/${path.slice('.claude/agents/'.length)}`;
+        if (path.startsWith(`${skillRoot}/hire-agent/`)) archive = `legacy/hire-agent/${path.slice(`${skillRoot}/hire-agent/`.length)}`;
+        const source=safePath(migration,path), dest=safePath(stage,archive);
         if(!existsSync(source)) return;
         if(lstatSync(source).isSymbolicLink()) throw new Error(`Legacy symlink collision: ${path}`);
         if(lstatSync(source).isDirectory()) {
           for(const name of readdirSync(source)) copyTree(`${path}/${name}`);
         } else if(lstatSync(source).isFile()) {
+          const retiredKey = retired.get(path);
+          if (retiredKey && (pristine.files?.[retiredKey] || []).includes(fingerprint(readFileSync(source)))) return;
           const entry=planned.get(path);
           if(entry && entry.ownership!=='client-template') {
             const sourceEntry=manifest.deployment.entries.find(item=>item.destinations?.[tool]===path);
@@ -98,8 +104,18 @@ function install() {
         else throw new Error(`Legacy special file: ${path}`);
       };
       for(const name of readdirSync(migration)) copyTree(name);
-      // Older Codex clients used team/. Copy only their roster and job sheets
-      // into the new destination. Release agents/ remains excluded above.
+      // Preserve Codex job sheets from the pre-split agents/ and team/ layouts.
+      if (tool === 'codex' && existsSync(safePath(migration, 'agents'))) {
+        for (const name of readdirSync(safePath(migration, 'agents'))) {
+          if (!/^[A-Za-z0-9][A-Za-z0-9_-]*\.md$/.test(name)) continue;
+          const source = safePath(migration, `agents/${name}`);
+          if (!lstatSync(source).isFile()) throw new Error(`Legacy job sheet collision: agents/${name}`);
+          if (name === 'README.md' && (pristine.files?.['agents/README.md'] || []).includes(fingerprint(readFileSync(source)))) continue;
+          mkdirSync(safePath(stage, 'agents'), { recursive: true });
+          copyFileSync(source, safePath(stage, `agents/${name}`));
+        }
+      }
+      // Keep historical team/ files at their original paths.
       if(tool==='codex' && existsSync(safePath(migration,'team'))) {
         const oldJobs=safePath(migration,'team');
         if(!lstatSync(oldJobs).isDirectory()) throw new Error('Legacy team/ is not a directory');
@@ -107,7 +123,9 @@ function install() {
           if(!/^[A-Za-z0-9][A-Za-z0-9_-]*\.md$/.test(name)) continue;
           const source=safePath(migration,`team/${name}`);
           if(!lstatSync(source).isFile()) throw new Error(`Legacy job sheet collision: team/${name}`);
-          copyFileSync(source,safePath(stage,`agents/${name}`));
+          const destination = safePath(stage, `team/${name}`);
+          mkdirSync(dirname(destination), { recursive: true });
+          copyFileSync(source, destination);
         }
       }
       const template=JSON.parse(readFileSync(join(release,'status/status.schema-template.json'),'utf8'));
@@ -122,7 +140,7 @@ function install() {
       oldStatus.selected_tool=tool;
       oldStatus.template_version=manifest.template_version;
       oldStatus.home={enabled:false,branch:'main'};
-      oldStatus.notes=[oldStatus.notes||'','Saved schedules need to be wired again in this new folder.'].filter(Boolean).join('\n');
+      oldStatus.notes=[oldStatus.notes||'','Review any schedules in the original folder before replacing them with native scheduled tasks.'].filter(Boolean).join('\n');
       oldStatus.notes=[oldStatus.notes||'',`migrated from legacy checkout to ${target}`].filter(Boolean).join('\n');
       writeFileSync(join(stage,'status/status.json'),JSON.stringify(oldStatus,null,2)+'\n');
       if(collisions.length) console.log(`Migration collisions (client edits preserved): ${collisions.sort().join(', ')}`);

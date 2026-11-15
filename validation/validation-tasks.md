@@ -33,7 +33,7 @@ never silently assumed either way.
 
 ## VT-01 · Prospect research end-to-end
 
-**Runs**: your agent's prospect-research task (agent-definition task 1), the way you'll
+**Runs**: the Prospect Research → Outreach skill (agent-definition task 1), the way you'll
 actually use it day to day.
 
 **Steps**: pick a real prospect you haven't contacted yet → hand them to your agent
@@ -79,7 +79,7 @@ confirmed by looking at the CRM itself, not the agent's word for it.
 
 ## VT-04 · Post-call debrief end-to-end
 
-**Runs**: your agent's post-call debrief task (agent-definition task 2), on a real
+**Runs**: the Post-Call Debrief skill (agent-definition task 2), on a real
 recent call (transcript or your own notes).
 
 **Pass criteria**:

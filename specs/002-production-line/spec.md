@@ -64,10 +64,8 @@ without the wizard ever seeing a password.
 ### User Story 2 - The README as a control panel (Priority: P1)
 
 The README stops being a linear document and becomes the client's control panel. At the
-top: **Press Start** (one command, plus a plain fallback). Below it: **the Library** —
-rows of buttons: *Agents · Skills · Workflows · Programs*. Each button opens a package
-page whose first block is the exact text to paste into your AI — the AI then installs
-that thing for you. (Honest mechanics: on GitHub a "button" is a link. We say so.)
+top: **Press Start** (one command, plus a plain fallback). Below it, built-in skills
+link directly to their instructions. Daily Practice can offer extra skills over the radio.
 
 **Why this priority**: the README is the product's face. "Which file do I open?" should
 never be a question a client has to ask.
@@ -78,18 +76,17 @@ what is this, what do I press first, and where do I get more capabilities later.
 **Acceptance Scenarios**:
 
 1. **Given** a fresh reader, **When** they open the README, **Then** Press Start is the
-   first actionable element, and every Library button leads to a page whose first block
-   is a copy-paste install prompt.
-2. **Given** any Library page, **When** the client follows it, **Then** it ends with
-   "you'll know it worked when…" and the smoke test to prove it.
+   first actionable element, and each built-in skill link opens its instructions.
+2. **Given** a radio skill offer, **When** the client accepts it, **Then** Orion installs
+   the skill and smoke-tests it on the client's own data.
 3. **Given** the repo is public on GitHub, **When** screenshots exist per `SHOTLIST.md`,
    **Then** the README's four image placeholders are filled.
 
 ---
 
-### User Story 3 - Day-one agents, extracted from the battle-tested harness (Priority: P2)
+### User Story 3 - Day-one skills, extracted from the battle-tested harness (Priority: P2)
 
-The client's Library offers three ready agents on day one: **Prospecting** (fill the top
+Orion ships three ready skills: **Prospecting** (fill the top
 of your pipeline), **Call-Planner Control Tower** (who to call today, in what order, with
 context and the likely objection), and **Friday Report** (the week's scoreboard, drafted
 for your approval). None of these are invented — each is extracted from the live Workweek
@@ -99,13 +96,12 @@ Workweek's data, and templatised so it can be trained onto any client's stack.
 **Why this priority**: the operating standard is *nothing ships that hasn't been battle-
 tested*. These three are the "gym protocol" answer to install overwhelm.
 
-**Independent Test**: each package installs from its Library page onto a machine that is
-not Workweek's, and passes its smoke test against that machine's live data.
+**Independent Test**: each built-in skill passes its smoke test on another business's live data.
 
 **Acceptance Scenarios**:
 
-1. **Given** the Prospecting package installed with a client's own ICP, **When** the
-   smoke test runs, **Then** it returns ~20 matching prospects with a one-line
+1. **Given** the Prospecting skill configured with a client's own ICP, **When** the
+   smoke test runs, **Then** the skill returns ~20 matching prospects with a one-line
    "why them" each — drafts and lists only, nothing sent.
 2. **Given** the Call-Planner installed against the client's CRM, **When** the smoke test
    runs, **Then** today's prioritised call plan is produced from their live pipeline.
@@ -181,14 +177,10 @@ out at the next session start; the reply arrives back.
   client's AI on the `AGENTS.md` install sequence, and MUST be re-runnable — resume from
   the bookmark, never restart from zero.
 - **FR-004**: The README MUST lead with Press Start (one command + ZIP/no-wizard
-  fallback) and present the Library as linked "buttons" grouped Agents · Skills ·
-  Workflows · Programs, each landing on a package page whose first block is the install
-  prompt.
-- **FR-005**: Every Library entry MUST follow one packaging shape:
-  `library/<kind>/<slug>/PACKAGE.md` with name, kind, version, requires; an install
-  prompt; a smoke test (a "prove it works" task on the client's own data); a changelog
-  line.
-- **FR-006**: The three day-one agent packages (Prospecting, Call-Planner Control Tower,
+  fallback) and link to built-in skills and instructions for receiving radio offers.
+- **FR-005**: Built-in skills live at `skills/<slug>/SKILL.md` and ship through the
+  deployment manifest. Optional skills come from the Daily Practice library over the radio.
+- **FR-006**: The three day-one skills (Prospecting, Call-Planner Control Tower,
   Friday Report) MUST be extracted from the live Workweek harness — behavior distilled,
   placeholders per Article VI — and MUST pass the scrub check (zero Workweek identifiers)
   before entering the repo.
@@ -228,7 +220,7 @@ out at the next session start; the reply arrives back.
   seen by the wizard.
 - **SC-002**: A first-time reader locates "what do I press first" and "where do I add
   capabilities" within one screen of the README (observed in the dry run, not assumed).
-- **SC-003**: All three day-one packages pass their smoke tests on live non-Workweek data
+- **SC-003**: All three day-one skills pass their smoke tests on live non-Workweek data
   before Kira's install session — nothing is demoed for the first time in front of a
   client.
 - **SC-004**: Scrub check on every extracted package: a defined grep list of Workweek

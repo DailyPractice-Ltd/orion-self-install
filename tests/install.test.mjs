@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,11 +19,14 @@ for (const tool of ['claude-code', 'codex']) {
     const read = (path) => readFileSync(join(target, path), 'utf8');
     assert.equal(JSON.parse(read('status/status.json')).selected_tool, tool);
     assert.ok(existsSync(join(target, 'AGENTS.md')));
-    assert.ok(existsSync(join(target, tool === 'codex' ? '.agents/skills/hire-agent/SKILL.md' : '.claude/skills/hire-agent/SKILL.md')));
-    assert.ok(existsSync(join(target, tool === 'codex' ? 'agents/README.md' : '.claude/agents/README.md')));
-    for (const name of readdirSync(join(release, 'skills'))) {
-      assert.ok(existsSync(join(target, tool === 'codex' ? `.agents/skills/${name}/SKILL.md` : `.claude/skills/${name}/SKILL.md`)), `${name} missing`);
+    const skillRoot = tool === 'codex' ? '.agents/skills' : '.claude/skills';
+    for (const name of ['prospecting', 'call-planner', 'friday-report', 'memory-consolidation', 'prospect-research-outreach', 'post-call-debrief']) {
+      assert.ok(existsSync(join(target, skillRoot, name, 'SKILL.md')));
     }
+    assert.equal(existsSync(join(target, 'library')), false);
+    assert.equal(existsSync(join(target, skillRoot, 'hire-agent')), false);
+    assert.equal(existsSync(join(target, skillRoot, 'report-bug')), false);
+    assert.equal(existsSync(join(target, tool === 'codex' ? 'agents' : '.claude/agents')), false);
     assert.equal(existsSync(join(target, '.specify')), false);
     assert.equal(existsSync(join(target, 'update/scaffold')), false);
     assert.ok(existsSync(join(target,'.git')));
@@ -92,8 +95,8 @@ test('legacy migration carries personal work into a separate deployed repository
   assert.equal(read('agent/knowledge-base/01-business-context.md'),'my business\n');
   assert.equal(read('memory/INDEX.md'),'my memory\n');
   assert.equal(read('.claude/skills/custom/SKILL.md'),'my skill\n');
-  assert.equal(read('.claude/agents/README.md'),'my roster\n');
-  assert.equal(read('.claude/agents/writer.md'),'my job\n');
+  assert.equal(read('legacy/claude-agents/README.md'),'my roster\n');
+  assert.equal(read('legacy/claude-agents/writer.md'),'my job\n');
   assert.equal(read('client-notes.md'),'my top-level notes\n');
   assert.equal(read('docs/my-playbook.md'),'my playbook\n');
   for(const path of ['skills','tests','n8n']) assert.equal(existsSync(join(target,path)),false);
@@ -104,19 +107,17 @@ test('legacy migration carries personal work into a separate deployed repository
   assert.equal(readFileSync(join(legacy,'status/status.json'),'utf8').includes('selected_tool'),false);
 });
 
-test('Codex migration maps legacy team jobs without copying release agent sources', t => {
+test('Codex migration preserves legacy team jobs in place', t => {
   const base=mkdtempSync(join(tmpdir(),'orion-codex-migrate-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
   const legacy=join(base,'legacy'),target=join(base,'client');mkdirSync(legacy);
   const put=(path,body)=>{const full=join(legacy,path);mkdirSync(dirname(full),{recursive:true});writeFileSync(full,body);};
   put('status/status.json',JSON.stringify({template_version:'2.0.0',selected_tool:'codex'}));
   put('team/README.md','my roster\n');put('team/writer.md','my job\n');
-  put('agents/README.md','release roster source\n');put('agents/maintainer.md','release-only agent\n');
   const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','codex','--target',target,'--migrate-from',legacy,'--local-only'],{encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);
-  assert.equal(readFileSync(join(target,'agents/README.md'),'utf8'),'my roster\n');
-  assert.equal(readFileSync(join(target,'agents/writer.md'),'utf8'),'my job\n');
-  assert.equal(existsSync(join(target,'agents/maintainer.md')),false);
-  assert.equal(existsSync(join(target,'team')),false);
+  assert.equal(readFileSync(join(target,'team/README.md'),'utf8'),'my roster\n');
+  assert.equal(readFileSync(join(target,'team/writer.md'),'utf8'),'my job\n');
+  assert.equal(existsSync(join(target,'agents')),false);
 });
 
 test('install defaults to a local repository',t=>{

@@ -63,14 +63,10 @@ test('software that cannot start on its own is never given a command', () => {
 
 // ── The prompt and the job sheet ─────────────────────────────────────────────
 
-test('the shift prompt has no quote characters and is the one HIRING.md gives for rung A', () => {
+test('a legacy shift prompt has no quote characters', () => {
   const prompt = shiftPrompt({ folder: '{absolute folder path}', name: '{name}', jobRoot: '{job-root}' });
   assert.equal(/['"`%^]/.test(prompt), false, 'the shift prompt has a character a command file cannot carry');
-  const hiring = read('library/HIRING.md');
-  const at = hiring.indexOf('`Open {absolute folder path} and run the {name} shift:');
-  assert.ok(at !== -1, 'the shift prompt is missing from HIRING.md');
-  const inHiring = hiring.slice(at + 1, hiring.indexOf('`', at + 1));
-  assert.equal(oneLine(inHiring), prompt, 'HIRING.md and status/schedule.mjs give different shift prompts');
+
 });
 
 test('the tools on a job sheet are read in every shape people write them', () => {
@@ -407,62 +403,16 @@ function scratchHarness(tool = 'claude-code') {
   return { base, run };
 }
 
-test('Codex schedule reads the agents/ job sheet and embeds that path in its wake-up', () => {
-  const { base, run } = scratchHarness('codex');
-  try {
-    const r = run('wire', '--agent', 'probe', '--surface', 'codex', '--at', '07:00', '--bin', process.execPath);
-    assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.match(readFileSync(join(base, 'status', 'shifts', 'probe.sh'), 'utf8'), /agents\/probe\.md/);
-  } finally { rmSync(base, { recursive: true, force: true }); }
-});
-
-test('wire writes only inside status/shifts/ and switches nothing on', () => {
+test('the legacy schedule command only supports cleanup', () => {
   const { base, run } = scratchHarness();
   try {
-    // --bin stands in for the agent software, so the test needs neither installed.
-    const r = run('wire', '--agent', 'probe', '--surface', 'claude-code', '--at', '07:00', '--days', 'mon,wed', '--bin', process.execPath);
-    assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.match(r.stdout, /Nothing is switched on yet/);
-    assert.match(r.stdout, /node status\/schedule\.mjs on --agent probe/);
-    // The job sheet said Read. The report's three commands were added.
-    assert.ok(r.stdout.includes(`--allowedTools ${['Read', ...SHIFT_TOOLS.slice(1)].join(',')}`));
-    const shifts = join(base, 'status', 'shifts');
-    const wakeUp = join(shifts, process.platform === 'win32' ? 'probe.cmd' : 'probe.sh');
-    assert.ok(readFileSync(wakeUp, 'utf8').includes('run the probe shift'));
-    const record = JSON.parse(readFileSync(join(shifts, 'probe.json'), 'utf8'));
-    assert.deepEqual([record.agent, record.at, record.days, record.os], ['probe', '07:00', ['mon', 'wed'], process.platform]);
-  } finally {
-    rmSync(base, { recursive: true, force: true });
-  }
-});
-
-test('wire refuses, and writes nothing, when it cannot build an honest wake-up', () => {
-  const { base, run } = scratchHarness();
-  try {
-    const cases = [
-      [['wire', '--agent', 'nobody', '--surface', 'claude-code', '--at', '07:00'], /no job sheet/],
-      [['wire', '--agent', 'probe', '--surface', 'cursor', '--at', '07:00'], /must match status.selected_tool/],
-      [['wire', '--agent', 'probe', '--surface', 'claude-code', '--at', '25:00', '--bin', process.execPath], /HH:MM/],
-      [['wire', '--agent', 'probe', '--surface', 'claude-code', '--at', '07:00', '--bin', join(base, 'not-there')], /--bin needs the full path/],
-      [['wire', '--agent', 'probe', '--surface', 'claude-code', '--at', '07:00', '--bin', 'codex'], /--bin needs the full path/],
-      [['wire', '--agent', 'probe', '--surface', 'claude-code', '--at', '07:00', '--bin', base], /--bin needs the full path/],
-      // A flag is never taken as another flag's value.
-      [['wire', '--agent', 'probe', '--bin', '--surface', 'claude-code'], /--bin is not understood/],
-      [['wire', '--agent', 'probe', '--at', '07:00', '--line', 'x'], /Not something schedule.mjs wire takes/],
-      [['on', '--agent', 'probe', '--at', '07:00'], /Not something schedule.mjs on takes/],
-      // Nothing can be switched on, fired or switched off before it is written.
-      [['on', '--agent', 'probe'], /no wake-up for probe/],
-      [['run', '--agent', 'probe'], /no wake-up for probe/],
-      [['off', '--agent', 'probe'], /no wake-up for probe/],
-      [['on', '--agent', '../probe'], /--agent:/],
-      [['unwire'], /not something schedule.mjs does/],
-    ];
-    for (const [args, expected] of cases) {
-      const r = run(...args);
-      assert.equal(r.status, 1, `${args.join(' ')} should exit 1`);
-      assert.match(r.stdout, expected);
-      assert.equal(existsSync(join(base, 'status', 'shifts')), false, `${args.join(' ')} wrote something`);
+    for (const command of ['wire', 'on', 'run']) {
+      const r = run(command, '--agent', 'probe');
+      assert.equal(r.status, 1);
+      assert.match(r.stdout, /Codex scheduled tasks or Claude Routines/);
     }
+    assert.equal(existsSync(join(base, 'status', 'shifts')), false);
+    assert.match(run('off', '--agent', 'probe').stdout, /no wake-up for probe/);
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
@@ -484,7 +434,7 @@ test('a record that does not belong to this folder on this machine switches noth
     ];
     for (const text of records) {
       writeFileSync(join(shifts, 'probe.json'), text);
-      for (const command of ['on', 'run', 'off']) {
+      for (const command of ['off']) {
         const r = run(command, '--agent', 'probe');
         assert.equal(r.status, 1, `${command} should refuse: ${text.slice(0, 40)}`);
         assert.match(r.stdout, /does not match this folder on this machine/);
@@ -497,26 +447,6 @@ test('a record that does not belong to this folder on this machine switches noth
 });
 
 // ── The words match the code ─────────────────────────────────────────────────
-
-test('HIRING.md sends rung B to the script and no longer writes a command by hand', () => {
-  const hiring = read('library/HIRING.md');
-  for (const command of ['wire --agent {name}', 'on --agent {name}', 'run --agent {name}', 'off --agent {name}']) {
-    assert.ok(hiring.includes(`node status/schedule.mjs ${command}`), `HIRING.md does not name: schedule.mjs ${command}`);
-  }
-  assert.equal(/claude -p/.test(hiring), false, 'HIRING.md still writes claude -p by hand');
-  assert.equal(/schtasks|launchctl/.test(hiring), false, 'HIRING.md still talks to a scheduler by hand');
-});
-
-test('each adapter shows the command the code starts', () => {
-  const codex = unattendedRunner('codex');
-  assert.ok(
-    read('agent/adapters/codex.md').includes([codex.bin, ...codex.args.map((a) => (a === PROMPT_SLOT ? '"{prompt}"' : a))].join(' ')),
-    'agent/adapters/codex.md differs from unattendedRunner',
-  );
-  const claude = unattendedRunner('claude-code', { tools: 'T' });
-  const shown = [claude.bin, ...claude.args.map((a) => (a === PROMPT_SLOT ? '"{prompt}"' : a === 'T' ? '"{the job sheet\'s tools, plus the report\'s}"' : a))].join(' ');
-  assert.ok(read('agent/adapters/claude-code.md').includes(shown), 'agent/adapters/claude-code.md differs from unattendedRunner');
-});
 
 test('the script travels with updates, and what it writes is left alone by them', () => {
   const manifest = JSON.parse(read('update/manifest.json'));

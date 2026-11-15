@@ -68,8 +68,13 @@ export function planForTool(deployment, tool, { releaseRoot = RELEASE_ROOT, root
     .filter((item) => item.isFile())
     .map((item) => relative(releaseRoot, join(item.parentPath, item.name)).split(sep).join('/')).sort();
   const mappedSkills = deployment.entries.filter((entry) => entry.source.startsWith('skills/'));
+<<<<<<< HEAD
   const skillSources = mappedSkills.map((entry) => entry.source).sort();
   if (JSON.stringify(actualSkills) !== JSON.stringify(skillSources)) throw new Error('Deployment skill mappings must cover every file under skills/ exactly once');
+=======
+  const skillSources = [...mappedSkills.filter((entry) => entry.source.endsWith('/SKILL.md')).map((entry) => entry.source), ...(deployment.local_skills || [])].sort();
+  if (JSON.stringify(actualSkills) !== JSON.stringify(skillSources)) throw new Error('Deployment skill mappings must cover every skills/*/SKILL.md exactly once');
+>>>>>>> feature/remove-multiple-agents
   for (const entry of mappedSkills) for (const selected of deployment.tools) {
     const expected = `${selected === 'codex' ? '.agents' : '.claude'}/skills/${entry.source.slice('skills/'.length)}`;
     if (entry.destinations?.[selected] !== expected) throw new Error(`Invalid skill mapping for ${entry.source} (${selected})`);
@@ -105,10 +110,9 @@ export function runtimeLayout(root, { legacyTool } = {}) {
   const status = readJson(join(root, 'status/status.json'), 'harness status');
   const tool = selectedTool(status, manifest.deployment, { legacyTool });
   const skill = manifest.deployment.entries.find((entry) => entry.source === 'skills/create-skill/SKILL.md');
-  const roster = manifest.deployment.entries.find((entry) => entry.source === 'agents/README.md');
-  if (!skill?.destinations?.[tool] || !roster?.destinations?.[tool]) throw new Error(`Missing runtime destinations for ${tool}`);
+  if (!skill?.destinations?.[tool]) throw new Error(`Missing runtime destinations for ${tool}`);
   const skillRoot = dirname(dirname(skill.destinations[tool]));
-  const rosterPath = roster.destinations[tool];
+  const rosterPath = tool === 'codex' ? 'agents/README.md' : '.claude/agents/README.md';
   safePath(root, skillRoot);
   safePath(root, rosterPath);
   return { tool, skillRoot, rosterPath, jobRoot: dirname(rosterPath) };

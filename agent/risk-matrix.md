@@ -66,15 +66,14 @@ the level. In words:
 - **off** (paused): everything waits for you.
 
 Say "set my risk to medium", "pause sending" or "resume sending" and your agent moves it.
-A hired agent can be kept apart ("the Friday report never sends"); it can never go above
-your level.
+A skill or scheduled task can constrain Orion to drafting or reading. The harness risk level sets the upper bound.
 
 ## What never goes on its own, at any level
 
 - Anyone on `status/no-contact.md`, for good.
 - A follow-up to someone who has replied in that thread: answer them instead.
 - Anything past a pacing cap you set with the level (`--cap-email`, `--cap-dm`, `--cap-sms`, per day).
-- A hired agent that is not live yet, or whose job sheet says `send_risk: never`.
+- A skill or scheduled task is scoped to drafts or read-only work.
 - Anything that would harm your reputation (rule 2 of the agent definition): that is
   refused before it is scored, not scored.
 

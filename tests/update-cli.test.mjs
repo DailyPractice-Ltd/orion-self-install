@@ -28,19 +28,19 @@ test('pinned selected update preserves collisions and restores additions and ret
 });
 function requireHash(s) { return createHash('sha256').update(s).digest('hex'); }
 
-test('Codex update carries legacy team job sheets into agents and can restore',t=>{
+test('Codex update preserves legacy team job sheets in place',t=>{
   const base=mkdtempSync(join(tmpdir(),'orion-update-team-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
   const source=join(base,'release'),client=join(base,'client');mkdirSync(source);mkdirSync(client);
-  const manifest={template_version:'2.0.0',deployment:{tools:['claude-code','codex'],common_sources:[],entries:[{source:'agents/README.md',destinations:{'claude-code':'.claude/agents/README.md',codex:'agents/README.md'},ownership:'client-template',fingerprint_key:'agents/README.md'}]}};
+  const manifest={template_version:'2.0.0',deployment:{tools:['claude-code','codex'],common_sources:[],entries:[]}};
   put(source,'agents/README.md','release roster\n');put(source,'update/manifest.json',JSON.stringify(manifest));put(source,'update/pristine.json',JSON.stringify({files:{}}));
   git(source,'init','-q');git(source,'add','.');git(source,'-c','user.email=test@example.com','-c','user.name=Test','commit','-qm','release');
   put(client,'status/status.json',JSON.stringify({template_version:'1.0.0',selected_tool:'codex'}));
   put(client,'team/README.md','client roster\n');put(client,'team/writer.md','client job\n');
   const updated=run('update','--root',client,'--release-repo',source,'--commit',git(source,'rev-parse','HEAD'));assert.equal(updated.status,0,updated.stderr);
   const report=JSON.parse(updated.stdout);
-  assert.equal(get(client,'agents/README.md'),'client roster\n');assert.equal(get(client,'agents/writer.md'),'client job\n');
+  assert.equal(get(client,'team/README.md'),'client roster\n');
   assert.equal(get(client,'team/writer.md'),'client job\n');
-  assert.ok(report.added.includes('agents/README.md'));assert.ok(report.added.includes('agents/writer.md'));
+  assert.equal(existsSync(join(client,'agents')),false);
   const restored=run('restore','--root',client,'--backup',report.backup);assert.equal(restored.status,0,restored.stderr);
   assert.equal(existsSync(join(client,'agents/README.md')),false);assert.equal(existsSync(join(client,'agents/writer.md')),false);
   assert.equal(get(client,'team/writer.md'),'client job\n');

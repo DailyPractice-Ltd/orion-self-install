@@ -27,8 +27,8 @@ test('recorded tool selects only its destinations and classifies absent files', 
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
   assert.equal(plan.selected_tool, 'codex');
-  assert.ok(plan.entries.some((e) => e.destination === '.agents/skills/hire-agent/SKILL.md' && e.state === 'absent'));
-  assert.ok(plan.entries.some((e) => e.destination === 'agents/README.md' && e.ownership === 'client-template'));
+  assert.ok(plan.entries.some((e) => e.destination === '.agents/skills/prospecting/SKILL.md' && e.state === 'absent'));
+  assert.ok(!plan.entries.some((e) => e.destination === 'agents/README.md'));
   assert.ok(plan.entries.every((e) => !e.destination.startsWith('.claude/')));
 });
 
@@ -43,12 +43,11 @@ test('missing and invalid recorded selections fail instead of inferring a tool',
   assert.match(result.stderr, /Invalid status\.selected_tool: chatgpt/);
 });
 
-test('ownership keeps edited release files and client roster rows', (t) => {
+test('ownership keeps edited release files and excludes the retired roster', (t) => {
   const root = harness(t, { selected_tool: 'claude-code' });
   for (const [source, destination] of [
-    ['skills/hire-agent/SKILL.md', '.claude/skills/hire-agent/SKILL.md'],
+    ['skills/prospecting/SKILL.md', '.claude/skills/prospecting/SKILL.md'],
     ['skills/create-skill/SKILL.md', '.claude/skills/create-skill/SKILL.md'],
-    ['agents/README.md', '.claude/agents/README.md'],
   ]) {
     mkdirSync(join(root, dirname(destination)), { recursive: true });
     copyFileSync(join(release, source), join(root, destination));
@@ -57,9 +56,9 @@ test('ownership keeps edited release files and client roster rows', (t) => {
   const result = run(root);
   assert.equal(result.status, 0, result.stderr);
   const byDestination = Object.fromEntries(JSON.parse(result.stdout).entries.map((e) => [e.destination, e.state]));
-  assert.equal(byDestination['.claude/skills/hire-agent/SKILL.md'], 'owned');
+  assert.equal(byDestination['.claude/skills/prospecting/SKILL.md'], 'owned');
   assert.equal(byDestination['.claude/skills/create-skill/SKILL.md'], 'preserve');
-  assert.equal(byDestination['.claude/agents/README.md'], 'client-owned');
+  assert.equal(byDestination['.claude/agents/README.md'], undefined);
 });
 
 test('legacy Claude layout requires an explicit migration choice', (t) => {
@@ -69,7 +68,7 @@ test('legacy Claude layout requires an explicit migration choice', (t) => {
   const plan = JSON.parse(result.stdout);
   assert.equal(plan.selected_tool, 'claude-code');
   assert.equal(plan.legacy_migration, true);
-  assert.ok(plan.entries.some((e) => e.destination === '.claude/agents/README.md'));
+  assert.ok(plan.entries.some((e) => e.destination === '.claude/skills/prospecting/SKILL.md'));
   result = run(root, '--legacy-tool', 'codex');
   assert.equal(result.status, 2);
   assert.match(result.stderr, /Legacy migration requires explicit/);

@@ -358,11 +358,13 @@ test('a harness on a version that was never tagged (0.6.6) is recognised file by
   if (!haveRef(UNTAGGED_066)) return t.skip('0.6.6 commit not fetched');
   const dir = makeClient({ ref: UNTAGGED_066, version: '0.6.6', handEditedFile: 'agent/agent-definition.md' });
   const theirs = readFileSync(join(dir, 'agent/agent-definition.md'), 'utf8');
+  const eligible = REFRESH.filter((path) =>
+    path !== 'agent/agent-definition.md' && existsSync(join(dir, path)));
   const { kept, refreshed, created } = runUpdate(dir);
   // The one file they changed is kept; nothing else is mistaken for theirs.
   assert.deepEqual(kept, ['agent/agent-definition.md'], 'only the changed file may be kept');
   assert.equal(readFileSync(join(dir, 'agent/agent-definition.md'), 'utf8'), theirs);
-  assert.ok(refreshed.length >= 40, `an untagged version must still refresh (got ${refreshed.length})`);
+  assert.deepEqual(refreshed, eligible, 'every other shipped file on the refresh list must be refreshed');
   assert.ok(created.length > 0, 'files new since 0.6.6 should be created');
   assert.equal(digest(join(dir, 'status/radio.mjs')), digest(join(repo, 'status/radio.mjs')));
 });

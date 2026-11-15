@@ -34,7 +34,8 @@ Daily Practice for a fresh code if your radio credentials were revoked.
 The command checks for the highest stable GitHub Release,
 excluding drafts, prereleases, and withdrawals. It downloads the published tag
 into a temporary checkout and runs that exact commit's updater, manifest,
-fingerprints, and shipped sources. It verifies publication and identity again
+historical fingerprints from `update/pristine.json`, and shipped sources.
+It verifies publication and identity again
 before changing the harness. If discovery or verification fails, retry when the
 published source is available.
 

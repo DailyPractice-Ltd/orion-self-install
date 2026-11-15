@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync, spawnSync, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { plainEnv } from './helpers/env.mjs';
 
 const checkout = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -201,6 +202,7 @@ async function publishedUpdateJourney(t, tool, { customizeCandidate, legacy, dam
   const publication = (id) => ({
     id: id === 2 && state.replacementId ? state.replacementId : id, tag_name: { 1: 'v2.0.0', 2: 'v2.10.0', 3: 'v9.0.0', 4: 'v3.0.0' }[id],
     draft: id === 3, prerelease: false, published_at: id === 1 ? '2026-12-01' : '2026-01-01',
+    ...(id === 2 && state.withdrawApplied ? { body: '<!-- orion:withdrawn -->' } : {}),
   });
   const url = 'https://fixture.test/api/bridge';
   const token = 'orion_' + 'test'.repeat(6);
@@ -1006,4 +1008,153 @@ test('explicit radio opt-in pairs the legacy migration target and preserves the 
   assert.equal(status(destination).sharing.install_token, null);
   assert.equal(read(destination, 'status/radio.key'), f.token + '\n');
   assert.equal(statSync(join(destination, 'status/radio.key')).mode & 0o777, 0o600);
+});
+
+function publishCorrection(f, fromVersion) {
+  git(f.release, 'checkout', '-q', '--detach', f.commit);
+  const manifest = JSON.parse(read(f.release, 'update/manifest.json'));
+  manifest.template_version = '3.0.0';
+  manifest.update_compatibility[0].from_version = fromVersion;
+  put(f.release, 'update/manifest.json', JSON.stringify(manifest));
+  const pristine = JSON.parse(read(f.release, 'update/pristine.json'));
+  pristine.files['skills/next/SKILL.md'] = [createHash('sha256').update('# Next release skill\n').digest('hex')];
+  put(f.release, 'update/pristine.json', JSON.stringify(pristine));
+  put(f.release, 'skills/next/SKILL.md', '# Corrected release\n');
+  git(f.release, 'add', '.');
+  git(f.release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'corrected publication');
+  git(f.release, 'tag', 'v3.0.0');
+  f.state.listed = [4, 2, 1];
+  return git(f.release, 'rev-parse', 'HEAD');
+}
+
+test('a client previews and elects backup restoration when a corrected release lacks a direct path', async t => {
+  const changed = 'AGENTS.md';
+  const f = await publishedUpdateJourney(t, 'codex', {
+    customizeCandidate({ release, manifest }) {
+      put(release, changed, read(release, changed) + '\nPublished change.\n');
+      manifest.remove_status_checklist_keys = ['retired_setting', 'later_setting'];
+    },
+  });
+  const before = status(f.client);
+  before.checklist.retired_setting = true;
+  before.checklist.later_setting = true;
+  put(f.client, 'status/status.json', JSON.stringify(before));
+  const originalManifest = read(f.client, 'update/manifest.json');
+  const update = await f.request();
+  assert.equal(update.code, 0, update.stderr);
+  const { backup } = JSON.parse(update.stdout);
+  const later = status(f.client);
+  later.sharing.status_signal_enabled = false;
+  later.sharing.radio_choice = 'declined';
+  later.checklist.later_setting = false;
+  later.notes += '\nWork completed after the update.';
+  put(f.client, 'status/status.json', JSON.stringify(later));
+  put(f.client, changed, '# Later client instructions\n');
+  put(f.client, 'agents/follow-up.md', '# Later hired agent\n');
+  f.state.withdrawApplied = true;
+  publishCorrection(f, '2.0.0');
+
+  const deferred = await f.request();
+  assert.notEqual(deferred.code, 0);
+  assert.match(deferred.stderr, /v2\.10\.0.*withdrawn/i);
+  assert.ok(deferred.stderr.includes(backup));
+  assert.match(deferred.stderr, /--restore-backup/);
+  assert.deepEqual(status(f.client), later);
+  assert.equal(read(f.client, f.newSkill), '# Next release skill\n');
+
+  const preview = await f.request({}, ['--restore-backup', backup]);
+  assert.equal(preview.code, 0, preview.stderr);
+  const plan = JSON.parse(preview.stdout);
+  assert.equal(plan.backup, backup);
+  assert.equal(plan.from.tag, 'v2.10.0');
+  assert.equal(plan.to.applied_release.tag, 'v2.0.0');
+  assert.ok(plan.remove.includes(f.newSkill));
+  assert.ok(plan.restore.includes('update/manifest.json'));
+  assert.ok(plan.keep.includes(changed));
+  assert.deepEqual(status(f.client), later);
+
+  put(f.client, f.newSkill, '# Later client skill\n');
+  const stale = await f.request({}, ['--restore-backup', backup, '--confirm-restore', plan.confirm]);
+  assert.notEqual(stale.code, 0);
+  assert.match(stale.stderr, /preview.*changed/i);
+  assert.deepEqual(status(f.client), later);
+
+  const refreshed = await f.request({}, ['--restore-backup', backup]);
+  assert.equal(refreshed.code, 0, refreshed.stderr);
+  const freshPlan = JSON.parse(refreshed.stdout);
+  const restored = await f.request({}, ['--restore-backup', backup, '--confirm-restore', freshPlan.confirm]);
+  assert.equal(restored.code, 0, restored.stderr);
+  assert.match(restored.stdout, /restored/i);
+  assert.ok(JSON.parse(restored.stdout).keep.includes(f.newSkill));
+  const after = status(f.client);
+  assert.equal(after.template_version, before.template_version);
+  assert.deepEqual(after.applied_release, before.applied_release);
+  assert.deepEqual(after.sharing, later.sharing);
+  assert.equal(after.checklist.retired_setting, true);
+  assert.equal(after.checklist.later_setting, false);
+  assert.match(after.notes, /Work completed after the update/);
+  assert.equal(read(f.client, changed), '# Later client instructions\n');
+  assert.equal(read(f.client, f.newSkill), '# Later client skill\n');
+  assert.equal(read(f.client, 'agents/follow-up.md'), '# Later hired agent\n');
+  assert.equal(read(f.client, 'update/manifest.json'), originalManifest);
+
+  const correction = await f.request({ ORION_PAIRING_CODE: 'BCDF-GHJK-LMNP' }, [
+    '--tag', 'v3.0.0', '--pair-radio',
+  ]);
+  assert.equal(correction.code, 0, correction.stderr);
+  assert.equal(status(f.client).applied_release.tag, 'v3.0.0');
+  assert.equal(read(f.client, f.newSkill), '# Later client skill\n');
+});
+
+test('a client elects a supported corrected release through the normal published update', async t => {
+  const f = await publishedUpdateJourney(t, 'codex');
+  const withdrawn = await f.request();
+  assert.equal(withdrawn.code, 0, withdrawn.stderr);
+  put(f.client, f.edit, '# Work after withdrawn release\n');
+  f.state.withdrawApplied = true;
+  const commit = publishCorrection(f, '2.10.0');
+  const restored = await f.request();
+  assert.equal(restored.code, 0, restored.stderr);
+  assert.equal(status(f.client).applied_release.commit, commit);
+  assert.equal(status(f.client).template_version, '3.0.0');
+  assert.equal(read(f.client, f.newSkill), '# Corrected release\n');
+  assert.equal(read(f.client, f.edit), '# Work after withdrawn release\n');
+  const oldBackup = JSON.parse(withdrawn.stdout).backup;
+  const stale = await f.request({}, ['--restore-backup', oldBackup]);
+  assert.notEqual(stale.code, 0);
+  assert.match(stale.stderr, /currently applied release/i);
+});
+
+test('an interrupted elected restore blocks updates and can recover to the withdrawn release through its pinned source', async t => {
+  const f = await publishedUpdateJourney(t, 'codex');
+  const installed = await f.request();
+  assert.equal(installed.code, 0, installed.stderr);
+  const { backup } = JSON.parse(installed.stdout);
+  const current = status(f.client);
+  f.state.withdrawApplied = true;
+  publishCorrection(f, '2.10.0');
+  const preview = await f.request({}, ['--restore-backup', backup]);
+  assert.equal(preview.code, 0, preview.stderr);
+  const restoreArgs = ['--restore-backup', backup, '--confirm-restore', JSON.parse(preview.stdout).confirm];
+  const stopped = await f.request({ ORION_UPDATE_INTERRUPT_AFTER: '1' }, restoreArgs);
+  assert.notEqual(stopped.code, 0);
+  assert.deepEqual(status(f.client), current);
+
+  const blocked = await f.request();
+  assert.notEqual(blocked.code, 0);
+  assert.match(blocked.stderr, /requires recovery from a separate pinned source/);
+  const recoveryBackup = /Evidence: (\.update-backup\/restore-\w+)/.exec(blocked.stderr)?.[1];
+  assert.ok(recoveryBackup);
+  const source = join(dirname(f.client), 'recover-elected-restore');
+  git(f.release, '-c', 'advice.detachedHead=false', 'clone', '-q', '--branch', 'v2.10.0', f.release, source);
+  const recovered = await f.execute([join(source, 'update/apply.mjs'), 'recover-published',
+    '--root', f.client, '--backup', recoveryBackup, '--tag', 'v2.10.0', '--commit', f.commit, '--release-id', '2']);
+  assert.equal(recovered.code, 0, recovered.stderr);
+  assert.deepEqual(status(f.client), current);
+  assert.equal(read(f.client, f.newSkill), '# Next release skill\n');
+
+  const restored = await f.request({}, restoreArgs);
+  assert.equal(restored.code, 0, restored.stderr);
+  assert.equal(status(f.client).applied_release.tag, 'v2.0.0');
+  assert.equal(existsSync(join(f.client, f.newSkill)), false);
 });

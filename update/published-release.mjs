@@ -15,12 +15,11 @@ function stablePublication(r) {
   );
 }
 export function eligibleRelease(r) {
-  return (
-    stablePublication(r) &&
-    !r.withdrawn &&
-    !String(r.body || '').includes(WITHDRAWAL_MARKER)
-  );
+  return stablePublication(r) && !withdrawnRelease(r);
 }
+const withdrawnRelease = (release) =>
+  Boolean(release.withdrawn) ||
+  String(release.body || '').includes(WITHDRAWAL_MARKER);
 export function compareVersions(a, b) {
   for (let i = 0; i < 3; i++) {
     const x = BigInt(a.replace(/^v/, '').split('.')[i]),
@@ -159,6 +158,27 @@ export async function checkoutHistoricalRelease(
   }
   return manifest;
 }
+
+/** A withdrawal is evidence only when the publication and tag still match. */
+export async function verifyReleaseWithdrawal(client, pin) {
+  if (
+    !tagPattern.test(pin?.tag) ||
+    !/^[a-f0-9]{40}$/.test(pin?.commit) ||
+    !Number.isSafeInteger(pin?.release_id) ||
+    pin.release_id < 1
+  )
+    throw new Error('A full published release identity is required.');
+  const release = await client.get(`/releases/${pin.release_id}`);
+  if (
+    !stablePublication(release) ||
+    release.id !== pin.release_id ||
+    release.tag_name !== pin.tag ||
+    remoteCommit(client, pin.tag) !== pin.commit
+  )
+    throw new Error('Published release identity changed.');
+  return withdrawnRelease(release);
+}
+
 export async function verifyPinnedRelease(
   client,
   pin,

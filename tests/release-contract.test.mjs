@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
@@ -76,4 +76,38 @@ test('all release skills have exactly one mapping for both tools', () => {
   assert.equal(existsSync(join(repo, '.claude')), false, 'release must not track or generate a second skill tree');
   for (const path of manifest.refresh) assert.ok(existsSync(join(repo, path)), `legacy refresh source missing: ${path}`);
   for (const name of names) assert.equal(manifest.refresh.includes(`.claude/skills/${name}/SKILL.md`), false);
+});
+
+
+test('release contract ships every skill supporting file to the selected runtime', () => {
+  const sources = readdirSync(join(repo, 'skills'), { recursive: true, withFileTypes: true })
+    .filter(entry => entry.isFile())
+    .map(entry => relative(repo, join(entry.parentPath, entry.name)).split(sep).join('/'));
+  for (const tool of ['codex', 'claude-code']) {
+    const run = spawnSync(process.execPath, [join(repo, 'update/release-contract.mjs'), '--tool', tool], { encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    const plan = JSON.parse(run.stdout);
+    for (const source of sources) {
+      assert.ok(plan.entries.some(entry => entry.source === source && entry.destination === `${tool === 'codex' ? '.agents' : '.claude'}/${source}`), `missing skill file: ${source}`);
+    }
+  }
+});
+
+
+test('release contract refuses a missing required historical fingerprint', (t) => {
+  const release = mkdtempSync(join(tmpdir(), 'orion-release-history-'));
+  t.after(() => rmSync(release, { recursive: true, force: true }));
+  const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
+  for (const path of [...manifest.deployment.common_sources, ...manifest.deployment.entries.map(entry => entry.source)]) {
+    mkdirSync(dirname(join(release, path)), { recursive: true });
+    copyFileSync(join(repo, path), join(release, path));
+  }
+  const pristine = JSON.parse(readFileSync(join(release, 'update/pristine.json'), 'utf8'));
+  const historical = 'skills/speckit-analyze/SKILL.md';
+  assert.ok(pristine.files[historical].length > 0);
+  delete pristine.files[historical];
+  writeFileSync(join(release, 'update/pristine.json'), JSON.stringify(pristine));
+  const run = spawnSync(process.execPath, [join(release, 'update/release-contract.mjs'), '--tool', 'codex'], { encoding: 'utf8' });
+  assert.notEqual(run.status, 0);
+  assert.match(run.stderr, /missing.*fingerprint.*skills\/speckit-analyze\/SKILL.md/i);
 });

@@ -363,8 +363,8 @@ const STAGE_WORDS = {
 async function main() {
   if (existsSync(join(__dirname, 'skills')) && existsSync(join(__dirname, 'install.mjs'))) {
     say('This is the Orion release folder. Create a separate client repository first:');
-    say('  node install.mjs --tool codex --target <your-client-folder>');
-    say('  node install.mjs --tool claude-code --target <your-client-folder>');
+    say('  node install-published.mjs --tool codex --target <your-client-folder>');
+    say('  node install-published.mjs --tool claude-code --target <your-client-folder>');
     say('Then run node start.mjs inside that new folder.');
     process.exitCode = 2;
     return;

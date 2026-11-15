@@ -76,8 +76,8 @@ const KEY_PATH = path.join(STATUS_DIR, RADIO_KEY_FILE);
 const KEY_REL = `status/${RADIO_KEY_FILE}`;
 
 // A release checkout is not a client's home, even if it is itself a git repository.
-if (fs.existsSync(path.join(ROOT, 'skills')) && fs.existsSync(path.join(ROOT, 'install.mjs'))) {
-  console.error('This is the Orion release folder. Run node install.mjs --tool <codex|claude-code> --target <client-folder> first.');
+if (fs.existsSync(path.join(ROOT, 'skills')) && fs.existsSync(path.join(ROOT, 'agents'))) {
+  console.error('This is the Orion release folder. Run node install-published.mjs --tool <codex|claude-code> --target <client-folder> first.');
   process.exit(2);
 }
 
@@ -211,6 +211,7 @@ function keyInFile() {
 
 const NEVER_SAVED = [
   KEY_REL,                          // the radio key
+  'status/release-notices/',         // display receipts for this machine
   'status/shifts/',                 // wake-up files: full paths that only mean something on one machine
   '.update-backup/',                // an update's safety copies, older keys among them
   '.DS_Store',

@@ -351,6 +351,7 @@ function rollbackSwitch(root,backup,journal) {
 }
 function restore(root,backupRel) {
   const backup=safe(root,backupRel); const journal=json(join(backup,'journal.json'));
+  if(journal.kind==='published-update') throw new Error('Use the documented published recovery procedure for this backup.');
   if(journal.kind==='switch') {
     if(journal.state!=='complete') throw new Error(`Switch backup is ${journal.state}; only completed switches can be restored`);
     const conflicts=journal.actions.filter(a=>{
@@ -385,6 +386,36 @@ function restore(root,backupRel) {
 try {
   const command=process.argv[2], root=arg('--root'); if(!root) throw new Error('--root is required');
   const repo=arg('--release-repo')||dirname(dirname(fileURLToPath(import.meta.url)));
-  const result=command==='update' ? update(root,repo,arg('--commit')) : command==='switch' ? switchTool(root,repo,arg('--commit'),arg('--to'),arg('--legacy-tool')) : command==='restore' ? restore(root,arg('--backup')) : command==='recover' ? {recovered:[...recoverPendingUpdates(root),...recoverPendingSwitches(root)]} : (()=>{throw new Error('Use update, switch, restore or recover');})();
-  console.log(JSON.stringify(result,null,2));
+  if (command === 'update-published' || command === 'recover-published') {
+    const { createReleaseClient } = await import('./published-release.mjs');
+    const { applyPublishedUpdate, recoverPublishedUpdate } = await import('./published-transaction.mjs');
+    const checkout = dirname(dirname(fileURLToPath(import.meta.url)));
+    const tag = arg('--tag');
+    const options = {
+      root, checkout,
+      migrateTo: arg('--migrate-to'), stagedPairing: arg('--staged-pairing') || arg('--migration-pairing'),
+      reviewDir: arg('--resolve-required'),
+      client: createReleaseClient({
+        repository: arg('--repository'), apiBase: arg('--api-base'), sourceUrl: arg('--source-url'),
+      }),
+      pin: { tag, commit: arg('--commit'), release_id: Number(arg('--release-id')), manifest_version: tag?.slice(1) },
+    };
+    const result = command === 'recover-published'
+      ? await recoverPublishedUpdate({ ...options, backupRel: arg('--backup') })
+      : await applyPublishedUpdate(options);
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    const { assertPublishedUpdateNotBlocked, withUpdateLock } = await import('./published-transaction.mjs');
+    const result = await withUpdateLock(root, () => {
+      assertPublishedUpdateNotBlocked(root, { includePending: true });
+      switch (command) {
+        case 'update': return update(root, repo, arg('--commit'));
+        case 'switch': return switchTool(root, repo, arg('--commit'), arg('--to'), arg('--legacy-tool'));
+        case 'restore': return restore(root, arg('--backup'));
+        case 'recover': return { recovered: [...recoverPendingUpdates(root), ...recoverPendingSwitches(root)] };
+        default: throw new Error('Use update, switch, restore or recover');
+      }
+    });
+    console.log(JSON.stringify(result,null,2));
+  }
 } catch(error) {console.error(error.message);process.exitCode=2;}

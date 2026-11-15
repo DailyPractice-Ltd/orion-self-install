@@ -83,11 +83,11 @@
  * Dependency-free: node:fs and global fetch only. No package.json, no npm install.
  */
 
-import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, lstatSync, renameSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, lstatSync, renameSync, rmSync, mkdtempSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { runtimeLayout } from '../update/destination-resolver.mjs';
+import { runtimeLayout, safePath } from '../update/destination-resolver.mjs';
 import {
   radioOn as radioIsOn, radioKey, readRadioKeyFile, keyHeader, wantsEnvProxy, envProxyEnv, isCloudRun,
   parseInstallDirective, isWorkTag, workTagMenu, labelProblem, countProblem,
@@ -182,16 +182,18 @@ const headers = {
 };
 
 /** One try, one plain line on failure, exit 0 — the radio never blocks local work. */
-async function call(method, path, body) {
+async function call(method, path, body, { optional = false } = {}) {
   try {
     const res = await fetch(base + path, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(10000),
+      ...(optional ? { redirect: 'error' } : {}),
     });
     return res;
   } catch (err) {
+    if (optional) return null;
     const code = err?.cause?.code || err.code || err.message;
     if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
       // The name could not even be looked up: on a laptop that is no network at
@@ -306,13 +308,168 @@ function rememberHeard(at) {
   }
 }
 
+const releaseVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const releaseCommit = /^[a-f0-9]{40}$/;
+const releaseClaim = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
+const validReleaseId = (id) => Number.isSafeInteger(id) && id > 0;
+const receiptPrefix = `${sharing.harness_id}-`;
+const receiptDirectory = () => safePath(ROOT, 'status/release-notices');
+
+function releaseNoticeLines(notice, applied) {
+  if (typeof notice.version !== 'string' || !releaseVersion.test(notice.version) ||
+    typeof notice.commit !== 'string' || notice.tag !== `v${notice.version}` || !releaseCommit.test(notice.commit) ||
+    !validReleaseId(notice.release_id) || typeof notice.notes_url !== 'string' ||
+    typeof notice.claim_id !== 'string' || !releaseClaim.test(notice.claim_id) ||
+    typeof notice.claim_expires_at !== 'string' || !(Date.parse(notice.claim_expires_at) > Date.now()) ||
+    !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/tag\/v[0-9.]+$/.test(notice.notes_url) ||
+    !notice.notes_url.endsWith(`/${notice.tag}`)) return null;
+
+  if (notice.kind === 'withdrawal') {
+    const current = notice.release_id === applied.release_id && notice.tag === applied.tag &&
+      notice.commit === applied.commit;
+    const guidance = {
+      currently_applied: [
+        'Your harness is running this release.',
+        'Ask Orion to help you choose whether to restore a backup or move to a corrected release when one is available.',
+      ],
+      previously_applied: [
+        'Your harness applied this release previously.',
+        'Keep using your current version.',
+      ],
+      notified_only: [
+        'Your harness never applied this release.',
+        'Skip this version and wait for another release notice.',
+      ],
+    };
+    if (typeof notice.application !== 'string' || !Object.hasOwn(guidance, notice.application) ||
+      current !== (notice.application === 'currently_applied')) return null;
+    return [
+      `Orion ${notice.version} was withdrawn.`,
+      ...guidance[notice.application],
+      `Full release notes: ${notice.notes_url}`,
+    ];
+  }
+
+  if (notice.kind !== 'release' || typeof notice.summary !== 'string' ||
+    !notice.summary.trim() || notice.summary.length > 300 || /[\p{Cc}\p{Cf}]/u.test(notice.summary)) return null;
+  return [
+    `Orion ${notice.version} is available.`,
+    notice.summary,
+    `Full release notes: ${notice.notes_url}`,
+    "Say 'update my harness' when you're ready.",
+  ];
+}
+
+async function showReleaseNotice(notice, lines) {
+  const directory = receiptDirectory();
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  if (notice.kind === 'release') {
+    const withdrawn = safePath(directory, `${receiptPrefix}withdrawal-${notice.release_id}`);
+    if (existsSync(withdrawn) || existsSync(`${withdrawn}.pending`)) return false;
+  }
+  const name = `${receiptPrefix}${notice.kind}-${notice.release_id}`;
+  const marker = safePath(directory, name);
+  const pending = safePath(directory, `${name}.pending`);
+
+  // Make a claim visible before inspecting other claims. A dead process cannot
+  // block the next check and a parallel check cannot print the same notice.
+  const prefix = `${name}-claim-`;
+  const claim = mkdtempSync(join(directory, `${prefix}${process.pid}-`));
+  try {
+    for (const entry of readdirSync(directory)) {
+      if (!entry.startsWith(prefix) || join(directory, entry) === claim) continue;
+      const owner = /^([1-9]\d*)-[\w]+$/.exec(entry.slice(prefix.length));
+      if (!owner) continue;
+      try {
+        process.kill(Number(owner[1]), 0);
+      } catch (error) {
+        if (error.code === 'ESRCH') continue;
+        throw error;
+      }
+      return false;
+    }
+    if (Date.parse(notice.claim_expires_at) <= Date.now()) return false;
+    const alreadyDisplayed = existsSync(marker) || existsSync(pending);
+    if (!alreadyDisplayed) {
+      await new Promise((resolve, reject) => process.stdout.write(
+        `${lines.join('\n')}\n`, (error) => error ? reject(error) : resolve(),
+      ));
+    }
+    const receipt = join(claim, 'displayed');
+    writeFileSync(receipt, notice.claim_id + '\n', { flag: 'wx', mode: 0o600, flush: true });
+    renameSync(receipt, pending);
+    return !alreadyDisplayed;
+  } finally {
+    rmSync(claim, { recursive: true, force: true });
+  }
+}
+
+async function acknowledgeReleaseNotice(kind, id) {
+  const directory = receiptDirectory();
+  const name = `${receiptPrefix}${kind}-${id}`;
+  const marker = safePath(directory, name);
+  const pending = safePath(directory, `${name}.pending`);
+  if (!existsSync(pending)) return;
+  const claim_id = readFileSync(pending, 'utf8').trim();
+  if (!releaseClaim.test(claim_id)) return;
+  const res = await call('POST', `/releases/${id}/display`, { kind, claim_id }, { optional: true });
+  // A superseded claim cannot be acknowledged, but its local display still
+  // counts if this copy receives another lease for the same notice.
+  if ([204, 409].includes(res?.status) && readFileSync(pending, 'utf8').trim() === claim_id)
+    renameSync(pending, marker);
+}
+
+async function retryReleaseAcknowledgments() {
+  const directory = receiptDirectory();
+  if (!existsSync(directory)) return;
+  await Promise.all(readdirSync(directory).flatMap((file) => {
+    if (!file.startsWith(receiptPrefix)) return [];
+    const match = /^(release|withdrawal)-([1-9]\d*)\.pending$/.exec(file.slice(receiptPrefix.length));
+    if (!match || !validReleaseId(Number(match[2]))) return [];
+    return [acknowledgeReleaseNotice(match[1], match[2]).catch(() => {})];
+  }));
+}
+
+async function checkReleaseNotice() {
+  const applied = status.applied_release;
+  const tool = status.selected_tool;
+  if (!['claude-code', 'codex'].includes(tool) || !applied ||
+    !releaseVersion.test(applied.manifest_version) ||
+    status.template_version !== applied.manifest_version ||
+    applied.tag !== `v${applied.manifest_version}` ||
+    !releaseCommit.test(applied.commit) || !validReleaseId(applied.release_id) ||
+    typeof applied.applied_at !== 'string' || !Number.isFinite(Date.parse(applied.applied_at))) return false;
+  await retryReleaseAcknowledgments().catch(() => {});
+  const { tag, commit, release_id, manifest_version, applied_at } = applied;
+  const res = await call('POST', '/releases', {
+    check_ins_enabled: true,
+    selected_tool: tool,
+    applied_release: { tag, commit, release_id, manifest_version, applied_at },
+  }, { optional: true });
+  if (!res?.ok) return false;
+  const data = await res.json().catch(() => null);
+  if (data?.version !== 1 || !data.notice) return false;
+  const notice = data.notice;
+  const lines = releaseNoticeLines(notice, applied);
+  if (!lines) return false;
+  try {
+    const shown = await showReleaseNotice(notice, lines);
+    await acknowledgeReleaseNotice(notice.kind, notice.release_id).catch(() => {});
+    return shown;
+  } catch {
+    // A local write failure leaves no receipt to acknowledge.
+    return false;
+  }
+}
+
 if (command === 'check') {
   // v=1 is the conversation, with state and names; a server that has not got it
   // yet answers the old way and we still print something a person can read.
   const res = await call('GET', '/nudges?v=1');
   if (res.status === 401) reportAuthProblem();
+  const data = res.ok ? await res.json().catch(() => null) : null;
+  const shownRelease = await checkReleaseNotice();
   if (!res.ok) { console.log(`Radio check answered ${res.status} — skipped, will try next session.`); process.exit(0); }
-  const data = await res.json().catch(() => null);
 
   const messages = Array.isArray(data?.messages)
     ? data.messages
@@ -326,7 +483,7 @@ if (command === 'check') {
 
   const waiting = unheard(messages.filter((m) => m.from === 'daily_practice'), sharing.radio_seen_through);
   if (waiting.length === 0) {
-    console.log('Radio quiet — nothing waiting.');
+    if (!shownRelease) console.log('Radio quiet — nothing waiting.');
     process.exit(0);
   }
 

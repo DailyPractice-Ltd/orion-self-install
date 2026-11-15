@@ -1,5 +1,6 @@
 status/status.json
 status/radio.key
+status/release-notices/
 .DS_Store
 .update-backup/
 memory/*

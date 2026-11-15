@@ -8,44 +8,39 @@ This changelog tracks **this repo's own** version history — independent of
 the coach-led kit this repo was adapted from. Cross-reference, don't duplicate: a change
 that applies to both gets made in both places, cited both ways.
 
-**Every heading below is a release.** `## X.Y.Z — date` is tagged `vX.Y.Z` on the commit
-that shipped it, and pushing that tag publishes a GitHub Release whose notes are the
-heading's section (`.github/workflows/release.yml`). Clients compare their
-`status.json` `template_version` with the Releases page and say "update my harness".
+**Each heading describes a release candidate.** A maintainer explicitly publishes an
+existing `vX.Y.Z` tag after verifying its exact commit, manifest, changelog and CI.
+Pushing a tag does not publish. Notes come from that candidate's changelog section,
+even when `main` has advanced. Published tags and release bytes are immutable;
+corrections need a new version. See [publication](docs/publishing.md).
+Clients discover published releases and say "update my harness" when ready.
 Write each section for the client who will read it there.
 
 ---
 
 ## 2.0.0 — 2026-11-12
 
-**Your Orion folder is now separate from the release, with a layout chosen for Claude Code or Codex.**
+**Orion installs and updates from verified published releases. Your own folder keeps its Claude Code or Codex layout and business files.**
 
-- Install from the downloaded release with `node install.mjs --tool codex --target
-  /path/to/my-orion` or `--tool claude-code`. The client folder has common runtime
-  files and only the selected tool's skills and team layout. Release sources, tests,
-  specs stay in the release checkout. All fourteen skills and the Speckit runtime
-  scaffold deploy. The client constitution starts from an unfilled template. The
-  installer makes a local Git repository by default; `--github-repo OWNER/NAME`
-  creates a private GitHub home during installation, or a private remote can be
-  connected later with `node status/home.mjs prepare --remote <address> --yes`.
+- Run `node install-published.mjs --tool codex --target /path/to/my-orion` or
+  use `--tool claude-code`. The installer chooses the highest stable published
+  version and confirms your radio pairing before finishing. It creates a local Git
+  repository with the shared runtime and the eleven skills in your chosen layout.
+  You can later connect a private GitHub home with
+  `node status/home.mjs prepare --remote <address> --yes`.
 - `AGENTS.md` is the shared instruction file. New installs omit `CLAUDE.md`.
   Claude Code setups with Anthropic's `agents-md` plugin can load `AGENTS.md` when
   there is no `CLAUDE.md` in scope. An older setup can use a `CLAUDE.md` containing
   only `@AGENTS.md`.
-- Updates now run the updater, manifest and files from one pinned release commit.
-  They preserve edited and client-owned files, report collisions, and back up every
-  replacement or retirement. Executable `status/*.mjs` scripts remain the documented
-  backed-up exception that update together.
+- Say “update my harness” when you're ready. Orion verifies the release, checks
+  that it supports your starting version, and stages the changes for your current
+  tool. It saves a backup before applying and records the new version after local
+  checks pass. Earlier Spec Kit files are removed only when their shipped copies
+  are still untouched.
 - A tool switch moves released skills and team routing to the new layout, carries
   personalized skills and job sheets, and records the new selection only after
   validation. Saved schedules must be rewired for the new tool. The switch has a
   backup and recovery command. See [updating](docs/updating.md).
-- All release skill definitions now live under `skills/`. All fourteen skills
-  deploy to the selected tool with the Speckit scripts, templates,
-  and configuration.
-  Claude Code maintainers can generate local discovery copies with
-  `node .specify/scripts/generate-claude-skills.mjs`. Older same-path updaters leave
-  their existing skill copies in place until the harness is migrated.
 
 
 ## 1.5.0 — 2026-11-04

@@ -27,7 +27,9 @@ Three tiers, by how your yes is given — and nothing besides:
    actually hire.
 4. **Which template version this folder is on** — stated on every radio call, so
    Daily Practice can tell whether an update reached you. A label about this folder,
-   never about your work.
+   never about your work. Release checks also report your selected tool and the
+   exact release recorded after a successful install or update. Orion sends a
+   receipt when it shows you a release notice.
 5. **Messages arriving from Daily Practice** — the inbound half (see "What comes
    in"). Reading a message out sends nothing back.
 

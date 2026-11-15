@@ -199,7 +199,7 @@ async function publishedUpdateJourney(t, tool, { customizeCandidate, legacy, dam
   const current = status(client);
   const state = { listed: [2, 1, 3], identityChanged: false };
   const publication = (id) => ({
-    id: id === 2 && state.replacementId ? state.replacementId : id, tag_name: { 1: 'v2.0.0', 2: 'v2.10.0', 3: 'v9.0.0' }[id],
+    id: id === 2 && state.replacementId ? state.replacementId : id, tag_name: { 1: 'v2.0.0', 2: 'v2.10.0', 3: 'v9.0.0', 4: 'v3.0.0' }[id],
     draft: id === 3, prerelease: false, published_at: id === 1 ? '2026-12-01' : '2026-01-01',
   });
   const url = 'https://fixture.test/api/bridge';
@@ -354,6 +354,28 @@ for (const tool of ['claude-code', 'codex']) {
     assert.deepEqual(status(f.client).applied_release, applied);
   });
 }
+
+test('a client can request the announced release even when a higher version is published', async t => {
+  const f = await publishedUpdateJourney(t, 'codex', {
+    customizeCandidate({ manifest }) {
+      manifest.update_compatibility.push({
+        ...manifest.update_compatibility[0],
+        starting_layout: 'legacy-same-folder',
+      });
+    },
+  });
+  f.state.listed = [4, 2, 1];
+  const result = await f.request({}, ['--tag', 'v2.10.0']);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(status(f.client).applied_release.tag, 'v2.10.0');
+
+  f.state.listed = [4, 1];
+  const before = read(f.client, 'status/status.json');
+  const absent = await f.request({}, ['--tag', 'v2.10.0']);
+  assert.notEqual(absent.code, 0);
+  assert.match(absent.stderr, /v2\.10\.0.*unavailable/);
+  assert.equal(read(f.client, 'status/status.json'), before);
+});
 
 test('a radio-off client can decline or fail pairing without changing the deployed harness', async t => {
   const f = await publishedUpdateJourney(t, 'codex');

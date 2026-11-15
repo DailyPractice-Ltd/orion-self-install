@@ -242,6 +242,7 @@ export async function requestPublishedUpdate({
   repository,
   apiBase,
   sourceUrl,
+  tag,
   migrateTo,
   reviewDir,
   pairRadio = false,
@@ -306,7 +307,7 @@ export async function requestPublishedUpdate({
     }
     const pin = await pinRelease(
       client,
-      await discoverRelease(client),
+      await discoverRelease(client, { tag }),
       checkout,
     );
     const env = { ...process.env };
@@ -359,11 +360,14 @@ if (
     return i < 0 ? undefined : process.argv[i + 1];
   };
   try {
+    const tag = arg('--tag');
+    if (process.argv.includes('--tag') && !tag) throw new Error('--tag requires a published release tag.');
     process.exitCode = await requestPublishedUpdate({
       root: resolve(arg('--root') || process.cwd()),
       repository: arg('--repository'),
       apiBase: arg('--api-base'),
       sourceUrl: arg('--source-url'),
+      tag,
       migrateTo: arg('--migrate-to'),
       reviewDir: arg('--resolve-required'),
       pairRadio: process.argv.includes('--pair-radio'),

@@ -17,7 +17,9 @@ Best fit when `{{CLIENT_AI_TOOL}}` = Claude (any paid plan; Projects requires Pr
    *Project settings → Instructions*. Paste as-is — no preamble.
 3. **Project knowledge**: upload the seven completed knowledge-base files
    (`01-…` through `07-…`), keeping the numbered filenames so the section references
-   in the prompt (e.g. "knowledge base §5") resolve unambiguously.
+   in the prompt (e.g. "knowledge base §5") resolve unambiguously. Attach both core skill
+   files named in the agent definition's setup notes. Name the attachments
+   `prospect-research-outreach.md` and `post-call-debrief.md`.
 4. **Model**: default to the best available general model on the client's plan.
 5. **First-run check, done with the client right there**: run the vocabulary check from
    `agent-definition.md`'s notes — one prospect-research task, read the draft back to
@@ -28,7 +30,8 @@ Best fit when `{{CLIENT_AI_TOOL}}` = Claude (any paid plan; Projects requires Pr
 Walk them through it live in the conversation, one click at a time — don't assume they know
 what "Project settings" means or where to find it. If they're on a plan without Projects,
 say so plainly and route them to the fallback in `chatgpt.md`'s "no plan" pattern (a
-persistent chat, first message = instructions, re-pinned as needed) adapted for Claude.
+persistent chat with the assembled prompt, knowledge-base files, and both core skill
+texts) adapted for Claude.
 
 ## Known quirks
 

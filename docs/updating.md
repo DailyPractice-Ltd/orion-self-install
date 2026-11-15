@@ -29,21 +29,21 @@ success or failure. Never fall back to the older local script or an unpinned `ma
 The update reads `update/manifest.json`, `update/pristine.json`, and all released
 files from that one commit. Its `deployment` plan maps portable release sources into
 the destination for the tool recorded in status. The current AI app does not choose
-the destination. Codex receives only the explicitly mapped `agents/README.md` from
-the release `agents/` tree; hired job sheets in that folder belong to the client.
+the destination. The release installs Orion and the mapped skills.
 The client folder never receives the release source trees wholesale, tests, specs,
 `CLAUDE.md`, or the other tool's runtime tree. All shipped skills are mapped explicitly. Earlier Spec Kit files are retired only when they still match shipped copies; client edits are preserved. Maintainer specifications stay in the release repository.
 
-A file the client has changed is kept and reported, as is a collision. The client roster and job sheets
-remain client-owned. A retired released file is removed only if it still matches a
+A file the client has changed is kept and reported, as is a collision. Legacy job sheets remain client-owned. A retired released file is removed only if it still matches a
 historical shipped fingerprint. Before changing files, the updater backs up status
 and each file it will replace or retire under `.update-backup/`. Executable
 `status/*.mjs` scripts are the narrow exception: they are backed up and replaced as a
 version-consistent set even when edited. The updater changes only
 `template_version`, one notes line, and named retired checklist keys in status.
-For a Codex client that already has the earlier `team/` layout, update copies its
-roster and Markdown job sheets into `agents/` when those destinations are absent.
-It leaves the old files in place and reports destination collisions for review.
+The update preserves Codex legacy job sheets in place and archives Claude job sheets
+under `legacy/claude-agents/`. Turn off any active legacy computer schedules listed
+by the updater and rerun it. Review `legacy_schedules`
+in the update report. See [Migrate a legacy schedule](scheduled-work.md#migrate-a-legacy-schedule)
+for both computer schedules and native tasks that still reference a job sheet.
 
 When applicable, run `node status/send.mjs migrate` for the older sending-rule
 migration. Then run `node status/radio.mjs check`. Report the pinned commit, version
@@ -70,11 +70,9 @@ Use `--to claude-code` to move the other way. For an older Claude harness with n
 `selected_tool`, add `--legacy-tool claude-code` to migrate it explicitly. The switch
 requires the harness version, manifest, and common runtime scripts to match the pinned
 release. Run the pinned update command above first if it reports an older version.
-preflights collisions, backs up, stages and validates the new layout, then records the
-new selection. It retires released files from the old layout while preserving edited
-skills, hired job sheets and roster rows. Active computer schedules must first be
-turned off with `node status/schedule.mjs off --agent <name>`; saved schedules are
-invalidated by the switch and must be rewired for the new tool. The switch reports
+The switch backs up, stages and validates the new skill layout, then records the new
+selection. Active legacy computer schedules must be turned off first. Review native
+tasks in the scheduler before switching. The switch reports
 its backup. If interrupted, run the pinned release script with `recover --root "$PWD"`
 before trying again. The temporary checkout is removed automatically.
 
@@ -107,8 +105,8 @@ Use `--tool codex` only when the legacy status already records Codex. The migrat
 copies the client's status and logs, knowledge, memory, skills, roster and job sheets,
 as well as other client-created files such as notes and playbooks, then overlays edited
 deployed files. Release-only source trees, maintainer files, and retired workflows stay
-behind. Saved computer schedules are invalidated because
-their paths refer to the legacy folder; wire them again in the new folder. The new
+behind. Computer schedules refer to the original folder. Review them there before
+replacing them in the native scheduler. The new
 private repository becomes the home, while `--local-only` leaves home disabled. The legacy
 checkout is left intact. The command creates and pushes a private GitHub repository;
 `--remote https://github.com/OWNER/PRIVATE-REPO.git` uses an existing private

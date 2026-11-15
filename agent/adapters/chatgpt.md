@@ -15,7 +15,8 @@ use the fallback below).
    rules and task list verbatim and move the "Who you work for" details fully into the
    knowledge files (they're already there — just remove the duplicated lines).
 3. **Knowledge**: upload the seven completed knowledge-base files with numbered filenames
-   intact.
+   intact. Attach both core skill files named in the agent definition's setup notes.
+   Name the attachments `prospect-research-outreach.md` and `post-call-debrief.md`.
 4. **Capabilities**: enable web browsing (prospect research needs it). Connect only the
    connectors the checklist names (CRM read-and-write, email read, draft and send,
    calendar read). Verified 4 November 2026: the agent scores by hand from
@@ -30,7 +31,8 @@ use the fallback below).
 ## Fallback (no custom-GPT plan)
 
 Use a persistent chat: paste the system prompt as the first message with "these are your
-standing instructions," then paste each knowledge-base file. Tell the client this is
+standing instructions," then paste each knowledge-base file and both core skills, with
+the skill name above each pasted block. Tell the client this is
 slightly weaker — instructions can drift over a long conversation, so re-paste them if the
 agent starts sounding generic again.
 
@@ -38,14 +40,13 @@ agent starts sounding generic again.
 
 The radio does not run here, by design: a chat surface can't run scripts, so the
 check-in channel is carried by the client's code-capable sessions (Codex or Claude
-Code: see those adapters) and by the agents hired there, whether they work when
-asked or on a schedule.
+Code: see those adapters), on request or on a schedule.
 Two consequences to say out loud, once, so nobody is surprised later:
 
 - Work done only in this surface is invisible to Daily Practice. It is real and
   valuable, just unreported. If the client wants their work counted, the tasks they
   want counted belong in a code-capable session, where a finished task is reported,
-  or with an agent hired there.
+  or from a native scheduled task there.
 - Never simulate a radio check or a signal from here, and never claim one happened.
   "This surface can't reach the radio" is the honest sentence.
 

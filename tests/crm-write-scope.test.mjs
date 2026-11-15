@@ -78,6 +78,5 @@ test('the product no longer stages a CRM write for approval', () => {
   assert.doesNotMatch(def, /CRM update → `debrief_completed`/);
   assert.match(def, /never covered by\s+the scope/, 'the irreversible list stays, and is read back');
   assert.match(read('AGENTS.md'), /CRM writes need none/);
-  assert.match(read('library/HIRING.md'), /crm_write: standing/);
   assert.equal(JSON.parse(read('status/status.schema-template.json')).scopes.crm_write, true);
 });

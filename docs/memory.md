@@ -33,7 +33,7 @@ loses nothing.
 ```
 memory/
   README.md          what this folder is (this file's short twin)
-  INDEX.md           the map — what this team knows; the dream agent maintains it
+  INDEX.md           the map — what this team knows; Orion maintains it
   shared/            team-wide truths, one small file per fact
     inbox.md         append-only proposals: any agent may suggest a shared truth here
   roles/<area>/      memory by role area — sales/, ops/, recruitment/, ...
@@ -42,26 +42,12 @@ memory/
     learning.md        curated lessons — ID, source, rule, status: active | candidate | superseded
 ```
 
-## Who reads what — scopes are about relevance, not permission
+## Reading and consolidating the notebook
 
-Each hired agent's job sheet names its reading list in the `memory:` frontmatter —
-typically `shared/`, its own role area, and its own `agents/<name>/` corner. That is
-why a talent scout doesn't wade through the sales ICP: not forbidden, just not its
-reading. **Writing is free for everyone**: your own corner directly, team-wide truths
-proposed via `shared/inbox.md`. Noise is not a problem, because of what happens at
-night.
-
-## The dream — nightly consolidation
-
-A hired agent called the dream runs while you sleep (the package at
-`library/agents/dream/PACKAGE.md`). It syncs, reads the inbox, the logs, and the new
-fact files, then tidies: merges duplicates, replaces contradicted facts with the
-latest truth (marking the old one superseded, never deleting history), folds accepted
-inbox proposals into `shared/`, prunes noise, rewrites `INDEX.md`, and checks that
-nothing credential-shaped slipped in. It reports like any other shift (a shift is
-work a hired agent does on a schedule): one line in the shift log, and one signal
-with a count when check-ins are on. On the wire that signal is called
-`routine_completed`. You wake up to a cleaner notebook.
+Read shared facts and the records relevant to the current task. For periodic cleanup,
+run Orion's memory-consolidation skill. It consolidates duplicate facts, records
+superseded facts, and refreshes `INDEX.md`. Use [native scheduling](scheduled-work.md)
+if you want this to recur.
 
 ## The habits (already installed — you set up nothing)
 
@@ -80,7 +66,7 @@ with a count when check-ins are on. On the wire that signal is called
 ## What never goes into memory
 
 - **Credentials, tokens, API keys — never, anywhere.** `memory.mjs` refuses the
-  obvious shapes and the dream double-checks nightly. A secret belongs in the tool
+  obvious shapes and the consolidation skill rechecks the notebook. A secret belongs in the tool
   that owns it.
 - **Raw personal data stays out of `shared/`.** Prospect and staff specifics live in
   role areas or agent corners where the role that needs them reads them; `shared/` is

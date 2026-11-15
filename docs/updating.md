@@ -156,7 +156,45 @@ invalidated by the switch and must be rewired for the new tool. The switch repor
 its backup. If interrupted, run the pinned release script with `recover --root "$PWD"`
 before trying again. The temporary checkout is removed automatically.
 
-## Restore
+## Recover from an applied withdrawn release
+
+If your harness is running a withdrawn release, you can choose a corrected
+release or restore the backup taken before the withdrawn update. Your applied
+version stays in place while you decide.
+
+When you choose a corrected release, request it with
+`node update/request.mjs --tag vX.Y.Z`. A correction uses the normal verified
+update when it declares a path from your installed version. If the correction
+requires an earlier starting version, Orion offers a matching backup when it
+can verify one.
+
+To review backup restoration, use the backup path from the original update
+report or from the recovery prompt.
+
+```sh
+node update/request.mjs --restore-backup .update-backup/VERSION-SUFFIX
+```
+
+The preview names the release it will restore, files it will put back or remove,
+and later edits it will keep. It also lists retired checklist entries it can
+reinstate. Your radio settings, work notes and later checklist changes stay
+in place. If you choose restoration, copy the preview's `confirm` value and run
+the same command with `--confirm-restore VALUE`. If files changed since the preview,
+review a fresh preview before confirming again.
+
+A successful restore records the earlier applied release, or the earlier
+template version if the harness had only recorded a version. Keep the original
+backup and the evidence path printed by the restore. If a restore is interrupted
+and Orion reports that recovery is required, use the
+[separate pinned recovery procedure](#recover-an-unfinished-update-from-a-separate-checkout)
+with the new evidence backup. This returns the harness to its pre-restore
+state. Then preview the original backup again if you still want to restore it.
+
+If the deployed launcher predates this procedure, use the official source
+download of a published release that contains it. Run its `update/request.mjs`
+from your deployed harness folder with the same options.
+
+## Restore an offline update or a tool switch
 
 For a completed offline update or tool switch, use the backup path printed by
 the command:

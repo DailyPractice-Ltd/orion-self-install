@@ -36,9 +36,12 @@ import {
   createReleaseClient,
   discoverRelease,
   pinRelease,
+  verifyReleaseWithdrawal,
 } from './published-release.mjs';
 import {
   assertPublishedUpdateNotBlocked,
+  preflightWithdrawnUpdate,
+  restoreCompletedPublishedUpdate,
   withUpdateLock,
 } from './published-transaction.mjs';
 
@@ -281,6 +284,19 @@ export async function requestPublishedUpdate({
     });
   }
   try {
+    let pin;
+    const pinCandidate = async () =>
+      pinRelease(client, await discoverRelease(client, { tag }), checkout);
+    if (
+      needsPairing &&
+      status.applied_release &&
+      (await verifyReleaseWithdrawal(client, status.applied_release).catch(
+        () => false,
+      ))
+    ) {
+      pin = await pinCandidate();
+      await preflightWithdrawnUpdate({ root, checkout, pin, client });
+    }
     const savedPairing =
       reviewDir && legacyMigration && !pairRadio
         ? resumeReviewPairing(resolve(reviewDir), binding)
@@ -305,11 +321,7 @@ export async function requestPublishedUpdate({
       }
       console.error('Radio pairing confirmed. Continuing your update.');
     }
-    const pin = await pinRelease(
-      client,
-      await discoverRelease(client, { tag }),
-      checkout,
-    );
+    pin ??= await pinCandidate();
     const env = { ...process.env };
     delete env.ORION_PAIRING_CODE;
     const result = await new Promise((complete, reject) => {
@@ -361,17 +373,47 @@ if (
   };
   try {
     const tag = arg('--tag');
-    if (process.argv.includes('--tag') && !tag) throw new Error('--tag requires a published release tag.');
-    process.exitCode = await requestPublishedUpdate({
+    if (process.argv.includes('--tag') && !tag)
+      throw new Error('--tag requires a published release tag.');
+    const options = {
       root: resolve(arg('--root') || process.cwd()),
       repository: arg('--repository'),
       apiBase: arg('--api-base'),
       sourceUrl: arg('--source-url'),
-      tag,
-      migrateTo: arg('--migrate-to'),
-      reviewDir: arg('--resolve-required'),
-      pairRadio: process.argv.includes('--pair-radio'),
-    });
+    };
+    if (process.argv.includes('--restore-backup')) {
+      if (
+        ['--tag', '--pair-radio', '--migrate-to', '--resolve-required'].some(
+          (flag) => process.argv.includes(flag),
+        )
+      )
+        throw new Error('Run backup restoration as a separate request.');
+      const confirm = arg('--confirm-restore');
+      if (
+        process.argv.includes('--confirm-restore') &&
+        !/^[a-f0-9]{64}$/.test(confirm ?? '')
+      )
+        throw new Error('Enter the confirmation from the restore preview.');
+      const result = await restoreCompletedPublishedUpdate({
+        root: options.root,
+        client: createReleaseClient(options),
+        backupRel: arg('--restore-backup'),
+        confirm,
+      });
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      if (process.argv.includes('--confirm-restore'))
+        throw new Error(
+          'Specify --restore-backup when confirming restoration.',
+        );
+      process.exitCode = await requestPublishedUpdate({
+        ...options,
+        tag,
+        migrateTo: arg('--migrate-to'),
+        reviewDir: arg('--resolve-required'),
+        pairRadio: process.argv.includes('--pair-radio'),
+      });
+    }
   } catch (error) {
     console.error(error.message);
     process.exitCode = 2;

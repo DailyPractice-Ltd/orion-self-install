@@ -32,7 +32,11 @@ import {
   planForTool,
   safePath,
 } from './destination-resolver.mjs';
-import { compareVersions, verifyPinnedRelease } from './published-release.mjs';
+import {
+  compareVersions,
+  verifyPinnedRelease,
+  verifyReleaseWithdrawal,
+} from './published-release.mjs';
 import {
   historicalFiles,
   reviewRequiredEdits,
@@ -45,6 +49,7 @@ import {
 } from '../status/shapes.mjs';
 import {
   cleanInstall,
+  MissingUpdatePath,
   preflightSteps,
   runSteps,
   selectPath,
@@ -816,9 +821,14 @@ function promote(root, stage, priorStatus, plan, pin, client) {
       throw new Error('Harness status changed during the update.');
     const status = JSON.parse(plan.nextStatus?.bytes ?? priorStatus.bytes);
     status.selected_tool = plan.tool;
+    journal.removed_checklist_keys = plan.removeChecklistKeys.filter((key) =>
+      Object.hasOwn(status.checklist ?? {}, key),
+    );
     for (const key of plan.removeChecklistKeys) delete status.checklist?.[key];
     status.template_version = pin.manifest_version;
     status.applied_release = { ...pin, applied_at: new Date().toISOString() };
+    journal.applied_at = status.applied_release.applied_at;
+    journal.installed_tool = plan.tool;
     status.notes = [
       status.notes,
       `updated to ${pin.tag}; backup in ${backupRel}`,
@@ -1056,6 +1066,375 @@ function requireReleasePin(pin) {
     throw new Error('A full published release identity is required.');
 }
 
+function completedBackup(root, backupRel, current, client) {
+  if (
+    !/^\.update-backup\/[\w.-]+$/.test(backupRel) ||
+    /\/\.{1,2}$/.test(backupRel)
+  )
+    throw new Error(
+      'Choose a completed published backup under .update-backup.',
+    );
+  const backup = safePath(root, backupRel);
+  const snapshot = file(safePath(backup, 'journal.json'));
+  if (!snapshot) throw new Error('The published backup journal is missing.');
+  const journal = JSON.parse(snapshot.bytes);
+  if (journal.kind !== 'published-update' || journal.state !== 'complete')
+    throw new Error('Choose the backup for a completed published update.');
+  const status = JSON.parse(current.bytes);
+  const applied = recordedRelease(status);
+  // Older journals have no application timestamp. The saved status hash or
+  // the most recent update note still ties them to a single application.
+  const lastUpdateNote = String(status.notes ?? '')
+    .split('\n')
+    .reverse()
+    .find((line) => /^updated to v[^ ]+; backup in /.test(line));
+  const matchesApplication = journal.applied_at
+    ? journal.applied_at === applied?.applied_at
+    : sameFile(
+        current,
+        journal.status?.installed_hash,
+        journal.status?.installed_mode,
+      ) ||
+      lastUpdateNote === `updated to ${applied?.tag}; backup in ${backupRel}`;
+  if (
+    !applied ||
+    !matchesApplication ||
+    !sameTransactionSource(journal, client, applied)
+  )
+    throw new Error(
+      'This backup does not match the currently applied release.',
+    );
+  if (journal.installed_tool && status.selected_tool !== journal.installed_tool)
+    throw new Error(
+      'The tool layout changed after this update. Keep the backup and contact Daily Practice to recover.',
+    );
+  validateRollbackJournal(journal);
+  if (!journal.status.installed_hash)
+    throw new Error('The backup does not record a completed status change.');
+  return {
+    backup,
+    journal,
+    status,
+    applied,
+    journalHash: digest(snapshot.bytes),
+  };
+}
+
+function originalBackupFile(backup, action) {
+  const saved = file(safePath(backup, `files/${action.destination}`));
+  if (!sameFile(saved, action.prior_hash, action.prior_mode))
+    throw new Error(`Backup verification failed: ${action.destination}`);
+  return saved;
+}
+
+function restorePlan(root, backupRel, current, context) {
+  const { backup, journal, status, applied, journalHash } = context;
+  const before = JSON.parse(originalBackupFile(backup, journal.status).bytes);
+  if (!versionPattern.test(before.template_version))
+    throw new Error('Invalid prior release version in the backup.');
+  recordedRelease(before);
+  const next = { ...status, template_version: before.template_version };
+  if (Object.hasOwn(before, 'applied_release'))
+    next.applied_release = before.applied_release;
+  else delete next.applied_release;
+
+  const restore = [],
+    remove = [],
+    keep = [],
+    statusRestore = [],
+    statusKeep = [];
+  for (const key of journal.removed_checklist_keys ?? []) {
+    if (!Object.hasOwn(before.checklist ?? {}, key)) continue;
+    if (!status.checklist || Object.hasOwn(status.checklist, key)) {
+      statusKeep.push(`checklist.${key}`);
+      continue;
+    }
+    next.checklist = { ...next.checklist, [key]: before.checklist[key] };
+    statusRestore.push(`checklist.${key}`);
+  }
+  next.notes = [status.notes, `restored from ${backupRel}`]
+    .filter(Boolean)
+    .join('\n');
+  const actions = [];
+  const observed = [];
+  for (const action of journal.actions) {
+    const { destination } = action;
+    // A separate-folder migration can stage radio opt-in. Keep the live key.
+    if (destination.toLowerCase() === 'status/radio.key') {
+      keep.push(destination);
+      continue;
+    }
+    let installed;
+    try {
+      installed = file(safePath(root, destination));
+    } catch (error) {
+      if (
+        !/^(?:Symlink collision|Expected regular file):/.test(error.message) &&
+        error.code !== 'ENOTDIR'
+      )
+        throw error;
+      observed.push([destination, 'non-file']);
+      keep.push(destination);
+      continue;
+    }
+    observed.push([
+      destination,
+      installed && digest(installed.bytes),
+      installed?.mode,
+    ]);
+    if (!sameFile(installed, action.installed_hash, action.installed_mode)) {
+      keep.push(destination);
+      continue;
+    }
+    if (action.prior_hash) {
+      originalBackupFile(backup, action);
+      restore.push(destination);
+    } else {
+      remove.push(destination);
+    }
+    actions.push({
+      destination,
+      kind: !action.installed_hash
+        ? 'add'
+        : action.prior_hash
+          ? 'replace'
+          : 'retire',
+      prior_hash: action.installed_hash,
+      prior_mode: action.installed_mode,
+      installed_hash: action.prior_hash,
+      installed_mode: action.prior_mode,
+    });
+  }
+  const to = {
+    template_version: before.template_version,
+    applied_release: before.applied_release ?? null,
+  };
+  const report = {
+    backup: backupRel,
+    from: applied,
+    to,
+    restore,
+    remove,
+    keep,
+    status_restore: statusRestore,
+    status_keep: statusKeep,
+  };
+  const confirm = digest(
+    serialized([
+      root,
+      report,
+      journalHash,
+      digest(current.bytes),
+      current.mode,
+      observed,
+    ]),
+  );
+  return { report, confirm, actions, next };
+}
+
+function promoteRestore(root, backupRel, context, plan, current) {
+  const { actions, report, next } = plan;
+  const backup = mkdtempSync(join(safePath(root, backups), 'restore-'));
+  const evidence = `${backups}/${basename(backup)}`;
+  const nextBytes = serialized(next);
+  // A reverse transaction keeps the pre-restore bytes so the established
+  // separate recovery command can undo an incomplete elected restoration.
+  const journal = {
+    kind: 'published-update',
+    state: 'recovery-required',
+    release: context.journal.release,
+    source: context.journal.source,
+    restoring: backupRel,
+    actions,
+    created_directories: missingDirectories(root, actions),
+    status: {
+      destination: statusFile,
+      prior_hash: digest(current.bytes),
+      prior_mode: current.mode,
+      installed_hash: digest(nextBytes),
+      installed_mode: current.mode,
+    },
+  };
+  for (const action of [...actions, journal.status]) {
+    const original = assertPriorFile(root, action);
+    if (original)
+      write(
+        safePath(backup, `files/${action.destination}`),
+        original.bytes,
+        original.mode,
+      );
+  }
+  const stagedStatus = safePath(backup, 'status.next');
+  write(stagedStatus, nextBytes, current.mode);
+  saveJournal(backup, journal);
+  try {
+    let count = 0;
+    for (const action of actions) {
+      assertPriorFile(root, action);
+      const target = safePath(root, action.destination);
+      if (action.installed_hash) {
+        const saved = originalBackupFile(context.backup, {
+          destination: action.destination,
+          prior_hash: action.installed_hash,
+          prior_mode: action.installed_mode,
+        });
+        const staged = safePath(backup, 'restoring.tmp');
+        write(staged, saved.bytes, saved.mode);
+        mkdirSync(dirname(target), { recursive: true });
+        renameSync(staged, target);
+      } else unlinkSync(target);
+      count++;
+      if (count === Number(process.env.ORION_UPDATE_INTERRUPT_AFTER))
+        process.exit(2);
+      if (count === Number(process.env.ORION_UPDATE_FAIL_AFTER))
+        throw new Error('Injected restore interruption');
+    }
+    assertPriorFile(root, journal.status);
+    renameSync(stagedStatus, safePath(root, statusFile));
+    journal.state = 'restore-complete';
+    saveJournal(backup, journal);
+  } catch (error) {
+    restoreInterrupted(root, backup, journal, error.message);
+    throw new Error(
+      `${error.message}. The pre-restore state was restored. Report: ${evidence}/failure.json`,
+    );
+  }
+  return {
+    ...report,
+    message: `Restored version ${report.to.template_version}.`,
+    evidence,
+  };
+}
+
+export async function restoreCompletedPublishedUpdate({
+  root,
+  client,
+  backupRel,
+  confirm,
+}) {
+  root = realpathSync(requireDeployedRoot(root));
+  assertPublishedUpdateNotBlocked(root, { includePending: true });
+  const current = file(safePath(root, statusFile));
+  if (!current) throw new Error('Harness status file is missing.');
+  const context = completedBackup(root, backupRel, current, client);
+  if (!(await verifyReleaseWithdrawal(client, context.applied)))
+    throw new Error(`${context.applied.tag} has no verified withdrawal.`);
+  const review = () => {
+    assertPublishedUpdateNotBlocked(root, { includePending: true });
+    const latest = file(safePath(root, statusFile));
+    if (!sameFile(latest, digest(current.bytes), current.mode))
+      throw new Error(
+        'The restore preview changed. Run the preview again before confirming.',
+      );
+    const open = completedBackup(root, backupRel, latest, client);
+    const approved = restorePlan(root, backupRel, latest, open);
+    if (confirm === undefined)
+      return { ...approved.report, confirm: approved.confirm };
+    if (confirm !== approved.confirm)
+      throw new Error(
+        'The restore preview changed. Run the preview again before confirming.',
+      );
+    return promoteRestore(root, backupRel, open, approved, latest);
+  };
+  return confirm === undefined ? review() : withUpdateLock(root, review);
+}
+
+function matchingCompletedBackup(root, current, client) {
+  const directory = safePath(root, backups);
+  if (!existsSync(directory)) return null;
+  const matches = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const backupRel = `${backups}/${entry.name}`;
+    try {
+      const context = completedBackup(root, backupRel, current, client);
+      restorePlan(root, backupRel, current, context);
+      matches.push(backupRel);
+    } catch {
+      // Irrelevant, incomplete, or unverifiable backups are never offered.
+    }
+  }
+  return matches.length === 1 ? matches[0] : null;
+}
+
+async function offerCompletedRestore(
+  error,
+  { root, checkout, pin, client, previous, priorStatus },
+) {
+  if (
+    !(error instanceof MissingUpdatePath) ||
+    !previous ||
+    compareVersions(pin.tag, previous.tag) <= 0
+  )
+    return error;
+  await verifyPinnedRelease(client, pin, checkout);
+  if (!(await verifyReleaseWithdrawal(client, previous).catch(() => false)))
+    return error;
+  const backup = matchingCompletedBackup(root, priorStatus, client);
+  const guidance = backup
+    ? `Preview your pre-update backup with node update/request.mjs --restore-backup ${backup}. You can also keep using your current version while you wait for a compatible correction.`
+    : 'No matching completed backup could be verified. Keep your current folder and contact Daily Practice.';
+  return new Error(
+    `${previous.tag} was withdrawn and ${pin.tag} has no supported update path from it. ${guidance}\n${error.message}`,
+  );
+}
+
+async function requireSupportedPath({
+  root,
+  checkout,
+  pin,
+  client,
+  previous,
+  priorStatus,
+  status,
+  manifest,
+}) {
+  try {
+    return selectPath({
+      root,
+      manifest,
+      status,
+      previous,
+      read: (directory, destination) => file(safePath(directory, destination)),
+    });
+  } catch (error) {
+    throw await offerCompletedRestore(error, {
+      root,
+      checkout,
+      pin,
+      client,
+      previous,
+      priorStatus,
+    });
+  }
+}
+
+// The launcher calls this before offering pairing to an affected harness.
+// A correction without a direct path should leave radio settings untouched.
+export async function preflightWithdrawnUpdate({
+  root,
+  checkout,
+  pin,
+  client,
+}) {
+  const priorStatus = file(safePath(root, statusFile));
+  if (!priorStatus) throw new Error('Harness status file is missing.');
+  const status = JSON.parse(priorStatus.bytes);
+  const previous = recordedRelease(status);
+  if (!previous || compareVersions(pin.tag, previous.tag) <= 0) return;
+  const manifest = json(safePath(checkout, 'update/manifest.json'));
+  await requireSupportedPath({
+    root,
+    checkout,
+    pin,
+    client,
+    previous,
+    priorStatus,
+    status,
+    manifest,
+  });
+}
+
 export async function recoverPublishedUpdate({
   root,
   checkout,
@@ -1241,12 +1620,15 @@ export async function applyPublishedUpdate({
     throw new Error('Pinned manifest identity changed.');
   const stage = mkdtempSync(join(dirname(checkout), 'orion-update-stage-'));
   try {
-    const path = selectPath({
+    const path = await requireSupportedPath({
       root,
-      manifest,
-      status,
+      checkout,
+      pin,
+      client,
       previous,
-      read: (directory, destination) => file(safePath(directory, destination)),
+      priorStatus,
+      status,
+      manifest,
     });
     const changingFolder = path.starting_layout === 'legacy-same-folder';
     if (!changingFolder && (migrateTo || pairing))

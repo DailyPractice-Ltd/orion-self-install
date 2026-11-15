@@ -78,17 +78,17 @@ function verifiedLayout(root, rule, read) {
   });
 }
 
+export class MissingUpdatePath extends Error {}
+
 export function selectPath({ root, manifest, status, previous, read }) {
   const { template_version: version, selected_tool: tool } = status;
   const verificationNeeded = !previous || tool == null;
   const error = verificationNeeded
     ? `Starting release or tool needs a declared verification migration. ${cleanInstall}`
     : `Expected one supported update path from ${version} for ${tool}. ${cleanInstall}`;
-  if (
-    !versionPattern.test(version) ||
-    !Array.isArray(manifest.update_compatibility)
-  )
-    throw new Error(error);
+  if (!versionPattern.test(version)) throw new Error(error);
+  if (manifest.update_compatibility == null) throw new MissingUpdatePath(error);
+  if (!Array.isArray(manifest.update_compatibility)) throw new Error(error);
   const candidates = manifest.update_compatibility.filter(
     (entry) =>
       entry?.from_version === version &&
@@ -108,6 +108,7 @@ export function selectPath({ root, manifest, status, previous, read }) {
   } catch (failure) {
     throw new Error(`${error} ${failure.message}`);
   }
+  if (paths.length === 0) throw new MissingUpdatePath(error);
   if (paths.length !== 1) throw new Error(error);
   const path = paths[0];
   if (

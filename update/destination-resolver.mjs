@@ -66,10 +66,19 @@ export function planForTool(deployment, tool, { releaseRoot = RELEASE_ROOT, root
   if (!deployment.tools.includes(tool)) throw new Error(`Unsupported selected tool: ${tool || '(missing)'}`);
   const actualSkills = (existsSync(join(releaseRoot, 'skills')) ? readdirSync(join(releaseRoot, 'skills'), { recursive: true, withFileTypes: true }) : [])
     .filter((item) => item.isFile())
-    .map((item) => relative(releaseRoot, join(item.parentPath, item.name)).split(sep).join('/')).sort();
+    .map((item) => relative(releaseRoot, join(item.parentPath, item.name)).split(sep).join('/'));
+  const localSkills = deployment.local_skills || [];
+  for (const source of localSkills) {
+    if (!/^skills\/[^/]+\/SKILL\.md$/.test(source) || !actualSkills.includes(source)) {
+      throw new Error(`Invalid source-only skill: ${source}`);
+    }
+  }
+  const localFolders = new Set(localSkills.map((source) => source.split('/')[1]));
+  if (localFolders.size !== localSkills.length) throw new Error('Duplicate source-only skill');
   const mappedSkills = deployment.entries.filter((entry) => entry.source.startsWith('skills/'));
+  const shippedSkills = actualSkills.filter((source) => !localFolders.has(source.split('/')[1])).sort();
   const skillSources = mappedSkills.map((entry) => entry.source).sort();
-  if (JSON.stringify(actualSkills) !== JSON.stringify(skillSources)) throw new Error('Deployment skill mappings must cover every file under skills/ exactly once');
+  if (JSON.stringify(shippedSkills) !== JSON.stringify(skillSources)) throw new Error('Deployment skill mappings must cover every shipped skill file exactly once and exclude source-only skills');
   for (const entry of mappedSkills) for (const selected of deployment.tools) {
     const expected = `${selected === 'codex' ? '.agents' : '.claude'}/skills/${entry.source.slice('skills/'.length)}`;
     if (entry.destinations?.[selected] !== expected) throw new Error(`Invalid skill mapping for ${entry.source} (${selected})`);

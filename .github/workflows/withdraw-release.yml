@@ -1,0 +1,45 @@
+name: Withdraw release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Published stable tag (vX.Y.Z)'
+        required: true
+        type: string
+      commit:
+        description: 'Exact full 40-character released commit'
+        required: true
+        type: string
+      release_id:
+        description: 'GitHub Release ID'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-publication
+  cancel-in-progress: false
+
+jobs:
+  withdraw:
+    if: github.ref == 'refs/heads/main'
+    environment: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Mark and verify the published release as withdrawn
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          WITHDRAW_TAG: ${{ inputs.tag }}
+          WITHDRAW_COMMIT: ${{ inputs.commit }}
+          WITHDRAW_RELEASE_ID: ${{ inputs.release_id }}
+        run: node .github/scripts/withdraw-release.mjs --tag "$WITHDRAW_TAG" --commit "$WITHDRAW_COMMIT" --release-id "$WITHDRAW_RELEASE_ID"

@@ -29,7 +29,7 @@ Three tiers, by how your yes is given — and nothing besides:
    Daily Practice can tell whether an update reached you. A label about this folder,
    never about your work. Release checks also report your selected tool and the
    exact release recorded after a successful install or update. Orion sends a
-   receipt when it shows you a release notice.
+   receipt when it shows you a release or withdrawal notice.
 5. **Messages arriving from Daily Practice** — the inbound half (see "What comes
    in"). Reading a message out sends nothing back.
 
@@ -144,6 +144,12 @@ is sent anywhere to do this: it happens on your machine.
 
 Each message is read to you once. Your harness remembers what you have already heard,
 so nothing is repeated at the next session.
+
+If a release you were told about or installed is withdrawn, the radio tells
+you whether your harness is still running it. You can keep using your current
+version if the withdrawn release is no longer installed. If you are still
+running it, ask Orion to help you choose between a backup and a corrected
+release. The radio leaves your installation in place until you decide.
 
 ## The choice, and how it's put to you
 

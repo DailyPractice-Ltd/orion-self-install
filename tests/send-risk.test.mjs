@@ -301,12 +301,19 @@ test('set-level writes the record, says in one line what now sends, remembers th
   }
 });
 
+function seedLegacySchedule(h) {
+  const original = execFileSync('git', ['show', '77f8a99356ae52f5e9c71b00f78c7a29c1986461:status/schedule.mjs'], { cwd: ROOT });
+  const script = join(h.dir, 'status', 'legacy-schedule.mjs');
+  writeFileSync(script, original);
+  const wired = spawnSync(process.execPath, [script, 'wire', '--agent', 'follow-up',
+    '--surface', 'claude-code', '--at', '07:00', '--bin', process.execPath],
+  { cwd: h.dir, encoding: 'utf8', env: plainEnv() });
+  assert.equal(wired.status, 0, wired.stdout + wired.stderr);
+}
+
 test('set-level re-renders a wired wake-up in place, so the allowlist follows the level with no re-wiring', (t) => {
   const h = makeHarness(t, { level: 'off' });
-  const sched = (...args) => spawnSync(process.execPath, [join(h.dir, 'status', 'schedule.mjs'), ...args], { cwd: h.dir, encoding: 'utf8', env: plainEnv() });
-  // --bin stands in for the agent software, so the test needs none installed.
-  const wired = sched('wire', '--agent', 'follow-up', '--surface', 'claude-code', '--at', '07:00', '--bin', process.execPath);
-  assert.equal(wired.status, 0, wired.stdout + wired.stderr);
+  seedLegacySchedule(h);
   const wakeUp = join(h.dir, 'status', 'shifts', process.platform === 'win32' ? 'follow-up.cmd' : 'follow-up.sh');
   const before = readFileSync(wakeUp, 'utf8');
   assert.ok(!before.includes(GMAIL_SEND), 'with the level off, the wired allowlist has no send tool');
@@ -455,8 +462,6 @@ test('the runner\'s arguments are pinned: print mode under dontAsk with the allo
   const r = unattendedRunner('claude-code', { tools: 'Read' });
   assert.deepEqual(r.args, ['-p', PROMPT_SLOT, '--permission-mode', 'dontAsk', '--allowedTools', 'Read']);
   assert.ok(!r.args.includes('--bare'));
-  assert.match(read('agent/adapters/claude-code.md'), /mcp__claude_ai_Gmail__send_message/, 'the adapter carries the proven headless tool name');
-  assert.match(read('agent/adapters/claude-code.md'), /--bare/, 'the adapter says what bare mode would do');
 });
 
 test('tripwire: the plain-words matrix is the matrix in shapes.mjs, row for row', () => {
@@ -491,10 +496,8 @@ test('tripwire: rule 1 of the agent definition is the rule migrate writes, and c
 
 test('tripwire: every template carries the words migrate writes into a kept file, so a migrated folder reads like a fresh one', () => {
   for (const [where, oldWords, newWords] of RETIRED) {
-    if (where.endsWith('*.md')) {
-      assert.ok(squash(read('library/HIRING.md')).includes(squash(newWords)), `library/HIRING.md should carry: ${newWords.slice(0, 60)}`);
-      continue;
-    }
+    if (where.endsWith('*.md') || !existsSync(join(ROOT, where)) ||
+        ['AGENTS.md', 'agent/adapters/claude-code.md', 'agent/adapters/codex.md'].includes(where)) continue;
     const shipped = spawnSync('git', ['show', `v1.4.1:${where}`], { cwd: ROOT, encoding: 'utf8' });
     if (shipped.status !== 0) continue;
     if (!retiredRe(oldWords).test(shipped.stdout)) continue; // an older wording, already gone from the template
@@ -508,14 +511,14 @@ test('tripwire: the retired sentences are gone from every file that enforces or 
   const files = [
     'agent/agent-definition.md', 'AGENTS.md', 'README.md', 'CLAUDE.md',
     'agent/adapters/claude-code.md', 'agent/adapters/claude.md', 'agent/adapters/codex.md', 'agent/adapters/chatgpt.md', 'agent/adapters/copilot.md',
-    'library/HIRING.md', 'library/README.md', 'library/ROLES.md',
+    'library/README.md',
     'connectors/connector-checklist.md', 'status/status-schema.md', 'validation/validation-tasks.md', 'docs/radio.md', 'docs/updating.md',
     'specs/002-production-line/contracts/agent-anatomy.md', 'specs/002-production-line/contracts/package-shape.md',
-    'agents/README.md', 'skills/hire-agent/SKILL.md', 'skills/update-harness/SKILL.md', 'skills/create-skill/SKILL.md',
+    'skills/update-harness/SKILL.md', 'skills/create-skill/SKILL.md',
     'specs/002-production-line/contracts/send-risk.md',
   ];
   const packages = (dir) => readdirSync(join(ROOT, dir)).map((d) => `${dir}/${d}/PACKAGE.md`).filter((p) => existsSync(join(ROOT, p)));
-  for (const f of [...files, ...packages('library/agents'), ...packages('library/workflows'), ...packages('library/programs'), ...packages('library/skills')]) {
+  for (const f of [...files, ...packages('library/workflows'), ...packages('library/programs'), ...packages('library/skills')]) {
     const hit = RETIRED_WORDS.exec(squash(read(f)));
     assert.equal(hit, null, `${f} still says: ${hit && hit[0]}`);
   }
@@ -606,9 +609,7 @@ test('set-level warns about a job sheet that allows all of Bash, whichever form 
   assert.equal(r.code, 0, r.out);
   assert.match(r.out, /ops[^\n]*allows all of Bash/, r.out);
   // A shift wired by 1.4.x has no bin in its record: the wake-up file still says what was started.
-  const sched = (...args) => spawnSync(process.execPath, [join(h.dir, 'status', 'schedule.mjs'), ...args], { cwd: h.dir, encoding: 'utf8', env: plainEnv() });
-  const wired = sched('wire', '--agent', 'follow-up', '--surface', 'claude-code', '--at', '07:00', '--bin', process.execPath);
-  assert.equal(wired.status, 0, wired.stdout + wired.stderr);
+  seedLegacySchedule(h);
   const recordPath = join(h.dir, 'status', 'shifts', 'follow-up.json');
   const record = JSON.parse(readFileSync(recordPath, 'utf8'));
   delete record.bin; delete record.node_dir; delete record.send_risk;

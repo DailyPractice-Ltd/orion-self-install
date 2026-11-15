@@ -41,9 +41,8 @@ note and task written for you and reported in one line. The follow-up goes out t
 your agent's rule 1 says (a reply to someone who answered scores low and goes on its own
 at any level); a delete, merge, owner change or lifecycle move waits for your yes.
 
-Want the debrief to trigger other work — a proposal draft, a scheduling touch? That's
-a handoff: a hired agent can run "after a call" as its shift trigger
-(`library/HIRING.md`, Q4's handoff lane), with this chain upstream.
+For a proposal draft or another follow-up after the debrief, ask Orion to include
+that step in the same run. Orion applies its existing permissions to each action.
 
 ## What it doesn't do
 

@@ -2,14 +2,14 @@
 /**
  * Call-Planner Control Tower — day-sheet generator.
  *
- *   node library/agents/call-planner/build-call-plan.mjs [--data <path>] [--out <dir>]
+ *   node scripts/build-call-plan.mjs [--data <path>] [--out <dir>] [--timezone <IANA-zone>]
  *
  * Reads call-data.json (by default the one next to this script) and writes three files
  * into the data file's folder (or --out): a readable markdown day-sheet plus two CSVs
  * you can open in any spreadsheet tool. Re-run it as often as you like — it only ever
  * reads the data file and rewrites its own three outputs.
  *
- * The data shape is the contract in PACKAGE.md (today / history / enrichment / lists) —
+ * The data shape is the contract in SKILL.md (today / history / enrichment / lists) —
  * extracted, with its triage rules, from a live operating harness's daily calling
  * command center. The rules it preserves exactly:
  *   • Overdue callbacks outrank everything, then priority (P0 first), then owner.
@@ -33,6 +33,11 @@ for (let i = 0; i < argv.length; i++) {
   if (argv[i].startsWith('--')) flags[argv[i].slice(2)] = argv[i + 1] ?? '';
 }
 
+if (Object.hasOwn(flags, 'help')) {
+  console.log('Usage: node scripts/build-call-plan.mjs --data <path> [--out <directory>] [--timezone <IANA-zone>]');
+  process.exit(0);
+}
+
 const DATA_PATH = flags.data || join(__dirname, 'call-data.json');
 let raw;
 try {
@@ -40,25 +45,37 @@ try {
 } catch {
   console.log(`No call data found at ${DATA_PATH}.`);
   console.log('Your agent builds that file from your CRM each morning — the shape is in');
-  console.log('PACKAGE.md, and call-data.template.json is the empty starting point.');
+  console.log('SKILL.md, and call-data.template.json is the empty starting point.');
   process.exit(1);
 }
 const data = JSON.parse(raw);
 for (const key of ['today', 'enrichment', 'lists']) {
   if (!(key in data)) {
-    console.log(`call-data.json is missing "${key}" — see the data contract in PACKAGE.md.`);
+    console.log(`call-data.json is missing "${key}" — see the data contract in SKILL.md.`);
     process.exit(1);
   }
 }
 
 const OUT_DIR = flags.out || dirname(DATA_PATH);
 const now = new Date();
-const stamp = now.toISOString().slice(0, 10);
+const formatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: flags.timezone || data.timezone || undefined,
+  year: 'numeric', month: '2-digit', day: '2-digit',
+});
+const dateKey = (date) => {
+  const parts = Object.fromEntries(formatter.formatToParts(date).map(({ type, value }) => [type, value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
+const stamp = dateKey(now);
 
 // ── Triage (the extracted ordering rules) ───────────────────────────────────
 
 const overdue = (r) => Boolean(r.callback_at) && new Date(r.callback_at) < now && !r.connected;
-const dueToday = (r) => Boolean(r.callback_at) && new Date(r.callback_at).toDateString() === now.toDateString() && !r.connected;
+const dueToday = (r) => {
+  if (!r.callback_at || r.connected) return false;
+  const callback = new Date(r.callback_at);
+  return !Number.isNaN(callback.getTime()) && dateKey(callback) === stamp;
+};
 const parked = (r) => r.dialled && !r.connected && ['No answer', 'Voicemail', 'Gatekeeper'].includes(r.outcome || '');
 
 const prioRank = (p) => {
@@ -130,7 +147,7 @@ md.push(`- **Priorities**: ${(data.lists.priorities || []).join(' · ') || '—'
 md.push(`- **Stages**: ${(data.lists.stages || []).join(' · ') || '—'}`);
 md.push(`- **Outcomes**: ${(data.lists.outcomes || []).join(' · ') || '—'}`);
 md.push('');
-md.push(`_Generated ${now.toISOString()} from ${DATA_PATH.split('/').pop()}. Rebuild anytime: node library/agents/call-planner/build-call-plan.mjs_`);
+md.push(`_Generated ${now.toISOString()} from ${DATA_PATH.split('/').pop()}. Rebuild anytime: node scripts/build-call-plan.mjs_`);
 
 // ── CSVs (open in any spreadsheet tool) ─────────────────────────────────────
 

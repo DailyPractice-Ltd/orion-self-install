@@ -2,7 +2,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, existsSync, rmSync, lstatSync, readdirSync, rmdirSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative, sep } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { destinationState, fingerprint, planForTool, selectedTool, safePath } from './destination-resolver.mjs';
 import { isOn } from '../status/schedule.mjs';
@@ -22,6 +22,22 @@ function sourceSnapshot(repo, commit) {
   execFileSync('tar',['-xf','-','-C',dir],{input:archive});
   return dir;
 }
+function legacySchedules(root) {
+  const dir = safe(root, 'status/shifts');
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).filter(name => /^[A-Za-z0-9][A-Za-z0-9_-]*\.json$/.test(name)).map(file => {
+    const path = safe(root, `status/shifts/${file}`);
+    const name = file.slice(0, -5);
+    let record;
+    try { record = json(path); }
+    catch (error) { if (!(error instanceof SyntaxError)) throw error; }
+    const active = record?.os === process.platform
+      ? isOn(record, { uid: process.getuid?.() ?? 0 })
+      : null;
+    return { name, active };
+  });
+}
+
 function update(root,repo,commit) {
   recoverPendingUpdates(root);
   const snapshot=sourceSnapshot(repo,commit);
@@ -45,29 +61,45 @@ function update(root,repo,commit) {
       if (state==='absent') actions.push({kind:'add',e,src,dest});
       else if (fingerprint(readFileSync(dest))!==fingerprint(readFileSync(src))) actions.push({kind:'replace',e,src,dest});
     }
-    // A Codex harness deployed by the earlier preview may still hold client
-    // jobs in team/. Promote only Markdown job sheets to agents/ on update.
-    if (tool==='codex' && existsSync(safe(root,'team'))) {
-      const oldJobs=safe(root,'team');
-      if (!lstatSync(oldJobs).isDirectory()) throw new Error('Legacy team/ is not a directory');
-      for (const name of readdirSync(oldJobs).filter(n=>/^[A-Za-z0-9][A-Za-z0-9_-]*\.md$/.test(n))) {
-        const oldRel=`team/${name}`, nextRel=`agents/${name}`;
-        const src=safe(root,oldRel), dest=safe(root,nextRel);
-        if (!lstatSync(src).isFile()) throw new Error(`Legacy job sheet collision: ${oldRel}`);
-        if (existsSync(dest)) {
-          if (!lstatSync(dest).isFile() || fingerprint(readFileSync(dest))!==fingerprint(readFileSync(src))) report.collisions.push(nextRel);
-          continue;
-        }
-        const existing=actions.find(a=>a.e.destination===nextRel);
-        if (existing) existing.src=src;
-        else actions.push({kind:'add',e:{source:oldRel,destination:nextRel,ownership:'client-template',fingerprint_key:'agents/README.md'},src,dest});
-      }
+    report.legacy_schedules = legacySchedules(root);
+    const running = report.legacy_schedules.filter(schedule => schedule.active);
+    if (running.length) {
+      const commands = running.map(({ name }) => `node status/schedule.mjs off --agent ${name}`).join('\n');
+      throw new Error(`Turn off active legacy computer schedules before upgrading:\n${commands}\nThen see docs/scheduled-work.md in the release.`);
     }
+    const archiveLegacy = (oldPath, archive) => {
+      const src = safe(root, oldPath), dest = safe(root, archive);
+      if (!lstatSync(src).isFile()) throw new Error(`Legacy file collision: ${oldPath}`);
+      if (!existsSync(dest)) actions.push({kind:'add',e:{destination:archive},src,dest});
+      else if (!lstatSync(dest).isFile() || fingerprint(readFileSync(dest)) !== fingerprint(readFileSync(src))) {
+        throw new Error(`Legacy file collides with ${archive}`);
+      }
+      actions.push({kind:'retire',e:{destination:oldPath},dest:src});
+    };
+    const archives = new Map();
+    const collectLegacy = (source, archive) => {
+      const path = safe(root, source);
+      if (!existsSync(path)) return;
+      if (!lstatSync(path).isDirectory()) throw new Error(`Legacy directory collision: ${source}`);
+      for (const item of readdirSync(path, { withFileTypes: true })) {
+        const from = `${source}/${item.name}`, to = `${archive}/${item.name}`;
+        if (item.isDirectory()) collectLegacy(from, to);
+        else archives.set(from, to);
+      }
+    };
+    collectLegacy('.claude/agents', 'legacy/claude-agents');
+    const legacyHire = tool === 'codex' ? '.agents/skills/hire-agent' : '.claude/skills/hire-agent';
+    collectLegacy(legacyHire, 'legacy/hire-agent');
     for (const e of [...retired,...commonRetired]) {
       const dest=safe(root,e.destination), state=destinationState(root,e,pristine);
-      if (state==='owned') actions.push({kind:'retire',e,dest});
-      else if (state==='preserve'||state==='client-owned') report.kept.push(e.destination);
+      if (state==='owned') {
+        actions.push({kind:'retire',e,dest});
+        archives.delete(e.destination);
+      } else if (state==='preserve'||state==='client-owned') {
+        if (!archives.has(e.destination)) report.kept.push(e.destination);
+      }
     }
+    for (const [oldPath, archive] of archives) archiveLegacy(oldPath, archive);
     const stamp=new Date().toISOString().replace(/[:.]/g,'-');
     const backupRel=`.update-backup/${status.template_version}-${stamp}`;
     const backup=safe(root,backupRel); if(existsSync(backup)) throw new Error('Backup already exists');
@@ -104,8 +136,7 @@ function update(root,repo,commit) {
   } finally {rmSync(snapshot,{recursive:true,force:true});}
 }
 
-// A switch moves only release-owned files out of the old layout. Personal
-// skills, job sheets and the roster are copied across, then left in place.
+// A switch moves the active skill layout. Historical job files stay in place.
 function switchTool(root,repo,commit,to,legacyTool) {
   recoverPendingSwitches(root);
   recoverPendingUpdates(root);
@@ -188,27 +219,9 @@ function switchTool(root,repo,commit,to,legacyTool) {
     };
     const oldSkill=from==='codex'?'.agents/skills':'.claude/skills';
     const newSkill=to==='codex'?'.agents/skills':'.claude/skills';
-    const oldJobs=dirname(sourcePlan.find(e=>e.source==='agents/README.md').destination);
-    const newJobs=dirname(targetPlan.find(e=>e.source==='agents/README.md').destination);
-    portable(oldSkill,newSkill);portable(oldJobs,newJobs);
-    const shifts=safe(root,'status/shifts');
-    if(existsSync(shifts)) for(const name of readdirSync(shifts).filter(n=>n.endsWith('.json'))) {
-      const recordPath=join(shifts,name), record=json(recordPath);
-      if(record.os===process.platform) {
-        // An active system schedule could fire while its files are being moved.
-        if(isOn(record,{uid:process.getuid?.()??0})) throw new Error(`Schedule ${name} is active; run status/schedule.mjs off --agent ${name.slice(0,-5)} first`);
-      }
-      invalidated.push(name.slice(0,-5));
-      retire.push(`status/shifts/${name}`);
-      for(const path of [record.wake_up,record.plist].filter(Boolean)) {
-        const rel=relative(root,path).split(sep).join('/');
-        if(!rel.startsWith('status/shifts/')) throw new Error(`Schedule path outside status/shifts: ${path}`);
-        const saved=safe(root,rel);
-        if(existsSync(saved)) {
-          if(!lstatSync(saved).isFile()) throw new Error(`Schedule file collision: ${rel}`);
-          retire.push(rel);
-        }
-      }
+    portable(oldSkill,newSkill);
+    for (const schedule of legacySchedules(root)) {
+      if (schedule.active) throw new Error(`Schedule ${schedule.name} is active; run node status/schedule.mjs off --agent ${schedule.name} first`);
     }
     // Stage expected bytes and all backups before touching the deployed tree.
     const stamp=new Date().toISOString().replace(/[:.]/g,'-');
@@ -232,7 +245,7 @@ function switchTool(root,repo,commit,to,legacyTool) {
         if(process.env.ORION_SWITCH_FAIL_AFTER && ++count===Number(process.env.ORION_SWITCH_FAIL_AFTER)) throw new Error('Injected switch interruption');
       }
       for(const destination of retired) rmSync(safe(root,destination));
-      for(const layout of [oldSkill,oldJobs]) pruneEmpty(safe(root,layout));
+      pruneEmpty(safe(root,oldSkill));
       pruneEmpty(safe(root,from==='codex'?'.agents':'.claude'));
       status.selected_tool=to;
       status.notes=[status.notes||'',`switched from ${from} to ${to}; backup in ${backupRel}`].filter(Boolean).join('\n');

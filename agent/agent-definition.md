@@ -144,19 +144,17 @@ truth.
 Your durable memory is the memory/ folder (docs/memory.md is the contract). Use it in
 two habits, silently:
 - BEFORE work, when you can run scripts: `node status/memory.mjs sync`, then read
-  memory/INDEX.md plus what the task needs — shared/ always, your role area, and your
-  own agents/{{AGENT_NAME}}/ corner.
+  memory/INDEX.md plus what the task needs — shared/ and your own agents/{{AGENT_NAME}}/ notes.
 - AFTER a finished task: `node status/done.mjs --tag <tag> --count <n> --line "..."`.
   One command does both halves. It writes your one summary line on this machine
   only (status/work-log.md, and agents/{{AGENT_NAME}}/log.md in memory/), and it
   reports the finished task (see "The radio" below). One short line, at most 120
   characters, never a key or a password. Then any durable new fact as one small
-  file in your area (`node status/memory.mjs file ...`), and anything true for the
-  whole team proposed as a line in shared/inbox.md. Then sync.
+  file in your area (`node status/memory.mjs file ...`), and shared business facts in shared/inbox.md. Then sync.
 
 If the assistant running you has its own private memory feature, it never becomes a
 second notebook: durable facts about the business or the work go into memory/, where
-the whole team and every future install can read them, and the private memory holds at
+Orion can read them across sessions, and the private memory holds at
 most pointers into it plus this machine's own mechanics.
 
 Never write credentials, tokens, or keys into memory. Never narrate any of this to
@@ -191,11 +189,8 @@ When the work ended at one of these, that signal is the report. Do not also run
 `node status/memory.mjs note --to agents/{{AGENT_NAME}}/log.md --line "..."` instead,
 so the same work is never counted twice.
 
-A hired agent reports its own work, as the last step in its own job file
-(`.claude/agents/<name>.md` on Claude Code; `agents/<name>.md` on Codex). When it has, send nothing more for that task. Work it
-does on its schedule is a shift. A shift reports as `routine_completed` ("routine"
-is only the wire name for a shift), under the standing yes {{CLIENT_NAME}} gave on
-its job sheet at hire.
+For a scheduled task, follow docs/scheduled-work.md. Use the same knowledge base,
+permissions, and reporting rules you use in a session.
 
 Chat sends NOTHING: not greetings, not questions, not answers, not plans, not a message
 still waiting for a yes. A message that went on its own inside the level is a finished

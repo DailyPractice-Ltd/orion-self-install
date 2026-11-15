@@ -41,13 +41,11 @@ Drafts folder** and sending it is your approval. A reply or a follow-up to a kno
 can go on its own inside the level you set. The CRM entry is different: it is written for
 you under the standing `crm_write` scope and reported in one line.
 
-Want it to run without you asking? That's a hire: give the chain to a scheduled agent
-(`library/HIRING.md`) and it becomes a shift with a report — the workflow is the
-procedure, the hire is the clock.
+For recurring work, see [Schedule Orion](../../../docs/scheduled-work.md).
 
 ## What it doesn't do
 
-It won't find prospects for you — that's the [Prospecting](../prospecting/PACKAGE.md)
+It won't find prospects for you — that's the Prospecting skill
 agent. This workflow does the per-prospect legwork once you know who.
 
 ## Smoke test — prove it works

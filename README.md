@@ -76,19 +76,11 @@ Honest mechanics: on this website a "button" is a link. Each one opens a package
 whose **first block is the exact text to paste into your AI** — your AI installs it
 from there, fits it to your business, and proves it works on your real data.
 
-**Agents** — a colleague with a job:
-
-- **[Prospecting](library/agents/prospecting/PACKAGE.md)** — ~20 researched
-  candidates that match your ideal customer, each with a one-line "why them."
-- **[Call-Planner Control Tower](library/agents/call-planner/PACKAGE.md)** — who to
-  call today, in what order, with context and the angle.
-- **[Friday Report](library/agents/friday-report/PACKAGE.md)** — the week's honest
-  scoreboard, drafted for you.
-
-**Skills** — one teachable capability:
-
-- **[Meeting Sizing](library/skills/meeting-sizing/PACKAGE.md)** — every meeting gets
-  an outcome, a decision-maker, and the shortest useful length.
+**Skills** let one Orion use your connected tools for different jobs. The installer includes
+[Prospecting](skills/prospecting/SKILL.md), [Call Planner](skills/call-planner/SKILL.md), and
+[Friday Report](skills/friday-report/SKILL.md). Tell Orion which task to do or teach it a new procedure.
+For a meeting brief, use [Meeting Sizing](library/skills/meeting-sizing/PACKAGE.md).
+Use [Codex scheduled tasks or Claude Routines](docs/scheduled-work.md) for recurring work.
 
 **Workflows** — automated chains, gated on your yes:
 

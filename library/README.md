@@ -7,31 +7,25 @@ on your real data, and writes it into your bookmark file. No package is ever "in
 because files exist; it's installed when its own **"you'll know it worked when…"** test
 passes on your data.
 
-Want a role that isn't on this shelf? Say **"I want to hire an agent"** — your AI runs
-the interview and builds the colleague with you: [how hiring works](HIRING.md).
+Three kinds live here:
 
-Four kinds live here, each in its own folder:
-
-| Kind | Plainly | Folder |
-|---|---|---|
-| **Agents** | A colleague with a job. It runs a whole role for you; what it sends is scored and goes only inside the risk level you set, the rest waits for you | [`agents/`](agents/) |
-| **Skills** | One teachable capability your agent applies everywhere (like how to size a meeting) | [`skills/`](skills/) |
-| **Workflows** | An automated chain that runs when you trigger it — form in, drafted work out | [`workflows/`](workflows/) |
-| **Programs** | An operating rhythm: a cadence your agent runs with you daily or weekly | [`programs/`](programs/) |
+| Kind | What Orion does with it |
+|---|---|
+| Skills | Follows a reusable procedure |
+| Workflows | Runs a multi-step way of handling a task |
+| Programs | Follows a daily, weekly, or monthly operating rhythm |
 
 ## On the shelf today
 
-**Agents**
-- [Prospecting](agents/prospecting/PACKAGE.md) — fill the top of your pipeline: ~20
-  researched candidates with a one-line "why them," first drafts scored against your risk level.
-- [Call-Planner Control Tower](agents/call-planner/PACKAGE.md) — who to call today, in
-  what order, with context and the likely angle.
-- [Friday Report](agents/friday-report/PACKAGE.md) — the week's honest scoreboard,
-  drafted for you.
-
 **Skills**
-- [Meeting Sizing](skills/meeting-sizing/PACKAGE.md) — every meeting gets an outcome, a
-  decision-maker, and the shortest length that can do the job.
+- [Prospecting](../skills/prospecting/SKILL.md) — qualify prospects and draft first touches.
+- [Call Planner](../skills/call-planner/SKILL.md) — rank today's calls and prepare angles.
+- [Friday Report](../skills/friday-report/SKILL.md) — draft an evidence-backed weekly scorecard.
+- [Memory Consolidation](../skills/memory-consolidation/SKILL.md) — consolidate the notebook and refresh its index.
+- [Meeting Sizing](skills/meeting-sizing/PACKAGE.md) — give every meeting an outcome, a decision-maker, and a duration.
+
+The installer puts Prospecting, Call Planner, Friday Report, and Memory Consolidation in the selected tool's skills directory.
+Ask Orion for the capability by name. Use `teach Orion` to add a private procedure.
 
 **Workflows**
 - [Prospect Research → Outreach](workflows/prospect-research-outreach/PACKAGE.md) — the

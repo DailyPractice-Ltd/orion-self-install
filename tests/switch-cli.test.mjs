@@ -17,9 +17,8 @@ function fixture(t, from='claude-code') {
   const release=join(base,'release'), client=join(base,'client'); mkdirSync(release);mkdirSync(client);
   const manifest={template_version:'2.0.0',deployment:{tools:['claude-code','codex'],common_sources:[],entries:[
     {source:'skills/foo/SKILL.md',destinations:{'claude-code':'.claude/skills/foo/SKILL.md',codex:'.agents/skills/foo/SKILL.md'},ownership:'release',fingerprint_key:'skills/foo/SKILL.md'},
-    {source:'skills/bar/SKILL.md',destinations:{'claude-code':'.claude/skills/bar/SKILL.md',codex:'.agents/skills/bar/SKILL.md'},ownership:'release',fingerprint_key:'skills/bar/SKILL.md'},
-    {source:'agents/README.md',destinations:{'claude-code':'.claude/agents/README.md',codex:'agents/README.md'},ownership:'client-template',fingerprint_key:'agents/README.md'}]}};
-  put(release,'skills/foo/SKILL.md','new foo\n');put(release,'skills/bar/SKILL.md','new bar\n');put(release,'agents/README.md','template\n');
+    {source:'skills/bar/SKILL.md',destinations:{'claude-code':'.claude/skills/bar/SKILL.md',codex:'.agents/skills/bar/SKILL.md'},ownership:'release',fingerprint_key:'skills/bar/SKILL.md'}]}};
+  put(release,'skills/foo/SKILL.md','new foo\n');put(release,'skills/bar/SKILL.md','new bar\n');
   put(release,'update/manifest.json',JSON.stringify(manifest));put(release,'update/pristine.json',JSON.stringify({files:{'skills/foo/SKILL.md':[hash('old foo\n')],'skills/bar/SKILL.md':[hash('old bar\n')]}}));
   execFileSync('git',['init','-q'],{cwd:release});execFileSync('git',['add','.'],{cwd:release});execFileSync('git',['-c','user.email=test@example.com','-c','user.name=Test','commit','-qm','release'],{cwd:release});
   const commit=execFileSync('git',['rev-parse','HEAD'],{cwd:release,encoding:'utf8'}).trim();
@@ -30,22 +29,21 @@ function fixture(t, from='claude-code') {
   put(client,`${skill}/speckit-plan/SKILL.md`,'maintainer only\n');
   put(client,`${job}/README.md`,'my roster rows\n');put(client,`${job}/writer.md`,'my job\n');
   put(client,'status/shift-log.md','old log\n');put(client,'status/shifts/writer.sh','old prompt\n');put(client,'status/shifts/writer.log','old run log\n');put(client,'status/shifts/writer.json',JSON.stringify({agent:'writer',surface:from,os:'other',wake_up:join(client,'status/shifts/writer.sh')}));
-  return {release,client,commit,skill,job,to:from==='codex'?'claude-code':'codex',targetSkill:from==='codex'?'.claude/skills':'.agents/skills',targetJob:from==='codex'?'.claude/agents':'agents'};
+  return {release,client,commit,skill,job,to:from==='codex'?'claude-code':'codex',targetSkill:from==='codex'?'.claude/skills':'.agents/skills'};
 }
 
-for (const from of ['claude-code','codex']) test(`switch ${from} preserves client work and invalidates saved schedules`,t=>{
+for (const from of ['claude-code','codex']) test(`switch ${from} preserves client work and legacy schedule records`,t=>{
   const h=fixture(t,from);const result=run({},'switch','--root',h.client,'--release-repo',h.release,'--commit',h.commit,'--to',h.to);
   assert.equal(result.status,0,result.stderr);const report=JSON.parse(result.stdout);
   assert.equal(JSON.parse(get(h.client,'status/status.json')).selected_tool,h.to);
   assert.equal(get(h.client,`${h.targetSkill}/foo/SKILL.md`),'new foo\n');assert.equal(existsSync(join(h.client,`${h.skill}/foo/SKILL.md`)),false);
   assert.equal(get(h.client,`${h.targetSkill}/bar/SKILL.md`),'my edited bar\n');assert.equal(existsSync(join(h.client,`${h.skill}/bar/SKILL.md`)),false);
-  assert.equal(get(h.client,`${h.targetSkill}/custom/SKILL.md`),'my skill\n');assert.equal(get(h.client,`${h.targetJob}/README.md`),'my roster rows\n');assert.equal(get(h.client,`${h.targetJob}/writer.md`),'my job\n');
+  assert.equal(get(h.client,`${h.targetSkill}/custom/SKILL.md`),'my skill\n');assert.equal(get(h.client,`${h.job}/README.md`),'my roster rows\n');assert.equal(get(h.client,`${h.job}/writer.md`),'my job\n');
   assert.equal(existsSync(join(h.client,`${h.targetSkill}/speckit-plan/SKILL.md`)),false);
-  for(const old of [`${h.skill}/custom/SKILL.md`,`${h.skill}/speckit-plan/SKILL.md`,`${h.job}/README.md`,`${h.job}/writer.md`]) assert.equal(existsSync(join(h.client,old)),false,old);
-  assert.equal(existsSync(join(h.client,h.skill.split('/').slice(0,-1).join('/'))),false);
+  for(const old of [`${h.skill}/custom/SKILL.md`,`${h.skill}/speckit-plan/SKILL.md`]) assert.equal(existsSync(join(h.client,old)),false,old);
   assert.equal(get(h.client,`${report.backup}/files/${h.skill}/speckit-plan/SKILL.md`),'maintainer only\n');
-  assert.equal(get(h.client,'status/shift-log.md'),'old log\n');assert.equal(existsSync(join(h.client,'status/shifts/writer.json')),false);assert.ok(report.invalidated_schedules.includes('writer'));
-  assert.equal(existsSync(join(h.client,'status/shifts/writer.sh')),false);assert.equal(get(h.client,'status/shifts/writer.log'),'old run log\n');
+  assert.equal(get(h.client,'status/shift-log.md'),'old log\n');assert.ok(existsSync(join(h.client,'status/shifts/writer.json')));assert.deepEqual(report.invalidated_schedules, []);
+  assert.ok(existsSync(join(h.client,'status/shifts/writer.sh')));assert.equal(get(h.client,'status/shifts/writer.log'),'old run log\n');
 });
 
 test('legacy migration requires explicit source and collision preflight leaves client unchanged',t=>{

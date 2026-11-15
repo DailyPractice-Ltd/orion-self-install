@@ -16,15 +16,12 @@ Three tiers, by how your yes is given — and nothing besides:
 2. **"A piece of work finished"**: what kind of work it was, how many things were
    done, when, and what did it. The kind is one general tag from a short public menu
    (see "The tag menu" below), such as "prospecting". The count is a number: say, 18.
-   What did it is the name of the skill or hired agent that ran, if one did. This
-   covers a task you set your AI in a session, a hired agent's shift (work it does
+   What did it is the name of the skill that ran, if one did. This
+   covers a task you set your AI in a session, Orion's scheduled work (work it does
    on a schedule), and the named moments in the table below. Never what was in
    the work, never who it was for.
-3. **"This machine now runs X"** — when you install a Library package or hire an
-   agent, its name, kind, and version — and for a hire, which role it is: a label from
-   [the public role menu](../library/ROLES.md) (or "custom"). That's how Daily
-   Practice knows who's affected when a package is improved, and which roles teams
-   actually hire.
+3. **"This machine now runs X"** — a Library install shares the package's name, kind,
+   and version so Daily Practice knows whom to support when a package improves.
 4. **Which template version this folder is on** — stated on every radio call, so
    Daily Practice can tell whether an update reached you. A label about this folder,
    never about your work.
@@ -39,9 +36,7 @@ Practice as a request. Your words go only if you say yes. Daily Practice looks a
 requests every Friday and tells you what it decided.
 
 **Tier 3 — your artifacts, shown to you first**: a skill you choose to offer the
-library (you see exactly what would be sent before it goes), and — when you hire an
-agent — one sentence you approve at hire saying what that agent is for, read back to
-you word for word before it is ever sent.
+Library after reviewing exactly what it will send.
 
 **Never, under any setting**: the content of your messages or drafts, your knowledge
 base, your prospects or customers, anything from your CRM or email. The label tier
@@ -96,16 +91,15 @@ radio never learns your level, the score, or who it was to.
 | "Outreach declined" (`outreach_rejected`) | You say no to a message that was waiting for you (equally useful for improving the kit) | Your agent, right after your no |
 | "Debrief done" (`debrief_completed`) | A post-call debrief finishes and its CRM update is written. No yes is asked: CRM writes are a standing scope | Your agent, right after the write |
 | "CRM updated" (`crm_updated`) | Your agent performs a standalone CRM write inside your standing scope (not part of a debrief). No yes is asked | Your agent, right after the write |
-| "A shift ran" (`routine_completed`) | A hired agent finishes a shift: work it does on a schedule, started by a clock or a handoff and not by a person. The standing yes you gave on its job sheet at hire covers exactly this report. A shift may report a count of 0: it ran and found nothing to do. ("Routine" is only the name on the wire. In plain words it is a shift.) | The agent, as the last step of the shift (`node status/done.mjs --shift`), with its name, a tag, and a count |
-| "This machine runs X" (`report-install`) | A package's smoke test passes, or a hired agent's first run on real work passes. A hire carries its role label. The purpose sentence rides only after the job-sheet readback named it and you said yes | Your agent, right after the pass |
+| A scheduled task ran (`routine_completed`) | Orion completes a task in Codex scheduled tasks or Claude Routines. A run may report count zero when it checked for work and found none. | Orion runs `node status/done.mjs --shift` with a tag, count, and skill when applicable |
+| This machine runs X (`report-install`) | A package passes its real-data smoke test | Orion, after the pass |
 | Your message (`send`) | You have something to say to Daily Practice and say yes to sending it — your words | Your agent, on your yes in that conversation |
 | A skill offered up (`contribute`) | You choose to offer a skill to the library, after seeing exactly what would be sent | Your agent, on your yes to the shown preview |
 
 Three rules sit under that table.
 
 First, every real-work message **follows work you asked for or approved**: a task you
-set in a session, an action you said yes to, a CRM write under your standing scope, or a shift you approved once, at hire,
-on the job sheet that names its schedule and this report. The radio never learns
+set in a session, an action you said yes to, a CRM write under your standing scope, or a scheduled task you set up in the native scheduler. The radio never learns
 about anything you didn't ask for or approve.
 
 Second, it's **one message per piece of work**. The most specific label wins, and
@@ -155,7 +149,7 @@ once, in these words:
 > knowledge base, or your prospects. You can switch this off. Keep check-ins on?
 
 "Running" has one meaning here: your harness reported finished work in the last 14
-days. Work you asked for in a session counts, and so does work a hired agent did on
+days. Work you asked for in a session counts, and so does work Orion did on
 a schedule.
 
 The box is pre-ticked — most people keep it, and it's genuinely how we spot problems

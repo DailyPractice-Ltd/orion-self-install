@@ -451,6 +451,19 @@ test('done: --shift sends routine_completed and writes an auto: line to the shif
   assert.ok(!h.wire().includes('candidates'), 'the line stays local on a shift too');
 });
 
+test('a native scheduled skill reports under Orion without a hired agent', (t) => {
+  const h = makeHarness(t);
+  const r = h.run('done.mjs', ['--tag', 'reporting', '--shift', '--skill', 'friday-report',
+    '--count', '0', '--line', 'Checked the weekly reporting window']);
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /Signal sent \(routine_completed\)/);
+  const { payload } = onlySignal(h);
+  assert.equal(payload.routine, 'friday-report');
+  assert.equal(payload.asset, 'friday-report');
+  assert.equal(payload.count, 0);
+  assert.match(h.shiftLog(), /Neo \| count: 0 \| auto:/);
+});
+
 test('done: the auto: marker is never doubled, and a wiring test keeps its auto-test: marker', (t) => {
   const h = makeHarness(t);
   h.run('done.mjs', ['--tag', 'ops', '--agent', 'dream', '--shift', '--line', 'auto: merged 4 duplicate notes']);
@@ -516,7 +529,6 @@ test('done: every other bad report is refused the same way', (t) => {
     ['an agent with a capital', [...good, '--agent', 'Prospecting']],
     ['a roster name over 30 characters', [...good, '--agent', 'a'.repeat(31)]],
     ['an agent that is a person\'s name', [...good, '--agent', 'thandi@acme.co.za']],
-    ['--shift without --agent', [...good, '--shift', '--line', 'ran']],
     ['an empty --line', [...good, '--line', '   ']],
     ['a --line that swallowed the next flag', [...good, '--agent', 'prospecting', '--line', '--shift']],
     ['a flag it does not know', [...good, '--note', 'called Thandi at Acme']],
@@ -828,19 +840,6 @@ test('tripwire: the consent sentence is the same words in AGENTS.md, the wizard,
   const body = consent.replace(/ Keep check-ins on\?$/, '');
   assert.ok(said.includes(body), `the wizard should say the consent word for word.\nExpected: ${body}\nSaid: ${said}`);
   assert.ok(said.includes('Keep check-ins on?'));
-});
-
-test('tripwire: the roster legend in library/HIRING.md is the one a new roster ships with', () => {
-  const legendOf = (text) => {
-    const from = text.indexOf('**Status legend.**');
-    const to = text.indexOf('never count).', from);
-    assert.ok(from !== -1 && to !== -1, 'the legend should run from "Status legend." to "never count)."');
-    return squash(text.slice(from, to + 'never count).'.length).replace(/^> ?/gm, ''));
-  };
-  const roster = readFileSync(join(repo, 'agents', 'README.md'), 'utf8');
-  const hiring = readFileSync(join(repo, 'library', 'HIRING.md'), 'utf8');
-  assert.equal(legendOf(hiring), legendOf(roster));
-  assert.match(roster, /^\| Agent \| Role \| Job \| Schedule \| Status \| Skill \|$/m);
 });
 
 test('tripwire: the release has one version, and it ships done.mjs', () => {

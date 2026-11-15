@@ -1,12 +1,10 @@
 ---
 name: create-skill
-description: Teach the client's team a reusable judgment as a skill. Use when the client says "teach it to…", "I want it to {decide/judge/size/score} the way I do", or asks for a repeatable procedure rather than a new team member. NOT for anything with a schedule — "teach it to do X every morning" is a hire (use hire-agent). Three questions, one file, tested on a real example.
+description: Teach Orion a reusable business judgment or procedure when the user asks Orion to learn how they assess, decide, or do recurring work.
 ---
 
-Read `library/HIRING.md`, Part C ("Teaching a skill instead"), and follow it exactly.
+# Teach Orion a skill
 
-A skill is invoked, not scheduled: no schedule, no report step of its own, no
-probation. When a finished task used the skill, that task's report names it
-(`node status/done.mjs --skill <slug> …`). One screen
-maximum — if the file wants to be longer, it is an agent trying to happen, and you
-should offer the hire path (Part A) instead.
+Ask one question at a time for the trigger, the procedure or judgment, and an example of a good result. Read the knowledge base first and reuse answers it already contains. Write a `SKILL.md` with a clear name, description, evidence requirements, limits, and completion check in the selected tool's skills directory. Resolve the directory with `runtimeLayout` from `update/destination-resolver.mjs`.
+
+Run the procedure on a user-approved real example and incorporate their correction before recording it as proven. The procedure inherits Orion's permissions and can further restrict its own actions. For recurring execution, use native scheduling as documented in `docs/scheduled-work.md` at the harness root.

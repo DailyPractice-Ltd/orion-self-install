@@ -3,11 +3,7 @@ name: Test
 # Every push to main and every pull request, on the three kinds of machine a
 # client can have:
 #   unit       the test suite (node --test).
-#   scheduler  status/schedule.mjs against the machine's REAL scheduler: launchd
-#              on a Mac, Task Scheduler on Windows, cron on Linux. It wires a
-#              stand-in agent, switches the schedule on, fires it, checks what
-#              the stand-in was handed, and switches it off again. This is the
-#              only place the Windows and Linux paths are actually run.
+#   scheduler  Legacy schedule cleanup against launchd, Task Scheduler and cron.
 
 on:
   push:

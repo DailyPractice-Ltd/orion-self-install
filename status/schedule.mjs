@@ -1,67 +1,17 @@
 #!/usr/bin/env node
 /**
- * A hired agent's schedule, on this machine's own scheduler.
- *
- *   node status/schedule.mjs wire --agent <roster name> --surface <claude-code|codex>
- *                                 --at <HH:MM> [--days <mon,tue,wed,thu,fri>] [--bin <full path>]
- *   node status/schedule.mjs on   --agent <roster name>
- *   node status/schedule.mjs run  --agent <roster name>
- *   node status/schedule.mjs off  --agent <roster name>
- *
- * What it is for: library/HIRING.md step 6, rung B. When the client's agent
- * software has no scheduled tasks of its own, the computer's scheduler has to
- * start that software at the right time, in this folder, with nobody watching.
- * Writing that by hand means nesting quotes inside quotes for two shells and an
- * XML file, and it used to assume Claude Code was the software. This script
- * does it instead, for the software named in --surface, and it talks to the
- * scheduler itself, so nothing depends on which shell the assistant happens to
- * be typing into.
- *
- * wire   Writes the wake-up, inside this folder only, under status/shifts/:
- *          <name>.sh  (Mac, Linux) or <name>.cmd (Windows): go to this folder
- *                     and start the software with the shift prompt.
- *          world.dailypractice.orion.<name>.plist (Mac): the launchd entry.
- *          <name>.json: what was asked for, so on, run and off need only a name.
- *        It changes nothing outside this folder and switches nothing on.
- * on     Switches the schedule on. This is the change to the client's machine:
- *        tell them what wire printed and run this only on their yes. Safe to
- *        run again after a new wire: it replaces what was there.
- * run    Fires the schedule once, now, through the scheduler itself. This is
- *        the wake-up check of HIRING.md step 7.
- * off    Switches the schedule off. The files stay, so on brings it back.
- *
- *   --agent    The roster name of the hired agent. Its job sheet must exist in
- *              the selected tool's job directory.
- *   --surface  The selected runtime in status/status.json. Only claude-code
- *              and codex can be started with nobody watching.
- *   --at       The time of day, 24-hour, this machine's own clock.
- *   --days     Which days, as mon,tue,wed,thu,fri,sat,sun. Leave it out for
- *              every day. A schedule finer than a time of day (every 30
- *              minutes, say) is beyond this script: use a scheduled task inside
- *              the agent software (rung A).
- *   --bin      The full path of the software's command, when it is not on PATH.
- *
- * On Claude Code the wake-up allows the tools on the agent's job sheet (its
- * `tools:` line), plus the few things every shift needs to read its job and
- * report, and nothing else. It never stops to ask: there is nobody to ask.
- * On Codex it runs in the workspace sandbox with the network allowed, because
- * the shift's report has to reach the radio.
- *
- * Anything it cannot do is one plain explanation and exit 1, with nothing
- * written. Then library/HIRING.md, Part D, "Scheduler failure" is the lane:
- * the agent is hired, works when asked, and its schedule reads "not yet wired".
- *
- * Dependency-free: node built-ins and status/shapes.mjs only.
+ * Legacy computer scheduler compatibility. The command only switches off
+ * schedules set up by earlier releases. Exports support legacy records and
+ * their send-level updates. Use the native scheduler for new tasks.
  */
-
 import {
-  readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync, statSync, realpathSync, copyFileSync, rmSync,
+  readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync, realpathSync, copyFileSync, rmSync,
   openSync, closeSync,
 } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, delimiter, isAbsolute, win32, posix } from 'node:path';
+import { dirname, join, isAbsolute, win32, posix } from 'node:path';
 import { homedir } from 'node:os';
 import { labelProblem, unattendedRunner, PROMPT_SLOT, SEND_TOOL, SEND_LEVELS } from './shapes.mjs';
 import { runtimeLayout } from '../update/destination-resolver.mjs';
@@ -340,20 +290,6 @@ export function buildCronLine({ wakeUpPath, logPath, days, hour, minute, marker 
   return `${minute} ${hour} * * ${dow} ${shQuote(wakeUpPath)} >> ${shQuote(logPath)} 2>&1 ${marker}`;
 }
 
-/** Look for a command on PATH the way a shell would. Null when it is not there. */
-export function findOnPath(bin, { env = process.env, platform = process.platform } = {}) {
-  const exts = platform === 'win32' ? ['.cmd', '.exe', '.bat', ''] : [''];
-  for (const dir of String(env.PATH || env.Path || '').split(delimiter).filter(Boolean)) {
-    for (const ext of exts) {
-      const candidate = join(dir, bin + ext);
-      try {
-        if (statSync(candidate).isFile()) return candidate;
-      } catch { /* not here */ }
-    }
-  }
-  return null;
-}
-
 /** Folders on a Mac that the system guards: the first scheduled run there brings up a question. */
 function guardedMacFolder(folder, home) {
   if (!home) return null;
@@ -395,7 +331,7 @@ export function plan({ os, folder, name, surface, at, days, bin, sheetTools, crm
   }
   if (problems.length > 0) return { problems };
   if (!bin) {
-    return { problems: [`Could not find the ${runner.bin} command on this machine. If the client only uses the app, wire the schedule inside the app instead (library/HIRING.md step 6, rung A). If the command is installed somewhere unusual, give its full path with --bin.`] };
+    return { problems: [`Could not find the ${runner.bin} command on this machine. If the client only uses the app, wire the schedule inside the app instead. If the command is installed somewhere unusual, give its full path with --bin.`] };
   }
 
   const hour = Number(time[1]);
@@ -564,7 +500,8 @@ export function apply(list, { run = spawnSync, start = spawn } = {}) {
       } else if (step.gone) {
         // This command has to fail: what it looks for must no longer be there.
         const still = run(step.gone[0], step.gone[1], { encoding: 'utf8' });
-        if (!still.error && still.status === 0) return step.failure;
+        if (still.error) return still.error.message;
+        if (still.status === 0) return step.failure;
       } else if (step.exec) {
         const [command, args] = step.exec;
         const done = run(command, args, { encoding: 'utf8' });
@@ -636,7 +573,7 @@ export function rerender({ folder, name }) {
     // Wired before 1.5.0: the record did not keep the command, but the wake-up
     // file says exactly what was started, so read it back from there.
     const learned = commandFromWakeUp(record);
-    if (!learned) return { problem: `it was wired before 1.5.0 and its wake-up could not be read; wire it again with  node status/schedule.mjs wire --agent ${name} ...` };
+    if (!learned) return { problem: `it was wired before 1.5.0 and its wake-up could not be read; review it using docs/scheduled-work.md` };
     Object.assign(record, learned);
   }
   const layout = runtimeLayout(folder);
@@ -657,22 +594,17 @@ export function rerender({ folder, name }) {
   return { written: wakeUp.path, sendRisk };
 }
 
-// ── The command ─────────────────────────────────────────────────────────────
-
-const USAGE = [
-  'Usage: node status/schedule.mjs wire --agent <roster name> --surface <claude-code|codex> --at <HH:MM> [--days <mon,tue,wed,thu,fri>] [--bin <full path>]',
-  '       node status/schedule.mjs on | run | off --agent <roster name>',
-].join('\n');
+// Legacy cleanup entry point. New schedules live in the host application.
+const USAGE = 'Usage: node status/schedule.mjs off --agent <legacy-name>';
 
 function main(argv) {
   const [command, ...rest] = argv;
   if (!command || command === '--help' || command === '-h') {
     console.log(USAGE);
-    console.log('Details in the header of this file, and in library/HIRING.md step 6.');
     return 0;
   }
-  if (!['wire', 'on', 'run', 'off'].includes(command)) {
-    console.log(`"${command}" is not something schedule.mjs does.`);
+  if (command !== 'off') {
+    console.log("Use Codex scheduled tasks or Claude Routines to schedule Orion. This command only disables a legacy schedule.");
     console.log(USAGE);
     return 1;
   }
@@ -686,7 +618,7 @@ function main(argv) {
     }
     flags[arg.slice(2)] = rest[++i];
   }
-  const taken = command === 'wire' ? ['agent', 'surface', 'at', 'days', 'bin'] : ['agent'];
+  const taken = ['agent'];
   const unknown = Object.keys(flags).filter((k) => !taken.includes(k));
   if (unknown.length > 0) {
     console.log(`Not something schedule.mjs ${command} takes: ${unknown.map((k) => `--${k}`).join(', ')}. Nothing was done.`);
@@ -703,100 +635,38 @@ function main(argv) {
     return 1;
   }
 
-  if (command !== 'wire') {
-    const recordPath = join(folder, 'status', 'shifts', `${name}.json`);
-    if (!existsSync(recordPath)) {
-      console.log(`There is no wake-up for ${name} in status/shifts/ yet. Run  node status/schedule.mjs wire --agent ${name} ...  first.`);
-      return 1;
-    }
-    let record = null;
-    try {
-      record = JSON.parse(readFileSync(recordPath, 'utf8'));
-    } catch { /* said below */ }
-    // The record holds full paths. If the folder has moved, or the record was
-    // written on another machine, everything in it points somewhere else.
-    const here = (p) => { try { return realpathSync(p); } catch { return null; } };
-    const stale = !record || record.os !== process.platform || !record.wake_up
-      || !here(record.wake_up) || here(dirname(record.wake_up)) !== here(dirname(recordPath))
-      || (record.os === 'darwin' && !here(record.plist));
-    if (stale) {
-      console.log(`The wake-up for ${name} in status/shifts/ does not match this folder on this machine (the folder was moved, the files were copied from elsewhere, or one is damaged). Run  node status/schedule.mjs wire --agent ${name} ...  again here.`);
-      return 1;
-    }
-    const failed = apply(steps(command, record, { home: homedir(), uid: process.getuid?.() ?? 0 }));
-    if (failed) {
-      console.log(`That did not work for ${name}: ${failed}`);
-      console.log('The agent is still hired and still works when asked: library/HIRING.md, Part D, "Scheduler failure".');
-      return 1;
-    }
-    const when = `${record.at}, ${record.days.length === 0 ? 'every day' : record.days.join(', ')}`;
-    if (command === 'on') console.log(`The schedule for ${name} is on: ${when}, by this machine's clock. Now check it really fires:  node status/schedule.mjs run --agent ${name}`);
-    else if (command === 'off') console.log(`The schedule for ${name} is off. Its files are still in status/shifts/, so  node status/schedule.mjs on --agent ${name}  brings it back.`);
-    else console.log(`Fired once, now. A new line for ${name} should land in status/shift-log.md within a few minutes. What the wake-up itself printed is in status/shifts/${name}.log.`);
-    return 0;
-  }
-
-  const layout = runtimeLayout(folder);
-  if (flags.surface !== layout.tool) {
-    console.log(`--surface must match status.selected_tool (${layout.tool}). Switch tools through migration first. Nothing was written.`);
+  const recordPath = join(folder, 'status', 'shifts', `${name}.json`);
+  if (!existsSync(recordPath)) {
+    console.log(`There is no wake-up for ${name} in status/shifts/ yet. Check the original machine and folder.`);
     return 1;
   }
-  const sheetPath = join(folder, layout.jobRoot, `${name}.md`);
-  if (!existsSync(sheetPath)) {
-    console.log(`There is no job sheet at ${layout.jobRoot}/${name}.md, so there is no agent to schedule. Nothing was written.`);
+  let record = null;
+  try {
+    record = JSON.parse(readFileSync(recordPath, 'utf8'));
+  } catch { /* said below */ }
+  // The record holds full paths. If the folder has moved, or the record was
+  // written on another machine, everything in it points somewhere else.
+  const here = (p) => { try { return realpathSync(p); } catch { return null; } };
+  const tag = folderTag(folder);
+  const targetMatches = record?.os === 'darwin'
+    ? record.label === launchdLabel(name, tag)
+    : record?.os === 'win32'
+      ? record.task === windowsTaskName(name, tag)
+      : record?.marker === cronMarker(name, tag);
+  const stale = !record || record.agent !== name || record.os !== process.platform || !targetMatches
+    || !record.wake_up || !here(record.wake_up) || here(dirname(record.wake_up)) !== here(dirname(recordPath))
+    || (record.os === 'darwin' && (!here(record.plist) || here(dirname(record.plist)) !== here(dirname(recordPath))));
+  if (stale) {
+    console.log(`The wake-up for ${name} in status/shifts/ does not match this folder on this machine (the folder was moved, the files were copied from elsewhere, or one is damaged). Turn it off on the original machine or in its scheduler.`);
     return 1;
   }
-  const sheetText = readFileSync(sheetPath, 'utf8');
-  const sheetTools = jobSheetTools(sheetText);
-  const crmWrite = jobSheetCrmWrite(sheetText);
-  const sendRisk = effectiveSendRisk({ status: readStatusFile(folder), sheetText });
-  const wanted = unattendedRunner(flags.surface);
-  if (flags.bin) {
-    let isFile = false;
-    try { isFile = isAbsolute(flags.bin) && statSync(flags.bin).isFile(); } catch { /* not there */ }
-    if (!isFile) {
-      console.log(`--bin needs the full path of the command's own file. "${flags.bin}" is not one. Nothing was written.`);
-      return 1;
-    }
-  }
-  // The wake-up file is what a switched-on schedule runs. Rewriting it under a
-  // live schedule would change what runs before anyone said yes.
-  const oldRecordPath = join(folder, 'status', 'shifts', `${name}.json`);
-  if (existsSync(oldRecordPath)) {
-    let old = null;
-    try { old = JSON.parse(readFileSync(oldRecordPath, 'utf8')); } catch { /* a damaged record is simply replaced */ }
-    if (old && old.os === process.platform && isOn(old, { uid: process.getuid?.() ?? 0 })) {
-      console.log(`The schedule for ${name} is switched on (${old.at}, ${old.days?.length ? old.days.join(', ') : 'every day'}). Switch it off first, then wire it again:  node status/schedule.mjs off --agent ${name}`);
-      console.log('Nothing was written.');
-      return 1;
-    }
-  }
-  const bin = flags.bin || (wanted.schedulable ? findOnPath(wanted.bin) : null);
-  const days = flags.days ? String(flags.days).toLowerCase().split(',').map((d) => d.trim()).filter(Boolean) : [];
-
-  const result = plan({
-    os: process.platform, folder, name, surface: flags.surface, at: flags.at, days, bin, sheetTools, crmWrite, sendRisk,
-    nodeDir: dirname(process.execPath), home: homedir(), jobRoot: layout.jobRoot,
-  });
-  if (result.problems.length > 0) {
-    for (const problem of result.problems) console.log(problem);
-    console.log('Nothing was written. The schedule is not wired: library/HIRING.md, Part D, "Scheduler failure".');
+  const uid = process.getuid?.() ?? 0;
+  const failed = apply(steps('off', record, { home: homedir(), uid }));
+  if (failed) {
+    console.log(`That did not work for ${name}: ${failed}`);
     return 1;
   }
-
-  for (const file of result.files) {
-    mkdirSync(dirname(file.path), { recursive: true });
-    writeFileSync(file.path, file.text);
-    if (file.executable) chmodSync(file.path, 0o755);
-    console.log(`Written: ${file.path}`);
-  }
-  const { record } = result;
-  console.log(`The ${name} agent will be started with: ${result.command.join(' ')}`);
-  console.log(`When: ${record.at}, ${record.days.length === 0 ? 'every day' : record.days.join(', ')}, by this machine's clock.`);
-  for (const note of result.notes) console.log(note);
-  console.log('Nothing is switched on yet. Switching on is a change to the machine, so tell the client what it does and run this on their yes:');
-  console.log(`  node status/schedule.mjs on --agent ${name}`);
-  console.log(`To switch it off again:  node status/schedule.mjs off --agent ${name}`);
+  console.log(`The legacy schedule for ${name} is off. See docs/scheduled-work.md for native scheduling.`);
   return 0;
 }
 

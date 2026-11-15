@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { plainEnv } from './helpers/env.mjs';
 
 const script = fileURLToPath(new URL('../.github/scripts/withdraw-release.mjs', import.meta.url));
@@ -49,7 +49,7 @@ function run(t, { release = {}, remoteCommit = commit, releaseId = id, verifyFai
       return Response.json({}, { status: 404 });
     };
   `);
-  const result = spawnSync(process.execPath, ['--import', fixture, script,
+  const result = spawnSync(process.execPath, ['--import', pathToFileURL(fixture).href, script,
     '--tag', tag, '--commit', commit, '--release-id', String(releaseId)], {
     encoding: 'utf8', env: { ...plainEnv(), GITHUB_REPOSITORY: 'test/orion', GH_TOKEN: 'fixture' },
   });

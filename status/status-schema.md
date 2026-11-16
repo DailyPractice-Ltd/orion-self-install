@@ -42,6 +42,13 @@ when a session ends — the client might close their laptop mid-sentence. If a c
 step isn't written back yet when that happens, it's lost, and the client will be asked
 the same question twice next time. That's the exact failure this file exists to prevent.
 
+## Template source
+
+`template_commit` records the full Git commit of the latest update from `main`.
+Use it as the source of the previous shipped file in a three-way merge. Restoring
+that update restores the prior source record. A published install starts with
+`applied_release.commit` as its source.
+
 ## Published release identity
 
 `applied_release` is absent until a published install or update completes. Its

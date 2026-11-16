@@ -100,51 +100,152 @@ function update(root,repo,commit) {
       }
     }
     for (const [oldPath, archive] of archives) archiveLegacy(oldPath, archive);
-    const stamp=new Date().toISOString().replace(/[:.]/g,'-');
-    const backupRel=`.update-backup/${status.template_version}-${stamp}`;
-    const backup=safe(root,backupRel); if(existsSync(backup)) throw new Error('Backup already exists');
-    mkdirSync(backup,{recursive:true}); copyTo(statusPath,join(backup,'status/status.json'));
-    const journal={kind:'update',state:'pending',from:status.template_version,to:manifest.template_version,commit,selected_tool:tool,
-      actions:actions.map(a=>({kind:a.kind,destination:a.e.destination,installed_hash:a.kind==='retire'?null:fingerprint(readFileSync(a.src)),prior_hash:a.kind==='add'?null:fingerprint(readFileSync(a.dest))})),
-      remove_status_checklist_keys:manifest.remove_status_checklist_keys||[]};
-    for(const key of journal.remove_status_checklist_keys) delete status.checklist?.[key];
-    status.template_version=manifest.template_version;
-    status.notes=[status.notes||'',`updated to ${manifest.template_version}; backup in ${backupRel}`].filter(Boolean).join('\n');
-    const nextStatus=JSON.stringify(status,null,2)+'\n';
-    journal.status_installed_hash=fingerprint(nextStatus);
-    // All existing targets are backed up before the first write or removal.
-    for (const a of actions) if(a.kind!=='add') copyTo(a.dest,join(backup,'files',a.e.destination));
-    for (const a of actions) if(a.kind!=='retire') copyTo(a.src,join(backup,'stage',a.e.destination));
-    mkdirSync(join(backup,'stage/status'),{recursive:true});
-    writeFileSync(join(backup,'stage/status/status.json'),nextStatus);
-    writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
-    try {
-      let count=0;
-      for (const a of actions) {
-        if(a.kind==='retire') {rmSync(a.dest);report.retired.push(a.e.destination);}
-        else {mkdirSync(dirname(a.dest),{recursive:true});renameSync(join(backup,'stage',a.e.destination),a.dest);report[a.kind==='add'?'added':'refreshed'].push(a.e.destination);}
-        if(process.env.ORION_UPDATE_FAIL_AFTER && ++count===Number(process.env.ORION_UPDATE_FAIL_AFTER)) throw new Error('Injected update interruption');
-      }
-      for (const path of report.retired.filter(path => path.startsWith('library/'))) {
-        let parent = dirname(path);
-        while (parent !== '.') {
-          const directory = safe(root, parent);
-          if (existsSync(directory)) {
-            if (readdirSync(directory).length > 0) break;
-            rmdirSync(directory);
-          }
-          parent = dirname(parent);
-        }
-      }
-      renameSync(join(backup,'stage/status/status.json'),statusPath);
-      journal.state='complete';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
-    } catch(error) {
-      rollbackUpdate(root,backup,journal);
-      journal.state='recovered';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
-      throw error;
-    }
-    return {...report,backup:backupRel};
+    return applyActions({ root, statusPath, status, manifest, tool, commit, actions, report });
   } finally {rmSync(snapshot,{recursive:true,force:true});}
+}
+
+function stagedContext(root, snapshot) {
+  const manifest=json(join(snapshot,'update/manifest.json'));
+  const pristine=json(join(snapshot,'update/pristine.json'));
+  const statusPath=safe(root,'status/status.json'), statusBytes=readFileSync(statusPath);
+  const status=JSON.parse(statusBytes), statusHash=fingerprint(statusBytes);
+  const tool=selectedTool(status,manifest.deployment);
+  if (newer(status.template_version,manifest.template_version)) throw new Error('Refusing to roll back the harness version');
+  const entries=new Map(planForTool(manifest.deployment,tool,{releaseRoot:snapshot,root}).map(e=>[e.destination,e]));
+  const retired=new Map([
+    ...(manifest.remove||[]).map(path=>[path,path]),
+    ...(manifest.deployment.retired||[]).map(e=>[
+      e.destinations?.[tool]||e.destination, e.sources?.[tool]||e.fingerprint_key||e.source,
+    ]),
+  ]);
+  return {manifest,pristine,statusPath,status,statusHash,tool,entries,retired};
+}
+
+function currentFingerprint(root, path) {
+  const dest=safe(root,path);
+  if (!existsSync(dest)) return null;
+  if (!lstatSync(dest).isFile()) throw new Error(`Destination is not a file: ${path}`);
+  return fingerprint(readFileSync(dest));
+}
+
+function stagedInventory(root, repo, commit) {
+  const snapshot=sourceSnapshot(repo,commit);
+  try {
+    const {manifest,pristine,status,statusHash,tool,entries,retired}=stagedContext(root,snapshot);
+    const files=[];
+    for (const [path,e] of entries) {
+      const before=currentFingerprint(root,path);
+      const incoming=fingerprint(readFileSync(safe(snapshot,e.source)));
+      const shipped=path==='update/pristine.json' || pristine.files?.[e.fingerprint_key]?.includes(before);
+      if (before===incoming) continue;
+      const action=before===null ? 'copy' : e.ownership==='client-template' ? 'keep' : shipped ? 'copy' : 'merge';
+      files.push({path,before,action,source:e.source,fingerprint_key:e.fingerprint_key});
+    }
+    for (const [path,key] of retired) {
+      if (entries.has(path)) continue;
+      const before=currentFingerprint(root,path);
+      if (before===null) continue;
+      files.push({path,before,action:pristine.files?.[key]?.includes(before)?'retire':'keep'});
+    }
+    return {commit,status_hash:statusHash,from:status.template_version,to:manifest.template_version,
+      previous_commit:status.template_commit || status.applied_release?.commit || null,selected_tool:tool,files};
+  } finally {rmSync(snapshot,{recursive:true,force:true});}
+}
+
+// The prompt chooses and merges files. This operation only validates and commits its plan.
+function applyStaged(root, repo, commit, stage) {
+  if (!stage) throw new Error('--stage is required');
+  recoverPendingUpdates(root);
+  const snapshot=sourceSnapshot(repo,commit);
+  try {
+    const {manifest,pristine,statusPath,status,statusHash,tool,entries,retired}=stagedContext(root,snapshot);
+    const plan=json(safe(stage,'plan.json'));
+    if (plan.commit!==commit || plan.status_hash!==statusHash) {
+      throw new Error('The staged plan no longer matches the source or harness status');
+    }
+    const seen=new Set(), actions=[];
+    for (const { path, before, retire } of plan.files) {
+      if (seen.has(path) || path==='status/status.json') throw new Error(`Invalid staged destination: ${path}`);
+      seen.add(path);
+      const dest=safe(root,path);
+      const current=currentFingerprint(root,path);
+      if (current!==before) throw new Error(`Destination changed since staging: ${path}`);
+      if (retire) {
+        const key=retired.get(path);
+        if (!key || entries.has(path) || !pristine.files?.[key]?.includes(current)) {
+          throw new Error(`Cannot retire a client file: ${path}`);
+        }
+        actions.push({kind:'retire',e:{destination:path},dest});
+        continue;
+      }
+      const e=entries.get(path);
+      if (!e || (current!==null && e.ownership==='client-template')) throw new Error(`Cannot update a client file: ${path}`);
+      const src=safe(stage,`files/${path}`);
+      if (!lstatSync(src).isFile()) throw new Error(`Staged destination is not a file: ${path}`);
+      if (path.endsWith('.mjs')) {
+        const check=spawnSync(process.execPath,['--check',src],{encoding:'utf8'});
+        if (check.status!==0) throw new Error(`Invalid staged script ${path}: ${check.stderr}`);
+      }
+      if (current!==fingerprint(readFileSync(src))) actions.push({kind:current===null?'add':'replace',e,src,dest});
+    }
+    const legacy_schedules=legacySchedules(root);
+    const running=legacy_schedules.filter(schedule=>schedule.active);
+    if (running.length) throw new Error(`Turn off active legacy computer schedules before upgrading: ${running.map(({name})=>name).join(', ')}. See docs/scheduled-work.md.`);
+    if (!actions.length && status.template_commit===commit) return {commit,version:status.template_version,unchanged:true};
+    const report={from:status.template_version,to:manifest.template_version,commit,selected_tool:tool,refreshed:[],added:[],retired:[],legacy_schedules};
+    return applyActions({root,statusPath,status,manifest,tool,commit,actions,report,recordSource:true});
+  } finally {rmSync(snapshot,{recursive:true,force:true});}
+}
+
+function applyActions({root,statusPath,status,manifest,tool,commit,actions,report,recordSource=false}) {
+  const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+  const backupRel=`.update-backup/${status.template_version}-${stamp}`;
+  const backup=safe(root,backupRel); if(existsSync(backup)) throw new Error('Backup already exists');
+  mkdirSync(backup,{recursive:true,mode:0o700}); copyTo(statusPath,join(backup,'status/status.json'));
+  const journal={kind:'update',state:'pending',from:status.template_version,to:manifest.template_version,commit,selected_tool:tool,
+    actions:actions.map(a=>({kind:a.kind,destination:a.e.destination,installed_hash:a.kind==='retire'?null:fingerprint(readFileSync(a.src)),prior_hash:a.kind==='add'?null:fingerprint(readFileSync(a.dest))})),
+    remove_status_checklist_keys:manifest.remove_status_checklist_keys||[]};
+  for(const key of journal.remove_status_checklist_keys) delete status.checklist?.[key];
+  status.template_version=manifest.template_version;
+  if (recordSource) {
+    status.template_commit=commit;
+    journal.record_template_commit=true;
+  }
+  status.notes=[status.notes||'',`updated to ${manifest.template_version}; backup in ${backupRel}`].filter(Boolean).join('\n');
+  const nextStatus=JSON.stringify(status,null,2)+'\n';
+  journal.status_installed_hash=fingerprint(nextStatus);
+  // All existing targets are backed up before the first write or removal.
+  for (const a of actions) if(a.kind!=='add') copyTo(a.dest,join(backup,'files',a.e.destination));
+  for (const a of actions) if(a.kind!=='retire') copyTo(a.src,join(backup,'stage',a.e.destination));
+  mkdirSync(join(backup,'stage/status'),{recursive:true});
+  writeFileSync(join(backup,'stage/status/status.json'),nextStatus,{mode:lstatSync(statusPath).mode & 0o777});
+  writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
+  try {
+    let count=0;
+    for (const a of actions) {
+      if(a.kind==='retire') {rmSync(a.dest);report.retired.push(a.e.destination);}
+      else {mkdirSync(dirname(a.dest),{recursive:true});renameSync(join(backup,'stage',a.e.destination),a.dest);report[a.kind==='add'?'added':'refreshed'].push(a.e.destination);}
+      if(process.env.ORION_UPDATE_FAIL_AFTER && ++count===Number(process.env.ORION_UPDATE_FAIL_AFTER)) throw new Error('Injected update interruption');
+    }
+    for (const path of report.retired.filter(path => path.startsWith('library/'))) {
+      let parent = dirname(path);
+      while (parent !== '.') {
+        const directory = safe(root, parent);
+        if (existsSync(directory)) {
+          if (readdirSync(directory).length > 0) break;
+          rmdirSync(directory);
+        }
+        parent = dirname(parent);
+      }
+    }
+    renameSync(join(backup,'stage/status/status.json'),statusPath);
+    journal.state='complete';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
+  } catch(error) {
+    rollbackUpdate(root,backup,journal);
+    journal.state='recovered';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
+    throw error;
+  }
+  return {...report,backup:backupRel};
 }
 
 // A switch moves the active skill layout. Historical job files stay in place.
@@ -373,12 +474,17 @@ function restore(root,backupRel) {
       if(fingerprint(readFileSync(dest))!==a.installed_hash) {kept.push(a.destination);continue;}
       rmSync(dest);restored.push(a.destination);
     } else {
-      if(existsSync(dest) && a.installed_hash && fingerprint(readFileSync(dest))!==a.installed_hash) {kept.push(a.destination);continue;}
+      const current=currentFingerprint(root,a.destination);
+      if(current!==a.installed_hash) {kept.push(a.destination);continue;}
       copyTo(prior,dest);restored.push(a.destination);
     }
   }
   for(const key of journal.remove_status_checklist_keys) if(Object.hasOwn(old.checklist||{},key)) {status.checklist ||= {};status.checklist[key]=old.checklist[key];}
   status.template_version=old.template_version;
+  if (journal.record_template_commit) {
+    if (Object.hasOwn(old,'template_commit')) status.template_commit=old.template_commit;
+    else delete status.template_commit;
+  }
   status.notes=[status.notes||'',`restored from ${backupRel}`].filter(Boolean).join('\n');
   writeFileSync(statusPath,JSON.stringify(status,null,2)+'\n');
   return {restored,kept,backup:backupRel};
@@ -404,16 +510,19 @@ try {
       ? await recoverPublishedUpdate({ ...options, backupRel: arg('--backup') })
       : await applyPublishedUpdate(options);
     console.log(JSON.stringify(result, null, 2));
+  } else if (command === 'inspect') {
+    console.log(JSON.stringify(stagedInventory(root,repo,arg('--commit')),null,2));
   } else {
     const { assertPublishedUpdateNotBlocked, withUpdateLock } = await import('./published-transaction.mjs');
     const result = await withUpdateLock(root, () => {
       assertPublishedUpdateNotBlocked(root, { includePending: true });
       switch (command) {
         case 'update': return update(root, repo, arg('--commit'));
+        case 'apply-staged': return applyStaged(root,repo,arg('--commit'),arg('--stage'));
         case 'switch': return switchTool(root, repo, arg('--commit'), arg('--to'), arg('--legacy-tool'));
         case 'restore': return restore(root, arg('--backup'));
         case 'recover': return { recovered: [...recoverPendingUpdates(root), ...recoverPendingSwitches(root)] };
-        default: throw new Error('Use update, switch, restore or recover');
+        default: throw new Error('Use inspect, apply-staged, update, switch, restore or recover');
       }
     });
     console.log(JSON.stringify(result,null,2));

@@ -61,3 +61,83 @@ test('failed update rolls back writes from the predeclared transaction',t=>{
   assert.equal(JSON.parse(get(client,'status/status.json')).template_version,'1.0.0');
   const recovery=run('recover','--root',client);assert.equal(recovery.status,0,recovery.stderr);
 });
+
+test('prompt stages local merges without writes, applies with radio off and restores', t => {
+  const root = mkdtempSync(join(tmpdir(), 'orion-staged-update-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const source = join(root, 'source');
+  const client = join(root, 'client');
+  const stage = join(root, 'stage');
+  const skill = '.agents/skills/example/SKILL.md';
+  const prior = 'first\n\nsecond\n\nthird\n';
+  const local = prior.replace('first', 'client edit');
+  const incoming = prior.replace('third', 'release edit');
+  const merged = local.replace('third', 'release edit');
+  const editedStatus = { template_version: '2.0.0', selected_tool: 'codex', sharing: { status_signal_enabled: false } };
+  const manifest = {
+    template_version: '2.1.0',
+    deployment: {
+      tools: ['codex', 'claude-code'],
+      common_sources: ['status/example.mjs'],
+      entries: [{
+        source: 'skills/example/SKILL.md',
+        destinations: { codex: skill, 'claude-code': '.claude/skills/example/SKILL.md' },
+        ownership: 'release',
+        fingerprint_key: 'skills/example/SKILL.md',
+      }],
+    },
+  };
+  put(source, 'update/manifest.json', JSON.stringify(manifest));
+  put(source, 'update/pristine.json', JSON.stringify({ files: { 'skills/example/SKILL.md': [requireHash(prior)] } }));
+  put(source, 'skills/example/SKILL.md', incoming);
+  put(source, 'status/example.mjs', 'export const latest = true;\n');
+  git(source, 'init', '-q');
+  git(source, 'add', '.');
+  git(source, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'release');
+  const commit = git(source, 'rev-parse', 'HEAD');
+  put(client, 'status/status.json', JSON.stringify(editedStatus));
+  put(client, skill, local);
+  put(client, '.claude/skills/example/SKILL.md', 'other tool\n');
+
+  const args = ['--root', client, '--release-repo', source, '--commit', commit];
+  const inspect = run('inspect', ...args);
+  assert.equal(inspect.status, 0, inspect.stderr);
+  const inventory = JSON.parse(inspect.stdout);
+  assert.equal(inventory.files.find(({ path }) => path === skill).action, 'merge');
+  assert.equal(get(client, skill), local);
+  assert.equal(existsSync(join(client, '.update-backup')), false);
+
+  const plan = {
+    commit,
+    status_hash: inventory.status_hash,
+    files: inventory.files.map(({ path, before }) => ({ path, before })),
+  };
+  put(stage, 'plan.json', JSON.stringify(plan));
+  put(stage, 'local', local);
+  put(stage, 'prior', prior);
+  put(stage, 'incoming', incoming);
+  const merge = spawnSync('git', ['merge-file', '-p', 'local', 'prior', 'incoming'], { cwd: stage, encoding: 'utf8' });
+  assert.equal(merge.status, 0, merge.stderr);
+  put(stage, `files/${skill}`, merge.stdout);
+  put(stage, 'files/status/example.mjs', 'export const latest = true;\n');
+  put(client, skill, 'edited while reviewing\n');
+  const stale = run('apply-staged', ...args, '--stage', stage);
+  assert.equal(stale.status, 2);
+  assert.match(stale.stderr, /Destination changed since staging/);
+  assert.equal(existsSync(join(client, 'status/example.mjs')), false);
+  put(client, skill, local);
+
+  const applied = run('apply-staged', ...args, '--stage', stage);
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.equal(get(client, skill), merged);
+  assert.equal(get(client, '.claude/skills/example/SKILL.md'), 'other tool\n');
+  assert.deepEqual(JSON.parse(get(client, 'status/status.json')).sharing, editedStatus.sharing);
+  assert.equal(JSON.parse(get(client, 'status/status.json')).template_commit, commit);
+
+  const { backup } = JSON.parse(applied.stdout);
+  const restored = run('restore', '--root', client, '--backup', backup);
+  assert.equal(restored.status, 0, restored.stderr);
+  assert.equal(get(client, skill), local);
+  assert.equal(existsSync(join(client, 'status/example.mjs')), false);
+  assert.equal(JSON.parse(get(client, 'status/status.json')).template_commit, undefined);
+});

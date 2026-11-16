@@ -1,5 +1,5 @@
 {
- "_what": "Fingerprints are keyed by stable release source path, independent of deployed destination. Legacy Claude paths contribute historical hashes to their portable source key. A destination whose fingerprint is not listed under its source key is client-edited and must be preserved. Historical legacy refresh keys remain in this registry for clients still on a same-path updater, although the retired .claude skill sources are no longer in the refresh list. Contract: update/manifest.json deployment and docs/updating.md.",
+ "_what": "Fingerprints are keyed by stable release source path, independent of deployed destination. Legacy Claude paths contribute historical hashes to their portable source key. A destination whose fingerprint is not listed under its source key may contain local edits. Follow docs/updating.md to merge updates and preserve edited retirements. Historical legacy refresh keys remain in this registry for clients still on a same-path updater, although the retired .claude skill sources are no longer in the refresh list. Contract: update/manifest.json deployment and docs/updating.md.",
  "_fingerprint": "SHA-256, as lowercase hex, of the file read as UTF-8 text with every CRLF turned into LF.",
  "_regenerate": "node tests/helpers/pristine.mjs --write, before every release. node --test fails if it is stale.",
  "files": {
@@ -139,6 +139,7 @@
    "e9d298c50c86cb263d5adb91cdb18c1e6d7bea93ecc79f07559a10e62be6b6f9",
    "ec42e8138c947e952dfa6fd2db3e92bfca766a763bdd3dfd901fe8f86659ed8f",
    "ec6a36409c98816943c44e8d5fb579c26ee3e87a21c8b02cd5a024b941757177",
+   "f36e1a72b3797288a4cc46f88657c78a4bf0a7a9e558ddac4c742aff3c46e514",
    "f552c7baf0f00060b3cae6374903fbc8214107b8872edeb265a1da073f1f522a",
    "fcdf0a15b61769b6c386e579f2f008df6eb4bde8204f33f32bdee70675b17ea2",
    "fd2fc4ab755b37df6f6f3f2ec5e2e0b4e29e9ab385b6f22dd76ae2429e99f82a",
@@ -215,6 +216,7 @@
   "README.md": [
    "03459ae62f50f9780164db1913071787adb90651edadcc3b7b9af65b430cbcd8",
    "0c82f166d6433299787c2c0b8c1c19a735f1f8b05f39a06c7cdf9e8dc1e780b4",
+   "15a6168cf73844150ea753e7db186de3c0f80dc211379ae80af45479e43f6bb5",
    "21db571ce598361569997c395e2ef6bbd9945f583b61d58845a51139ef90d971",
    "26e243badf4cd0d3957e36fb592883734185fec9fe24488ef97107495ed49a3a",
    "2797f85c913550741a59e32de56c2d2f1885b43de63fb45b88b1c5219b900700",
@@ -419,6 +421,7 @@
    "65cb6926031be1cf59d7190c82da3dcc274217e317e2b54906e3cae106b8f342",
    "6e8adc8a3ee661386bd653bd7b1745b040276cb118e4107bea6d50a910e58bd1",
    "775bf2a6a1371ab3b922dfde78496448fcdf0983895262b2960b33e0573cbbe6",
+   "9398752595f9a927a17d015cb38b8a18ceaa6d510a56e6a7d35622559147e38f",
    "9bc213636d03d55fe0e03604b1d52b94085c440f0c88bbf23e05f18885aa67d2",
    "a46fbdd0fe6dc701ea929b07f5dafc9f36fb1a285facfe904e24283a80351b2a",
    "adc1b13fe4f53532240ba89239361d0612d5dbb0d282e4d09f19281bfc06fe6f",
@@ -445,6 +448,9 @@
    "7a5386bf20c4db15dcd30d5c162f2c8822e49716f8a73b2589e3d6baeb9b3519",
    "89aae2bb1569afac7341423957b10aa2ab32adc40c9a01a0f36766034b3e3d1c",
    "c2c423b0087c1731de42b372732713062008be6b83dbb537ceaa171f6e4d4c79"
+  ],
+  "docs/update-maintenance.md": [
+   "85a7e3f61bbdb53bac5a89efd29e924658714f87de1aae6a0767db632d0328fe"
   ],
   "docs/updating.md": [
    "07b3afe696ab1ae695c200056a4c85a666e4be24869de2d2b2a2c574e2eb5172",
@@ -477,6 +483,7 @@
    "9e0a1cacfe66c0679e062bea12935865aa83d0ece79f64729be24366dc1d02b8",
    "a5720a04ac520c53d6cd912eb4144b704a4fc2e5a2c09571a2e5784afbcd9dad",
    "a79b1c8ea11699f88ab661d9676d7bb3dca28357fbcb2cdf4877d0308b89c305",
+   "ba0fafccbda62a4476dfee15f325dde19e9a59d1c481c30f58a8878f36a2ab32",
    "bae7559860e77b96082929b533c3818c128ed819e08fc0b005093c0a3c27e29f",
    "bdca48141bd88f49b12d2752e9b4f003e19d2866caafc632a4da85249a7abd6f",
    "d955a6db05bcd3ce56d47d5bd745fdbf504c71912c25504660ecf34a37b7e10e",
@@ -770,6 +777,7 @@
    "163eb1d9bf6f673d0a7ae2c3bdf73bc1e37c232b9f0ead3179f45e7251c39b33"
   ],
   "skills/update-harness/SKILL.md": [
+   "0b47a01698a424f33650b122c8a5d67516676bd4a3559ad27480b6f8a4b0b0e2",
    "1259836634e962d1ead9758b4eceb4dd7bcedf80304366dc22affbb18c3e003a",
    "5a01e7840dd33711606563442dfe7869bda088640faa1f9ccc4df1a2466d032e",
    "99d9b18736a582ce0f83ffa796a11e280f14d867ab878a6be5d376efe39cd0c2",
@@ -855,6 +863,7 @@
    "93bc11aea37d3da962ba6a2ef1828b3040f7a7b378a27a4613eb798dc7960161",
    "a05e81c375f04b9225d7688ed279cd0540b191429e691ad6ecba142c01c3ec41",
    "a30515735c941a36c1797ab4cf1356816dd98d588d7b0186d714ba390578e0df",
+   "ba4e4fdde36e18183b0ef4a696d92eb32a7a8088d0a6ebd8629dd402c7951064",
    "bf4f75f69c1d626f32ea65a4540c624271c00508caf755c8092ba57c18d72f08",
    "bf628fd838c0278715089e4393f0c4655821e2c7c735c09a0435099cdedaa19c",
    "cc7bab24bb5cd26f0c3e585fe1e6ac6dec41d9ed79f6379b7c7253e4a7c340de",
@@ -922,6 +931,7 @@
    "8a5e67c119a29e9a9439d84e9c2a64538497ff93183deb1623a43357915e8da3",
    "8dfc4d219e5507a223103cd1bbc600a28907b07bc7fc0fa8ab5b77781e0e3d22",
    "8e21db781b805fe29cc95399e95c0180224f551cdb8dc63b4f296a1f741bc31a",
+   "9e264cabbda87cc90ad711c9ee6d5c4c5abcbf55baf116211e0d4ee90d30eb3b",
    "a40851301a39614410b1fdb9340a36fee02f979f62dff5f51b351ff469cda692",
    "ab55f8c337987b904dd67965adbf183a1badba95fc00f31bcb15e5826c334f47",
    "d95e18158fd8afe2d7e103ebc6dd31f0c2189ddf2bbe9fa1d1af0d3a74975f84",
@@ -976,6 +986,7 @@
    "09e16ade9f82f65fec5f43d4577ca6da7829804bf1ec03ad7cc07c1eb3598ae7",
    "305acd1670a5b4464543ea4f524c9564be6f52f98224a1c76fa118f0f5ac8a3a",
    "50e84ff447030754aaea51a85f4771313aa9740a7646fdd0d18bc32395f62da8",
+   "5109c1ec6f3ba9b6a2ac3c76dffdea872bd5fd6c915e3906ccad1f7f7ff0bf7b",
    "6e450c0c07d44103ef606cd95f20f11d7b3f4a99b2531c92e6da4fdaebe35eeb",
    "748641a8afae305f3e03157ce3d296a2b4d327e33893290594cf0957d2b48508",
    "8dba080b8f11d4e3572af8e597c45591566bbf978da953552be9e970a7cd82b8",
@@ -1034,6 +1045,7 @@
    "97ec61572addb1654a6a32f7d0d6a4408d281e5ead1fd0af84742095c47f71cb",
    "9a391c16ab7fd52f3fc6975e970ec88ff988ed5ca580f468c51df684bdebadf4",
    "9df211f37fc9053a3b60af733ae4e484168f714385f49411b9c01ff9b3719b62",
+   "a0dc38ad70def06ad74b7d36407f2aa2f7bcb33c93fbf73ee94a0b59047c62ff",
    "aaf58db59afd051ccb631916de8a42c637caae00848b1645fe617c7e646eccf6",
    "ada8e30247c87e1a12d8d86cf8718a9c35f92fdc44bc1589df2717d8623458d8",
    "af7eecb29d9dd47576597683f099662bea1e8c21d2e7e9258708ad2bb829f0c8",

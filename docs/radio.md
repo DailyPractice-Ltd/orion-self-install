@@ -139,6 +139,10 @@ is sent anywhere to do this: it happens on your machine.
 Each message is read to you once. Your harness remembers what you have already heard,
 so nothing is repeated at the next session.
 
+Release notices describe published versions. They are informational and use the
+verified publication identity while that snapshot is installed. For updates,
+follow [Updating Orion](updating.md) with the radio in either setting.
+
 If a release you were told about or installed is withdrawn, the radio tells
 you whether your harness is still running it. You can keep using your current
 version if the withdrawn release is no longer installed. If you are still

@@ -356,7 +356,6 @@ function releaseNoticeLines(notice, applied) {
     `Orion ${notice.version} is available.`,
     notice.summary,
     `Full release notes: ${notice.notes_url}`,
-    "Say 'update my harness' when you're ready.",
   ];
 }
 
@@ -436,6 +435,7 @@ async function checkReleaseNotice() {
   if (!['claude-code', 'codex'].includes(tool) || !applied ||
     !releaseVersion.test(applied.manifest_version) ||
     status.template_version !== applied.manifest_version ||
+    (status.template_commit && status.template_commit !== applied.commit) ||
     applied.tag !== `v${applied.manifest_version}` ||
     !releaseCommit.test(applied.commit) || !validReleaseId(applied.release_id) ||
     typeof applied.applied_at !== 'string' || !Number.isFinite(Date.parse(applied.applied_at))) return false;

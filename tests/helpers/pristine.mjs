@@ -3,8 +3,8 @@
  * every copy of that path this repository has ever held.
  *
  * "Update my harness" uses it to tell a file the client never touched (its
- * fingerprint is listed: refresh it) from one the client, their assistant or the
- * install has changed (not listed: keep it exactly as it is). It replaces "compare
+ * fingerprint is listed: refresh it) from a client edit (not listed: stage a
+ * merge on update or keep it if the file is retired). It replaces "compare
  * with the copy at your version's tag", which could not serve a harness on a
  * version that was never tagged, and stranded a file that came from any commit
  * other than the tagged one.
@@ -90,7 +90,7 @@ export function computePristine() {
   for (const path of [...sources].sort()) {
     // This file has no entry for itself. It cannot hold its own fingerprint, and
     // listing its earlier copies would change it on every regeneration. It is pure
-    // data that nobody edits, so an update always replaces it (docs/updating.md, step 4).
+    // data that gets refreshed on update (docs/updating.md).
     if (path === PRISTINE_PATH) continue;
     const prints = new Set();
     for (const id of idsByPath.get(path)) if (blobs.has(id)) prints.add(fingerprint(blobs.get(id)));
@@ -100,7 +100,7 @@ export function computePristine() {
     files[path] = [...prints].sort();
   }
   return {
-    _what: "Fingerprints are keyed by stable release source path, independent of deployed destination. Legacy Claude paths contribute historical hashes to their portable source key. A destination whose fingerprint is not listed under its source key is client-edited and must be preserved. Historical legacy refresh keys remain in this registry for clients still on a same-path updater, although the retired .claude skill sources are no longer in the refresh list. Contract: update/manifest.json deployment and docs/updating.md.",
+    _what: "Fingerprints are keyed by stable release source path, independent of deployed destination. Legacy Claude paths contribute historical hashes to their portable source key. A destination whose fingerprint is not listed under its source key may contain local edits. Follow docs/updating.md to merge updates and preserve edited retirements. Historical legacy refresh keys remain in this registry for clients still on a same-path updater, although the retired .claude skill sources are no longer in the refresh list. Contract: update/manifest.json deployment and docs/updating.md.",
     _fingerprint: 'SHA-256, as lowercase hex, of the file read as UTF-8 text with every CRLF turned into LF.',
     _regenerate: 'node tests/helpers/pristine.mjs --write, before every release. node --test fails if it is stale.',
     files,

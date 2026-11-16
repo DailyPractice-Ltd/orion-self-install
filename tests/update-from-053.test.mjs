@@ -384,7 +384,7 @@ test('our own files checked out with CRLF line endings still read as ours', (t) 
 test('the manifest opens with the note that sends an older harness to the current procedure', () => {
   const keys = Object.keys(manifest);
   assert.equal(keys[0], '_read_first', 'the note must be the first thing an assistant reads in the manifest');
-  for (const phrase of ['never stop to ask', 'never replace a file the client has changed', 'docs/updating.md', 'update/pristine.json']) {
+  for (const phrase of ['docs/updating.md', 'pinned main', 'merges local edits', 'Legacy refresh lists']) {
     assert.ok(manifest._read_first.includes(phrase), `_read_first must mention "${phrase}"`);
   }
   assert.ok(REFRESH.includes(PRISTINE_PATH), 'update/pristine.json must itself be refreshed');
@@ -399,15 +399,17 @@ test('the manifest opens with the note that sends an older harness to the curren
   }
 });
 
-test('the procedure itself contains no stop-and-ask step', () => {
+test('the update prompt stages merges before applying and pauses for manual conflicts', () => {
   const doc = readFileSync(join(repo, 'docs/updating.md'), 'utf8');
-  for (const phrase of ['let them choose', 'tripwire', 'show the client the difference']) {
-    assert.equal(doc.includes(phrase), false, `docs/updating.md still says "${phrase}"`);
-  }
-  assert.ok(doc.includes('The request is the consent'), 'docs/updating.md must state that the request is the consent');
-  assert.ok(doc.includes('A file the client has changed is kept'), 'docs/updating.md must state that a changed file is kept');
-  assert.ok(doc.includes('update/pristine.json'), 'docs/updating.md must name the shipped-copies list');
-  assert.equal(doc.includes('replace it\n  like any other'), false, 'docs/updating.md must not tell the installer to replace a changed file');
   const agents = readFileSync(join(repo, 'AGENTS.md'), 'utf8');
-  assert.ok(agents.includes('The request is the consent'), 'AGENTS.md must carry the same rule');
+  const skill = readFileSync(join(repo, 'skills/update-harness/SKILL.md'), 'utf8');
+  assert.match(doc, /git clone --quiet --branch main/);
+  assert.match(doc, /git merge-file/);
+  assert.match(doc, /needs manual resolution/);
+  assert.ok(doc.indexOf('Leave the live harness untouched') < doc.indexOf('apply-staged'));
+  assert.match(doc, /Updates work with the\s+radio off/);
+  for (const pointer of [agents, skill]) {
+    assert.match(pointer, /docs\/updating\.md/);
+    assert.doesNotMatch(pointer, /update\/request\.mjs/);
+  }
 });

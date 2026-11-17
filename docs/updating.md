@@ -43,8 +43,9 @@ On the same version it reports an up-to-date result when there is no work.
 If it reports active legacy computer schedules, follow the
 [schedule migration instructions](scheduled-work.md#migrate-a-legacy-schedule).
 
-When upgrading a harness that predates the 1.5.0 sending rule, follow
-[the sending-rule migration](../AGENTS.md). If the radio is on, check it with
+When upgrading a harness that predates the 1.5.0 sending rule, run
+`node status/send.mjs migrate` as described in [AGENTS.md](../AGENTS.md).
+If the radio is on, check it with
 `node status/radio.mjs check`. Report the version, changed files, preserved edits,
 any replaced edited runtime scripts and the backup path. Remove the temporary
 source checkout after the operation.

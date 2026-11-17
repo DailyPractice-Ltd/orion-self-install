@@ -1,6 +1,0 @@
-[
-  {
-    "op": "prepare-separate-harness-status",
-    "path": "status/status.json"
-  }
-]

@@ -1,5 +1,5 @@
 {
-  "_read_first": "Follow docs/updating.md. This manifest maps a pinned main snapshot into the selected tool layout. The agent stages updates and merges local edits before applying. Legacy refresh lists support older same-folder updaters.",
+  "_read_first": "Use docs/updating.md to request a published update. The request starts verified release selection. The deployed layout comes from the recorded tool. Read update/pristine.json from the pinned release. The published updater preserves optional client edits and stops on required collisions. Older same-folder updaters use the legacy refresh lists: never stop to ask and never replace a file the client has changed under those lists.",
   "_what": "Legacy refresh/remove lists remain for older harnesses, except their three retired .claude skill sources. deployment is the source-to-destination and ownership contract for separate client repositories; select exactly one recorded tool. Contract: docs/updating.md and deployment._contract.",
   "_regenerate": "Map each skill and its resources under deployment.entries. Run node tests/helpers/pristine.mjs --write after release edits.",
   "template_version": "2.0.0",
@@ -34,7 +34,6 @@
     "docs/radio.md",
     "docs/self-serve-learnings.md",
     "docs/simulated-dry-run-example.md",
-    "docs/update-maintenance.md",
     "docs/updating.md",
     "memory/README.md",
     "start.mjs",
@@ -55,7 +54,7 @@
     "docs/scheduled-work.md"
   ],
   "never_touch": {
-    "status/status.json": "the client's own record for pairing, stages, packages, and choices. On a main update record template_version, template_commit, an appended note, and explicitly retired checklist keys. Published installs record applied_release.",
+    "status/status.json": "the client's own record for pairing, stages, packages, and choices. On success the published updater records template_version, applied_release, an appended note, and any explicitly retired checklist keys.",
     "status/send-log.md": "the client's own record of every send decision and verdict, content-free (since 1.5.0)",
     "status/no-contact.md": "the client's own no-contact list, for good (since 1.5.0)",
     "status/waiting.md": "the client's list of messages waiting for them, rewritten by every run (since 1.5.0)",
@@ -69,7 +68,7 @@
     ".update-backup/": "prior updates' safety copies",
     "anything not in the refresh or remove lists": "refresh may write its paths, remove may delete its paths — nothing else may be touched at all. The two lists are the whole permission"
   },
-  "_remove": "Shipped paths eligible for retirement under docs/updating.md. The deployed map also lists tool-specific retirements.",
+  "_remove": "Paths pruned on update, with the same backup-first safety as refresh (docs/updating.md steps 3 and 4b). A path lands here when a release retires it; it never returns to refresh. A directory the prune empties is deleted too.",
   "remove": [
     "n8n/README.md",
     "n8n/wf-01-prospect-research-outreach.json",
@@ -296,7 +295,6 @@
       "docs/scheduled-work.md",
       "docs/self-serve-learnings.md",
       "docs/simulated-dry-run-example.md",
-      "docs/update-maintenance.md",
       "docs/updating.md",
       "memory/README.md",
       "start.mjs",

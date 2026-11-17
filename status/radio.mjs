@@ -356,6 +356,7 @@ function releaseNoticeLines(notice, applied) {
     `Orion ${notice.version} is available.`,
     notice.summary,
     `Full release notes: ${notice.notes_url}`,
+    "Say 'update my harness' when you're ready.",
   ];
 }
 

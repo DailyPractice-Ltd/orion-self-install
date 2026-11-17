@@ -309,7 +309,7 @@ test('a release is shown once and acknowledged again when the first acknowledgme
   assert.match(checks[0].stdout, /Orion 2\.3\.0 is available/);
   assert.match(checks[0].stdout, /Your weekly report now includes finished work\./);
   assert.ok(checks[0].stdout.includes(NOTICE.notes_url));
-  assert.doesNotMatch(checks[0].stdout, /update my harness/);
+  assert.match(checks[0].stdout, /Say 'update my harness' when you're ready\./);
   assert.doesNotMatch(checks[0].stdout, /1023|c{40}|reply --nudge|node update|Radio quiet/);
   assert.doesNotMatch(checks[1].stdout, /2\.3\.0 is available/);
   assert.match(checks[2].stdout, /Orion 2\.4\.0 is available/);

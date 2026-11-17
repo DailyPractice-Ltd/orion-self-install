@@ -24,9 +24,8 @@ skills section shows what Orion can do for you.
 - **It keeps up without you.** Daily Practice ships improvements as numbered
   [releases](https://github.com/DailyPractice-Ltd/orion-self-install/releases). Ask your
   AI "what version is my harness on?", and if it is behind, say "update my harness".
-  Your AI stages and merges updates from `main`. See [how updates and backups
-  work](docs/updating.md). If your installed instructions still use the published
-  updater, give your AI this procedure to start the update.
+  Your edits and business records are preserved by the update rules
+  ([how updates and backups work](docs/updating.md)).
 
 ---
 

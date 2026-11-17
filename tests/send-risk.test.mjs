@@ -551,6 +551,7 @@ test('tripwire: the status template, the wizard, the manifest and the changelog 
   assert.match(never, /status\/send-log\.md/);
   assert.match(never, /status\/no-contact\.md/);
   assert.match(read('CHANGELOG.md'), /^## 1\.5\.0 — 2026-11-\d{2}\n\n\*\*[^\n]*risk level[^\n]*\*\*/m);
+  assert.match(read('docs/updating.md'), /node status\/send\.mjs migrate/);
   assert.match(read('AGENTS.md'), /filled in before 1\.5\.0/);
 
   // A fresh install: the wizard writes low, by the install, today.

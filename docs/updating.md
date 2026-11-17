@@ -1,240 +1,293 @@
-# Updating — "update my harness", and everything that promise means
+# Updating a deployed Orion harness
 
-The client says **"update my harness."** That is the entire interface. Everything below
-is what their AI does with it, and the guarantees are enforced by an allowlist, not by
-anyone remembering them.
+Run the update command from your deployed client folder after you ask Orion to update.
+Orion uses the Codex or Claude Code layout recorded in `status/status.json`.
 
-**The promise, in one paragraph, for the client:** an update refreshes Daily Practice's
-files — the instructions, the adapters, the Library recipes, the scripts — and cannot
-touch yours. Your knowledge base, your hired agents, the skills you've taught, your
-status file, your shift log, and every file you created stay exactly as they are. Every
-file the update replaces is copied aside first, so any update can be undone by saying
-**"restore my harness from the backup."** Updates never go backwards. An update
-runs start to finish without asking you anything: the three words are the yes. And a
-Daily Practice file you have changed counts as yours: the update keeps it as it is.
+## Update from a published release
 
-**If any other file describes updating differently, this file wins.** The allowlist
-lives in `update/manifest.json`; a path not on it may not be written, ever.
+```sh
+cd /path/to/my-orion
+node update/request.mjs
+```
 
-## Which version am I on? (client)
+The request is the consent to start. The updater needs an enabled, paired,
+working radio so Orion can receive release and withdrawal notices.
 
-Ask your AI: **"what version is my harness on?"** It reads `template_version` from
-`status/status.json` and tells you, e.g. "0.3.0". Then look at the Releases page:
+When you ask for an update after a radio notice, use the version named in the
+notice. For a notice about Orion 2.1.0, run `node update/request.mjs --tag v2.1.0`.
+Orion verifies that release again before applying it. The command without a tag
+requests the highest stable published release.
 
-https://github.com/DailyPractice-Ltd/orion-self-install/releases
+If your radio is off or hasn't been paired, Orion explains the requirement and
+asks whether to turn on check-ins. Read [what radio check-ins share](radio.md)
+before you decide. If you opt in, use the one-time pairing code from Daily
+Practice. A successful pairing continues the update you already requested. If
+you decline or pairing fails, your existing radio choice and applied release
+are kept.
 
-The top entry is the latest. Every release lists, in plain words, what changed and why
-it matters to you. If your number is lower than the top one, say **"update my
-harness"** and the procedure below runs. If it is the same, there is nothing to do.
-Daily Practice can also see your version over the radio, and will tell you when an
-update is worth your time — you never have to check by hand.
+If an assistant runs the command without a terminal, tell it whether to opt in.
+After you opt in, add `--pair-radio` to the original command and provide the code
+locally through the `ORION_PAIRING_CODE` environment variable. In a terminal,
+`--pair-radio` can also pair again if Daily Practice replaces your code. Ask
+Daily Practice for a fresh code if your radio credentials were revoked.
 
-**For maintainers:** a release is a `## X.Y.Z — date` heading in `CHANGELOG.md` with a
-git tag `vX.Y.Z` on the commit that shipped it. Push the tag and
-`.github/workflows/release.yml` publishes the release with that heading's section as
-the notes. The version a client sees in `status.json` and the version on the Releases
-page are the same number by construction. Before the tag, as the last edit of the
-release, run `node tests/helpers/pristine.mjs --write`: `update/pristine.json` must
-hold the fingerprint of every file as it ships, and `node --test` fails if it is stale.
+The command checks for the highest stable GitHub Release,
+excluding drafts, prereleases, and withdrawals. It downloads the published tag
+into a temporary checkout and runs that exact commit's updater, manifest,
+historical fingerprints from `update/pristine.json`, and shipped sources.
+It verifies publication and identity again
+before changing the harness. If discovery or verification fails, retry when the
+published source is available.
 
-## If your harness is older than 0.5.7 (one time only)
+A release declares which starting versions and tool layouts it supports. A
+matching recorded release is already up to date. A downgrade or a different
+commit or Release ID for the same recorded version stops the update. A version
+string on its own needs a declared verification migration. If a starting version
+has no supported path, keep the old folder and install into a separate folder.
 
-The update layer itself — this file, and `update/manifest.json` — first shipped in
-0.5.7. If your harness was installed before that, those files are not on your machine,
-so **"update my harness" has nothing to act on**. Your AI is not being difficult; the
-instructions that phrase refers to genuinely are not there.
+A file the client has changed is kept and reported when the change is optional.
+Orion keeps the roster, hired job sheets, and unmapped client files.
 
-One paste fixes it forever. Open your Orion folder in your AI and give it this:
+### Review a required edit
 
-> Fetch these two files and save them at these exact paths in this folder, creating the
-> directories if they do not exist:
->
-> - `https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/main/docs/updating.md`
->   → `docs/updating.md`
-> - `https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/main/update/manifest.json`
->   → `update/manifest.json`
->
-> Write nothing else. Then read `docs/updating.md` and run the procedure in it, starting
-> at step 1.
+If a local edit blocks a required fix after any declared migrations, Orion
+pauses and prints the path to a private temporary review folder. Open
+`review.json` there. Each entry links to three local files with the prior
+shipped version, your edited version, and the incoming published version.
+When a file is new in this release, `prior` is `null`. Review the files locally.
+The updater only prints file names and the review location, so your edits can
+stay out of chat and logs.
 
-That is the whole bootstrap. It fetches the instructions and the allowlist, then hands
-over to the ordinary procedure below — which takes the backup, refuses to go backwards,
-and cannot touch anything you made. From then on **"update my harness"** works the way
-it does for everyone else, and this paste is never needed again.
+Set `choice` for every listed file in `review.json`:
 
-**If the fetch fails on Codex**, it is the sandbox, not the network: apply
-`agent/adapters/codex.md`'s one-time setting and try again. The same fix unblocks the
-radio, which is why a harness in that state usually looks silent to Daily Practice as
-well.
+- `"replace"` installs the incoming version and saves your edit in the update
+  backup.
+- `"merge"` uses the version you review and save at the listed `merged` path.
+  Include the required fix and resolve any conflict markers. If `merged` is
+  `null`, the file controls the pinned updater and requires replacement.
 
-**Why we cannot do this for you.** The radio carries labels and timestamps, never files
-or instructions, and nothing installs on your machine without you saying yes. So the one
-thing we cannot do is reach in and add the missing files ourselves. You paste it, your
-AI does the rest.
+Run the original update command with the review folder added:
 
----
+```sh
+node update/request.mjs --resolve-required "/path/from/the/update"
+```
 
-## The procedure (installer: follow exactly — no improvised steps, no questions)
+Orion rechecks the publication, the starting harness, and the copies that
+need a decision. If the review has gone stale, use the fresh review or retry
+the original command. To defer, leave the update paused.
 
-**The request is the consent.** "Update my harness" is the yes. From here to step 8
-there is nothing to ask the client: no "apply the prepared merge?", no diff to approve,
-no "shall I continue?". The backup in step 3 is the safety, not a question. An update
-that pauses for approval is an update that never happens: the client has walked away,
-the question sits unanswered, and the harness stays old.
+If you opted into radio, omit `--pair-radio` when continuing a review. Keep the
+same migration destination if you specified one. Orion saves the confirmed
+pairing in a private file alongside the review and applies it when the update
+succeeds.
+Keep the review folder local and delete it when you no longer need its copies.
 
-**0. Network first, on Codex.** Fetching needs the same network access as the radio. If
-any fetch prints a network failure, apply `agent/adapters/codex.md`'s sandbox fix first
-(one setting, one-time), then resume. On a corporate machine that still can't reach the
-template, stop honestly: `docs/radio.md`, "If the radio can't get through" — the same
-one-line IT ask unblocks both.
+If Orion confirms pairing but the publication or radio check stops the update
+before a review opens, it gives you a private continuation folder. Retry the
+same request with `--resume-pairing "/path/from/the-update"` in place of
+`--pair-radio`. This uses the pairing you already approved. Delete that folder
+if you decide to abandon the update.
 
-**1. Resolve main's current commit, then fetch the manifest pinned to it.**
-First read the commit `main` points at right now:
-`https://api.github.com/repos/DailyPractice-Ltd/orion-self-install/commits/main` — take
-the `sha`. Call it COMMIT. (If that request fails, fall back to the literal `main` in
-every URL below and carry on — you keep the update, you lose only the freshness
-guarantee.) Then fetch the manifest at that commit:
-`https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/{COMMIT}/update/manifest.json`
-and, from the same COMMIT, `update/pristine.json`: the fingerprint of every copy of
-every file Daily Practice has ever shipped. Step 4 uses it to tell the client's changes
-from our files. If it cannot be fetched, stop and say so plainly; touch nothing.
+The updater stages changes, backs up each affected file under `.update-backup/`,
+and then applies them. It records the tag, full commit, Release ID, and
+application time only after local smoke checks succeed. A failed smoke check
+restores the prior files and leaves a failure report in the backup. If the
+process is interrupted, retry the same update command. Automatic resumption
+requires the same published release to still be available. Report the resulting
+version, changes, preserved edits and collisions, and backup or failure report
+path.
 
-**1b. Refresh the instructions before following them further.** Fetch
-`docs/updating.md` from the same COMMIT and continue from step 2 using **the fetched
-copy** — the local copy describes the version you have, not the one you're getting,
-and a release can change the procedure itself (this step, and step 4b below, are the
-proof). A harness whose local copy predates this step simply gains it on its next
-update; the release nudge tells live harnesses when a one-off re-run is worth it.
+### Recover an unfinished update from a separate checkout
 
-Pin to the commit, never the bare `main`, for two reasons. `raw.githubusercontent.com`
-caches the `main` ref for five minutes, so a release made in the last few minutes still
-serves the old manifest and looks like "nothing to update" — a commit URL is always
-fresh. And every file in step 4 is fetched from this same COMMIT, so an update can never
-mix a new manifest with old file bodies. The local manifest describes the version you
-HAVE; the commit's describes the version you're getting. Files added since this install
-exist only in the commit's list — fetching the local one would miss them, which is
-exactly the failure this rule prevents.
+If Orion says recovery is required, keep the backup directory identified in the
+message. It contains the prior files and `journal.json`. A failed automatic
+restoration also records the cause and affected files in `failure.json`.
+Orion blocks updates until recovery succeeds.
 
-**2. Compare versions — never roll back.** Read `template_version` from the fetched
-manifest and from `status/status.json`.
-- Equal → one check before stopping: if any path on the fetched manifest's `remove`
-  list still exists locally, run steps 3 and 4b for those paths only (a maintenance
-  pass — an earlier update under older instructions may have skipped the prune), say
-  what was tidied, and then say "already on {version}." Otherwise say "already on
-  {version} — nothing to update," and stop.
-- Fetched older than local (should never happen against main) → **stop**, touch
-  nothing, and say so plainly. An update never goes backwards.
+Read `release.tag`, `release.commit`, and `release.release_id` from the
+backup's `journal.json`. Use those exact values to fill in the command below.
+It downloads the same publication into a fresh temporary checkout, checks the
+commit before running its recovery code, then verifies the release identity and
+clean checkout against the transaction. This recovery uses the original backup
+even if the publication has since been withdrawn.
 
-**3. Back up before anything is replaced or removed.** Create
-`.update-backup/{local-version}-{YYYY-MM-DD}/` and copy every file on the refresh list
-**and every file on the `remove` list** that exists locally into it, preserving paths —
-plus one copy of `status/status.json`, so even the checklist keys step 4b deletes have
-an undo. This is the undo. Do not skip it because the update "looks small."
+```sh
+(
+  set -eu
+  cd /path/to/my-orion
+  backup=.update-backup/TRANSACTION
+  release_tag=TAG
+  release_commit=FULL_COMMIT
+  release_id=RELEASE_ID
+  recovery_tmp=$(mktemp -d)
+  trap 'rm -rf "$recovery_tmp"' EXIT
+  git clone --quiet --depth 1 --branch "$release_tag" https://github.com/DailyPractice-Ltd/orion-self-install.git "$recovery_tmp/release"
+  test "$(git -C "$recovery_tmp/release" rev-parse HEAD)" = "$release_commit"
+  node "$recovery_tmp/release/update/apply.mjs" recover-published --root "$PWD" --backup "$backup" --tag "$release_tag" --commit "$release_commit" --release-id "$release_id"
+)
+```
 
-**4. Refresh, allowlist only.** For each path in the manifest's `refresh` list: fetch
-`https://raw.githubusercontent.com/DailyPractice-Ltd/orion-self-install/{COMMIT}/{path}`
-— the same COMMIT resolved in step 1, so every file comes from one consistent snapshot —
-and replace the local file (create it if it is new to this version). Two rules:
-- **A path not on the list is never written.** Not "also tidied," not "while we're
-  here." The allowlist is the whole permission.
-- **A file the client has changed is kept. Never replaced, and nobody is asked.** Some
-  files on this list do not stay ours. The install itself writes the agent's identity
-  into `agent/agent-definition.md`, and a client's own assistant may have added to
-  `AGENTS.md`, `CLAUDE.md` or others. So before writing over a local file, check whether
-  it is still one of ours: take its fingerprint and look for it under that path in the
-  `update/pristine.json` fetched in step 1. Listed: it is a copy we shipped and the
-  client never changed it, so replace it. Not listed: the file is the client's now.
-  Leave it exactly as it is and name it in the step 8 report as kept. Do not replace
-  it, do not merge it by hand, do not ask.
-  The fingerprint is the SHA-256 of the file's text with every CRLF turned into LF.
-  This prints it for any number of files, on any machine that can run the radio:
-  `node -e "const c=require('crypto'),f=require('fs');for(const p of process.argv.slice(1))console.log(c.createHash('sha256').update(f.readFileSync(p,'utf8').replace(/\r\n/g,'\n')).digest('hex'),p)" FILE [FILE ...]`
-  Two things are always replaced, changed or not. The radio's own scripts
-  (`status/*.mjs`), because they run as a set and a mismatched set goes silent; a
-  changed one is already in the backup from step 3, so name it in the report with the
-  backup path. And `update/pristine.json` itself, which is pure data and has no entry
-  of its own.
+If recovery reports a collision, keep a separate copy of the affected work and
+ask Daily Practice for help reconciling it. Recovery keeps the backup, the
+original failure report, and the latest attempt's `recovery.json` together.
 
-**4b. Prune, remove-list only.** If the fetched manifest has a `remove` list: delete
-each named path that exists locally (its copy is already in the backup from step 3),
-delete any directory that leaves empty, and tell the client in one plain sentence what
-was retired and why the release notes say so.
-If it has `remove_status_checklist_keys`: delete those keys from `status/status.json`'s
-`checklist` (they described steps that no longer exist; the pre-update copy in the
-backup still holds them). The same two rules apply in
-reverse: **a path not on the `remove` list is never deleted** — not "also tidied" — and
-**every path on it is deleted without asking**; if one carried local edits, name it in
-the step 8 report with the backup path. The backup holds it either way.
+## Switch the selected tool
 
-**4c. Bring the sending rule in line, by script, without asking.** Run
-`node status/send.mjs migrate`. Files the update kept in step 4 (the agent definition
-with the client's name in it, a changed `AGENTS.md`, the adapters, every hired agent's
-job sheet) may still carry the old rule that nothing sends without a yes. The script
-backs each one up first, replaces only the kit's own old sentences (every wording it
-ever shipped; never a line the client wrote), writes the send level `low` into
-`status/status.json` when none is recorded, and prints what it did. It backs up into the same
-`.update-backup/{local-version}-{date}/` folder as step 3, so one restore undoes both. Read its one line
-to the client in the step 8 report, word for word. Anything it lists as "left alone" is
-theirs; anything it lists as residue is an old sentence in changed words, and the level
-cannot move until it is gone, so name it.
+A tool switch is a separate operation. Take the tag and full commit from the
+published release that is already applied to this harness. The command checks
+that the download matches that commit before running its switch operation:
 
-**5. Prove the scripts survived the trip.** Run `node --check` on every `.mjs` file
-just fetched. A truncated download must fail here, loudly, not at 07:00 tomorrow. On
-any failure: restore that file from the backup and report which one.
+```sh
+(
+  set -eu
+  cd /path/to/my-orion
+  release_tmp=$(mktemp -d)
+  trap 'rm -rf "$release_tmp"' EXIT
+  release_tag=TAG
+  release_commit=FULL_COMMIT
+  git clone --quiet --depth 1 --branch "$release_tag" https://github.com/DailyPractice-Ltd/orion-self-install.git "$release_tmp/release"
+  test "$(git -C "$release_tmp/release" rev-parse HEAD)" = "$release_commit"
+  node "$release_tmp/release/update/apply.mjs" switch --root "$PWD" --release-repo "$release_tmp/release" --commit "$release_commit" --to codex
+)
+```
 
-**6. Record it.** In `status/status.json` (the client's file — an update may edit
-exactly three things in it by hand: `template_version`, one appended `notes` line, and
-the key deletions step 4b names — nothing else, ever; the one script step 4c runs writes
-`scopes.send_risk: low` when no level is recorded, and touches nothing else): set `template_version` to the new
-version, and append one line to `notes`: "updated to {version} on {date}; backup in
-.update-backup/…".
+Use `--to claude-code` to move the other way. For an older Claude harness with no
+`selected_tool`, add `--legacy-tool claude-code` to migrate it explicitly. The switch
+requires the harness version, manifest, and common runtime scripts to match the pinned
+release. Run the published update command above first if it reports an older version.
+It checks collisions, backs up, stages and validates the new layout, then records the
+new selection. It retires released files from the old layout while preserving edited
+skills, hired job sheets and roster rows. Active computer schedules must first be
+turned off with `node status/schedule.mjs off --agent <name>`; saved schedules are
+invalidated by the switch and must be rewired for the new tool. The switch reports
+its backup. If interrupted, run the pinned release script with `recover --root "$PWD"`
+before trying again. The temporary checkout is removed automatically.
 
-**7. Prove the radio.** `node status/radio.mjs check` — expect "Radio quiet" or a real
-message. "Didn't answer" here is the third-state rule from AGENTS.md: one plain
-sentence, the fix pointer, never silence.
+## Recover from an applied withdrawn release
 
-**8. Report, in plain words, short.** Version from → to; how many files refreshed,
-how many are new, and what was pruned; where the backup is; every file kept because
-the client had changed it, named, and any replaced radio script or removed file that
-carried local edits, named with the backup path (statements, never questions); the
-one-line headline from the new CHANGELOG entry; and the sentence that
-matters: **"your knowledge base, your agents, your skills and your logs were not
-touched — and in your status file, only the version number, one note line, and any
-retired checklist entries changed. Nothing of yours."** Apart from a hard stop in step
-0 or step 2, this report is the only thing the update says to the client, and it comes
-after the work, never before it.
+If your harness is running a withdrawn release, you can choose a corrected
+release or restore the backup taken before the withdrawn update. Your applied
+version stays in place while you decide.
 
-**When an update changes what check-ins share, the client hears that in full.** The
-headline is the bold sentence directly under the version's heading in `CHANGELOG.md`.
-Read the entries for every version above the one the client was on, not only the
-newest. If any of them says the harness now tells Daily Practice something it did not
-tell it before, read that entry's headline to the client word for word, as its own
-sentence. Do not summarise it, and do not skip it because the update looks small.
-1.1.0 is the first such release: from 1.1.0 a harness also reports a finished task's
-general tag, a count, and which skill or agent ran, never the content. Then remind
-them in one clause that check-ins are still one switch (`docs/radio.md`, "Saying no,
-now or later").
+When you choose a corrected release, request it with
+`node update/request.mjs --tag vX.Y.Z`. A correction uses the normal verified
+update when it declares a path from your installed version. If the correction
+requires an earlier starting version, Orion offers a matching backup when it
+can verify one.
 
-## Restoring
+To review backup restoration, use the backup path from the original update
+report or from the recovery prompt.
 
-"Restore my harness from the backup" → copy every **refresh-list and remove-list**
-file from the newest `.update-backup/{…}/` back over the current files. 
-`status/status.json` is the one exception — it is the client's live record and is
-**never copied back wholesale**: from the backup's copy, re-add only the checklist
-keys the update deleted, set `template_version` back to the backup's version, and
-append a notes line. Everything else in the live status file (stages, packages,
-pairing, notes written since) stays exactly as it is. One honest nuance: files that were **new** in the
-update (they had no pre-update copy to back up) remain after a restore — they are inert
-without the new instructions that referenced them, and the next update refreshes them
-anyway. The backup folder itself is never deleted by any procedure — only the client may
-clear old ones.
+```sh
+node update/request.mjs --restore-backup .update-backup/VERSION-SUFFIX
+```
 
-## Why the allowlist is the safety, in one paragraph (for maintainers)
+The preview names the release it will restore, files it will put back or remove,
+and later edits it will keep. It also lists retired checklist entries it can
+reinstate. Your radio settings, work notes and later checklist changes stay
+in place. If you choose restoration, copy the preview's `confirm` value and run
+the same command with `--confirm-restore VALUE`. If files changed since the preview,
+review a fresh preview before confirming again.
 
-Deltas rot and hand-written file lists miss things. The manifest is generated from the
-repository's own inventory at each release (`_regenerate` inside it), the whole
-ours-zone is refreshed every time (idempotent — replacing an identical file is a no-op),
-and everything the client has ever made survives **by construction**, because nothing
-outside the list can be written at all. The same three words therefore work from any
-baseline: a 0.3.0 install and yesterday's install run the identical procedure and both
-land on main.
+A successful restore records the earlier applied release, or the earlier
+template version if the harness had only recorded a version. Keep the original
+backup and the evidence path printed by the restore. If a restore is interrupted
+and Orion reports that recovery is required, use the
+[separate pinned recovery procedure](#recover-an-unfinished-update-from-a-separate-checkout)
+with the new evidence backup. This returns the harness to its pre-restore
+state. Then preview the original backup again if you still want to restore it.
+
+If the deployed launcher predates this procedure, use the official source
+download of a published release that contains it. Run its `update/request.mjs`
+from your deployed harness folder with the same options.
+
+## Restore an offline update or a tool switch
+
+For a completed offline update or tool switch, use the backup path printed by
+the command:
+
+```sh
+node update/apply.mjs restore --root . --backup .update-backup/VERSION-TIMESTAMP
+```
+
+For an offline update made with `update/apply.mjs update`, restore puts prior
+released files back and removes newly installed files. A file changed after update is kept and reported. It restores the prior
+version and retired checklist keys without replacing the client's live status
+wholesale. A completed switch can also be restored from its reported backup; any
+new-layout edits that conflict must be handled first. Keep the backup for audit.
+
+## Older same-path folders
+
+For a harness that still uses the sending rule from before 1.5.0,
+`node status/send.mjs migrate` is the separate local sending-rule command.
+It backs up the files it changes.
+
+A supported older same-folder harness moves into a separate deployed folder.
+The updater verifies the historical layout and shipped files before carrying
+over the client's status, radio choice, team, knowledge, memory, and other local
+work. It keeps the original folder available. Saved computer schedules point to
+the old path and need to be wired again in the new folder.
+
+If the old harness has no `update/request.mjs`, use the official **Source code**
+download for a published release that contains the launcher. Extract it outside
+the old harness. From the old harness run the launcher from that download:
+
+```sh
+cd /path/to/older-orion
+node /path/to/published-orion/update/request.mjs
+```
+
+The new folder is created alongside the old one, with `-deployed` added to its
+name. To choose another new folder alongside the original, add
+`--migrate-to /path/to/new-orion`. The command reports the new folder and update
+backup once checks pass. If verification fails, keep the old folder and follow
+the published fresh-install instructions into a separate folder.
+Use `--tool codex` only when the legacy status already records Codex. The migration
+copies the client's status and logs, knowledge, memory, skills, roster and job sheets,
+as well as other client-created files such as notes and playbooks, then overlays edited
+deployed files. Release-only source trees, maintainer files, and retired workflows stay
+behind. Computer schedules refer to the original folder. Review them there before
+replacing them in the native scheduler. The new
+private repository becomes the home, while `--local-only` leaves home disabled. The legacy
+checkout is left intact. The command creates and pushes a private GitHub repository;
+`--remote https://github.com/OWNER/PRIVATE-REPO.git` uses an existing private
+repository, verified through `gh`. With no GitHub option, installation creates a local Git repository; `--local-only` is the explicit equivalent. A private remote can be connected later with `node status/home.mjs prepare --remote <address> --yes`.
+
+## Declare a supported starting version
+
+In `update/manifest.json`, add one unambiguous `update_compatibility` path for
+each starting version and tool layout you support. Name the
+`required_destinations` from the selected deployment map, and list the
+required `checks`. Include a `deployed-layout` check and any applicable
+`node-syntax` checks with their mapped `path`. For a release that needs no
+migration script, declare `steps: []`.
+
+A migration lists steps in order with `from_version` and `to_version` values
+that connect the starting version to the release. Historical versions in a
+required-edit review come from the recorded release's exact GitHub Release ID,
+tag and commit. For a supported starting state without that record, a pinned
+verification rule can specify `historical_source` with its exact `tag` and
+`commit`. The historical tag must still resolve to that commit. The release
+inventory lists pinned updater control files in
+`deployment.immutable_update_sources`.
+
+Every step names a pinned
+`script` under `update/migrations/` and declares its allowed `changes`, each
+with a relative `path` and an `operation` of `add`, `replace`, or `retire`.
+Scripts are JSON arrays of local file instructions. `write-text` takes `text`,
+`replace-text` takes a unique `find` string and a `replace` string, and `remove`
+retires a file. Each instruction supplies its target `path`. The updater
+reports the actual effects by step and backs up the prior bytes of changed
+files. Running the script does not invoke shells or connect to external
+accounts.
+
+A path that verifies older state must declare `verification.anchors` with
+shipped `path` and `sha256` fingerprints, and `verification.absent_paths` to
+distinguish the layout. With `verification.infer_tool: true`, Orion can record
+the tool if the evidence identifies a single path. For same-version backfill,
+the installed release files must also match the pinned publication. Explicitly
+list which release destinations accept client edits in
+`verification.allow_client_edits`. A path with
+`starting_layout: "legacy-same-folder"` stages a copy using the pinned
+`copy_exclude` declaration and `prepare-separate-harness-status` migration
+instruction. The default starting layout is `deployed`.

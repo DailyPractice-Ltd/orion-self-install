@@ -105,8 +105,9 @@ available, and that promise is made to every reader in `README.md` — keep it.
    assistant's sandbox is blocking the network", that is this assistant, not the radio:
    ask for network approval for the command (the adapter says how) and run it again.
 
-   **If Orion prints a release notice, show its version, summary and release notes
-   link before other work.** Treat it as information.
+   **If Orion prints a release notice, show its version, summary, full-notes link
+   and invitation before other work.** Wait for the client to request an update.
+   A release notice needs no reply.
 
    **If Orion prints a withdrawal notice, tell the client the version, whether this
    harness is still running it, and the next step shown.** If this harness is running
@@ -300,8 +301,23 @@ the same session-start radio message and adapter fix, once per session.
 
 ## Updating — "update my harness"
 
-**Update, check version, restore or switch tools** — read [Updating Orion](docs/updating.md)
-and follow the matching procedure for this harness.
+When the client says anything like **"update my harness"**, **"get the latest
+version"**, **"am I up to date?"**, or **"restore my harness from the backup"** — read
+`docs/updating.md` and follow it exactly. For an update, run `node update/request.mjs`
+from the deployed folder. If the client is responding to a release invitation, use its version as
+`--tag vX.Y.Z` to request the release they heard about. The command verifies the
+selected stable GitHub Release and runs its pinned updater. The selected tool in status determines destinations. Report preserved
+edits, blocked changes, and the backup or failure report. **The request is the consent**
+to start the published update procedure. If the update pauses for radio pairing,
+explain the [check-in choice](docs/radio.md) and ask the client whether to opt in.
+On their yes, continue the original update using the pairing step in
+`docs/updating.md`.
+If this harness runs a withdrawn release, offer a compatible corrected release or a
+preview of the pre-update backup. Tell the client which files restoration changes
+and which later edits it keeps. The client must choose restoration after seeing
+the preview before you run its confirmation command.
+For a tool change, follow the same document's `switch` and schedule steps. On Claude
+Code and Codex this is also invocable as `/update-harness`.
 
 ## Skills from Daily Practice
 

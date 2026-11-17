@@ -63,5 +63,4 @@ Keep the original release and its tag for audit and backup verification. Keep
 the `<!-- orion:withdrawn -->` marker in the notes and publish any correction
 under a new version. The bridge reads the marker on radio check and surfaces a
 withdrawal to paired harnesses that acknowledged the offer or recorded applying
-the release. Fresh installs skip withdrawn publications. The agent update reads the current
-`main` snapshot, so land a correction on `main` when withdrawing affected code.
+the release. A fresh install or update rejects the withdrawn release.

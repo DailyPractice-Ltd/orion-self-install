@@ -1,7 +1,7 @@
 {
-  "_read_first": "Read docs/updating.md and update/pristine.json from the pinned release commit. Run that commit's update/apply.mjs, not the older client copy. The deployment plan selects the tool recorded in status. The request is the consent: never stop to ask; never replace a file the client has changed, except executable status/*.mjs scripts, which are backed up and replaced together. Report collisions.",
+  "_read_first": "Follow docs/updating.md with the manifest and update/pristine.json pinned to main. The deployment map uses the tool recorded in status. The request is consent: never stop to ask, and never replace a file the client has changed outside the documented runtime-script exception.",
   "_what": "Legacy refresh/remove lists remain for older harnesses, except their three retired .claude skill sources. deployment is the source-to-destination and ownership contract for separate client repositories; select exactly one recorded tool. Contract: docs/updating.md and deployment._contract.",
-  "_regenerate": "Map each shipped skill and its resources, or list its entry point in deployment.local_skills. Run node tests/helpers/pristine.mjs --write after release edits.",
+  "_regenerate": "Map every file under skills/ in deployment.entries. Run node tests/helpers/pristine.mjs --write after release edits.",
   "template_version": "2.0.0",
   "refresh": [
     ".gitignore",
@@ -79,7 +79,7 @@
     "n8n_wf02_imported"
   ],
   "deployment": {
-    "_contract": "Map each shipped skill and its resources. local_skills lists source-only procedures outside a generic client install.",
+    "_contract": "Map every file under skills/ to the selected tool’s skills directory.",
     "tools": [
       "claude-code",
       "codex"
@@ -626,6 +626,294 @@
         },
         "ownership": "release",
         "fingerprint_key": "skills/prospect-research-outreach/SKILL.md"
+      },
+      {
+        "source": "skills/apollo-enrich-phone/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/apollo-enrich-phone/SKILL.md",
+          "codex": ".agents/skills/apollo-enrich-phone/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/apollo-enrich-phone/SKILL.md"
+      },
+      {
+        "source": "skills/apollo-enrich-phone/agents/openai.yaml",
+        "destinations": {
+          "claude-code": ".claude/skills/apollo-enrich-phone/agents/openai.yaml",
+          "codex": ".agents/skills/apollo-enrich-phone/agents/openai.yaml"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/apollo-enrich-phone/agents/openai.yaml"
+      },
+      {
+        "source": "skills/apollo-enrich-phone/references/hubspot-mapping.md",
+        "destinations": {
+          "claude-code": ".claude/skills/apollo-enrich-phone/references/hubspot-mapping.md",
+          "codex": ".agents/skills/apollo-enrich-phone/references/hubspot-mapping.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/apollo-enrich-phone/references/hubspot-mapping.md"
+      },
+      {
+        "source": "skills/apollo-enrich-phone/references/za-phone-types.md",
+        "destinations": {
+          "claude-code": ".claude/skills/apollo-enrich-phone/references/za-phone-types.md",
+          "codex": ".agents/skills/apollo-enrich-phone/references/za-phone-types.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/apollo-enrich-phone/references/za-phone-types.md"
+      },
+      {
+        "source": "skills/call-planner-control-tower/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/call-planner-control-tower/SKILL.md",
+          "codex": ".agents/skills/call-planner-control-tower/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/call-planner-control-tower/SKILL.md"
+      },
+      {
+        "source": "skills/call-planner-control-tower/agents/openai.yaml",
+        "destinations": {
+          "claude-code": ".claude/skills/call-planner-control-tower/agents/openai.yaml",
+          "codex": ".agents/skills/call-planner-control-tower/agents/openai.yaml"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/call-planner-control-tower/agents/openai.yaml"
+      },
+      {
+        "source": "skills/call-planner-control-tower/references/blue-collar-assessment.md",
+        "destinations": {
+          "claude-code": ".claude/skills/call-planner-control-tower/references/blue-collar-assessment.md",
+          "codex": ".agents/skills/call-planner-control-tower/references/blue-collar-assessment.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/call-planner-control-tower/references/blue-collar-assessment.md"
+      },
+      {
+        "source": "skills/call-planner-control-tower/references/contact-history-and-reentry.md",
+        "destinations": {
+          "claude-code": ".claude/skills/call-planner-control-tower/references/contact-history-and-reentry.md",
+          "codex": ".agents/skills/call-planner-control-tower/references/contact-history-and-reentry.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/call-planner-control-tower/references/contact-history-and-reentry.md"
+      },
+      {
+        "source": "skills/call-planner-control-tower/references/outcome-routing.md",
+        "destinations": {
+          "claude-code": ".claude/skills/call-planner-control-tower/references/outcome-routing.md",
+          "codex": ".agents/skills/call-planner-control-tower/references/outcome-routing.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/call-planner-control-tower/references/outcome-routing.md"
+      },
+      {
+        "source": "skills/call-planner-control-tower/references/queue-schema-and-call-ask.md",
+        "destinations": {
+          "claude-code": ".claude/skills/call-planner-control-tower/references/queue-schema-and-call-ask.md",
+          "codex": ".agents/skills/call-planner-control-tower/references/queue-schema-and-call-ask.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/call-planner-control-tower/references/queue-schema-and-call-ask.md"
+      },
+      {
+        "source": "skills/call-planner-control-tower/references/today-only-queue.md",
+        "destinations": {
+          "claude-code": ".claude/skills/call-planner-control-tower/references/today-only-queue.md",
+          "codex": ".agents/skills/call-planner-control-tower/references/today-only-queue.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/call-planner-control-tower/references/today-only-queue.md"
+      },
+      {
+        "source": "skills/closeout-spreadsheet/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/closeout-spreadsheet/SKILL.md",
+          "codex": ".agents/skills/closeout-spreadsheet/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/closeout-spreadsheet/SKILL.md"
+      },
+      {
+        "source": "skills/closeout-spreadsheet/references/sheet-stage-evidence.md",
+        "destinations": {
+          "claude-code": ".claude/skills/closeout-spreadsheet/references/sheet-stage-evidence.md",
+          "codex": ".agents/skills/closeout-spreadsheet/references/sheet-stage-evidence.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/closeout-spreadsheet/references/sheet-stage-evidence.md"
+      },
+      {
+        "source": "skills/lifecycle-governance/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/lifecycle-governance/SKILL.md",
+          "codex": ".agents/skills/lifecycle-governance/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/lifecycle-governance/SKILL.md"
+      },
+      {
+        "source": "skills/lifecycle-governance/agents/openai.yaml",
+        "destinations": {
+          "claude-code": ".claude/skills/lifecycle-governance/agents/openai.yaml",
+          "codex": ".agents/skills/lifecycle-governance/agents/openai.yaml"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/lifecycle-governance/agents/openai.yaml"
+      },
+      {
+        "source": "skills/lifecycle-governance/references/hubspot-model.md",
+        "destinations": {
+          "claude-code": ".claude/skills/lifecycle-governance/references/hubspot-model.md",
+          "codex": ".agents/skills/lifecycle-governance/references/hubspot-model.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/lifecycle-governance/references/hubspot-model.md"
+      },
+      {
+        "source": "skills/lifecycle-governance/references/hubspot-schema.json",
+        "destinations": {
+          "claude-code": ".claude/skills/lifecycle-governance/references/hubspot-schema.json",
+          "codex": ".agents/skills/lifecycle-governance/references/hubspot-schema.json"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/lifecycle-governance/references/hubspot-schema.json"
+      },
+      {
+        "source": "skills/lifecycle-governance/references/lifecycle-stage-policy.md",
+        "destinations": {
+          "claude-code": ".claude/skills/lifecycle-governance/references/lifecycle-stage-policy.md",
+          "codex": ".agents/skills/lifecycle-governance/references/lifecycle-stage-policy.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/lifecycle-governance/references/lifecycle-stage-policy.md"
+      },
+      {
+        "source": "skills/prospect-call-list/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/prospect-call-list/SKILL.md",
+          "codex": ".agents/skills/prospect-call-list/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/prospect-call-list/SKILL.md"
+      },
+      {
+        "source": "skills/prospect-call-list/agents/openai.yaml",
+        "destinations": {
+          "claude-code": ".claude/skills/prospect-call-list/agents/openai.yaml",
+          "codex": ".agents/skills/prospect-call-list/agents/openai.yaml"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/prospect-call-list/agents/openai.yaml"
+      },
+      {
+        "source": "skills/prospect-call-list/references/crm-review.md",
+        "destinations": {
+          "claude-code": ".claude/skills/prospect-call-list/references/crm-review.md",
+          "codex": ".agents/skills/prospect-call-list/references/crm-review.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/prospect-call-list/references/crm-review.md"
+      },
+      {
+        "source": "skills/prospect-call-list/references/run-guide.md",
+        "destinations": {
+          "claude-code": ".claude/skills/prospect-call-list/references/run-guide.md",
+          "codex": ".agents/skills/prospect-call-list/references/run-guide.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/prospect-call-list/references/run-guide.md"
+      },
+      {
+        "source": "skills/prospect-call-list/references/target-brief.md",
+        "destinations": {
+          "claude-code": ".claude/skills/prospect-call-list/references/target-brief.md",
+          "codex": ".agents/skills/prospect-call-list/references/target-brief.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/prospect-call-list/references/target-brief.md"
+      },
+      {
+        "source": "skills/prospect-enrichment/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/prospect-enrichment/SKILL.md",
+          "codex": ".agents/skills/prospect-enrichment/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/prospect-enrichment/SKILL.md"
+      },
+      {
+        "source": "skills/report-bug/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/report-bug/SKILL.md",
+          "codex": ".agents/skills/report-bug/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/report-bug/SKILL.md"
+      },
+      {
+        "source": "skills/report-bug/agents/openai.yaml",
+        "destinations": {
+          "claude-code": ".claude/skills/report-bug/agents/openai.yaml",
+          "codex": ".agents/skills/report-bug/agents/openai.yaml"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/report-bug/agents/openai.yaml"
+      },
+      {
+        "source": "skills/report-bug/references/report-guide.md",
+        "destinations": {
+          "claude-code": ".claude/skills/report-bug/references/report-guide.md",
+          "codex": ".agents/skills/report-bug/references/report-guide.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/report-bug/references/report-guide.md"
+      },
+      {
+        "source": "skills/task-planner/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/task-planner/SKILL.md",
+          "codex": ".agents/skills/task-planner/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/task-planner/SKILL.md"
+      },
+      {
+        "source": "skills/task-planner/agents/openai.yaml",
+        "destinations": {
+          "claude-code": ".claude/skills/task-planner/agents/openai.yaml",
+          "codex": ".agents/skills/task-planner/agents/openai.yaml"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/task-planner/agents/openai.yaml"
+      },
+      {
+        "source": "skills/task-planner/references/call-ranking.md",
+        "destinations": {
+          "claude-code": ".claude/skills/task-planner/references/call-ranking.md",
+          "codex": ".agents/skills/task-planner/references/call-ranking.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/task-planner/references/call-ranking.md"
+      },
+      {
+        "source": "skills/task-planner/references/slack-opportunity-intake.md",
+        "destinations": {
+          "claude-code": ".claude/skills/task-planner/references/slack-opportunity-intake.md",
+          "codex": ".agents/skills/task-planner/references/slack-opportunity-intake.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/task-planner/references/slack-opportunity-intake.md"
+      },
+      {
+        "source": "skills/task-planner/references/webinar-follow-up.md",
+        "destinations": {
+          "claude-code": ".claude/skills/task-planner/references/webinar-follow-up.md",
+          "codex": ".agents/skills/task-planner/references/webinar-follow-up.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/task-planner/references/webinar-follow-up.md"
       }
     ],
     "release_only": [
@@ -650,16 +938,6 @@
         "skills/update-harness/SKILL.md": ".claude/skills/update-harness/SKILL.md",
         "agents/README.md": ".claude/agents/README.md"
       }
-    },
-    "local_skills": [
-      "skills/apollo-enrich-phone/SKILL.md",
-      "skills/call-planner-control-tower/SKILL.md",
-      "skills/closeout-spreadsheet/SKILL.md",
-      "skills/lifecycle-governance/SKILL.md",
-      "skills/prospect-call-list/SKILL.md",
-      "skills/prospect-enrichment/SKILL.md",
-      "skills/report-bug/SKILL.md",
-      "skills/task-planner/SKILL.md"
-    ]
+    }
   }
 }

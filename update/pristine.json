@@ -28,6 +28,7 @@
    "fe5de8c5339206ff9050735af4cbc55afe5c45289029f5543d4f7577ce62a6e6"
   ],
   ".gitignore": [
+   "037dde8b8dc8661c896c8eb4972799a6b84f348eef93e252fd05d883a1ec4f1d",
    "3810a1e71f4d70e7593d09c1718f2bb080dfcb4bbdaa9c11d76534d950f0f495",
    "886370b541aa01f77cfc33e655f1051dcff3cbad92196b11ee1b28a043c37d1a",
    "8f7b240e95cf905561884b4d8b83828a599cceed5b081e805a488d78da30ab49",
@@ -569,6 +570,39 @@
    "63e91a31b8651f47a7046eeb13a1642ac7604ca7084db38348674772cf800932",
    "b076979b103c4f0b77ba6635fed2f95e78823d8a7cb85e5b808a689479596b59"
   ],
+  "skills/apollo-enrich-phone/SKILL.md": [
+   "0332cffc34bc04d08d0122358d0ccc4dbaa694ad44901784c50242030a451690"
+  ],
+  "skills/apollo-enrich-phone/agents/openai.yaml": [
+   "5b44541c15c760064b2c4ab8470ea3fb3243c1b9e39b6a514968e80ea76475cc"
+  ],
+  "skills/apollo-enrich-phone/references/hubspot-mapping.md": [
+   "2dafb78eaa62125acdd6a5bb24097e9f818d6c3dd607bf5f96c8a4a5863893d1"
+  ],
+  "skills/apollo-enrich-phone/references/za-phone-types.md": [
+   "0136c0aa5828e0ce70066052b3573e41d4bf6c6a3e90554dd855120c8047ac39"
+  ],
+  "skills/call-planner-control-tower/SKILL.md": [
+   "7d5cb732ca75aa5b659b2c4e820ee42ed5a6d6bbaf5a13e09339ca55f4fdba8e"
+  ],
+  "skills/call-planner-control-tower/agents/openai.yaml": [
+   "967ebd6df7387b9d215a2b8d68ce6f070b1cbb7688d8f5d10580db5b38351e99"
+  ],
+  "skills/call-planner-control-tower/references/blue-collar-assessment.md": [
+   "2b9d1bc25ebe9c2eac776a73f774712628258eaa7611a55b5a169023449013d9"
+  ],
+  "skills/call-planner-control-tower/references/contact-history-and-reentry.md": [
+   "7c5091b65703496f46dc6a55c6ce0e277e1fb204aeba16d0d037a32e22d951d0"
+  ],
+  "skills/call-planner-control-tower/references/outcome-routing.md": [
+   "675570758511ebb1492bb99f44fcb98478d3d19411e052993913970f4599bd3e"
+  ],
+  "skills/call-planner-control-tower/references/queue-schema-and-call-ask.md": [
+   "1aee71a1fa5b1b72093509a72db2cc56f4d978a132a0cba72aaf702390eba950"
+  ],
+  "skills/call-planner-control-tower/references/today-only-queue.md": [
+   "b324eba3246da8867b38a45a97126907c3baaa9006e63b85ed3552b632e04df4"
+  ],
   "skills/call-planner/SKILL.md": [
    "0b0859a81f0315704bbebc54320bf8d59d871ee30b8e3f498b15afc53412ca84"
   ],
@@ -577,6 +611,12 @@
   ],
   "skills/call-planner/scripts/build-call-plan.mjs": [
    "0329031a800975988a6e4bf6a2818b1d130a843e143caaa5257b8a386e60f5b8"
+  ],
+  "skills/closeout-spreadsheet/SKILL.md": [
+   "38805ce211b7cee8ecc2c0bcca9f501552f91aa5084ec16f90a61be80ccbfed4"
+  ],
+  "skills/closeout-spreadsheet/references/sheet-stage-evidence.md": [
+   "ef880af90e57916dbf7746981e52d757b6cf545950b54181fd63438c4e9a69cb"
   ],
   "skills/create-skill/SKILL.md": [
    "3b6d2bd65e00b422aace6a57beb432e4befa9e2eb9b16c44a11aaf09976540ae",
@@ -594,11 +634,44 @@
    "7d11accf71237ac769011cd47ec604c2f7e6eb427ad23f04f6240507e9af3d56",
    "819773ceb514c196c89861a4585f690f5c25f8bd81e137dbac0ebb4f878a338b"
   ],
+  "skills/lifecycle-governance/SKILL.md": [
+   "26dabaee5fce5cd8bf9a30e600bcf9c61f63a9fcb819d4efa3ac488fa049e69d"
+  ],
+  "skills/lifecycle-governance/agents/openai.yaml": [
+   "27ea8d10f12a3277e3563d428f4e661e2f73f4697b22168148a7b6c2b798900e"
+  ],
+  "skills/lifecycle-governance/references/hubspot-model.md": [
+   "d2164820619e8ef566da1591967a6e01473778594d75bd851c6e4fcfbf937f48"
+  ],
+  "skills/lifecycle-governance/references/hubspot-schema.json": [
+   "698617de0e17d2e764f7c902fa6a9585787e99ad5b2e510bcc2401cc9e5a163d"
+  ],
+  "skills/lifecycle-governance/references/lifecycle-stage-policy.md": [
+   "322590a01a7154ae6a7688af76057822524a9b0d697472f61cddfb15696c81af"
+  ],
   "skills/memory-consolidation/SKILL.md": [
    "67bc40433c60caeff5a469beaf36bbab22285769d7f49bd4d2677ed052618eda"
   ],
   "skills/post-call-debrief/SKILL.md": [
    "0c01bff073713a03bc77db89eac85f89f484855cc8f0a6bd79cc9e7ff7421f3b"
+  ],
+  "skills/prospect-call-list/SKILL.md": [
+   "f4aed3e008633632695ff5b59a0345e038c872ceccc4d6014b9cbde2921fc624"
+  ],
+  "skills/prospect-call-list/agents/openai.yaml": [
+   "4d850adfed776a491cc16244c54e092f74db6e882147b08e0b6a52999f7ca6fe"
+  ],
+  "skills/prospect-call-list/references/crm-review.md": [
+   "cc57ab9af3c9eb22ba74b8011dd8bebffaad45b754acae357d8415e508fb75b3"
+  ],
+  "skills/prospect-call-list/references/run-guide.md": [
+   "797e0f2bc0d8bf268611abdcbc5342c44592508e695e9000f9483ce1ac52a668"
+  ],
+  "skills/prospect-call-list/references/target-brief.md": [
+   "dc18f39d625f222fce009f4065cea9b0263c40fb94bda3b53d35cecee8973130"
+  ],
+  "skills/prospect-enrichment/SKILL.md": [
+   "ebdef0542e15bc5f33a434e62ef34f72a2aaa20232b64c8ccb0492007c130511"
   ],
   "skills/prospect-research-outreach/SKILL.md": [
    "46935f7f4e68166adf2595b543a3fcb747b9eaff3b98941834008738c1e51207"
@@ -606,6 +679,15 @@
   "skills/prospecting/SKILL.md": [
    "0fbec3f8380b833d9ff0dd57b62f37c7b4bc8b09aecc0e35ed2cb78ebe96daac",
    "de90bdcb15ec162b17f710339f60a917d3a3b77bb5c4f0f0a7d252a8ce8830df"
+  ],
+  "skills/report-bug/SKILL.md": [
+   "2377d5e23014ae48c7cb2b474f50b1b085aee389e3e068f8b7b0cbf51fb90be7"
+  ],
+  "skills/report-bug/agents/openai.yaml": [
+   "9985cd6a74a6d9c52149e48c6e06a7af4354491983b1f8b78e516232c5c63cfd"
+  ],
+  "skills/report-bug/references/report-guide.md": [
+   "97fab64c4faf9e723df5d2aa0683f0cefbfce737b95c6bb457c5298861bdedd0"
   ],
   "skills/speckit-agent-context-update/SKILL.md": [
    "4bebe9b02a5aa3f65b27d54fee7e4e112cc3bb89cc554866d370c9082c8f0fe8"
@@ -639,6 +721,21 @@
   ],
   "skills/speckit-taskstoissues/SKILL.md": [
    "dfe23aaca349cd76e98505dafa9aae1ef4616a0c35a5c79122b9bd881e16b62f"
+  ],
+  "skills/task-planner/SKILL.md": [
+   "d9374993827602cfea2aeb02c59ee1000448d5b4d9526f6e13946d323d1ede0b"
+  ],
+  "skills/task-planner/agents/openai.yaml": [
+   "aefab17e0136b3150e9c2690bd9fcbbb306f00380bcddd447830a322b9ca33df"
+  ],
+  "skills/task-planner/references/call-ranking.md": [
+   "d8e367ad308ba4eeaf6869ae5fba08d733b85c6d3a23f5e66422f5a6618850ed"
+  ],
+  "skills/task-planner/references/slack-opportunity-intake.md": [
+   "c374047f7fc13ee2fbbcb318fcf8504a2bffaff9fe232a9579f2bfc4bb9c1992"
+  ],
+  "skills/task-planner/references/webinar-follow-up.md": [
+   "163eb1d9bf6f673d0a7ae2c3bdf73bc1e37c232b9f0ead3179f45e7251c39b33"
   ],
   "skills/update-harness/SKILL.md": [
    "5a01e7840dd33711606563442dfe7869bda088640faa1f9ccc4df1a2466d032e",
@@ -842,6 +939,7 @@
    "56f956f389976a7c74fa33ae3b51b456c8a02856eb0221fc7ebff126bc9d6de3",
    "bbe1f7aa3914c13ed72a755dcde53d8b59388f3130b507dcb6af12feb40c5f6d",
    "d722d0da4489fb9098dc9a3c2f7a6b9c3d9d8de1d325375f4937817d311703d2",
+   "dd957a26249e2ba9906b703ebb984f2a83039ba5241639c9c89d824042b3100f",
    "e72fd0eded4aa3e6a71beb687ad0b13d61843635ae405c68f4409dd4a1914636",
    "ea6440daab4516defba11d343753e12de6f19678297bab07d0be10039277ac66"
   ],
@@ -879,6 +977,7 @@
    "afd54c2c326d8c23c135779f51c40858a38bdacd4c921d502f02357c335c7364",
    "b2f7849226a3fccf888aeddd131b74f638b2aa791f4b0245069d7e25d0de4e86",
    "b385b690fc166200d40e15e885a36f69ae89111994873d920a4d7a158e0ca2e0",
+   "c069158a336a412180f84ef3968585942d53700ec35cc151376cf33692d92875",
    "c229136fd20885dacf85191dfccef6236d50d9c75b5d639a934bbddf80db5be1",
    "c43f812a009d00c1d715d519def5a0fc8e3a87d27f82109d5a3317707c138ccc",
    "c57e714922737c47b33d7e7028e2772a6847e08a92d8355fa8502246ff525d68",

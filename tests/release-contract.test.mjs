@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync, relative, sep } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +14,6 @@ test('release contract plans one selected runtime from portable sources', (t) =>
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
   for (const path of ['update/manifest.json', 'update/release-contract.mjs',
     ...manifest.deployment.common_sources,
-    ...manifest.deployment.local_skills,
     ...manifest.deployment.entries.flatMap((entry) => [entry.source,...Object.values(entry.sources || {})])]) {
     mkdirSync(dirname(join(release, path)), { recursive: true });
     copyFileSync(join(repo, path), join(release, path));
@@ -67,7 +66,7 @@ test('all release skills have exactly one mapping for both tools', () => {
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
   const names = readdirSync(join(repo, 'skills')).sort();
   const mapped = manifest.deployment.entries.filter(entry => entry.source.startsWith('skills/') && entry.source.endsWith('/SKILL.md'));
-  assert.deepEqual([...mapped.map(entry => entry.source), ...manifest.deployment.local_skills].sort(),
+  assert.deepEqual(mapped.map(entry => entry.source).sort(),
     names.map(name => `skills/${name}/SKILL.md`).sort());
   for (const entry of mapped) for (const tool of ['codex', 'claude-code']) {
     assert.equal(entry.destinations[tool], `${tool === 'codex' ? '.agents' : '.claude'}/${entry.source}`);
@@ -76,4 +75,18 @@ test('all release skills have exactly one mapping for both tools', () => {
   assert.equal(existsSync(join(repo, '.claude')), false, 'release must not track or generate a second skill tree');
   for (const path of manifest.refresh) assert.ok(existsSync(join(repo, path)), `legacy refresh source missing: ${path}`);
   for (const name of names) assert.equal(manifest.refresh.includes(`.claude/skills/${name}/SKILL.md`), false);
+});
+test('release contract ships every skill file to the selected runtime', () => {
+  const sources = readdirSync(join(repo, 'skills'), { recursive: true, withFileTypes: true })
+    .filter(entry => entry.isFile())
+    .map(entry => relative(repo, join(entry.parentPath, entry.name)).split(sep).join('/'));
+  for (const tool of ['codex', 'claude-code']) {
+    const run = spawnSync(process.execPath, [join(repo, 'update/release-contract.mjs'), '--tool', tool], { encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    const plan = JSON.parse(run.stdout);
+    for (const source of sources) {
+      const destination = `${tool === 'codex' ? '.agents' : '.claude'}/${source}`;
+      assert.ok(plan.entries.some(entry => entry.source === source && entry.destination === destination), `missing skill file: ${source}`);
+    }
+  }
 });

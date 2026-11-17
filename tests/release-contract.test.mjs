@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync, relative, sep } from 'node:fs';
+import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
@@ -76,6 +76,7 @@ test('all release skills have exactly one mapping for both tools', () => {
   for (const path of manifest.refresh) assert.ok(existsSync(join(repo, path)), `legacy refresh source missing: ${path}`);
   for (const name of names) assert.equal(manifest.refresh.includes(`.claude/skills/${name}/SKILL.md`), false);
 });
+
 test('release contract ships every skill file to the selected runtime', () => {
   const sources = readdirSync(join(repo, 'skills'), { recursive: true, withFileTypes: true })
     .filter(entry => entry.isFile())

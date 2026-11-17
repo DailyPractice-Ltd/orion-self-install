@@ -291,16 +291,10 @@ the same session-start radio message and adapter fix, once per session.
 
 ## Updating — "update my harness"
 
-When the client says anything like **"update my harness"**, **"get the latest
-version"**, **"am I up to date?"**, or **"restore my harness from the backup"** — read
-`docs/updating.md` and follow it exactly. Obtain the current release as a temporary
-checkout, resolve its full commit, and run that commit's `update/apply.mjs` with its
-pinned manifest and source files. The selected tool in status determines destinations.
-Back up before replacing or retiring; report preserved edits and collisions. Released
-`status/*.mjs` scripts are the documented backed-up exception that update together.
-**The request is the consent**: run start to finish without an extra confirmation.
-For a tool change, follow the same document's `switch` and schedule steps. On Claude
-Code and Codex this is also invocable as `/update-harness`.
+When the client asks to update Orion, check its version, restore an update backup
+or switch tools, follow [Updating Orion](docs/updating.md). The request is the consent
+for an update. In Claude Code and Codex, the same procedure is available as
+`/update-harness`.
 
 ## Skills from Daily Practice
 

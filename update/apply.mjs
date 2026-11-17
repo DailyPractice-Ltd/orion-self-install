@@ -100,13 +100,18 @@ function update(root,repo,commit) {
       }
     }
     for (const [oldPath, archive] of archives) archiveLegacy(oldPath, archive);
+    const checklistKeys = manifest.remove_status_checklist_keys || [];
+    const hasRetiredChecklistKeys = checklistKeys.some(key => Object.hasOwn(status.checklist || {}, key));
+    if (status.template_version === manifest.template_version && !actions.length && !hasRetiredChecklistKeys) {
+      return { ...report, up_to_date: true };
+    }
     const stamp=new Date().toISOString().replace(/[:.]/g,'-');
     const backupRel=`.update-backup/${status.template_version}-${stamp}`;
     const backup=safe(root,backupRel); if(existsSync(backup)) throw new Error('Backup already exists');
     mkdirSync(backup,{recursive:true}); copyTo(statusPath,join(backup,'status/status.json'));
     const journal={kind:'update',state:'pending',from:status.template_version,to:manifest.template_version,commit,selected_tool:tool,
       actions:actions.map(a=>({kind:a.kind,destination:a.e.destination,installed_hash:a.kind==='retire'?null:fingerprint(readFileSync(a.src)),prior_hash:a.kind==='add'?null:fingerprint(readFileSync(a.dest))})),
-      remove_status_checklist_keys:manifest.remove_status_checklist_keys||[]};
+      remove_status_checklist_keys:checklistKeys};
     for(const key of journal.remove_status_checklist_keys) delete status.checklist?.[key];
     status.template_version=manifest.template_version;
     status.notes=[status.notes||'',`updated to ${manifest.template_version}; backup in ${backupRel}`].filter(Boolean).join('\n');

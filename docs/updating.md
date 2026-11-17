@@ -1,58 +1,57 @@
-# Updating a deployed Orion harness
+# Updating Orion
 
-The request is the consent. Work in the **deployed
-client folder**, whose `status/status.json` records `selected_tool` as `claude-code` or
-`codex`. The release repository is a separate, temporary source. A client needs only
-their deployed folder to begin.
+Say **"update my harness"** inside your deployed Orion folder. The request is the consent.
+Orion updates from Daily Practice's current `main` commit. The version is
+`template_version` in the deployed folder's `status/status.json`.
+For a version inquiry, report that value. To check whether it is current, compare it
+with the pinned manifest without applying an update. Updates work with the radio off.
 
-## Update from a pinned release
+## Pin main
 
-Run this in the deployed folder. It downloads the current `main` release, resolves its
-full commit hash, runs that commit's updater with its manifest and source files, then
-removes the temporary checkout. The script and the content it applies come from the
-same commit; do not run the older `update/apply.mjs` already in the client folder.
+From the deployed folder, clone the official `main` into a temporary directory.
+Read its full commit and the manifest at that commit.
 
 ```sh
-(
-  set -eu
-  cd /path/to/my-orion
-  release_tmp=$(mktemp -d)
-  trap 'rm -rf "$release_tmp"' EXIT
-  git clone --quiet --depth 1 https://github.com/DailyPractice-Ltd/orion-self-install.git "$release_tmp/release"
-  release_commit=$(git -C "$release_tmp/release" rev-parse HEAD)
-  node "$release_tmp/release/update/apply.mjs" update --root "$PWD" --release-repo "$release_tmp/release" --commit "$release_commit"
-)
+harness="$PWD"
+scratch=$(mktemp -d)
+git clone --quiet --depth 1 --branch main https://github.com/DailyPractice-Ltd/orion-self-install.git "$scratch/source"
+commit=$(git -C "$scratch/source" rev-parse HEAD)
+git -C "$scratch/source" show "$commit:update/manifest.json"
 ```
 
-If clone or update fails, inspect the error. The temporary checkout is removed on
-success or failure. Never fall back to the older local script or an unpinned `main` path.
-The update reads `update/manifest.json`, `update/pristine.json`, and all released
-files from that one commit. Its `deployment` plan maps portable release sources into
-the destination for the tool recorded in status. The current AI app does not choose
-the destination. The release installs Orion and the mapped skills.
-The client folder never receives the release source trees wholesale, tests, specs,
-`CLAUDE.md`, or the other tool's runtime tree. All shipped skills are mapped explicitly. Earlier Spec Kit files are retired only when they still match shipped copies; client edits are preserved. Maintainer specifications stay in the release repository.
+Read the pinned `docs/updating.md` and follow its apply instructions. If the
+source version is older than the installed version, report both versions and
+stop. If the fetch fails in Codex, see the [network instructions](../agent/adapters/codex.md).
+If status has no selected tool, use [the migration procedure](#older-same-path-folders)
+for the separate deployed layout.
 
-A file the client has changed is kept and reported, as is a collision. Legacy job sheets remain client-owned. A retired released file is removed only if it still matches a
-historical shipped fingerprint. Before changing files, the updater backs up status
-and each file it will replace or retire under `.update-backup/`. Executable
-`status/*.mjs` scripts are the narrow exception: they are backed up and replaced as a
-version-consistent set even when edited. The updater changes only
-`template_version`, one notes line, and named retired checklist keys in status.
-The update preserves Codex legacy job sheets in place and archives Claude job sheets
-under `legacy/claude-agents/`. Turn off any active legacy computer schedules listed
-by the updater and rerun it. Review `legacy_schedules`
-in the update report. See [Migrate a legacy schedule](scheduled-work.md#migrate-a-legacy-schedule)
-for both computer schedules and native tasks that still reference a job sheet.
+## Apply the pinned update
 
-When applicable, run `node status/send.mjs migrate` for the older sending-rule
-migration. Then run `node status/radio.mjs check`. Report the pinned commit, version
-change, refreshed, added, retired, kept and collided files, replaced edited scripts,
-radio result, and backup path.
+Use the pinned source's file helper to apply its manifest and fingerprints
+to the tool recorded in the deployed status file.
+
+```sh
+node "$scratch/source/update/apply.mjs" update --root "$harness" --commit "$commit"
+```
+
+The helper uses the selected tool's deployment allowlist. A file the client has changed is kept
+and reported. The runtime scripts under `status/` are refreshed together, and
+`update/pristine.json` is refreshed with the source fingerprints. The helper backs up
+replaced and retired files, retires listed files that match shipped fingerprints,
+checks the incoming scripts and records the version after applying the update.
+On the same version it reports an up-to-date result when there is no work.
+If it reports active legacy computer schedules, follow the
+[schedule migration instructions](scheduled-work.md#migrate-a-legacy-schedule).
+
+When upgrading a harness that predates the 1.5.0 sending rule, follow
+[the sending-rule migration](../AGENTS.md). If the radio is on, check it with
+`node status/radio.mjs check`. Report the version, changed files, preserved edits,
+any replaced edited runtime scripts and the backup path. Remove the temporary
+source checkout after the operation.
 
 ## Switch the selected tool
 
-Use the same pinned release procedure, with `switch` as the operation:
+Use the pinned source with `switch` as the operation:
 
 ```sh
 (
@@ -60,7 +59,7 @@ Use the same pinned release procedure, with `switch` as the operation:
   cd /path/to/my-orion
   release_tmp=$(mktemp -d)
   trap 'rm -rf "$release_tmp"' EXIT
-  git clone --quiet --depth 1 https://github.com/DailyPractice-Ltd/orion-self-install.git "$release_tmp/release"
+  git clone --quiet --depth 1 --branch main https://github.com/DailyPractice-Ltd/orion-self-install.git "$release_tmp/release"
   release_commit=$(git -C "$release_tmp/release" rev-parse HEAD)
   node "$release_tmp/release/update/apply.mjs" switch --root "$PWD" --release-repo "$release_tmp/release" --commit "$release_commit" --to codex
 )
@@ -117,7 +116,7 @@ lists the three `.claude/skills/` source files removed from the release. An olde
 same-path updater can still refresh the other listed files; it will leave those
 three installed skills as they are. To receive current skill definitions, migrate
 the harness into a separate client folder with `install.mjs --migrate-from` above,
-or run the pinned updater in an already deployed folder. That updater maps the
+or follow the pinned update procedure in an already deployed folder. It maps the
 `skills/` sources to the chosen runtime paths and recognizes historical Claude
 copies by fingerprint. `deployment` is the contract for separate client folders.
 Maintainers run

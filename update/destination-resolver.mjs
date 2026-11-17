@@ -57,6 +57,7 @@ export function destinationState(root, entry, pristine) {
   if (!existsSync(target)) return 'absent';
   if (!lstatSync(target).isFile()) return 'preserve';
   if (entry.ownership === 'client-template') return 'client-owned';
+  if (entry.source === 'update/pristine.json' && entry.destination === entry.source) return 'owned';
   const known = pristine.files?.[entry.fingerprint_key] || [];
   return known.includes(fingerprint(readFileSync(target))) ? 'owned' : 'preserve';
 }

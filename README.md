@@ -41,8 +41,8 @@ node install.mjs --tool claude-code --target /path/to/my-orion
 ```
 
 The target must be a new or empty folder outside this release. The installer creates
-a separate local Git repository, copies the three Orion skills into your chosen
-tool's layout with its team roster, and records that choice in `status/status.json`.
+a separate local Git repository, copies the shipped skills into your chosen
+tool's layout, and records that choice in `status/status.json`.
 It leaves the release sources, tests, and project specifications behind. Then enter your new folder and
 press Start:
 

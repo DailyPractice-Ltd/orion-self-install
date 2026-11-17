@@ -1,6 +1,10 @@
 ---
 name: update-harness
-description: Update Orion, check its version, restore an update backup, or switch its selected tool.
+description: Use when the client says "update my harness", "get the latest version", "am I up to date?", or "restore my harness from the backup". Applies verified stable GitHub Releases to the selected Orion tool layout.
 ---
 
-Read [Updating Orion](docs/updating.md) in this harness and follow the matching procedure.
+Read `docs/updating.md`. When the client asks for an update, run
+`node update/request.mjs` from that deployed harness and follow its result.
+A paired radio is required. Report the version, preserved edits or collisions,
+and the backup or failure report. If preflight reports a required file with a
+local edit, keep the file and report the block.

@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0.0",
-  "template_version": "2.0.0",
+  "template_version": "3.0.0",
   "ai_assistant": null,
   "client_id": null,
   "business_name": null,
@@ -61,7 +61,16 @@
     "install_token": null,
     "paired_at": null,
     "radio_seen_through": null,
-    "intelligence_library_opt_in": false
+    "intelligence_library_opt_in": false,
+    "pairing": {
+      "version": 1,
+      "state": "unpaired",
+      "verified_at": null,
+      "last_check": null,
+      "migration_started_at": null,
+      "migration_deadline_at": null,
+      "migration_satisfied_at": null
+    }
   },
   "notes": ""
 }

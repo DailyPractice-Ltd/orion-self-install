@@ -26,9 +26,9 @@ anything. Its contents ARE the answer to "where did we leave off."
 | `memory` | the team notebook's wiring (schema 1.5.0): `enabled` (default `true`), `backend` (`folder` — a plain local folder — or `git` — a private repo the CLIENT owns), `remote` (git backend only), `path` (default `memory`) | config only, read by `status/memory.mjs`; the notebook's CONTENT lives in the `memory/` folder, never here. Contract: `docs/memory.md`. Independent of the radio by design |
 | `scopes` | the standing permissions the client has given, once (schema 1.8.0). `crm_write` (default `true`): notes, tasks, contact, company and deal properties and meeting outcomes are written straight away and reported in one line, never staged. It never covers a delete, a merge, an owner change or a lifecycle-stage move, which are read back and wait for a yes, and it never covers sending. `send_risk` (schema 1.9.0; `off`, `low`, `medium` or `high`, a fresh install writes `low`): the one risk level the client set, with `send_risk_set_by` and `send_risk_set_on`; a message scored at or under it sends on its own, one above it waits (`agent/risk-matrix.md`). `send_risk_resume` remembers the level while sending is paused. `send_caps` holds the per-day caps per channel group, set with the level. `waiting_session` (optional) is the fixed id of the command-line "waiting for you" session, where the assistant can keep one | the client, by telling their assistant; `node status/send.mjs set-level` writes it and the edit is the record. Skills can further limit actions for their task |
 | `home` | whether this folder lives in a private repository its owner controls (schema 1.7.0): `enabled` (default `false`), `branch` (default `main`) | only `node status/home.mjs prepare --yes`, on the owner's say-so. While it is on: the radio key lives in `status/radio.key`, which is never saved to the home, and `sharing.install_token` stays `null`; this file itself is saved there; and `status/done.mjs` saves the folder after every finished piece of work. The script's header is the contract |
-| `sharing.status_signal_enabled` | default `true` — the radio's master switch (constitution Article V, channel 1) | only the client changes this, and only if they ask to |
-| `sharing.radio_choice` | `null` until the check-in choice has been presented once; then `"accepted"` or `"declined"` | set once by the wizard (or by you, on the conversational path) — its presence is why the choice is never re-asked |
-| `sharing.bridge_url` / `sharing.harness_id` / `sharing.install_token` | the radio's address and key, from the client's pairing code exchange | during the wizard's check-in step (or its conversational equivalent). All three plus the master switch must be set before anything dials out — anything less is a silent local no-op. The token is typed by the client, never echoed, never logged |
+| `sharing.status_signal_enabled` | default `true` — required operational connection switch (constitution Article V, channel 1); disabling pauses supported work outside migration grace | only the client changes this, and only if they ask to |
+| `sharing.radio_choice` | `null` until the check-in choice has been presented once; then `"accepted"` or `"declined"` | preserve prior decline until explicit pairing; do not silently accept during migration |
+| `sharing.bridge_url` / `sharing.harness_id` / `sharing.install_token` | the radio's address and key, from the client's pairing code exchange | during the wizard's check-in step (or its conversational equivalent). Exchange returns the token to the folder; the human enters only a short code. Fresh matching server verification, not local shape, authorizes work. Never display/log even token suffixes |
 | `status/radio.key` (a file, not a field) | the radio key, one line, when it does not live in `sharing.install_token` (since 1.3.0). The radio uses the first well-shaped key it finds in: `ORION_INSTALL_TOKEN` in the machine's environment, this file, then `sharing.install_token` | written by `status/home.mjs` when the folder gets a home, and by the wizard when a folder that has one is paired. Never by hand, never printed, never saved anywhere but this machine |
 | ~~`sharing.status_signal_endpoint`~~ | removed in schema 1.2.0 (002a reconciliation) — the 001-era unauthenticated webhook is gone; the authenticated radio (`bridge_url` + key) is the only outbound path | delete it if an old status.json still carries it |
 | `sharing.intelligence_library_opt_in` | default `false` | only on the client's explicit, separate say-so — see `docs/intelligence-library-opt-in.md` |
@@ -41,3 +41,20 @@ anything. Its contents ARE the answer to "where did we leave off."
 when a session ends — the client might close their laptop mid-sentence. If a completed
 step isn't written back yet when that happens, it's lost, and the client will be asked
 the same question twice next time. That's the exact failure this file exists to prevent.
+
+## Required pairing (template 3.0.0; schema remains 2.0.0)
+
+`sharing.pairing` is the version-1 feature marker and resumable state. The shipped
+example has unpaired state and null verification/migration timestamps. Missing
+marker plus recorded pre-existing progress is the legacy migration detector;
+version comparisons are incorrect. `verified_at` is informational; every pre-work
+invocation verifies again. `migration_satisfied_at` permanently ends grace eligibility.
+The one-time start/deadline are written together before work and never reset.
+Partial/malformed/future starts fail closed. At exactly 30 days grace expires.
+
+See [required-pairing contract](../specs/007-required-pairing/contracts/status-and-guard.md)
+for field definitions, accepted/invalid/unreachable/server_error outcomes, credential
+recovery, atomic store lock, and typed labels-only `status/radio-outbox.json`.
+Pending reports survive restart and are replayed before work outside valid grace;
+no log text, purpose sentence, token or artifact belongs in that queue. Status and
+outbox are client-owned and are not replaced by an update.

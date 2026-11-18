@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Required pairing feature marker and state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "state",
+    "last_check",
+    "verified_at",
+    "migration_started_at",
+    "migration_deadline_at",
+    "migration_satisfied_at"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "state": {
+      "enum": [
+        "unpaired",
+        "exchanged",
+        "verified"
+      ]
+    },
+    "last_check": {
+      "enum": [
+        null,
+        "accepted",
+        "invalid",
+        "unreachable",
+        "server_error"
+      ]
+    },
+    "verified_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "migration_started_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "migration_deadline_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "migration_satisfied_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  }
+}

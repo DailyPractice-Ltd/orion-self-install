@@ -1,6 +1,6 @@
 # Proposed constitution amendment: required pairing
 
-**Status:** Approved by the Daily Practice maintainer in this implementation session. Article V is amended in `.specify/memory/constitution.md` version 2.0.0.
+**Status:** Approved by the Daily Practice maintainer in this implementation session. The pre-existing approval evidence below authorizes restoration of the historical self-install constitution (v1.4.0 from `feffff9^`) and the Article V amendment in `.specify/memory/constitution.md` version 2.0.0. This maintainer source is not deployed to client folders.
 
 ## Principle changed
 

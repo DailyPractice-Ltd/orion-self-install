@@ -8,7 +8,26 @@ code and its contract (`specs/002-intelligence-bridge/contracts/bridge.ts` in th
 which remains the source of truth. The 2026-07-25 "to confirm at the bridge build"
 checklist is resolved at the bottom.
 
-## Transport rules (all four doors)
+## Required-pairing update (2026-11-18)
+
+The current account/code/verification and durable replay contract is
+[007 status and guard](../../007-required-pairing/contracts/status-and-guard.md),
+confirmed against mono `b4ebd5b0f0408775bcb4f3701f85fde1f43c682e`.
+New server implementation has focused tests/typecheck; database concurrency and
+real-account/deployment verification remain pending ticket 07. Earlier dated
+verification below describes the historical bridge, not these new routes.
+
+Signed-in `/home/pair` issues/renews via same-origin session-authenticated
+`POST /pairing-code` -> 200 `{code,expires_at}` (15 minutes), 401/403/503.
+`POST /pair` -> 200 `{install_token,harness_id,bridge_url}`; 400 malformed,
+404 unknown/expired/used/superseded, 429 throttle, 503 service failure. Redemption
+is transactional. Codes establish owned account linkage, never payment eligibility.
+`GET /verify` -> 200 `{status:'accepted',harness_id}`, 401 missing/invalid/revoked,
+503 service failure; no-store and no writes, including no contact/version marks.
+Require returned identity to match the folder; malformed 200 is server_error,
+identity mismatch invalid; network failure unreachable. Never use nudges as a check.
+
+## Transport rules
 
 - Base URL: `sharing.bridge_url` (from the welcome pack; canonical value
   `https://www.dailypractice.world/api/bridge`).
@@ -26,9 +45,13 @@ checklist is resolved at the bottom.
   written on any auth failure.
 - Radio-on gate before any call: `sharing.status_signal_enabled` AND `bridge_url` AND
   `harness_id` AND a token from one of the places above (or a cloud run, where it is
-  attached outside the machine). Anything less → silent local no-op, exit 0.
-- Failures never retry automatically and never block local work.
-- No PII in any payload: no message content, no KB content, no prospect data — ever.
+  attached outside the machine). Anything less pauses supported work outside valid migration grace; report labels
+  remain durable locally. Explicit words/artifacts retain per-item consent.
+- Required supported work passes fresh verification and durable outbox delivery first,
+  except valid one-time existing-user grace. Recovery remains available. Operational
+  reports are written ahead and replayed with original identity under the shared lock.
+- No PII or client-authored words in ambient operational payloads: no message content,
+  KB content or prospect data. Explicit send/reply/contribute are separately consented tiers.
   The server enforces a best-effort tripwire (PII-shaped key names and email-shaped
   values are rejected with 400) on top of this promise, not instead of it.
 
@@ -48,7 +71,7 @@ under "What a work signal carries", below.
 
 - **`occurred_at` is the server's field name** (not `sent_at`) and is required — a full
   ISO 8601 datetime, not date-only, not future beyond ~5 min clock skew. It anchors the
-  server's replay-idempotence key `(harness, signal_type, occurred_at, routine)` — the
+  server's replay-idempotence key `(harness, signal_type, occurred_at, routine, asset, tag)` — the
   routine label joined the key with agent teams (11 Aug 2026), so same-second shifts
   from different agents are distinct rows; signals with no routine label match only
   rows that also have none. Re-sending the same signal is answered
@@ -131,8 +154,8 @@ still waiting on a yes never touch the radio. Plain-words mirror: `docs/radio.md
 | `task_completed` | a task the client set in a session is finished: they have the thing they asked for, or the action is taken. Not a named moment (each of those keeps its own, more specific type) and never chat. Requires `payload.tag` + `payload.count` (at least 1); may name what ran with `routine` and the asset fields | the last step of the task → `status/done.mjs` → `radio.mjs signal` |
 | `routine_completed` | a hired agent's shift completes: work its schedule started (a clock or a handoff, not a person). The standing yes was given once, at hire, on the job sheet naming the schedule and its report (`agent-anatomy.md`). Since 1.1.0 the supervised first run at hire is a `task_completed`, not a shift. A wiring test still arrives as `routine_completed`, because the schedule fired it: the shift-log marker (`auto:` / `auto-test:`), not the type, tells a test from the real thing. Requires `payload.routine` + `payload.count` (0 is allowed); may carry `tag` and the asset fields. The replay key includes the routine label so same-second shifts from different agents stay distinct rows | the shift's own report step → `status/done.mjs --shift` → `radio.mjs signal` |
 
-On surfaces that can't run commands, agent-rule signals are skipped silently — same
-posture as the session-start radio check (`AGENTS.md` rule 2).
+Website-only/paste-only surfaces cannot execute the required guard and are no longer
+supported install or work paths. Use a supported local runtime.
 
 ## Door 2 — `GET {bridge_url}/nudges` — the mailbox
 

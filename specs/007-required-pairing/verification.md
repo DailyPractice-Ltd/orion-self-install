@@ -51,7 +51,7 @@ On 2026-11-18, using existing Node v26.9.0 with no dependency installation:
 - `node tests/helpers/pristine.mjs --write` regenerated candidate fingerprints
   after release edits and the source commit; the full suite's freshness check passed.
   Final evidence-only commits do not ship to client folders. Regeneration after
-  those commits is required to confirm the registry remains unchanged.
+  those commits confirmed the registry remained unchanged.
 
 The full suite includes new-install failure/success and saved-exchange interruption;
 key secrecy and ordinary/homed/environment/cloud credential variants; legacy paired,

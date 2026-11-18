@@ -4,13 +4,18 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** implemented; database integration verification pending
 
-- [ ] Confirm the current server's code issuance, exchange, authentication, account ownership, and event replay contracts before changing the client; record the findings with the feature.
-- [ ] Provide a signed-in page that issues a code, shows its expiry, and offers renewal without support intervention. Enforce account ownership on the server, including accounts without an existing harness.
-- [ ] Preserve the existing short-code format, single-use exchange, and server-derived harness identity unless current server evidence requires a documented change.
-- [ ] Provide an authenticated, side-effect-free verification route. Do not consume messages, mark them read, update activity, or count work merely by verifying.
-- [ ] Distinguish accepted credentials, invalid or revoked credentials, and server errors; do not misclassify a database failure as invalid credentials. Document network failure handling for callers.
-- [ ] Never show an install token in the page, logs, or error output, or ask a user to paste one. Return it only through the existing credential exchange.
+- [x] Confirm the current server's code issuance, exchange, authentication, account ownership, and event replay contracts before changing the client; record the findings with the feature.
+- [x] Provide a signed-in page that issues a code, shows its expiry, and offers renewal without support intervention. Enforce account ownership on the server, including accounts without an existing harness.
+- [x] Preserve the existing short-code format, single-use exchange, and server-derived harness identity unless current server evidence requires a documented change.
+- [x] Provide an authenticated, side-effect-free verification route. Do not consume messages, mark them read, update activity, or count work merely by verifying.
+- [x] Distinguish accepted credentials, invalid or revoked credentials, and server errors; do not misclassify a database failure as invalid credentials. Document network failure handling for callers.
+- [x] Never show an install token in the page, logs, or error output, or ask a user to paste one. Return it only through the existing credential exchange.
 - [ ] Test authentication and account isolation, expiry, renewal, malformed/expired/reused codes, concurrent redemption, successful verification, revoked credentials, and server failure.
-- [ ] Update the monorepo bridge contracts alongside server changes. Make all monorepo changes on `feature/required-pairing`.
+- [x] Update the monorepo bridge contracts alongside server changes. Make all monorepo changes on `feature/required-pairing`.
+
+Evidence: mono `b4ebd5b`; 20 focused HTTP/component tests passed. Full server checks
+and the unexecuted database runner are recorded in [verification](../verification.md).
+The database coverage checkbox remains open until that runner executes; it does
+not prevent dependent client implementation against the established contract.

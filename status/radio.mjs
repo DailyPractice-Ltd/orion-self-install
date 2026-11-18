@@ -20,7 +20,7 @@
  *
  *   node status/radio.mjs library --install <slug> --yes
  *       Collect a skill Daily Practice has put on the radio (GET /library/<slug>),
- *       write its folder to the selected tool's skills directory, and report it to the shelf.
+ *       write its folder to your AI assistant's skills directory, and report it to the shelf.
  *       What the skill lists under "Fill at install" is filled from status.json
  *       as it lands (the business name, the agent's name); the rest is printed
  *       for the assistant to ask. Never overwrites a skill already there. Their

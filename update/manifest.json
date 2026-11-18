@@ -42,7 +42,6 @@
     "status/home.mjs",
     "status/memory.mjs",
     "status/radio.mjs",
-    "status/schedule.mjs",
     "status/send.mjs",
     "status/shapes.mjs",
     "status/status-schema.md",
@@ -60,7 +59,7 @@
     "status/waiting.md": "the client's list of messages waiting for them, rewritten by every run (since 1.5.0)",
     "status/shift-log.md": "the client's work history",
     "status/work-log.md": "the client's work history: one line per finished task they asked for (since 1.1.0)",
-    "status/shifts/": "the wake-up files written for this machine by status/schedule.mjs: full paths and schedules that only make sense here (since 1.2.0)",
+    "status/shifts/": "legacy wake-up files and schedule records specific to the original computer and folder",
     "memory/ (everything but README.md)": "the client's own memory — facts, logs, lessons, the index; an update improves the notebook's binding, never its pages",
     "agent/knowledge-base/01..07*.md": "the client's business, captured in their words",
     ".claude/agents/ (everything but nothing — the whole directory)": "the client's hired team; the roster README carries their rows",
@@ -79,7 +78,7 @@
     "n8n_wf02_imported"
   ],
   "deployment": {
-    "_contract": "Map every file under skills/ to the selected tool’s skills directory.",
+    "_contract": "Map every file under skills/ to the chosen AI assistant’s skills directory.",
     "tools": [
       "claude-code",
       "codex"
@@ -123,7 +122,6 @@
       "status/home.mjs",
       "status/memory.mjs",
       "status/radio.mjs",
-      "status/schedule.mjs",
       "status/send.mjs",
       "status/shapes.mjs",
       "status/status-schema.md",
@@ -926,7 +924,7 @@
     "ownership": {
       "release": "Install only into an absent destination. On update replace only when the destination fingerprint is a known shipped copy for this fingerprint_key; preserve and report edits and collisions. Back up before replacement or retirement.",
       "client-template": "Install only into an absent destination. Thereafter the destination belongs to the client; never refresh or retire personalized roster rows or job sheets.",
-      "unlisted": "Any destination absent from this selected-tool plan belongs to the client. Never write or retire it."
+      "unlisted": "Any destination absent from the deployment plan for this AI assistant belongs to the client. Never write or retire it."
     },
     "fingerprints": {
       "algorithm": "sha256-utf8-lf",

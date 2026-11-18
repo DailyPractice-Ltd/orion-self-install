@@ -26,8 +26,7 @@
  *              written anywhere.
  *   set-level  Writes the harness level (or, with --agent, the role's line on
  *              its job sheet), who set it and when; records the pacing caps
- *              once; re-renders every wired wake-up so the allowlist follows
- *              the level; and prints the one line the client hears.
+ *              once; and prints the one line the client hears.
  *   outcome    What happened after a decision: sent, failed, or left waiting.
  *   verdict    The client's yes or no on a waiting message: this is what the
  *              history factor reads.
@@ -37,16 +36,15 @@
  *              the per-agent files), backs up first, lists what it could not
  *              place, and writes the level when the status file has none.
  *
- * Dependency-free: node built-ins and status/shapes.mjs only.
+ * Uses Node built-ins and Orion's local modules.
  */
 import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync, copyFileSync, readdirSync, realpathSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   SEND_LEVELS, SEND_THRESHOLDS, SEND_CEILING, WAITING_SENTENCE, LEVEL_SENDS, LEVEL_WAITS, CONTENT_SHORT, HISTORY_DAYS,
-  RISK_MATRIX, SEND_TOOL, riskLabel, riskScore, lowestLevelFor, levelSends, labelProblem, countProblem,
+  RISK_MATRIX, riskLabel, riskScore, lowestLevelFor, levelSends, labelProblem, countProblem,
 } from './shapes.mjs';
-import { jobSheetSendRisk, jobSheetGoLive, jobSheetTools, rerender } from './schedule.mjs';
 import { runtimeLayout } from '../update/destination-resolver.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -99,12 +97,20 @@ function frontValue(lines, key) {
   return line.slice(key.length + 1).replace(/\s+#.*$/, '').trim().replace(/^["']|["']$/g, '');
 }
 
-/** The role's own send line and go-live flag, read the way the scheduler reads them; a name with no sheet is the harness's own agent. */
+/** Apply the send restrictions on existing job sheets. Missing fields use the legacy defaults. */
 function roleOf(name) {
   const path = join(FOLDER, jobRel(name));
   if (!existsSync(path)) return { sheet: null, sendRisk: 'harness', live: true };
   const text = readFileSync(path, 'utf8');
-  return { sheet: path, text, sendRisk: jobSheetSendRisk(text), live: jobSheetGoLive(text) };
+  const lines = frontmatter(text);
+  const sendRisk = frontValue(lines, 'send_risk')?.toLowerCase() ?? 'harness';
+  const goLive = frontValue(lines, 'go_live')?.toLowerCase() ?? 'true';
+  return {
+    sheet: path,
+    text,
+    sendRisk: ['harness', 'with the harness', 'on', 'true', 'yes'].includes(sendRisk) ? 'harness' : 'never',
+    live: ['true', 'yes', 'on'].includes(goLive),
+  };
 }
 
 function appendLog(line) {
@@ -343,32 +349,6 @@ function setSheetLine(text, key, value) {
   return `${front[1]}${lines.join(nl)}${front[3]}${text.slice(front[0].length)}`;
 }
 
-/** Every wired wake-up follows the level: re-render each one in place, so the next scheduled run follows with no re-wiring. */
-function rerenderShifts() {
-  const shifts = join(here, 'shifts');
-  if (!existsSync(shifts)) return [];
-  const done = [];
-  for (const f of readdirSync(shifts).filter((n) => n.endsWith('.json'))) {
-    const name = f.slice(0, -5);
-    const result = rerender({ folder: FOLDER, name });
-    if (result && result.written) done.push(name);
-    else if (result && result.problem) console.log(`The wake-up for ${name} was not re-rendered: ${result.problem}`);
-  }
-  return done;
-}
-
-/** A job sheet that allows all of Bash can send from the shell with nothing at the tool boundary: say so, once per sheet. */
-function bareShellWarnings() {
-  const agents = join(FOLDER, jobRoot());
-  if (!existsSync(agents)) return [];
-  const found = [];
-  for (const f of readdirSync(agents).filter((n) => n.endsWith('.md') && n !== 'README.md').sort()) {
-    const tools = jobSheetTools(readFileSync(join(agents, f), 'utf8')) || [];
-    if (tools.includes('Bash')) found.push(`${f.slice(0, -3)}'s job sheet allows all of Bash, which can send from the shell on its own: the level is the rule there, with nothing at the tool boundary.`);
-  }
-  return found;
-}
-
 function setLevel(rest) {
   const [what, ...more] = rest;
   const { flags, problems } = parseFlags(more, { values: ['agent', 'cap-email', 'cap-dm', 'cap-sms', 'by'] });
@@ -415,19 +395,13 @@ function setLevel(rest) {
     }
     const rewritten = setSheetLine(role.text, 'send_risk', word);
     if (rewritten === null) {
-      console.log(`The job sheet ${jobRel(flags.agent)} has no frontmatter block to write the line into. Add one (library/HIRING.md gives the template), then set it again. Nothing was written.`);
+      console.log(`Add a frontmatter block to ${jobRel(flags.agent)}, then set its send level again.`);
       return 1;
     }
     writeFileSync(role.sheet, rewritten);
     const levelNow = harnessLevel(status) ?? 'off';
     if (word === 'never') console.log(`${flags.agent} never sends. The rest of the harness is still at ${levelNow}.`);
     else console.log(`${flags.agent} now sends with the harness, at ${levelNow}${LEVEL_SENDS[levelNow] ? `: ${LEVEL_SENDS[levelNow]}` : ''}.`);
-    const tools = jobSheetTools(role.text) || [];
-    if (word === 'harness' && !tools.some((t) => SEND_TOOL.test(t.split('(')[0]) || t === 'Bash')) {
-      console.log('Its job sheet names no tool that sends, so on a scheduled shift its messages wait for you until a promotion adds one. In a session: "This assistant cannot send on its own. Every message waits for you here."');
-    }
-    for (const w of bareShellWarnings()) console.log(w);
-    for (const name of rerenderShifts()) console.log(`Re-rendered the wake-up for ${name}, so the next scheduled run follows this.`);
     return 0;
   }
 
@@ -456,8 +430,6 @@ function setLevel(rest) {
   if (level !== 'off' && status.checklist && status.checklist.connector_email_live === false) {
     console.log('No email connector is live yet, so nothing can send until one is. When it is, grant reading, drafting and sending in one go; if the grant turns out to be read and draft only, the words are: "Your Gmail connection can read and draft but not send. Re-authorise Gmail with send permission and the level will take effect."');
   }
-  for (const w of bareShellWarnings()) console.log(w);
-  for (const name of rerenderShifts()) console.log(`Re-rendered the wake-up for ${name}, so the next scheduled run follows this.`);
   return 0;
 }
 
@@ -586,13 +558,13 @@ export const RETIRED = [
     '- **Go-live**: until your human flips `go_live`, an agent reads and drafts only, and\n  sends nothing. Once live, its messages go or wait by the harness\'s risk level (rule 1).'],
   ['agent/adapters/claude-code.md',
     "- Nothing sends without explicit approval — a code-capable surface makes it *easier* to\n  accidentally automate past that gate (e.g. by piping a script's output straight into a\n  send call). Don't. Every send/write path still stops for a yes.",
-    '- Sending follows the risk level, and here the allowlist is a real tool boundary: a\n  scheduled shift is given the send tools on its job sheet only while the level allows\n  (`status/schedule.mjs`), and in a session rule 1 of the agent definition is the gate.\n  Never pipe anything into a send tool without the score line that allows it.'],
+    '- Sending follows rule 1 in the agent definition. The scheduled environment\'s connector\n  permissions also apply. If a send tool is missing or requires interactive approval,\n  leave the message waiting for the user.'],
   ['agent/adapters/claude.md',
     "approval gate is the agent's own non-negotiable rules (drafts only, explicit yes;\n  Article III), not the tool: connectors read and stage drafts; **sending stays the\n  client's own act, from their own Drafts folder** — the agent never instructs a tool\n  to send (agent-definition rule 1).",
     "gate is rule 1 of the agent definition, not the tool: every message is scored, goes\n  inside the client's risk level, and waits for them above it (agent-definition rule 1)."],
   ['agent/adapters/codex.md',
     "- Everything outbound still stages for the client's yes. A code-capable surface makes it\n  easier to automate past that gate; don't. Same rule as `claude-code.md`.",
-    "- Sending follows the risk level (rule 1 of the agent definition). Codex's headless run\n  loads no mail, Slack or calendar tool, so on Codex every message waits for the client\n  with that reason; there is no tool gate here, only the prompt and the script."],
+    '- Sending follows rule 1 in the agent definition. The scheduled environment\'s connector\n  permissions also apply. If a send tool is missing or requires interactive approval,\n  leave the message waiting for the user.'],
   ['agent/adapters/chatgpt.md',
     "gate is the agent's own rules — drafts only; sending stays the client's own act,\n   from their own Drafts folder, never the agent instructing a tool\n   (agent-definition rule 1).",
     'gate is rule 1 of the agent definition: every message is scored; a custom GPT\n   cannot send on its own, so here every message waits for the client\n   (agent-definition rule 1).'],
@@ -733,7 +705,6 @@ function migrate(rest) {
     console.log('Old rule still present, not a wording this script knows (left alone; set-level refuses until it is changed by hand):');
     for (const r of left) console.log(`  ${r.file}:${r.line}  ${r.text}`);
   }
-  for (const name of rerenderShifts()) console.log(`Re-rendered the wake-up for ${name}, so its next scheduled run follows the level with no re-wiring.`);
   return 0;
 }
 

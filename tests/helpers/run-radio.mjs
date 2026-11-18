@@ -48,7 +48,7 @@ export function runRadio(args, { reply, skill, writeSkill = writeRichSkill, stat
     mkdirSync(join(dir, 'update'));
     for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(updateDir, f), join(dir, 'update', f));
     writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
-      template_version: '1.2.1', selected_tool: 'claude-code',
+      template_version: '1.2.1', ai_assistant: 'claude-code',
       ...(status || {}),
       sharing: {
         status_signal_enabled: true,

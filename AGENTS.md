@@ -278,7 +278,7 @@ know why, just that the names are load-bearing; don't rename them.
 One Orion serves this business. It uses the connected tools and the same knowledge
 base, memory, and permissions across tasks. Add reusable procedures as skills.
 For "teach Orion" or an equivalent request, follow the `create-skill` procedure
-from the selected tool's skills directory. The [README](README.md) lists the built-in skills.
+from your AI assistant's skills directory. The [README](README.md) lists the built-in skills.
 
 For recurring work, follow `docs/scheduled-work.md` and use Codex scheduled tasks
 or Claude Routines. If a legacy prompt requests a roster or job sheet run, refer
@@ -303,7 +303,7 @@ for an update. In Claude Code and Codex, the same procedure is available as
    `node status/radio.mjs library --install <slug>`. With no `--yes` that command only
    shows what the skill is, what it needs, and where it would go. Tell the client that
    in your own plain words, and run it again with `--yes` only if they want it. It
-   writes the skill's folder under the selected tool's skills directory, never overwrites a skill
+   writes the skill's folder under your AI assistant's skills directory, never overwrites a skill
    they already have, and reports the shelf itself. Then smoke-test it on something
    real after filling any remaining placeholders. Record a successful smoke test in
    `status/status.json` under `packages.<slug>` with its kind, version, install date,

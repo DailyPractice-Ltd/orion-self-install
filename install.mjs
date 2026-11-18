@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-/** Create a separate, selected-tool client repository from this release. */
+/** Create a separate client repository for the chosen AI assistant from this release. */
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, copyFileSync, existsSync, lstatSync, readdirSync, renameSync, rmdirSync, rmSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve, relative, sep, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { planForTool, fingerprint, safePath } from './update/destination-resolver.mjs';
+import { LEGACY_AI_ASSISTANT_KEY, recordedAiAssistant } from './status/shapes.mjs';
 
 const release = dirname(fileURLToPath(import.meta.url));
 const usage = 'Usage: node install.mjs --tool <claude-code|codex> --target <new client folder> [--migrate-from <legacy checkout>] [--github-repo OWNER/NAME | --remote https://github.com/OWNER/NAME.git | --local-only]';
@@ -53,7 +54,7 @@ function install() {
     // Record the choice before copying any release file into the staged harness.
     mkdirSync(join(stage, 'status'));
     const status = JSON.parse(readFileSync(join(release, 'status/status.schema-template.json'), 'utf8'));
-    status.selected_tool = tool;
+    status.ai_assistant = tool;
     writeFileSync(join(stage, 'status/status.json'), JSON.stringify(status, null, 2) + '\n');
     for (const entry of plan) {
       const destination = join(stage, entry.destination);
@@ -64,8 +65,9 @@ function install() {
       const oldStatusPath=join(migration,'status/status.json');
       if(!existsSync(oldStatusPath)) throw new Error('Legacy checkout has no status/status.json');
       const oldStatus=JSON.parse(readFileSync(oldStatusPath,'utf8'));
-      if(oldStatus.selected_tool && oldStatus.selected_tool!==tool) throw new Error('Legacy selected_tool differs; migrate with its current tool, then switch.');
-      if(!oldStatus.selected_tool && tool!=='claude-code') throw new Error('Legacy layout without selected_tool requires --tool claude-code.');
+      const oldAssistant=recordedAiAssistant(oldStatus);
+      if(oldAssistant!=null && oldAssistant!==tool) throw new Error('Migrate with the AI assistant recorded in the legacy status, then switch.');
+      if(oldAssistant==null && tool!=='claude-code') throw new Error('Legacy layout without a recorded AI assistant requires --tool claude-code.');
       const pristine=JSON.parse(readFileSync(join(release,'update/pristine.json'),'utf8'));
       const planned=new Map(plan.map(entry=>[entry.destination,entry]));
       const excluded=['.git','.github','.codex','node_modules','install.mjs','n8n','.specify','update/scaffold',...(tool==='codex'?['team']:[]),...manifest.deployment.release_only.filter(path=>!path.includes('*')).map(path=>path.replace(/\/$/,'')),...(manifest.remove||[])];
@@ -137,7 +139,8 @@ function install() {
       oldStatus.scopes={...template.scopes,...oldStatus.scopes};
       oldStatus.memory={...template.memory,...oldStatus.memory};
       oldStatus.schema_version=template.schema_version;
-      oldStatus.selected_tool=tool;
+      oldStatus.ai_assistant=tool;
+      delete oldStatus[LEGACY_AI_ASSISTANT_KEY];
       oldStatus.template_version=manifest.template_version;
       oldStatus.home={enabled:false,branch:'main'};
       oldStatus.notes=[oldStatus.notes||'','Review any schedules in the original folder before replacing them with native scheduled tasks.'].filter(Boolean).join('\n');

@@ -4,8 +4,8 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, exis
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { destinationState, fingerprint, planForTool, selectedTool, safePath } from './destination-resolver.mjs';
-import { isOn } from '../status/schedule.mjs';
+import { LEGACY_AI_ASSISTANT_KEY } from '../status/shapes.mjs';
+import { destinationState, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
 
 const arg = name => { const i=process.argv.indexOf(name); return i<0 ? undefined : process.argv[i+1]; };
 const json = path => JSON.parse(readFileSync(path,'utf8'));
@@ -22,21 +22,6 @@ function sourceSnapshot(repo, commit) {
   execFileSync('tar',['-xf','-','-C',dir],{input:archive});
   return dir;
 }
-function legacySchedules(root) {
-  const dir = safe(root, 'status/shifts');
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir).filter(name => /^[A-Za-z0-9][A-Za-z0-9_-]*\.json$/.test(name)).map(file => {
-    const path = safe(root, `status/shifts/${file}`);
-    const name = file.slice(0, -5);
-    let record;
-    try { record = json(path); }
-    catch (error) { if (!(error instanceof SyntaxError)) throw error; }
-    const active = record?.os === process.platform
-      ? isOn(record, { uid: process.getuid?.() ?? 0 })
-      : null;
-    return { name, active };
-  });
-}
 
 function update(root,repo,commit) {
   recoverPendingUpdates(root);
@@ -45,12 +30,12 @@ function update(root,repo,commit) {
     const manifest=json(join(snapshot,'update/manifest.json'));
     const pristine=json(join(snapshot,'update/pristine.json'));
     const statusPath=safe(root,'status/status.json'), status=json(statusPath);
-    const tool=selectedTool(status,manifest.deployment);
+    const tool=resolveAiAssistant(status,manifest.deployment);
     if (newer(status.template_version,manifest.template_version)) throw new Error('Refusing to roll back the harness version');
     const plan=planForTool(manifest.deployment,tool,{releaseRoot:snapshot,root});
     const retired=(manifest.deployment.retired||[]).map(e=>({source:e.source,destination:e.destinations?.[tool]||e.destination,ownership:'release',fingerprint_key:e.sources?.[tool]||e.fingerprint_key||e.source}));
     const commonRetired=(manifest.remove||[]).map(path=>({source:path,destination:path,ownership:'release',fingerprint_key:path}));
-    const actions=[], report={from:status.template_version,to:manifest.template_version,commit,selected_tool:tool,refreshed:[],added:[],retired:[],kept:[],collisions:[]};
+    const actions=[], report={from:status.template_version,to:manifest.template_version,commit,ai_assistant:tool,refreshed:[],added:[],retired:[],kept:[],collisions:[]};
     for (const e of plan) {
       const dest=safe(root,e.destination), state=destinationState(root,e,pristine);
       if (state==='client-owned') {report.collisions.push(e.destination);continue;}
@@ -60,12 +45,6 @@ function update(root,repo,commit) {
       if (e.destination.endsWith('.mjs')) { const check=spawnSync(process.execPath,['--check',src],{encoding:'utf8'}); if(check.status!==0) throw new Error(`Invalid script ${e.source}: ${check.stderr}`); }
       if (state==='absent') actions.push({kind:'add',e,src,dest});
       else if (fingerprint(readFileSync(dest))!==fingerprint(readFileSync(src))) actions.push({kind:'replace',e,src,dest});
-    }
-    report.legacy_schedules = legacySchedules(root);
-    const running = report.legacy_schedules.filter(schedule => schedule.active);
-    if (running.length) {
-      const commands = running.map(({ name }) => `node status/schedule.mjs off --agent ${name}`).join('\n');
-      throw new Error(`Turn off active legacy computer schedules before upgrading:\n${commands}\nThen see docs/scheduled-work.md in the release.`);
     }
     const archiveLegacy = (oldPath, archive) => {
       const src = safe(root, oldPath), dest = safe(root, archive);
@@ -102,17 +81,20 @@ function update(root,repo,commit) {
     for (const [oldPath, archive] of archives) archiveLegacy(oldPath, archive);
     const checklistKeys = manifest.remove_status_checklist_keys || [];
     const hasRetiredChecklistKeys = checklistKeys.some(key => Object.hasOwn(status.checklist || {}, key));
-    if (status.template_version === manifest.template_version && !actions.length && !hasRetiredChecklistKeys) {
+    const renameAiAssistant = Object.hasOwn(status, LEGACY_AI_ASSISTANT_KEY);
+    if (status.template_version === manifest.template_version && !actions.length && !hasRetiredChecklistKeys && !renameAiAssistant) {
       return { ...report, up_to_date: true };
     }
     const stamp=new Date().toISOString().replace(/[:.]/g,'-');
     const backupRel=`.update-backup/${status.template_version}-${stamp}`;
     const backup=safe(root,backupRel); if(existsSync(backup)) throw new Error('Backup already exists');
     mkdirSync(backup,{recursive:true}); copyTo(statusPath,join(backup,'status/status.json'));
-    const journal={kind:'update',state:'pending',from:status.template_version,to:manifest.template_version,commit,selected_tool:tool,
+    const journal={kind:'update',state:'pending',from:status.template_version,to:manifest.template_version,commit,ai_assistant:tool,
       actions:actions.map(a=>({kind:a.kind,destination:a.e.destination,installed_hash:a.kind==='retire'?null:fingerprint(readFileSync(a.src)),prior_hash:a.kind==='add'?null:fingerprint(readFileSync(a.dest))})),
-      remove_status_checklist_keys:checklistKeys};
+      remove_status_checklist_keys:checklistKeys, renamed_ai_assistant:renameAiAssistant};
     for(const key of journal.remove_status_checklist_keys) delete status.checklist?.[key];
+    status.ai_assistant=tool;
+    delete status[LEGACY_AI_ASSISTANT_KEY];
     status.template_version=manifest.template_version;
     status.notes=[status.notes||'',`updated to ${manifest.template_version}; backup in ${backupRel}`].filter(Boolean).join('\n');
     const nextStatus=JSON.stringify(status,null,2)+'\n';
@@ -162,7 +144,7 @@ function switchTool(root,repo,commit,to,legacyTool) {
     const pristine=json(join(snapshot,'update/pristine.json'));
     const deployment=manifest.deployment;
     const statusPath=safe(root,'status/status.json'), status=json(statusPath);
-    const from=selectedTool(status,deployment,{legacyTool});
+    const from=resolveAiAssistant(status,deployment,{legacyTool});
     if (status.template_version !== manifest.template_version ||
         !existsSync(safe(root,'update/manifest.json')) ||
         fingerprint(readFileSync(safe(root,'update/manifest.json'))) !== fingerprint(readFileSync(safe(snapshot,'update/manifest.json')))) {
@@ -177,7 +159,7 @@ function switchTool(root,repo,commit,to,legacyTool) {
     if (!deployment.tools.includes(to) || to===from) throw new Error(`Choose the other supported tool (current: ${from})`);
     const sourcePlan=planForTool(deployment,from,{releaseRoot:snapshot,root});
     const targetPlan=planForTool(deployment,to,{releaseRoot:snapshot,root});
-    const actions=[], retire=[], invalidated=[];
+    const actions=[], retire=[];
     const targetPaths=new Set();
     const add=(destination,source,kind='copy') => {
       safe(root,destination);
@@ -236,9 +218,6 @@ function switchTool(root,repo,commit,to,legacyTool) {
     const oldSkill=from==='codex'?'.agents/skills':'.claude/skills';
     const newSkill=to==='codex'?'.agents/skills':'.claude/skills';
     portable(oldSkill,newSkill);
-    for (const schedule of legacySchedules(root)) {
-      if (schedule.active) throw new Error(`Schedule ${schedule.name} is active; run node status/schedule.mjs off --agent ${schedule.name} first`);
-    }
     // Stage expected bytes and all backups before touching the deployed tree.
     const stamp=new Date().toISOString().replace(/[:.]/g,'-');
     const backupRel=`.update-backup/switch-${from}-to-${to}-${stamp}`;
@@ -250,7 +229,7 @@ function switchTool(root,repo,commit,to,legacyTool) {
     }
     const retired=[...new Set(retire)];
     for(const destination of retired) copyTo(safe(root,destination),join(backup,'files',destination));
-    const journal={kind:'switch',state:'pending',from,to,actions:actions.map(a=>({destination:a.destination,kind:a.kind||'copy',hash:fingerprint(readFileSync(join(backup,'stage',a.destination))),prior_hash:a.kind==='replace'?fingerprint(readFileSync(join(backup,'files',a.destination))):null})),retire:retired,invalidated};
+    const journal={kind:'switch',state:'pending',from,to,actions:actions.map(a=>({destination:a.destination,kind:a.kind||'copy',hash:fingerprint(readFileSync(join(backup,'stage',a.destination))),prior_hash:a.kind==='replace'?fingerprint(readFileSync(join(backup,'files',a.destination))):null})),retire:retired};
     writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
     try {
       let count=0;
@@ -263,12 +242,13 @@ function switchTool(root,repo,commit,to,legacyTool) {
       for(const destination of retired) rmSync(safe(root,destination));
       pruneEmpty(safe(root,oldSkill));
       pruneEmpty(safe(root,from==='codex'?'.agents':'.claude'));
-      status.selected_tool=to;
+      status.ai_assistant=to;
+      delete status[LEGACY_AI_ASSISTANT_KEY];
       status.notes=[status.notes||'',`switched from ${from} to ${to}; backup in ${backupRel}`].filter(Boolean).join('\n');
       writeFileSync(statusPath,JSON.stringify(status,null,2)+'\n');
       journal.state='complete';
       writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
-      return {from,to,backup:backupRel,installed:journal.actions.map(a=>a.destination),retired,invalidated_schedules:invalidated};
+      return {from,to,backup:backupRel,installed:journal.actions.map(a=>a.destination),retired};
     } catch(error) {
       rollbackSwitch(root,backup,journal);
       journal.state='recovered';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
@@ -382,6 +362,14 @@ function restore(root,backupRel) {
     }
   }
   for(const key of journal.remove_status_checklist_keys) if(Object.hasOwn(old.checklist||{},key)) {status.checklist ||= {};status.checklist[key]=old.checklist[key];}
+  if (journal.renamed_ai_assistant) {
+    if (Object.hasOwn(old, 'ai_assistant')) {
+      status[LEGACY_AI_ASSISTANT_KEY] = old[LEGACY_AI_ASSISTANT_KEY];
+    } else {
+      status[LEGACY_AI_ASSISTANT_KEY] = status.ai_assistant ?? old[LEGACY_AI_ASSISTANT_KEY];
+      delete status.ai_assistant;
+    }
+  }
   status.template_version=old.template_version;
   status.notes=[status.notes||'',`restored from ${backupRel}`].filter(Boolean).join('\n');
   writeFileSync(statusPath,JSON.stringify(status,null,2)+'\n');

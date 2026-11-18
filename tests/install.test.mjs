@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { LEGACY_AI_ASSISTANT_KEY } from '../status/shapes.mjs';
 
 const release = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -17,7 +18,7 @@ for (const tool of ['claude-code', 'codex']) {
     const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', target], { encoding: 'utf8' });
     assert.equal(run.status, 0, run.stderr);
     const read = (path) => readFileSync(join(target, path), 'utf8');
-    assert.equal(JSON.parse(read('status/status.json')).selected_tool, tool);
+    assert.equal(JSON.parse(read('status/status.json')).ai_assistant, tool);
     assert.ok(existsSync(join(target, 'AGENTS.md')));
     const skillRoot = tool === 'codex' ? '.agents/skills' : '.claude/skills';
     for (const name of ['prospecting', 'call-planner', 'friday-report', 'memory-consolidation', 'prospect-research-outreach', 'post-call-debrief']) {
@@ -37,7 +38,7 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(JSON.parse(read('status/status.json')).schema_version, '2.0.0');
     const second = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', target, '--local-only'], { encoding: 'utf8' });
     assert.notEqual(second.status, 0);
-    assert.equal(JSON.parse(read('status/status.json')).selected_tool, tool);
+    assert.equal(JSON.parse(read('status/status.json')).ai_assistant, tool);
   });
 }
 
@@ -85,7 +86,7 @@ test('legacy migration carries personal work into a separate deployed repository
   const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','claude-code','--target',target,'--migrate-from',legacy,'--local-only'],{encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);
   const read=path=>readFileSync(join(target,path),'utf8');
-  assert.equal(JSON.parse(read('status/status.json')).selected_tool,'claude-code');
+  assert.equal(JSON.parse(read('status/status.json')).ai_assistant,'claude-code');
   assert.equal(read('status/work-log.md'),'sold to client\n');
   assert.equal(read('status/radio.key'),'private-key\n');
   assert.equal(existsSync(join(target,'status/shifts')),false);
@@ -102,17 +103,20 @@ test('legacy migration carries personal work into a separate deployed repository
   assert.equal(existsSync(join(target,'.claude/skills/speckit-plan/SKILL.md')),false);
   assert.equal(JSON.parse(read('status/status.json')).schema_version,'2.0.0');
 
-  assert.equal(readFileSync(join(legacy,'status/status.json'),'utf8').includes('selected_tool'),false);
+  assert.equal(readFileSync(join(legacy,'status/status.json'),'utf8').includes('ai_assistant'),false);
 });
 
 test('Codex migration preserves legacy team jobs in place', t => {
   const base=mkdtempSync(join(tmpdir(),'orion-codex-migrate-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
   const legacy=join(base,'legacy'),target=join(base,'client');mkdirSync(legacy);
   const put=(path,body)=>{const full=join(legacy,path);mkdirSync(dirname(full),{recursive:true});writeFileSync(full,body);};
-  put('status/status.json',JSON.stringify({template_version:'2.0.0',selected_tool:'codex'}));
+  put('status/status.json',JSON.stringify({template_version:'2.0.0',[LEGACY_AI_ASSISTANT_KEY]:'codex'}));
   put('team/README.md','my roster\n');put('team/writer.md','my job\n');
   const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','codex','--target',target,'--migrate-from',legacy,'--local-only'],{encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);
+  const migrated = JSON.parse(readFileSync(join(target, 'status/status.json'), 'utf8'));
+  assert.equal(migrated.ai_assistant, 'codex');
+  assert.equal(Object.hasOwn(migrated, LEGACY_AI_ASSISTANT_KEY), false);
   assert.equal(readFileSync(join(target,'team/README.md'),'utf8'),'my roster\n');
   assert.equal(readFileSync(join(target,'team/writer.md'),'utf8'),'my job\n');
   assert.equal(existsSync(join(target,'agents')),false);

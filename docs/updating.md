@@ -22,26 +22,25 @@ git -C "$scratch/source" show "$commit:update/manifest.json"
 Read the pinned `docs/updating.md` and follow its apply instructions. If the
 source version is older than the installed version, report both versions and
 stop. If the fetch fails in Codex, see the [network instructions](../agent/adapters/codex.md).
-If status has no selected tool, use [the migration procedure](#older-same-path-folders)
-for the separate deployed layout.
+Use [the migration procedure](#older-same-path-folders) for a separate deployed layout
+if status has no recorded AI assistant. The updater saves the assistant recorded by
+older installs under `ai_assistant`.
 
 ## Apply the pinned update
 
 Use the pinned source's file helper to apply its manifest and fingerprints
-to the tool recorded in the deployed status file.
+to the AI assistant recorded in the deployed status file.
 
 ```sh
 node "$scratch/source/update/apply.mjs" update --root "$harness" --commit "$commit"
 ```
 
-The helper uses the selected tool's deployment allowlist. A file the client has changed is kept
+The helper uses the deployment allowlist for your AI assistant. A file the client has changed is kept
 and reported. The runtime scripts under `status/` are refreshed together, and
 `update/pristine.json` is refreshed with the source fingerprints. The helper backs up
 replaced and retired files, retires listed files that match shipped fingerprints,
 checks the incoming scripts and records the version after applying the update.
 On the same version it reports an up-to-date result when there is no work.
-If it reports active legacy computer schedules, follow the
-[schedule migration instructions](scheduled-work.md#migrate-a-legacy-schedule).
 
 When upgrading a harness that predates the 1.5.0 sending rule, run
 `node status/send.mjs migrate` as described in [AGENTS.md](../AGENTS.md).
@@ -50,7 +49,7 @@ If the radio is on, check it with
 any replaced edited runtime scripts and the backup path. Remove the temporary
 source checkout after the operation.
 
-## Switch the selected tool
+## Switch AI assistants
 
 Use the pinned source with `switch` as the operation:
 
@@ -66,13 +65,12 @@ Use the pinned source with `switch` as the operation:
 )
 ```
 
-Use `--to claude-code` to move the other way. For an older Claude harness with no
-`selected_tool`, add `--legacy-tool claude-code` to migrate it explicitly. The switch
+Use `--to claude-code` to move the other way. For an older Claude harness with no recorded
+AI assistant, add `--legacy-tool claude-code` to migrate it explicitly. The switch
 requires the harness version, manifest, and common runtime scripts to match the pinned
 release. Run the pinned update command above first if it reports an older version.
 The switch backs up, stages and validates the new skill layout, then records the new
-selection. Active legacy computer schedules must be turned off first. Review native
-tasks in the scheduler before switching. The switch reports
+selection. Review your scheduled tasks in the app that owns them before switching. The switch reports
 its backup. If interrupted, run the pinned release script with `recover --root "$PWD"`
 before trying again. The temporary checkout is removed automatically.
 
@@ -93,7 +91,7 @@ new-layout edits that conflict must be handled first. Keep the backup for audit.
 ## Older same-path folders
 
 Older folders that used the release checkout as their business folder must first be
-migrated into a separate deployed repository with an explicit selected tool. From a
+migrated into a separate deployed repository for an explicitly chosen AI assistant. From a
 fresh release checkout, run:
 
 ```sh

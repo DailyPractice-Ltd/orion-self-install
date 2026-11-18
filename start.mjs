@@ -50,6 +50,7 @@ import {
   keyHeader,
   homeOn,
   RADIO_KEY_FILE,
+  recordedAiAssistant,
 } from './status/shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -472,8 +473,9 @@ async function main() {
   const mp = status.machine_profile;
   // A new deployed harness has already made the one tool choice at install.
   // Keep the wizard's handoff aligned with the recorded runtime layout.
-  if (!mp.chosen_surface && ['claude-code', 'codex'].includes(status.selected_tool)) {
-    mp.chosen_surface = status.selected_tool;
+  const assistant = recordedAiAssistant(status);
+  if (!mp.chosen_surface && ['claude-code', 'codex'].includes(assistant)) {
+    mp.chosen_surface = assistant;
     save(status);
   }
   if (!mp.chosen_surface) {

@@ -54,7 +54,7 @@ test('release contract plans one selected runtime from portable sources', (t) =>
 test('release contract rejects an unsupported tool and keeps historical ownership hashes', () => {
   const run = spawnSync(process.execPath, [join(repo, 'update/release-contract.mjs'), '--tool', 'chatgpt'], { encoding: 'utf8' });
   assert.notEqual(run.status, 0);
-  assert.match(run.stderr, /selected tool/i);
+  assert.match(run.stderr, /AI assistant/i);
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
   assert.deepEqual(manifest.deployment.tools, ['claude-code', 'codex']);
   const pristine = JSON.parse(readFileSync(join(repo, 'update/pristine.json'), 'utf8'));

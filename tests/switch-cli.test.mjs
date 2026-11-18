@@ -24,7 +24,7 @@ function fixture(t, from='claude-code') {
   const commit=execFileSync('git',['rev-parse','HEAD'],{cwd:release,encoding:'utf8'}).trim();
   const skill=from==='codex'?'.agents/skills':'.claude/skills', job=from==='codex'?'agents':'.claude/agents';
   put(client,'update/manifest.json',JSON.stringify(manifest));
-  put(client,'status/status.json',JSON.stringify({template_version:'2.0.0',selected_tool:from,notes:'keep'}));
+  put(client,'status/status.json',JSON.stringify({template_version:'2.0.0',ai_assistant:from,notes:'keep'}));
   put(client,`${skill}/foo/SKILL.md`,'old foo\n');put(client,`${skill}/bar/SKILL.md`,'my edited bar\n');put(client,`${skill}/custom/SKILL.md`,'my skill\n');
   put(client,`${skill}/speckit-plan/SKILL.md`,'maintainer only\n');
   put(client,`${job}/README.md`,'my roster rows\n');put(client,`${job}/writer.md`,'my job\n');
@@ -35,36 +35,37 @@ function fixture(t, from='claude-code') {
 for (const from of ['claude-code','codex']) test(`switch ${from} preserves client work and legacy schedule records`,t=>{
   const h=fixture(t,from);const result=run({},'switch','--root',h.client,'--release-repo',h.release,'--commit',h.commit,'--to',h.to);
   assert.equal(result.status,0,result.stderr);const report=JSON.parse(result.stdout);
-  assert.equal(JSON.parse(get(h.client,'status/status.json')).selected_tool,h.to);
+  assert.equal(JSON.parse(get(h.client,'status/status.json')).ai_assistant,h.to);
   assert.equal(get(h.client,`${h.targetSkill}/foo/SKILL.md`),'new foo\n');assert.equal(existsSync(join(h.client,`${h.skill}/foo/SKILL.md`)),false);
   assert.equal(get(h.client,`${h.targetSkill}/bar/SKILL.md`),'my edited bar\n');assert.equal(existsSync(join(h.client,`${h.skill}/bar/SKILL.md`)),false);
   assert.equal(get(h.client,`${h.targetSkill}/custom/SKILL.md`),'my skill\n');assert.equal(get(h.client,`${h.job}/README.md`),'my roster rows\n');assert.equal(get(h.client,`${h.job}/writer.md`),'my job\n');
   assert.equal(existsSync(join(h.client,`${h.targetSkill}/speckit-plan/SKILL.md`)),false);
   for(const old of [`${h.skill}/custom/SKILL.md`,`${h.skill}/speckit-plan/SKILL.md`]) assert.equal(existsSync(join(h.client,old)),false,old);
   assert.equal(get(h.client,`${report.backup}/files/${h.skill}/speckit-plan/SKILL.md`),'maintainer only\n');
-  assert.equal(get(h.client,'status/shift-log.md'),'old log\n');assert.ok(existsSync(join(h.client,'status/shifts/writer.json')));assert.deepEqual(report.invalidated_schedules, []);
+  assert.equal(get(h.client,'status/shift-log.md'),'old log\n');
+  assert.ok(existsSync(join(h.client,'status/shifts/writer.json')));
   assert.ok(existsSync(join(h.client,'status/shifts/writer.sh')));assert.equal(get(h.client,'status/shifts/writer.log'),'old run log\n');
 });
 
 test('legacy migration requires explicit source and collision preflight leaves client unchanged',t=>{
-  const h=fixture(t);const status=JSON.parse(get(h.client,'status/status.json'));delete status.selected_tool;put(h.client,'status/status.json',JSON.stringify(status));
+  const h=fixture(t);const status=JSON.parse(get(h.client,'status/status.json'));delete status.ai_assistant;put(h.client,'status/status.json',JSON.stringify(status));
   assert.notEqual(run({},'switch','--root',h.client,'--release-repo',h.release,'--commit',h.commit,'--to','codex').status,0);
   put(h.client,'.agents/skills/foo/SKILL.md','collision\n');
-  const blocked=run({},'switch','--root',h.client,'--release-repo',h.release,'--commit',h.commit,'--to','codex','--legacy-tool','claude-code');assert.notEqual(blocked.status,0);assert.equal(get(h.client,'.claude/skills/foo/SKILL.md'),'old foo\n');assert.equal(JSON.parse(get(h.client,'status/status.json')).selected_tool,undefined);
+  const blocked=run({},'switch','--root',h.client,'--release-repo',h.release,'--commit',h.commit,'--to','codex','--legacy-tool','claude-code');assert.notEqual(blocked.status,0);assert.equal(get(h.client,'.claude/skills/foo/SKILL.md'),'old foo\n');assert.equal(JSON.parse(get(h.client,'status/status.json')).ai_assistant,undefined);
   rmSync(join(h.client,'.agents'),{recursive:true});
   const migrated=run({},'switch','--root',h.client,'--release-repo',h.release,'--commit',h.commit,'--to','codex','--legacy-tool','claude-code');assert.equal(migrated.status,0,migrated.stderr);
 });
 
 test('failed install rolls back all writes and selection',t=>{
   const h=fixture(t);const result=run({ORION_SWITCH_FAIL_AFTER:'2'},'switch','--root',h.client,'--release-repo',h.release,'--commit',h.commit,'--to','codex');assert.notEqual(result.status,0);
-  assert.equal(JSON.parse(get(h.client,'status/status.json')).selected_tool,'claude-code');assert.equal(get(h.client,'.claude/skills/foo/SKILL.md'),'old foo\n');assert.equal(existsSync(join(h.client,'.agents/skills/foo/SKILL.md')),false);assert.ok(existsSync(join(h.client,'status/shifts/writer.json')));
+  assert.equal(JSON.parse(get(h.client,'status/status.json')).ai_assistant,'claude-code');assert.equal(get(h.client,'.claude/skills/foo/SKILL.md'),'old foo\n');assert.equal(existsSync(join(h.client,'.agents/skills/foo/SKILL.md')),false);assert.ok(existsSync(join(h.client,'status/shifts/writer.json')));
 });
 
 test('completed switch can be restored with its roster, schedules and status',t=>{
   const h=fixture(t);const switched=run({},'switch','--root',h.client,'--release-repo',h.release,'--commit',h.commit,'--to','codex');assert.equal(switched.status,0,switched.stderr);
   const backup=JSON.parse(switched.stdout).backup;
   const restored=run({},'restore','--root',h.client,'--backup',backup);assert.equal(restored.status,0,restored.stderr);
-  assert.equal(JSON.parse(get(h.client,'status/status.json')).selected_tool,'claude-code');
+  assert.equal(JSON.parse(get(h.client,'status/status.json')).ai_assistant,'claude-code');
   assert.equal(get(h.client,'.claude/skills/foo/SKILL.md'),'old foo\n');
   assert.equal(get(h.client,'.claude/agents/README.md'),'my roster rows\n');
   assert.equal(get(h.client,'.claude/skills/bar/SKILL.md'),'my edited bar\n');
@@ -79,7 +80,7 @@ test('an interrupted switch journal is recovered before another switch',t=>{
   const journalPath=join(h.client,backup,'journal.json');const journal=JSON.parse(readFileSync(journalPath,'utf8'));
   journal.state='pending';writeFileSync(journalPath,JSON.stringify(journal));
   const recovered=run({},'recover','--root',h.client);assert.equal(recovered.status,0,recovered.stderr);
-  assert.equal(JSON.parse(get(h.client,'status/status.json')).selected_tool,'claude-code');
+  assert.equal(JSON.parse(get(h.client,'status/status.json')).ai_assistant,'claude-code');
   assert.equal(get(h.client,'.claude/skills/foo/SKILL.md'),'old foo\n');
   assert.equal(existsSync(join(h.client,'.agents/skills/foo/SKILL.md')),false);
 });

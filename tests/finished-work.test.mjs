@@ -75,7 +75,7 @@ function makeHarness(t, { sharing = {}, status = {}, unreachable = false, refuse
   }
   if (!noStatus) {
     writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
-      ...BASE_PAYLOAD, selected_tool: 'claude-code',
+      ...BASE_PAYLOAD, ai_assistant: 'claude-code',
       agent_name: 'Neo',
       memory: { enabled: true, backend: 'folder', remote: null, path: 'memory' },
       ...status,

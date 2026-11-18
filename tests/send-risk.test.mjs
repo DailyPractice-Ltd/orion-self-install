@@ -1,8 +1,7 @@
 /**
  * Send Risk (spec 007, K16): every message is scored 0 to 100, the client sets one
  * level, and a message inside the level sends on its own. These tests drive the
- * things the agent itself drives: the scheduler's allowlist, and the send
- * script's command line on a scratch harness.
+ * send script's command line on a scratch harness.
  *
  *   node --test tests/send-risk.test.mjs
  */
@@ -13,72 +12,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { unattendedRunner, PROMPT_SLOT, WAITING_SENTENCE, RISK_MATRIX, FACTOR_WORDS, SEND_THRESHOLDS, SEND_CEILING, HISTORY_DAYS, LEVEL_SENDS } from '../status/shapes.mjs';
-import { shiftPrompt } from '../status/schedule.mjs';
+import { WAITING_SENTENCE, RISK_MATRIX, FACTOR_WORDS, SEND_THRESHOLDS, SEND_CEILING, HISTORY_DAYS, LEVEL_SENDS, LEGACY_AI_ASSISTANT_KEY } from '../status/shapes.mjs';
 import { RULE_ONE, RETIRED, retiredRe } from '../status/send.mjs';
 import { runRadio } from './helpers/run-radio.mjs';
 import { pathToFileURL } from 'node:url';
 import { plainEnv } from './helpers/env.mjs';
-import { jobSheetTools, jobSheetCrmWrite, jobSheetSendRisk, allowedTools, SHIFT_TOOLS } from '../status/schedule.mjs';
-import { dontAsk, GMAIL_SEND, GMAIL_REPLY, GMAIL_FORWARD, GMAIL_DRAFT, GMAIL_SEARCH, SLACK_SEND, SLACK_DRAFT, HUBSPOT_WRITE, GCAL_CREATE, GCAL_LIST } from './helpers/dont-ask.mjs';
-
-const sheet = ({ tools, sendRisk } = {}) => `---
-name: follow-up
-tools: ${tools ?? `Read, ${GMAIL_SEARCH}, ${GMAIL_DRAFT}, ${GMAIL_SEND}, ${GMAIL_REPLY}, ${SLACK_SEND}, ${HUBSPOT_WRITE}, ${GCAL_CREATE}, ${GCAL_LIST}`}
-go_live: true
-crm_write: standing${sendRisk === undefined ? '' : `\nsend_risk: ${sendRisk}`}
-schedule: "weekdays 07:00 local"
----
-# Follow-up
-`;
-
-function shiftTools(text, level) {
-  const runner = unattendedRunner('claude-code', {
-    tools: allowedTools(jobSheetTools(text), { crmWrite: jobSheetCrmWrite(text), sendRisk: level }),
-  });
-  return runner.args[runner.args.indexOf('--allowedTools') + 1];
-}
-
-// ── Seam 2: the unattended allowlist follows the level ───────────────────────
-
-test('at a level that sends, the job sheet\'s send tools pass through by their real names, and a draft tool was never in question', () => {
-  for (const level of ['low', 'medium', 'high']) {
-    const tools = shiftTools(sheet(), level);
-    for (const t of [GMAIL_SEND, GMAIL_REPLY, SLACK_SEND, GMAIL_DRAFT, GMAIL_SEARCH, HUBSPOT_WRITE, GCAL_CREATE, GCAL_LIST]) {
-      assert.equal(dontAsk(tools, t), 'runs', `${t} at ${level}`);
-    }
-    assert.equal(dontAsk(tools, 'Bash', 'node status/send.mjs score --agent follow-up --channel email'), 'runs', 'the shift can score its messages');
-  }
-});
-
-test('with the level off, every send tool is filtered out and the rest of the sheet stands', () => {
-  const tools = shiftTools(sheet(), 'off');
-  for (const t of [GMAIL_SEND, GMAIL_REPLY, GMAIL_FORWARD, SLACK_SEND, GCAL_CREATE]) assert.equal(dontAsk(tools, t), 'refused', `${t}: a calendar invite to an outside person is a message too`);
-  for (const t of [GMAIL_DRAFT, GMAIL_SEARCH, HUBSPOT_WRITE, GCAL_LIST]) assert.equal(dontAsk(tools, t), 'runs', t);
-  assert.equal(dontAsk(tools, SLACK_DRAFT), 'refused', 'a tool the sheet never named is never added');
-});
-
-test('a role whose line says never is filtered the same way, whatever the harness level', () => {
-  assert.equal(jobSheetSendRisk(sheet({ sendRisk: 'never' })), 'never');
-  const tools = shiftTools(sheet(), 'never');
-  assert.equal(dontAsk(tools, GMAIL_SEND), 'refused');
-  assert.equal(dontAsk(tools, GMAIL_DRAFT), 'runs');
-});
-
-test('the scheduler never adds a send tool the sheet does not name', () => {
-  const tools = shiftTools(sheet({ tools: `Read, ${GMAIL_SEARCH}` }), 'high');
-  for (const t of [GMAIL_SEND, GMAIL_REPLY, GMAIL_FORWARD, SLACK_SEND, SLACK_DRAFT]) assert.equal(dontAsk(tools, t), 'refused', t);
-  assert.ok(!SHIFT_TOOLS.some((t) => /send_message|reply|forward/i.test(t)));
-});
-
-test('the role line is read the way people write it, and fails closed', () => {
-  for (const [value, want] of [[undefined, 'harness'], ['harness', 'harness'], ['"harness"', 'harness'], ['with the harness', 'harness'], ['on', 'harness'], ['never', 'never'], ['off', 'never'], ['no', 'never'], ['staged', 'never'], ['Harness # since hire', 'harness'], ['nevre', 'never']]) {
-    assert.equal(jobSheetSendRisk(sheet({ sendRisk: value })), want, String(value));
-  }
-});
-
-// ── Seam 1: the send script's command line on a scratch harness ─────────────
-
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** A harness folder with the real scripts in it, one level, and one hired agent. */
@@ -95,10 +33,10 @@ function makeHarness(t, { level = 'low', sheetExtra = '', status = {}, tool = 'c
   }
   const scopes = level === null ? { crm_write: true } : { crm_write: true, send_risk: level, send_risk_set_by: 'Priya', send_risk_set_on: '2026-11-01' };
   writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
-    template_version: '1.5.0', selected_tool: tool, agent_name: 'Orion', business_name: 'Northwind', client_name: 'Priya',
+    template_version: '1.5.0', ai_assistant: tool, agent_name: 'Orion', business_name: 'Northwind', client_name: 'Priya',
     scopes, sharing: { status_signal_enabled: false }, ...status,
   }, null, 2));
-  writeFileSync(join(dir, jobRoot, 'follow-up.md'), `---\nname: follow-up\ntools: Read, ${GMAIL_SEARCH}, ${GMAIL_SEND}\ngo_live: true\ncrm_write: standing\n${sheetExtra}---\n# Follow-up\n`);
+  writeFileSync(join(dir, jobRoot, 'follow-up.md'), `---\nname: follow-up\ntools: Read, mcp__claude_ai_Gmail__search_threads, mcp__claude_ai_Gmail__send_message\ngo_live: true\ncrm_write: standing\n${sheetExtra}---\n# Follow-up\n`);
   const run = (...args) => {
     const r = spawnSync(process.execPath, [join(dir, 'status', 'send.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: plainEnv() });
     return { code: r.status, out: r.stdout + r.stderr };
@@ -301,35 +239,7 @@ test('set-level writes the record, says in one line what now sends, remembers th
   }
 });
 
-function seedLegacySchedule(h) {
-  const original = execFileSync('git', ['show', '77f8a99356ae52f5e9c71b00f78c7a29c1986461:status/schedule.mjs'], { cwd: ROOT });
-  const script = join(h.dir, 'status', 'legacy-schedule.mjs');
-  writeFileSync(script, original);
-  const wired = spawnSync(process.execPath, [script, 'wire', '--agent', 'follow-up',
-    '--surface', 'claude-code', '--at', '07:00', '--bin', process.execPath],
-  { cwd: h.dir, encoding: 'utf8', env: plainEnv() });
-  assert.equal(wired.status, 0, wired.stdout + wired.stderr);
-}
-
-test('set-level re-renders a wired wake-up in place, so the allowlist follows the level with no re-wiring', (t) => {
-  const h = makeHarness(t, { level: 'off' });
-  seedLegacySchedule(h);
-  const wakeUp = join(h.dir, 'status', 'shifts', process.platform === 'win32' ? 'follow-up.cmd' : 'follow-up.sh');
-  const before = readFileSync(wakeUp, 'utf8');
-  assert.ok(!before.includes(GMAIL_SEND), 'with the level off, the wired allowlist has no send tool');
-  assert.ok(before.includes(GMAIL_SEARCH));
-  const r = h.run('set-level', 'low');
-  assert.match(r.out, /Re-rendered the wake-up for follow-up/, r.out);
-  const after = readFileSync(wakeUp, 'utf8');
-  assert.ok(after.includes(GMAIL_SEND), 'the send tool is on the allowlist now');
-  assert.ok(after.includes(process.execPath) && after.includes('run the follow-up shift'), 'the rest of the wake-up is as it was');
-  const record = JSON.parse(readFileSync(join(h.dir, 'status', 'shifts', 'follow-up.json'), 'utf8'));
-  assert.deepEqual([record.agent, record.at, record.send_risk], ['follow-up', '07:00', 'low']);
-  h.run('set-level', 'never', '--agent', 'follow-up');
-  assert.ok(!readFileSync(wakeUp, 'utf8').includes(GMAIL_SEND), 'a role set apart loses the tool on the next run');
-});
-
-// ── Seam 1, continued: migrate on the released trees ─────────────────────────
+// ── Migrate on the released trees ─────────────────────────
 
 const haveTag = (tag) => spawnSync('git', ['rev-parse', '--verify', `${tag}^{commit}`], { cwd: ROOT }).status === 0;
 
@@ -353,14 +263,14 @@ function releasedHarness(t, tag, { hand = null } = {}) {
   writeFileSync(def, readFileSync(def, 'utf8').replaceAll('{{CLIENT_NAME}}', 'Priya').replaceAll('{{AGENT_NAME}}', 'Orion').replaceAll('{{CLIENT_BUSINESS}}', 'Northwind'));
   if (hand) writeFileSync(def, hand(readFileSync(def, 'utf8')));
   const status = JSON.parse(readFileSync(join(dir, 'status', 'status.schema-template.json'), 'utf8'));
-  Object.assign(status, { template_version: tag.slice(1), selected_tool: 'claude-code', business_name: 'Northwind', agent_name: 'Orion', client_name: 'Priya' });
+  Object.assign(status, { template_version: tag.slice(1), [LEGACY_AI_ASSISTANT_KEY]: 'claude-code', business_name: 'Northwind', agent_name: 'Orion', client_name: 'Priya' });
   writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify(status, null, 2));
   // A hired agent, written from that release's hiring template, with the client's own exception.
   mkdirSync(join(dir, '.claude', 'agents'), { recursive: true });
   writeFileSync(join(dir, '.claude', 'agents', 'inbox.md'), `---
 name: inbox
 description: Use when Priya asks for the morning inbox list. Lists the threads that need her. Lists and drafts only.
-tools: Read, ${GMAIL_SEARCH}, ${GMAIL_DRAFT}
+tools: Read, mcp__claude_ai_Gmail__search_threads, mcp__claude_ai_Gmail__create_draft
 status: hired
 go_live: false
 crm_write: standing
@@ -458,12 +368,6 @@ test('a hand-edited old rule is residue: migrate names it and leaves it, and set
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 const squash = (text) => text.replace(/\s+/g, ' ').trim();
 
-test('the runner\'s arguments are pinned: print mode under dontAsk with the allowlist, never bare mode (bare drops every connector, #63)', () => {
-  const r = unattendedRunner('claude-code', { tools: 'Read' });
-  assert.deepEqual(r.args, ['-p', PROMPT_SLOT, '--permission-mode', 'dontAsk', '--allowedTools', 'Read']);
-  assert.ok(!r.args.includes('--bare'));
-});
-
 test('tripwire: the plain-words matrix is the matrix in shapes.mjs, row for row', () => {
   const doc = read('agent/risk-matrix.md');
   const section = (heading) => {
@@ -532,13 +436,6 @@ test('tripwire: the retired sentences are gone from every file that enforces or 
   }
 });
 
-test('tripwire: the shift prompt is one line that names the level, and HIRING.md gives the same words', () => {
-  const prompt = shiftPrompt({ folder: '/x', name: 'debrief' });
-  assert.match(prompt, /write to the CRM where crm_write allows and report it, send only what the risk score allows at your send level and leave the rest waiting; ask no questions\.$/);
-  assert.doesNotMatch(prompt, /send nothing/);
-  assert.ok(!prompt.includes('\n'));
-});
-
 test('tripwire: the status template, the wizard, the manifest and the changelog carry the level', (t) => {
   const template = JSON.parse(read('status/status.schema-template.json'));
   assert.equal(template.scopes.send_risk, 'low');
@@ -595,10 +492,10 @@ test('tripwire: on a fresh 1.5.0 folder migrate has nothing to change and finds 
   writeFileSync(join(dir, 'tree.tar'), tar);
   execFileSync('tar', ['-xf', join(dir, 'tree.tar'), '-C', dir]);
   // The working tree's own copies, so an uncommitted edit is checked too.
-  for (const rel of ['AGENTS.md', 'agent/agent-definition.md', 'agent/adapters/claude-code.md', 'agent/adapters/claude.md', 'agent/adapters/codex.md', 'agent/adapters/chatgpt.md', 'agent/adapters/copilot.md', 'status/send.mjs', 'status/shapes.mjs', 'status/schedule.mjs', 'update/manifest.json', 'update/destination-resolver.mjs']) copyFileSync(join(ROOT, rel), join(dir, rel));
+  for (const rel of ['AGENTS.md', 'agent/agent-definition.md', 'agent/adapters/claude-code.md', 'agent/adapters/claude.md', 'agent/adapters/codex.md', 'agent/adapters/chatgpt.md', 'agent/adapters/copilot.md', 'status/send.mjs', 'status/shapes.mjs', 'update/manifest.json', 'update/destination-resolver.mjs']) copyFileSync(join(ROOT, rel), join(dir, rel));
   copyFileSync(join(dir, 'status', 'status.schema-template.json'), join(dir, 'status', 'status.json'));
   const freshStatus = JSON.parse(readFileSync(join(dir, 'status', 'status.json'), 'utf8'));
-  freshStatus.selected_tool = 'claude-code';
+  freshStatus.ai_assistant = 'claude-code';
   writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify(freshStatus));
   const run = (...args) => spawnSync(process.execPath, [join(dir, 'status', 'send.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: plainEnv() });
   const m = run('migrate');
@@ -608,31 +505,6 @@ test('tripwire: on a fresh 1.5.0 folder migrate has nothing to change and finds 
   const set = run('set-level', 'medium');
   assert.equal(set.status, 0, set.stdout + set.stderr);
   assert.match(set.stdout, /^Set to medium\./m);
-});
-
-test('set-level warns about a job sheet that allows all of Bash, whichever form is used, and re-renders a wake-up wired before 1.5.0', (t) => {
-  const h = makeHarness(t, { level: 'low' });
-  writeFileSync(join(h.dir, '.claude', 'agents', 'ops.md'), `---\nname: ops\ntools: Read, Bash\ngo_live: true\n---\n# Ops\n`);
-  const r = h.run('set-level', 'medium');
-  assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /ops[^\n]*allows all of Bash/, r.out);
-  // A shift wired by 1.4.x has no bin in its record: the wake-up file still says what was started.
-  seedLegacySchedule(h);
-  const recordPath = join(h.dir, 'status', 'shifts', 'follow-up.json');
-  const record = JSON.parse(readFileSync(recordPath, 'utf8'));
-  delete record.bin; delete record.node_dir; delete record.send_risk;
-  writeFileSync(recordPath, JSON.stringify(record, null, 2));
-  const wakeUp = join(h.dir, 'status', 'shifts', process.platform === 'win32' ? 'follow-up.cmd' : 'follow-up.sh');
-  writeFileSync(wakeUp, readFileSync(wakeUp, 'utf8').replace('send only what the risk score allows at your send level and leave the rest waiting', 'stage every message and send nothing'));
-  const again = h.run('set-level', 'low');
-  assert.match(again.out, /Re-rendered the wake-up for follow-up/, again.out);
-  assert.ok(readFileSync(wakeUp, 'utf8').includes('send only what the risk score allows'), 'the old prompt is gone from the wake-up');
-  assert.equal(JSON.parse(readFileSync(recordPath, 'utf8')).bin, process.execPath, 'the record learns its bin for next time');
-  // migrate re-renders too, so an update brings a wired shift along with no re-wiring.
-  writeFileSync(wakeUp, readFileSync(wakeUp, 'utf8').replace('send only what the risk score allows at your send level and leave the rest waiting', 'stage every message and send nothing'));
-  const m = h.run('migrate');
-  assert.match(m.out, /Re-rendered the wake-up for follow-up/, m.out);
-  assert.ok(readFileSync(wakeUp, 'utf8').includes('send only what the risk score allows'));
 });
 
 test('tripwire: the "waiting for you" words and the route sentences are in the agent definition, word for word', () => {

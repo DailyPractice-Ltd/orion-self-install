@@ -51,7 +51,7 @@ function journey(t, tool) {
 for (const tool of ['claude-code', 'codex']) {
   test(`${tool} deployed journey: runtime commands, pinned update, and restore`, t => {
     const { release, client } = journey(t, tool);
-    assert.equal(status(client).selected_tool, tool);
+    assert.equal(status(client).ai_assistant, tool);
     for (const forbidden of ['skills', 'tests', 'specs', tool === 'codex' ? '.claude' : '.agents', ...(tool === 'codex' ? [] : ['agents'])]) {
       assert.equal(existsSync(join(client, forbidden)), false, `${forbidden} in client`);
     }
@@ -59,10 +59,9 @@ for (const tool of ['claude-code', 'codex']) {
     put(client, `${jobs(tool)}/follow-up.md`, '---\nname: follow-up\ntools: Read\ngo_live: true\n---\n# Follow-up\n');
     ok(run(client, 'status/send.mjs', 'set-level', 'never', '--agent', 'follow-up'));
     assert.match(read(client, `${jobs(tool)}/follow-up.md`), /send_risk: never/);
-    const removed = run(client, 'status/schedule.mjs', 'wire', '--agent', 'follow-up');
-    assert.notEqual(removed.status, 0);
-    assert.match(removed.stdout, /Codex scheduled tasks or Claude Routines/);
-    assert.equal(existsSync(join(client, 'status/shifts/follow-up.json')), false);
+    const shiftRecord = 'status/shifts/follow-up.json';
+    const shiftHistory = JSON.stringify({ agent: 'follow-up', os: 'legacy-machine' });
+    put(client, shiftRecord, shiftHistory);
 
     const original = read(client, 'AGENTS.md');
     const edited = read(client, `${skill(tool)}/prospecting/SKILL.md`) + '\nClient note.\n';
@@ -107,6 +106,7 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(read(client, `${skill(tool)}/new-release/SKILL.md`), '# New release skill\n');
     assert.ok(report.kept.includes(`${skill(tool)}/prospecting/SKILL.md`));
     assert.ok(report.retired.includes(retiredPage));
+    assert.equal(read(client, shiftRecord), shiftHistory);
     assert.ok(report.retired.includes(retiredMeetingPackage));
     assert.equal(existsSync(join(client, 'library/skills')), false);
     assert.equal(read(client, `${report.backup}/files/${retiredMeetingPackage}`), oldMeetingPackage);
@@ -164,7 +164,7 @@ for (const tool of ['claude-code', 'codex']) {
     ], { cwd: client, encoding: 'utf8', env: plainEnv({ ORION_SWITCH_FAIL_AFTER: '1' }) });
     assert.notEqual(interrupted.status, 0);
     assert.match(interrupted.stderr, /Injected switch interruption/);
-    assert.equal(status(client).selected_tool, tool);
+    assert.equal(status(client).ai_assistant, tool);
     assert.equal(read(client, `${skill(tool)}/meeting-sizing/SKILL.md`).includes('Size the meeting'), true);
     assert.equal(existsSync(join(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`)), false);
 
@@ -172,14 +172,14 @@ for (const tool of ['claude-code', 'codex']) {
       '--release-repo', release, '--commit', commit, '--to', other(tool));
     ok(switched);
     const report = JSON.parse(switched.stdout);
-    assert.equal(status(client).selected_tool, other(tool));
+    assert.equal(status(client).ai_assistant, other(tool));
     assert.equal(existsSync(join(client, '.specify')), false);
     assert.match(read(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`), /Size the meeting/);
     assert.equal(existsSync(join(client, `${skill(tool)}/meeting-sizing/SKILL.md`)), false);
     assert.equal(existsSync(join(client, `${jobs(tool)}/follow-up.md`)), true);
     assert.equal(existsSync(join(client, `${jobs(other(tool))}/follow-up.md`)), false);
     ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
-    assert.equal(status(client).selected_tool, tool);
+    assert.equal(status(client).ai_assistant, tool);
     assert.equal(existsSync(join(client, '.specify')), false);
     assert.match(read(client, `${skill(tool)}/meeting-sizing/SKILL.md`), /Size the meeting/);
     assert.equal(existsSync(join(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`)), false);
@@ -188,12 +188,7 @@ for (const tool of ['claude-code', 'codex']) {
 
 for (const tool of ['claude-code', 'codex']) {
   test(`${tool} update retires shipped Spec Kit files and keeps client edits`, t => {
-    const base = mkdtempSync(join(tmpdir(), 'orion-retire-speckit-'));
-    t.after(() => rmSync(base, { recursive: true, force: true }));
-    const release = join(base, 'release');
-    const client = join(base, 'client');
-    git(base, 'clone', '-q', checkout, release);
-    ok(run(release, 'install.mjs', '--tool', tool, '--target', client, '--local-only'));
+    const { release, client } = journey(t, tool);
     const oldSkill = `${skill(tool)}/speckit-tasks/SKILL.md`;
     const editedSkill = `${skill(tool)}/speckit-plan/SKILL.md`;
     const historical = '77f8a99356ae52f5e9c71b00f78c7a29c1986461';

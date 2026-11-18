@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { LEGACY_AI_ASSISTANT_KEY } from '../status/shapes.mjs';
 
 const release = join(dirname(fileURLToPath(import.meta.url)), '..');
 const command = join(release, 'update/destination-resolver.mjs');
@@ -22,29 +23,30 @@ function run(root, ...args) {
 }
 
 test('recorded tool selects only its destinations and classifies absent files', (t) => {
-  const root = harness(t, { selected_tool: 'codex', machine_profile: { chosen_surface: 'claude-code' } });
+  const root = harness(t, { ai_assistant: 'codex', [LEGACY_AI_ASSISTANT_KEY]: 'claude-code', machine_profile: { chosen_surface: 'claude-code' } });
   const result = run(root);
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
-  assert.equal(plan.selected_tool, 'codex');
+  assert.equal(plan.ai_assistant, 'codex');
   assert.ok(plan.entries.some((e) => e.destination === '.agents/skills/prospecting/SKILL.md' && e.state === 'absent'));
   assert.ok(!plan.entries.some((e) => e.destination === 'agents/README.md'));
   assert.ok(plan.entries.every((e) => !e.destination.startsWith('.claude/')));
 });
 
+
 test('missing and invalid recorded selections fail instead of inferring a tool', (t) => {
   const root = harness(t, { machine_profile: { chosen_surface: 'codex' } });
   let result = run(root);
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /Missing status\.selected_tool/);
-  writeFileSync(join(root, 'status/status.json'), JSON.stringify({ selected_tool: 'chatgpt' }));
+  assert.match(result.stderr, /Missing status\.ai_assistant/);
+  writeFileSync(join(root, 'status/status.json'), JSON.stringify({ ai_assistant: 'chatgpt' }));
   result = run(root);
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /Invalid status\.selected_tool: chatgpt/);
+  assert.match(result.stderr, /Invalid status\.ai_assistant: chatgpt/);
 });
 
 test('ownership keeps edited release files and excludes the retired roster', (t) => {
-  const root = harness(t, { selected_tool: 'claude-code' });
+  const root = harness(t, { ai_assistant: 'claude-code' });
   for (const [source, destination] of [
     ['skills/prospecting/SKILL.md', '.claude/skills/prospecting/SKILL.md'],
     ['skills/create-skill/SKILL.md', '.claude/skills/create-skill/SKILL.md'],
@@ -66,7 +68,7 @@ test('legacy Claude layout requires an explicit migration choice', (t) => {
   let result = run(root, '--legacy-tool', 'claude-code');
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
-  assert.equal(plan.selected_tool, 'claude-code');
+  assert.equal(plan.ai_assistant, 'claude-code');
   assert.equal(plan.legacy_migration, true);
   assert.ok(plan.entries.some((e) => e.destination === '.claude/skills/prospecting/SKILL.md'));
   result = run(root, '--legacy-tool', 'codex');

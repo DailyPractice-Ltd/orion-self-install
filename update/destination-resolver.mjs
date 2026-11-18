@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { recordedAiAssistant } from '../status/shapes.mjs';
 
 const RELEASE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -28,15 +29,15 @@ export function safePath(root, path) {
   return target;
 }
 
-export function selectedTool(status, deployment, { legacyTool } = {}) {
-  const recorded = status?.selected_tool;
+export function resolveAiAssistant(status, deployment, { legacyTool } = {}) {
+  const recorded = recordedAiAssistant(status);
   if (recorded == null && legacyTool != null) {
     if (legacyTool !== 'claude-code') throw new Error('Legacy migration requires explicit --legacy-tool claude-code');
     return legacyTool;
   }
-  if (recorded == null) throw new Error('Missing status.selected_tool; use --legacy-tool claude-code only for an explicit legacy migration');
-  if (!deployment.tools.includes(recorded)) throw new Error(`Invalid status.selected_tool: ${recorded}`);
-  if (legacyTool != null) throw new Error('--legacy-tool applies only when status.selected_tool is missing');
+  if (recorded == null) throw new Error('Missing status.ai_assistant; use --legacy-tool claude-code only for an explicit legacy migration');
+  if (!deployment.tools.includes(recorded)) throw new Error(`Invalid status.ai_assistant: ${recorded}`);
+  if (legacyTool != null) throw new Error('--legacy-tool applies only when the status has no recorded AI assistant');
   return recorded;
 }
 
@@ -64,7 +65,7 @@ export function destinationState(root, entry, pristine) {
 
 /** The sole source-to-destination mapper for release and deployed harnesses. */
 export function planForTool(deployment, tool, { releaseRoot = RELEASE_ROOT, root } = {}) {
-  if (!deployment.tools.includes(tool)) throw new Error(`Unsupported selected tool: ${tool || '(missing)'}`);
+  if (!deployment.tools.includes(tool)) throw new Error(`Unsupported AI assistant: ${tool || '(missing)'}`);
   const skillRoot = join(releaseRoot, 'skills');
   const actualSkills = (existsSync(skillRoot) ? readdirSync(skillRoot, { recursive: true, withFileTypes: true }) : [])
     .filter(item => item.isFile())
@@ -98,16 +99,16 @@ export function resolveDestinations({ root, releaseRoot = RELEASE_ROOT, legacyTo
   const manifest = readJson(join(releaseRoot, 'update/manifest.json'), 'release manifest');
   const pristine = readJson(join(releaseRoot, 'update/pristine.json'), 'fingerprint registry');
   const status = readJson(join(root, 'status/status.json'), 'harness status');
-  const tool = selectedTool(status, manifest.deployment, { legacyTool });
+  const tool = resolveAiAssistant(status, manifest.deployment, { legacyTool });
   const entries = planForTool(manifest.deployment, tool, { releaseRoot, root });
-  return { selected_tool: tool, legacy_migration: status.selected_tool == null, entries: entries.map((entry) => ({ ...entry, state: destinationState(root, entry, pristine) })) };
+  return { ai_assistant: tool, legacy_migration: recordedAiAssistant(status) == null, entries: entries.map((entry) => ({ ...entry, state: destinationState(root, entry, pristine) })) };
 }
 
 /** Paths used by a running client harness, from its recorded tool and release map. */
 export function runtimeLayout(root, { legacyTool } = {}) {
   const manifest = readJson(join(root, 'update/manifest.json'), 'deployment manifest');
   const status = readJson(join(root, 'status/status.json'), 'harness status');
-  const tool = selectedTool(status, manifest.deployment, { legacyTool });
+  const tool = resolveAiAssistant(status, manifest.deployment, { legacyTool });
   const skill = manifest.deployment.entries.find((entry) => entry.source === 'skills/create-skill/SKILL.md');
   if (!skill?.destinations?.[tool]) throw new Error(`Missing runtime destinations for ${tool}`);
   const skillRoot = dirname(dirname(skill.destinations[tool]));

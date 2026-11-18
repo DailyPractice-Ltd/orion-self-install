@@ -67,6 +67,6 @@ Use Codex scheduled tasks for recurring Orion work. See [Schedule Orion](../../d
   every run. Keep one thread the client names once and append to it with
   `codex exec resume <name>`. Verified 4 November 2026; a Composio route for Gmail is its
   own later research.
-- Sending follows the risk level (rule 1 of the agent definition). Codex's headless run
-  loads no mail, Slack or calendar tool, so on Codex every message waits for the client
-  with that reason; there is no tool gate here, only the prompt and the script.
+- Sending follows rule 1 in the agent definition. The scheduled environment's connector
+  permissions also apply. If a send tool is missing or requires interactive approval,
+  leave the message waiting for the user.

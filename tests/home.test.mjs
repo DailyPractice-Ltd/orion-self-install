@@ -146,7 +146,7 @@ function makeFolder(t, { base = scratch(t), name = 'harness', sharing = {}, stat
     copyFileSync(join(statusDir, f), join(dir, 'status', f));
   }
   writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
-    template_version: '1.3.0', selected_tool: 'claude-code',
+    template_version: '1.3.0', ai_assistant: 'claude-code',
     agent_name: 'Neo',
     ops_stage: 'seven_day_checkin',
     harness_status: 'validated',

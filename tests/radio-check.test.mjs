@@ -102,7 +102,7 @@ function runRadio(args, { thread = { version: 1, messages: [] }, sharing = {}, s
     }
     writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
       template_version: '0.6.4',
-      selected_tool: tool,
+      ai_assistant: tool,
       sharing: {
         status_signal_enabled: true,
         bridge_url: 'https://radio.test/api/bridge',

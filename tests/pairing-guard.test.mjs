@@ -18,7 +18,7 @@ test('new install pauses without a verified connection and does not acquire lega
  assert.equal(status(root).sharing.pairing.migration_started_at,null);
 });
 const identity = '11111111-1111-1111-1111-111111111111';
-const token = 'orion_123456789012345678901234';
+const token = 'orion_' + '123456'.repeat(4);
 const paired = () => ({status_signal_enabled:true, bridge_url:'https://example.test/api/bridge',harness_id:identity,install_token:token});
 const accepted = async () => ({status:200,json:async()=>({status:'accepted',harness_id:identity})});
 test('accepted ordinary credential is freshly verified without side effects on every invocation', async t => {
@@ -115,7 +115,7 @@ test('homed, environment and cloud-attached credentials use established preceden
  delete process.env.ORION_INSTALL_TOKEN;delete process.env.ORION_CLOUD;
  const root=harness(t,{home:{enabled:true},sharing:{...paired(),install_token:null}});
  if(source==='key-file')writeFileSync(join(root,'status/radio.key'),token);
- if(source==='environment'){process.env.ORION_INSTALL_TOKEN=token;writeFileSync(join(root,'status/radio.key'),'orion_another12345678901234567890');}
+ if(source==='environment'){process.env.ORION_INSTALL_TOKEN=token;writeFileSync(join(root,'status/radio.key'),'orion_' + 'another'.repeat(4));}
  if(source==='attached')process.env.ORION_CLOUD='1';
  let headers;const fetchImpl=async(url,options)=>{headers=options.headers;return accepted();};
  assert.equal((await checkWork({root,now:at,fetchImpl})).allow,true);

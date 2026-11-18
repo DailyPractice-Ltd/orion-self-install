@@ -120,3 +120,24 @@ for (const scenario of ['checkpoint-malformed','checkpoint-refuse']) {
   assert.equal(JSON.parse(readFileSync(join(h.root,'status/radio-outbox.json'))).length,1);
  });
 }
+for (const selected of ['website-chat', 'chatgpt-app', 'claude-desktop']) {
+ test(`legacy ${selected} setup hands off only to its recorded supported tool`, t => {
+  const h=harness(t,{machine_profile:{chosen_surface:selected},business_name:'Saved business'});
+  const run=h.run(['--code','BCDF-GHJK-LMNP']);
+  assert.equal(run.status,0,run.stdout+run.stderr);
+  assert.equal(h.status().machine_profile.chosen_surface,'codex');
+  assert.equal(h.status().business_name,'Saved business');
+  assert.match(run.stdout,/typing  codex/);
+  assert.doesNotMatch(run.stdout,/attach the file|Create a Project|your AI.s website|paste status.status.json/);
+ });
+}
+
+test('legacy unsupported surface without a recorded tool requests only executable choices', t => {
+ const h=harness(t,{ai_assistant:null,machine_profile:{chosen_surface:'website-chat'},business_name:'Saved business'});
+ const run=h.run(['--code','BCDF-GHJK-LMNP']);
+ assert.equal(run.status,0,run.stdout+run.stderr);
+ assert.ok(['codex','claude-code'].includes(h.status().machine_profile.chosen_surface));
+ assert.equal(h.status().business_name,'Saved business');
+ assert.match(run.stdout,/Choose Codex or Claude Code/);
+ assert.doesNotMatch(run.stdout,/attach the file|Create a Project|your AI.s website|paste status.status.json/);
+});

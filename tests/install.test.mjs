@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
@@ -33,9 +33,27 @@ for (const tool of ['claude-code', 'codex']) {
       assert.equal(existsSync(join(target, path)), false, `${path} leaked into client`);
     }
     const wizard = spawnSync(process.execPath, [join(target, 'start.mjs'), '--checkins', 'no'], { encoding: 'utf8', input: '', cwd: target });
-    assert.equal(wizard.status, 0, wizard.stderr);
+    assert.equal(wizard.status, 2, wizard.stderr);
+    assert.doesNotMatch(wizard.stdout, /Step 3 of 3|Read AGENTS.md and/);
     assert.equal(JSON.parse(read('status/status.json')).machine_profile.chosen_surface, tool);
     assert.equal(JSON.parse(read('status/status.json')).schema_version, '2.0.0');
+    // Exercise the actual deployed wizard: all guard/report dependencies must ship.
+    const mock = join(base, 'pairing-fetch.mjs');
+    writeFileSync(mock, `globalThis.fetch = async url => {
+      const harness_id = '12345678-1234-1234-1234-123456789abc';
+      if (String(url).endsWith('/pair')) return Response.json({harness_id, install_token: 'orion_' + 'test'.repeat(6), bridge_url: 'https://radio.test/api/bridge'});
+      if (String(url).endsWith('/verify')) return Response.json({status: 'accepted', harness_id});
+      if (String(url).endsWith('/signals')) return Response.json({signal_id: 'setup-1', recorded_at: '2026-11-18T12:00:00.000Z', replay: false}, {status: 201});
+      throw new Error('Unexpected route');
+    };`);
+    const paired = spawnSync(process.execPath, ['--import', pathToFileURL(mock).href, join(target, 'start.mjs'), '--code', 'BCDF-GHJK-LMNP'], { encoding: 'utf8', input: '', cwd: target });
+    assert.equal(paired.status, 0, paired.stdout + paired.stderr);
+    assert.match(paired.stdout, /Step 3 of 3/);
+    const saved = JSON.parse(read('status/status.json'));
+    assert.equal(saved.sharing.pairing.state, 'verified');
+    assert.equal(saved.setup_checkpoint.delivered, true);
+    assert.equal(saved.machine_profile.chosen_surface, tool);
+
     const second = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', target, '--local-only'], { encoding: 'utf8' });
     assert.notEqual(second.status, 0);
     assert.equal(JSON.parse(read('status/status.json')).ai_assistant, tool);

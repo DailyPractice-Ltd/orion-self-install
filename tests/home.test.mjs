@@ -104,6 +104,7 @@ function folder(base, dir, { answer = 201 } = {}) {
       }) + '\\n');
       const answer = ${JSON.stringify(answer)};
       if (answer === 'unreachable') throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
+      if (u.pathname.endsWith('/verify')) return json(200, { status: 'accepted', harness_id: ${JSON.stringify(HARNESS_ID)} });
       if (u.pathname.endsWith('/pair')) {
         return json(200, { install_token: ${JSON.stringify(OTHER_KEY)}, harness_id: ${JSON.stringify(HARNESS_ID)}, bridge_url: 'https://radio.test/api/bridge' });
       }
@@ -719,7 +720,8 @@ test('pairing a folder that has a home puts the key in status/radio.key, never i
   for (const file of ['guard.mjs', 'store.mjs', 'report.mjs', 'status.schema-template.json']) copyFileSync(join(statusDir, file), join(h.dir, 'status', file));
   const r = h.run('start.mjs', ['--code', CODE]);
   assert.equal(r.code, 0, r.err);
-  assert.match(r.out, /Paired\. Your key is saved on this machine only, in status\/radio\.key/);
+  assert.match(r.out, /Pairing saved securely/);
+  assert.equal(h.status().sharing.pairing.state, 'verified');
   assert.ok(!r.out.includes(OTHER_KEY), 'the wizard never prints the key');
   assert.equal(h.status().sharing.install_token, null);
   assert.equal(h.status().sharing.harness_id, HARNESS_ID);
@@ -741,7 +743,9 @@ test('the wizard still writes the key to status.json on a folder with no home', 
   copyFileSync(join(repo, 'start.mjs'), join(h.dir, 'start.mjs'));
   for (const file of ['guard.mjs', 'store.mjs', 'report.mjs', 'status.schema-template.json']) copyFileSync(join(statusDir, file), join(h.dir, 'status', file));
   const r = h.run('start.mjs', ['--code', CODE]);
-  assert.match(r.out, /your key is saved in your own bookmark file/);
+  assert.equal(r.code, 0, r.out + r.err);
+  assert.match(r.out, /Pairing saved securely/);
+  assert.equal(h.status().sharing.pairing.state, 'verified');
   assert.equal(h.status().sharing.install_token, OTHER_KEY);
   assert.equal(h.exists('status/radio.key'), false);
   assert.deepEqual(h.status().home, { enabled: false, branch: 'main' }, 'an older bookmark gains the home block, switched off');

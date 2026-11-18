@@ -1,15 +1,20 @@
 # The radio — Orion's check-in with Daily Practice, in plain words
 
-Orion can keep a small two-way radio open with Daily Practice. This page is the
-whole story of what that means — what goes out, what comes in, how to say no, and what
-saying no changes (nothing else). It is the plain-words version of the constitution's
-Article V, channel 1; there is no fine print anywhere else.
+Orion uses a required two-way operational connection to Daily Practice. Pairing
+links your signed-in account to this folder and does not check payment. Failed
+connection checks pause supported work outside the one-time existing-user
+transition. This is constitution Article V, channel 1, in plain words.
+
+Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.
+
+[Setup and recovery](setup.md) covers code renewal, interrupted setup, the 30-day
+transition and paused-work recovery.
 
 ## What goes out, exactly
 
 Three tiers, by how your yes is given — and nothing besides:
 
-**Tier 1 — labels, on by default** (the check-in switch covers all of these at once):
+**Tier 1 — required operational labels** (unchanged by the pairing requirement):
 
 1. **"Here's which step I'm on"** — your install stage and a timestamp, so Daily
    Practice knows to check in if you seem stuck.
@@ -22,7 +27,8 @@ Three tiers, by how your yes is given — and nothing besides:
    the work, never who it was for.
 3. **"This machine now runs X"** — a Library install shares the package's name, kind,
    and version so Daily Practice knows whom to support when a package improves.
-4. **Which template version this folder is on** — stated on every radio call, so
+4. **Which template version this folder is on** — included with operational signals
+   and reporting/support-message call headers, so
    Daily Practice can tell whether an update reached you. A label about this folder,
    never about your work.
 5. **Messages arriving from Daily Practice** — the inbound half (see "What comes
@@ -84,7 +90,7 @@ radio never learns your level, the score, or who it was to.
 
 | Message | The one moment it fires | Sent by |
 |---|---|---|
-| "Here's which step I'm on" (`install_checkpoint`) | You accept check-ins in the wizard; your install moves to a new stage | The wizard / the status script — automatic |
+| "Here's which step I'm on" (`install_checkpoint`) | Verified setup finishes; your install moves to a new stage | The wizard / the status script — automatic |
 | "A task finished" (`task_completed`) | A task you set your AI is finished: you have the thing you asked for, or the action is taken. One message per finished task. A finished task did at least one thing, so its count is 1 or more | Your agent, as the last step of the task (`node status/done.mjs`), with a tag, a count, and the name of the skill or agent that ran, if one did |
 | "A run you approved" (`workflow_execution_completed`) | A multi-step run (like a prospect-research chain) finishes **and you approved its result** | Your agent, after your yes |
 | "Outreach approved" (`outreach_approved`) | You say "send it" to a message that was waiting for you (one above your risk level) | Your agent, right after your yes |
@@ -118,8 +124,8 @@ a token or a password, so one never lands in a log.
 ## What comes in
 
 Short plain-language messages from Daily Practice — think *"Your follow-up agent hasn't
-run in 6 days — want us to take a look?"*. At the start of a session, your AI checks the
-radio, reads anything waiting out loud, and asks what you'd like to do. **A reply is
+run in 6 days — want us to take a look?"*. After the pre-work guard allows a session, your AI checks the
+radio for support messages, reads anything waiting out loud, and asks what you'd like to do. **A reply is
 sent only when you say yes, in that conversation, and it's your words that go.** No
 reply happens on its own.
 
@@ -137,105 +143,70 @@ is sent anywhere to do this: it happens on your machine.
 Each message is read to you once. Your harness remembers what you have already heard,
 so nothing is repeated at the next session.
 
-## The choice, and how it's put to you
+## Pairing and the existing-user transition
 
-During Press Start (or the first conversation, if you skipped the wizard), you're asked
-once, in these words:
+Sign in at [Daily Practice](https://www.dailypractice.world/home/pair) and request
+or renew your one-time code. It has twelve consonants in three groups, such as
+`BCDF-GHJK-LMNP`, and expires in 15 minutes. Run `node start.mjs --code YOUR-CODE`
+in your installed folder. It exchanges the code, saves the credential, verifies
+that the server accepts this folder, and delivers the setup report before handoff.
+No code, failed verification or failed report leaves setup unfinished.
 
-> Your harness checks in with Daily Practice so we can support you and count your
-> system as running. It shares which step you're on, what kind of task finished (a
-> general tag such as "prospecting", a count, and which skill or agent ran), and
-> which packages you've installed. Never the content of your messages, your
-> knowledge base, or your prospects. You can switch this off. Keep check-ins on?
+Ordinary folders store the returned key in `sharing.install_token`; a homed folder
+uses machine-local `status/radio.key`, excluded from its home repository. Never
+print a key or any suffix. Environment and supported cloud-attached credentials
+still require a matching server check; local key shape is not proof of acceptance.
 
-"Running" has one meaning here: your harness reported finished work in the last 14
-days. Work you asked for in a session counts, and so does work Orion did on
-a schedule.
-
-The box is pre-ticked — most people keep it, and it's genuinely how we spot problems
-before you have to report them — and declining is one keystroke. Once you've answered,
-you're never asked again.
-
-## Saying no, now or later
-
-- **At the wizard**: answer `n` to "Keep check-ins on?" — done.
-- **Any time after**: open `status/status.json` (a plain text file in this folder) and
-  change `"status_signal_enabled": true` to `false`. That single edit silences the
-  radio entirely — every message in the table above, all three tiers, outbound and
-  inbound alike.
-
-**What changes when the radio is off: nothing else.** Every agent, skill, program,
-and validation task works identically. The only difference is that Daily Practice can't
-see your system running — so if you want help, you reach out first
-(support@dailypractice.world).
-
-## What the radio needs before it can transmit at all
-
-A **pairing code**, if Daily Practice has given you one — twelve letters in three
-groups, like `BCDF-GHJK-LMNP`. All letters, no vowels, no numbers, so there is no `0`
-that might be an `O` and no `1` that might be an `I`. Nobody hands you one automatically:
-if you're going solo, there's no code to wait for, and the radio just stays off.
-
-That code is the only thing you ever type, and typing it is the whole setup: your
-machine sends it to Daily Practice, gets your key back, and stores that key in your own
-`status/status.json` and nowhere else. (If your folder has been given a home of its own,
-a private repository that you control, the key is kept in `status/radio.key` instead,
-a file that is never saved to that home.) **The key does not exist until your machine asks
-for it** — so there is never a moment when whoever gave you the code is holding your
-key, or could paste it into a chat by mistake. The code works **once**, expires after
-**15 minutes**, and is worthless to anyone who sees it after that.
-
-No code yet (or the radio switched off) → nothing is ever sent, even if check-ins are
-"on," and nothing else about your install is affected. Ask Daily Practice for a fresh
-code any time — it takes two seconds, and the new one replaces the old.
-
-Your key can be cancelled by Daily Practice and reissued (say, if it ever leaked). When
-that happens the wizard notices by itself the next time you run it and simply asks for a
-new code. If the radio address doesn't answer, nothing is lost — Orion carries on
-and tries at the next natural moment.
+Older releases allowed a declined radio choice. Existing folders receive one
+30-day transition from their first updated run; the start and deadline are saved
+once and never reset. During valid grace, existing work can continue with a
+reminder, including while disconnected. Prior decline remains historical until
+explicit pairing. An enabled paired folder can satisfy the requirement without
+another code. At the exact deadline, or after pairing has already satisfied the
+transition, fresh accepted verification and delivered pending reports are required.
+A disabled radio pauses supported work outside that grace. Updating, inspection,
+diagnosis and re-pairing remain available. Website-only or paste-only chat cannot
+run the guard; open the same folder in Codex or Claude Code instead.
 
 ## If the radio can't get through
 
-The radio never blocks your work and never retries on its own — it says one plain line
-and gets out of the way. What each line means:
+Run `node status/guard.mjs check --quiet` before every interactive Orion session
+and scheduled run. Exit 0 permits work; exit 2 pauses tasks, outbound messages and
+CRM writes. The guard uses the side-effect-free `/verify` endpoint, not the
+support-message `/nudges` endpoint. A saved `verified` state is only history.
 
-| The line you see | What it means | What to do |
-|---|---|---|
-| "Radio quiet — no messages" | Everything works; nothing waiting | Nothing |
-| "Radio is off (or not configured)" | Check-ins are off, or pairing never happened | Your choice — run `node start.mjs` to pair if you want it on |
-| "The radio address didn't answer (…)" | The call left your machine and hit a wall — see below | One of the two fixes below |
-| "This assistant's sandbox is blocking the network, or this machine is offline (…)" | The address could not even be looked up: inside an AI assistant that is nearly always its sandbox, not the radio | Ask the assistant for network approval for the command (its adapter file says how) and run it again; off a sandbox, check the connection |
-| "that key isn't valid (401)" | Your key was revoked or replaced | Ask Daily Practice for a fresh pairing code |
-| "Radio check answered 4xx/5xx" | Reached Daily Practice, answered oddly | Nothing — it tries again next session |
+| Outcome | What to do |
+|---|---|
+| Accepted and no pending reports | Continue work; check support messages separately |
+| Invalid or revoked key | Renew your code and run `node start.mjs --code YOUR-CODE` |
+| Unreachable service | Restore the network, then rerun the guard |
+| Server error | Rerun the guard once service is restored; preserve saved state |
+| Pending reports or local state error | Follow [recovery](setup.md); keep the outbox and original identities |
 
-The command that reports a finished task (`node status/done.mjs`) calls the radio to
-do it, so it prints these same lines. With the radio off it prints nothing about the
-radio at all, and still writes your own line.
+If the assistant's sandbox blocks the network, approve the required command and
+retry. The [Codex adapter](../agent/adapters/codex.md) explains that surface. On a
+company network, ask IT to allow HTTPS to `www.dailypractice.world`. Outside valid
+grace, work remains paused until the guard succeeds.
 
-**"Didn't answer" has two usual causes:**
+A report can fail after an allowed task. The task still happened: `done.mjs` keeps
+its local work-log line, and the reporting helper writes its **labels and original
+event time** to `status/radio-outbox.json` before attempting delivery. The guard
+replays pending reports before new work outside grace. Retry preserves the original
+identity, and bridge deduplication prevents duplicate counts. Lost or malformed
+receipts keep the report pending; a successful connection alone never deletes it.
 
-1. **Codex's safety sandbox** (most common). Codex blocks network calls by default.
-   The one-time fix is in [`agent/adapters/codex.md`](../agent/adapters/codex.md):
-   `network_access = true` under `[sandbox_workspace_write]` in `~/.codex/config.toml`,
-   then prove it with one `check`.
-2. **A company network** (corporate laptops). Company proxies and security tools often
-   let your browser through but block command-line calls. Test: open
-   `https://www.dailypractice.world/api/bridge/nudges` in your browser — an ugly
-   technical error message means the address is reachable and the block is local to
-   commands; a company block page means the network itself is filtering. Either way the
-   ask for your IT team is one line: **allow HTTPS to `www.dailypractice.world`** — one
-   address, standard port, a small check-in API. Until then, everything local keeps
-   working, and your own records still get every line: the shift log for each
-   shift, the work log for each finished task. Under each one that could not be
-   reported, the script adds a line saying so, so nothing goes missing quietly.
+The queue contains only allowlisted signal and installed-package metadata: folder
+identity, event type/time, stage/status/template version, public tag, count, routine
+or skill/asset slug, kind/version and applicable enum labels. Package reports keep
+the original installation time and version. It never contains credentials, local
+work-log text, prospect names, client words, artifact content or a package's
+free-text purpose. Tier 2 messages and Tier 3 contributions remain separate explicit
+consent operations and never enter this operational queue. Corrupt data requires
+repair rather than deletion. See [setup](setup.md) for safe lock recovery.
 
-## If your AI can't run commands (website-chat lane)
-
-On a plain website chat there's no way for your AI to dial anywhere, so: the check-in
-choice is still put to you in the same words and recorded in the same file — and the
-radio simply doesn't get checked from your side. Daily Practice reaches you by
-ordinary email instead. Same choice, same respect for it, slower lane — you lose
-nothing except automation.
+“Running” means finished work was reported in the last 14 days; a connection check
+alone does not create activity. The requirement is a supported flow in editable
+local files and native AI prompts, not tamper-proof licensing.
 
 ## Not the same thing as the Intelligence Library
 

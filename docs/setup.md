@@ -1,17 +1,79 @@
-# Finishing setup
+# Pair Orion and recover the connection
 
 Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.
 
-Open [your pairing page](https://www.dailypractice.world/home/pair), sign in, and issue a code. In your installed Orion folder run:
+## Finish setup
 
-```sh
-node start.mjs --code <your-code>
-```
+Use an installed Orion folder in **Codex or Claude Code**, where the assistant can
+read and write its files and execute Node.js commands. Open the folder created by
+`node install.mjs --tool codex --target /path/to/my-orion` (or `--tool claude-code`).
+Run `node start.mjs` there. A plain website or paste-only chat cannot execute the
+required checks: open this same folder in one of those supported tools to continue.
 
-The code lasts 15 minutes and works once. The wizard saves your answers and the exchanged credential before checking that Daily Practice accepts this folder's connection. Setup finishes and prints the next prompt only after fresh verification. Old decline or skip flags cannot finish a new setup.
+1. Sign in at [Daily Practice pairing](https://www.dailypractice.world/home/pair).
+   Request a code. It works once and expires after 15 minutes; renew it there if needed.
+2. Enter that code when Press Start asks, or run `node start.mjs --code YOUR-CODE`.
+   The wizard saves the returned credential securely, then checks that Daily Practice
+   accepts this folder's identity. You never copy an install token.
+3. Setup finishes only after accepted verification and delivery of its setup report.
+   A blank, malformed, expired or used code, failed exchange, rejected verification,
+   or undelivered report keeps setup unfinished, with no day-to-day handoff.
+   Run `node start.mjs` again to resume saved answers. If an exchange succeeded but
+   its response was lost before saving, request a fresh code.
 
-If setup stops, run `node start.mjs` again. A saved credential is checked again without spending another code or asking your saved answers again. Missing, expired, used, or malformed codes need a new code from the pairing page. If the connection fails during exchange and no credential was saved, renew the code: the server might have used it before the reply arrived. If verification fails after exchange, restore the connection and rerun the wizard; the credential stays saved.
+Pairing links your account and folder; it does not check payment or subscription.
+The [radio guide](radio.md) explains exactly which operational labels are shared.
 
-A folder with a home saves the key only in machine-local `status/radio.key`; ordinary folders save it in `status/status.json`. Never paste either credential into chat. An interrupted process can leave the shared status lock: inspect `status/.radio-lock/owner.json` and establish that its PID on its named host has stopped before removing only that lock directory. Never remove an active or unknown owner’s lock or replace the saved status or report files.
+## Before work
 
-For direct conversational installation, use the explanation above verbatim and the same pairing page and wizard command. When scripts cannot run in the conversation, have the person run the command in their installed folder. An exchange reply, a stored pairing date, a plausible key, or a cloud environment alone does not establish successful setup. Do not start day-to-day work or hand off until the wizard reports verified success. Existing-user transition reminders permit their temporary work window; they do not certify a new setup as finished.
+At every interactive session and before every scheduled run, execute
+`node status/guard.mjs check --quiet` in this folder **before** Orion tasks,
+outbound messages or CRM writes. Exit 0 allows work; exit 2 pauses it. The check
+uses the read-only `/verify` endpoint, then delivers pending reports before allowing
+new work. A previous successful check or `state: verified` is not permission now.
+Check support messages separately with `node status/radio.mjs check` after allowance.
+Use the [native scheduling instructions](scheduled-work.md) for recurring tasks.
+
+## Existing folders: one 30-day transition
+
+An existing folder with recorded progress receives a one-time 30-day transition
+from its **first updated run**, saved before work. A pristine copied status file
+is a new install. The start and deadline survive restarts and updates; the clock
+does not reset. During valid grace, existing work may continue with a concise
+reminder, even when offline, while operational reports remain queued locally.
+An enabled, already paired folder can satisfy this transition by verification
+without a new code. A prior declined choice remains recorded until explicit pairing.
+
+At the exact deadline, or after migration has already been satisfied, enabled
+pairing, fresh acceptance and delivered pending reports are required. Invalid,
+partial or future clock state requires repair; it never creates more grace.
+
+## When work pauses
+
+- **No pairing or a rejected/revoked key:** sign in, renew the code and run
+  `node start.mjs --code YOUR-CODE` in this folder.
+- **The service cannot be reached:** restore the network, then rerun the guard.
+  If the assistant's sandbox blocked it, approve the required network command in
+  that tool. See the [Codex adapter](../agent/adapters/codex.md).
+- **Server error:** retry the guard once service is restored. Keep the saved state.
+- **Pending reports:** rerun the guard after recovery. It replays their original
+  event identities before allowing new work, so retries do not add duplicate counts.
+- **Local state or lock error:** preserve status and outbox files. For a stale lock,
+  inspect `status/.radio-lock/owner.json` and establish that its PID on its named
+  host has stopped before removing that lock directory. An old timestamp alone
+  does not establish this. Never remove an active or unknown owner's lock.
+
+Diagnosis, status inspection, updating, re-pairing and recovery remain available
+while work is paused. A failed report after an allowed task does not undo that work:
+its operational labels and original event time stay in `status/radio-outbox.json`,
+and subsequent work waits for recovery outside valid grace. Keep local work-log
+text, client messages and credentials out of that queue and all evidence.
+
+Ordinary folders hold the key in `sharing.install_token`; homed folders keep it in
+machine-local `status/radio.key` instead. Cloud credential attachment still needs
+matching server acceptance. Never print the key, even a suffix, or commit it to a home.
+The optional top-level `setup_checkpoint` preserves setup report identity and its
+delivery result; it is progress, never authorization.
+
+This is a supported-flow policy in an editable local folder. Scripts and native
+AI prompts are user-owned and cannot enforce tamper-proof licensing.

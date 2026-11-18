@@ -152,6 +152,50 @@
           }
         }
       }
+    },
+    "setup_checkpoint": {
+      "type": "object",
+      "description": "Optional client-owned resumable setup report identity; progress only, never work authorization. Written under shared status lock.",
+      "required": [
+        "harness_id",
+        "occurred_at",
+        "payload",
+        "delivered"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "harness_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "ops_stage",
+            "harness_status",
+            "template_version"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "ops_stage": {
+              "type": "string"
+            },
+            "harness_status": {
+              "type": "string"
+            },
+            "template_version": {
+              "type": "string"
+            }
+          }
+        },
+        "delivered": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }

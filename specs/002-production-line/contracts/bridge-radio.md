@@ -29,7 +29,7 @@ identity mismatch invalid; network failure unreachable. Never use nudges as a ch
 
 ## Transport rules
 
-- Base URL: `sharing.bridge_url` (from the welcome pack; canonical value
+- Base URL: `sharing.bridge_url` (from code exchange; canonical value
   `https://www.dailypractice.world/api/bridge`).
 - Auth: `Authorization: Bearer <sharing.install_token>` on every request. The token IS
   the harness identity server-side (SHA-256 hash-stored, revocable). 401 means the
@@ -81,7 +81,7 @@ under "What a work signal carries", below.
   harness's last-active heartbeat.
 - Eight `signal_type` values. Seven are accepted by the deployed server: the five
   in-session real-work types from the mono's `SignalType` union, plus
-  `install_checkpoint` (installer tooling only — wizard opt-in moment, ops-stage
+  `install_checkpoint` (installer tooling only — verified setup completion, ops-stage
   changes; deliberately distinct so install noise never counts as real work), plus
   `routine_completed` (a hired agent's shift: work it does on a schedule. "Routine"
   is only the wire name). The eighth, `task_completed`, arrives with template
@@ -145,7 +145,7 @@ still waiting on a yes never touch the radio. Plain-words mirror: `docs/radio.md
 
 | Type | Exact moment | Sender |
 |---|---|---|
-| `install_checkpoint` | wizard opt-in accepted; `ops_stage` transition | `start.mjs` / `emit-status.mjs` (wired, automatic) |
+| `install_checkpoint` | verified setup completion; allowed `ops_stage` transition | `start.mjs` / `emit-status.mjs` (wired, automatic) |
 | `workflow_execution_completed` | a multi-step run completes **after the client approved its result** (e.g. an approved research run; an agent package's approved run) | agent rule → `radio.mjs signal` |
 | `outreach_approved` | the client's explicit **yes** to a staged outreach draft, witnessed in conversation | agent rule → `radio.mjs signal` |
 | `outreach_rejected` | the client's explicit **no** to a staged outreach draft | agent rule → `radio.mjs signal` |
@@ -212,8 +212,9 @@ supported install or work paths. Use a supported local runtime.
 
 1. `install_checkpoint` → **accepted server-side** as a sixth type (mono 002a,
    migration `20260726000001_bridge_reconciliation.sql`).
-2. Response bodies → documented above per door; the client still treats any 2xx as
-   success and prints nothing sensitive.
+2. Response bodies → documented above per door. Current operational reporting requires
+   endpoint-specific parsed acknowledgment (ID, full timestamp and status-matching
+   replay boolean); a malformed or lost receipt retains the original envelope.
 3. Nudge field names → confirmed `id` / `body` / `created_at`, wrapped in a
    `{ "nudges": [...] }` envelope (the client's original bare-array assumption was
    wrong and is fixed in `radio.mjs`).

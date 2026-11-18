@@ -452,27 +452,27 @@ async function main() {
   // A new deployed harness has already made the one tool choice at install.
   // Keep the wizard's handoff aligned with the recorded runtime layout.
   const { ai_assistant } = status;
-  if (!mp.chosen_surface && ['claude-code', 'codex'].includes(ai_assistant)) {
+  if (mp.chosen_surface !== ai_assistant && ['claude-code', 'codex'].includes(ai_assistant)) {
     mp.chosen_surface = ai_assistant;
     await save(status);
   }
-  if (!mp.chosen_surface) {
-    if (surfaces.length === 0) {
-      mp.chosen_surface = 'website-chat';
-      say(`  ✓ Your lane: ${SURFACE_WORDS['website-chat']}.`);
-    } else if (surfaces.length === 1) {
-      mp.chosen_surface = surfaces[0];
-      say(`  ✓ Your lane: ${SURFACE_WORDS[surfaces[0]]} — the only AI tool found, so no need to ask.`);
+  if (!['claude-code', 'codex'].includes(mp.chosen_surface)) {
+    const supported = surfaces.filter(surface => ['claude-code', 'codex'].includes(surface));
+    const choices = supported.length ? supported : ['codex', 'claude-code'];
+    if (mp.chosen_surface) say('Your previous surface cannot run the required checks. Choose Codex or Claude Code to continue in this folder.');
+    if (choices.length === 1) {
+      mp.chosen_surface = choices[0];
+      say(`  ✓ Your lane: ${SURFACE_WORDS[choices[0]]} — the supported AI tool found.`);
     } else {
       say('');
       say('One question — the only one this machine can\'t answer for you:');
       say('');
       say('  Which of these should run Orion day to day?');
-      surfaces.forEach((s, i) => say(`    ${i + 1}) ${SURFACE_WORDS[s]}`));
+      choices.forEach((s, i) => say(`    ${i + 1}) ${SURFACE_WORDS[s]}`));
       say('');
       const answer = await ask('surface', '  Type a number and press Enter (or just Enter for 1): ', '1');
-      const idx = Math.min(Math.max(parseInt(answer || '1', 10) || 1, 1), surfaces.length) - 1;
-      mp.chosen_surface = surfaces[idx];
+      const idx = Math.min(Math.max(parseInt(answer || '1', 10) || 1, 1), choices.length) - 1;
+      mp.chosen_surface = choices[idx];
       say(`  ✓ Noted: ${SURFACE_WORDS[mp.chosen_surface]}.`);
     }
     await save(status);
@@ -610,7 +610,6 @@ async function sendFirstSignal() {
 /** The copy-ready prompt that starts the client's AI on the AGENTS.md sequence. */
 function printHandoff(surface) {
   const prompt = 'Read AGENTS.md and let\'s get started. Press Start has already run — my machine profile is saved in status/status.json, so don\'t re-ask anything it already answers.';
-  const promptChat = 'Read AGENTS.md and let\'s get started. Press Start has already run on my computer — I\'ll paste status/status.json whenever you need to check where we are.';
 
   say('');
   switch (surface) {
@@ -624,36 +623,8 @@ function printHandoff(surface) {
       say('by typing  codex  and pressing Enter, then paste this prompt:');
       box(prompt);
       break;
-    case 'cursor':
-      say('Open Cursor, use File → Open Folder… to open THIS folder, open its AI chat');
-      say('panel, and paste this prompt:');
-      box(prompt);
-      break;
-    case 'copilot-vscode':
-      say('Open VS Code, use File → Open Folder… to open THIS folder, open Copilot');
-      say('Chat, and paste this prompt:');
-      box(prompt);
-      break;
-    case 'claude-desktop':
-      say('Open the Claude app and click Code (near the top of the sidebar), then open');
-      say('THIS folder with its folder picker — the one you gave Orion as its home in');
-      say('README Step 2. Then paste this prompt:');
-      box(prompt);
-      say('');
-      say('(No Code tab in your Claude app? Create a Project instead — a chat space');
-      say('with its own memory — add the file AGENTS.md from this folder to it, and');
-      say('paste the same prompt. Both roads lead to the same place.)');
-      break;
-    case 'chatgpt-app':
-      say('Open ChatGPT and attach the file AGENTS.md from this folder to a new chat');
-      say('(or add it to a Project/GPT if your plan has those), then paste this');
-      say('prompt:');
-      box(promptChat);
-      break;
     default:
-      say('Go to your AI\'s website (claude.ai, chatgpt.com, or Copilot), follow');
-      say('README.md Step 4 to hand it the file AGENTS.md, then paste this prompt:');
-      box(promptChat);
+      say('Open this installed folder in Codex or Claude Code. See docs/setup.md.');
   }
   say('');
   say('(That prompt also lives in README.md, so you can copy it later without');

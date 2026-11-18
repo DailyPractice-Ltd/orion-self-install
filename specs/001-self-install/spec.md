@@ -4,10 +4,10 @@
 
 **Created**: 2026-07-12
 
-**Status**: Draft
+**Status**: Updated for required-pairing source candidate 3.0.0 (007; live verification pending)
 
 **Input**: A non-technical entrepreneur, salesperson, or go-to-market person clones or
-downloads this repository and, guided entirely by whatever AI assistant they already use —
+downloads this repository and, guided entirely by Codex or Claude Code —
 with no Daily Practice coach present — reaches a running, validated Orion install on their
 own machine and accounts.
 
@@ -22,8 +22,7 @@ own machine and accounts.
 
 ### User Story 1 — Meet Your Agent (Priority: P1)
 
-A client opens this repository with their own AI assistant (Claude, ChatGPT, Copilot, or a
-code-capable tool) and, through direct conversation with no coach relaying questions, has
+A client opens their installed folder with Codex or Claude Code after verified pairing and, through direct conversation with no coach relaying questions, has
 their business context, ICP and vocabulary, offer, sales motion, tone, objection library,
 and monthly commitments captured in their own words — and their personal Orion agent is
 assembled and named.
@@ -39,10 +38,10 @@ recognisably theirs.
 
 **Acceptance Scenarios**:
 
-1. **Given** a fresh clone of this repository, **When** the client opens it with a
-   supported AI assistant and says they're ready to start, **Then** the assistant reads
-   `AGENTS.md` and `status/status.json`, recognises this as a new install, and begins the
-   knowledge-base conversation — never dumping every question at once.
+1. **Given** a fresh installed folder, **When** setup achieves accepted matching
+   verification and setup report acknowledgment, **Then** the supported assistant
+   reads AGENTS and status, runs the fresh guard and begins knowledge-base capture
+   one question at a time. Missing/failed pairing keeps setup unfinished.
 2. **Given** an in-progress knowledge-base capture, **When** the client answers in their
    own vocabulary (not generic sales language), **Then** that vocabulary is what gets
    written into `agent/knowledge-base/02-icp-and-vocabulary.md`, not a paraphrase.
@@ -145,31 +144,17 @@ correctly identifying every already-completed step from `status/status.json` alo
 
 ### User Story 5 — Let Daily Practice Know You're Progressing (Priority: P4)
 
-As the client advances through the install, a local record of their stage exists, and —
-only if they've left the default-on, fully-disclosed status signal enabled — that stage is
-communicated outward, without the client ever holding a credential that could write to
-Daily Practice's own systems.
+As the client advances, status is recorded locally and required operational labels
+are sent through the authenticated bridge. The payload contains no business name,
+knowledge-base content, prospect data or message text. See the current
+[bridge contract](../002-production-line/contracts/bridge-radio.md) and
+[007 guard/outbox contract](../007-required-pairing/contracts/status-and-guard.md).
 
-**Why this priority**: Lowest priority because nothing in US1–US4 depends on it, and it is
-the one story whose consumer (a Daily-Practice-side board update) is explicitly out of
-scope for this repository's own build — this story only covers what the client's own copy
-of the repository does, not what happens after.
-
-**Independent Test**: With the status signal left at its default (on), completing a stage
-produces a well-formed outbound payload matching the schema; with it switched off, no
-outbound call is made at all, verified by absence of any network attempt.
-
-**Acceptance Scenarios**:
-
-1. **Given** the default configuration, **When** the client's install status changes,
-   **Then** a payload conforming to `contracts/status-signal.schema.json` is emitted via
-   the client's own n8n workflow (or `status/emit-status.mjs` for a code-capable agent).
-2. **Given** the status signal switched off in `status/status.json`, **When** the install
-   status changes, **Then** no outbound network call is attempted — only the local file is
-   updated.
-3. **Given** the separate Intelligence Library opt-in (default off), **When** it has not
-   been explicitly enabled, **Then** no usage/outcome data beyond the bare lifecycle signal
-   is ever transmitted.
+**Independent test**: after a fresh guard allows a stage change, one original
+`install_checkpoint` identity is durably recorded and acknowledged. A failed report
+is retained, and outside valid grace subsequent work pauses until verified recovery
+and replay. A disabled connection cannot authorize new work outside valid grace.
+The separate Intelligence Library remains default-off, requiring explicit consent.
 
 ---
 
@@ -177,19 +162,11 @@ outbound call is made at all, verified by absence of any network attempt.
 
 - **Client has no CRM at all.** Routed to the CRM-deferred path (`crm/other-crm-manual-setup.md`);
   knowledge-base and agent-assembly work is never blocked on CRM being resolved first.
-- **Client's AI assistant isn't in the supported set** (not Claude, ChatGPT, Copilot, or a
-  code-capable tool with an equivalent adapter). The repository must fail safe: `AGENTS.md`
-  and `README.md` state the supported set up front, so this is discovered before time is
-  invested, not mid-install.
-- **Client's AI surface has no code-execution or file-write capability** (a plain web chat,
-  not Claude Code/Copilot agent mode/Cursor). Every scripted step (`crm/*/apply-*.mjs`,
-  `status/emit-status.mjs`) has a documented manual-equivalent path; the manual path is
-  never a second-class citizen (Article I).
-- **Client has no Node.js installed.** The manual path is the default baseline for
-  everyone regardless of Node availability; the scripted path is an accelerator only when
-  a code-capable agent and Node are already present.
-- **Client has no git or GitHub account.** The ZIP-download path in `README.md` requires
-  neither.
+- **Unsupported website-only or paste-only surface**: route to the same installed
+  folder in Codex or Claude Code. It cannot run pairing or pre-work checks.
+- **No Node.js**: help install Node before Orion work; it is required for the guard.
+- **Pairing/check failure**: keep setup unfinished or pause work outside valid grace;
+  inspection, updating, diagnosis and re-pairing remain available.
 - **Client loses their local working copy entirely** (not just pauses — the folder is
   gone). This is an honest, disclosed limitation: because there is deliberately no
   Daily-Practice-hosted state (Article IV), losing the local folder means restarting from
@@ -207,8 +184,7 @@ outbound call is made at all, verified by absence of any network attempt.
 
 ### Functional Requirements
 
-- **FR-001**: The repository's only hard prerequisite is an AI assistant the client
-  already uses; `README.md` and `AGENTS.md` state this before anything else.
+- **FR-001**: Supported use requires Node.js, git, an installed folder in Codex or Claude Code, and verified pairing with a signed-in Daily Practice account. README and AGENTS state this first.
 - **FR-002**: `AGENTS.md` MUST brief any AI agent reading it — regardless of underlying
   product — on Orion's identity, the agent's present job as installer, and where to check
   current progress, without a human coach mediating.
@@ -227,23 +203,17 @@ outbound call is made at all, verified by absence of any network attempt.
   party.
 - **FR-008**: Every install stage MUST be interruptible and resumable across sessions,
   days, machines, and AI assistants without data loss or repeated work.
-- **FR-009**: Nothing sends or writes externally without explicit, in-session client
-  approval — no exceptions, and no session in which an action executes without that
-  session's own approval.
+- **FR-009**: Sending follows the chosen send risk level; CRM writes use their standing scope. Operational labels follow required pairing. Words/artifacts to Daily Practice retain explicit per-item consent (constitution Article V).
 - **FR-010**: The installed Orion agent MUST refuse to generate content a reasonable
   person would consider reputationally harmful to the client if received by a prospect,
   and MUST explain what it won't do, briefly, without lecturing.
 - **FR-011**: A validation pass equivalent to `validation/validation-tasks.md`'s VT tasks
   MUST run against the client's own live CRM, Gmail, Calendar, and prospects before the
   install is considered `validated`.
-- **FR-012**: On reaching each stage, the repository MUST be able to produce a local status
-  record, and MAY emit a minimal subset of it outward only if the status-sharing flag
-  (default on, fully disclosed) is set.
+- **FR-012**: A stage change records local progress and a labels-only bridge report with stable original identity. Durable replay and fresh verification precede later work outside valid existing-user grace.
 - **FR-013**: Intelligence-Library-style signal contribution MUST be a distinct, explicit,
   **default-off** opt-in, disclosed separately from FR-012's status signal.
-- **FR-014**: The repository MUST support Claude, ChatGPT, Copilot, and code-capable AI
-  surfaces via adapter files, and MUST fail safe — telling the client clearly, before they
-  invest time — if their tool isn't in the supported set.
+- **FR-014**: The repository supports Codex and Claude Code executable folders. Other adapters route website-only and paste-only users to those tools before work; pasted instructions cannot satisfy the guard.
 - **FR-015**: The repository MUST ship a client-owned Notion project-tracker template,
   seeded with the install checklist and the client's commitments scoreboard.
 - **FR-016**: This repository's own `CHANGELOG.md` MUST record which template version a
@@ -261,9 +231,9 @@ outbound call is made at all, verified by absence of any network attempt.
 - **CRMChoice / CRMTemplate** — the client's CRM decision and, where applicable, the
   Attio/HubSpot template applied to bring their pipeline to the expected shape.
 - **ConnectorCredential** — CRM/Gmail/Calendar authentication, held only in the client's
-  own n8n instance, never in this repository or transmitted to Daily Practice.
+  own connector credential store, never in this repository or transmitted to Daily Practice.
 - **ValidationTask** — one of the VT-00..VT-08 live checks gating `connected → validated`.
-- **StatusSignal** — the minimal, always-disclosed payload optionally emitted on stage
+- **StatusSignal** — the required, disclosed operational-label report emitted on stage
   change (FR-012).
 - **IntelligenceOptIn** — the separate, default-off, explicit opt-in for richer usage
   signal contribution (FR-013).
@@ -282,14 +252,15 @@ outbound call is made at all, verified by absence of any network attempt.
 - **SC-03**: A client who closes their laptop mid-install and resumes — same day, days
   later, or on a different AI assistant — is correctly recognised at their true progress
   point, with zero already-completed steps re-asked.
-- **SC-04**: Zero outreach, CRM-write, or external-communication actions execute without
-  explicit in-session client approval.
+- **SC-04**: Messages respect the chosen send-risk level, CRM writes the standing
+  scope, and Daily Practice words/artifacts their per-item consent. None bypasses
+  the fresh work guard outside valid grace.
 - **SC-05**: A client reaching `validated` can, unassisted, drive one full staged task
   (prospect research or post-call debrief) end to end.
 - **SC-06**: A client whose AI assistant isn't supported is told before, not during, the
   install.
-- **SC-07**: With the status signal at its default, a stage change produces one
-  schema-conformant payload; with it switched off, zero outbound network attempts occur.
+- **SC-07**: An allowed stage change produces one schema-conformant report identity;
+  failures persist for replay and subsequent work pauses outside valid migration grace.
 
 ---
 
@@ -297,12 +268,12 @@ outbound call is made at all, verified by absence of any network attempt.
 
 - **Single operator**: one person acting as "the client" per install; multi-operator
   support (e.g. a founder plus an assistant) is out of scope for this version.
-- **No Daily-Practice-hosted state**: by design (Article IV) — a lost local folder means
+- **No hosted client business-content state**: by design (Article IV) — a lost local folder means
   restarting, and that trade-off is accepted in exchange for never holding client data
   centrally without an explicit, disclosed channel.
-- **Supported AI surfaces at launch**: Claude (chat and Claude Code), ChatGPT, Copilot.
-  Any other tool a client already uses is the FR-014 fail-safe case, not silently
-  unsupported.
+- **Supported AI surfaces**: Codex and Claude Code with file and Node.js execution.
+  The 007 one-time transition preserves existing progress for 30 days from first
+  updated use; new installs must pair before handoff. Account linkage is not payment.
 - **CRM templates at launch**: Attio and HubSpot, matching the coach-led kit. A third CRM
   or no CRM routes to the manual-shape path, not a dead end.
 - **Content-template layer (Instagram/LinkedIn) and the Skool support system are

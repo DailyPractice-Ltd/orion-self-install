@@ -24,6 +24,11 @@ test('release contract plans one selected runtime from portable sources', (t) =>
     assert.equal(run.status, 0, run.stderr);
     const plan = JSON.parse(run.stdout);
     const destinations = plan.entries.map((entry) => entry.destination);
+    for (const path of ['status/guard.mjs', 'status/store.mjs', 'status/report.mjs', 'docs/setup.md']) {
+      assert.ok(destinations.includes(path), `${path} must reach an installed ${tool} folder`);
+      assert.ok(manifest.refresh.includes(path), `${path} must also reach legacy updates`);
+    }
+    assert.ok(!destinations.some(path => path.startsWith('.specify/')), 'maintainer governance stays in the release');
     const skillRoot = tool === 'codex' ? '.agents/skills' : '.claude/skills';
     for (const name of ['prospecting', 'call-planner', 'friday-report', 'memory-consolidation']) {
       assert.ok(destinations.includes(`${skillRoot}/${name}/SKILL.md`));
@@ -84,4 +89,15 @@ test('update/pristine.json is up to date with everything this release ships', (t
     readFileSync(join(repo, PRISTINE_PATH), 'utf8'), serialise(computePristine()),
     'update/pristine.json is stale: run node tests/helpers/pristine.mjs --write as the last edit of the release',
   );
+});
+
+
+test('supported instructions route website chat to an executable paired folder', () => {
+  for (const file of ['README.md', 'AGENTS.md', 'agent/adapters/chatgpt.md', 'agent/adapters/claude.md', 'agent/adapters/copilot.md']) {
+    const text = readFileSync(join(repo, file), 'utf8');
+    assert.match(text, /Codex.*Claude Code|Claude Code.*Codex/s, `${file} names the supported tools`);
+    assert.match(text, /website|paste-only/i, `${file} explains the unsupported surface`);
+    assert.match(text, /docs\/setup\.md|setup\.md/, `${file} points at executable setup and recovery`);
+    assert.doesNotMatch(text, /always works|works just as well|nothing else about your install is affected|your work is unaffected|You can switch this off\. Keep check-ins on/);
+  }
 });

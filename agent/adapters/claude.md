@@ -1,48 +1,24 @@
-# Adapter — Claude (claude.ai)
+# Adapter — Claude website and Projects
 
-**Thin by design**: this file is *only* the mechanics of installing the
-[agent definition](../agent-definition.md) on Claude. Behaviour lives in the definition;
-if Claude needs a behavioural tweak that other tools don't, that's a definition bug —
-fix it there.
+This website-only or paste-only surface cannot execute Orion's pairing and fresh
+pre-work connection checks. It is no longer a supported installation or Orion work
+path. An uploaded knowledge base or pasted agent prompt does not satisfy the gate.
 
-Best fit when `{{CLIENT_AI_TOOL}}` = Claude (any paid plan; Projects requires Pro/Team+).
+## Continue in a supported tool
 
-## Install steps — walk the client through these directly, one at a time
+1. Explain that Orion needs a local assistant that can run the connection check.
+2. Open the client's existing installed Orion folder in **Codex or Claude Code**.
+   For the Claude desktop app use its Code environment, covered by
+   [the Claude Code adapter](claude-code.md). Keep their saved business files in
+   that folder rather than exporting credentials into chat.
+3. Follow [setup and recovery](../../docs/setup.md): run `node start.mjs`, get the
+   signed-in account's one-time code, exchange and verify it. Resume saved answers.
+4. In the supported tool run `node status/guard.mjs check --quiet` before Orion
+   tasks, outbound messages or CRM writes, and stop on exit 2. Native scheduled
+   work follows [Schedule Orion](../../docs/scheduled-work.md).
 
-1. **Create a Project** in claude.ai named `{{AGENT_NAME}}` (the name the client chooses
-   for their agent — they should see it every time they open the tool). Tell them: "this
-   keeps your agent's setup and knowledge separate from your everyday chats."
-2. **Project instructions**: paste the assembled system prompt from
-   `agent-definition.md` (§ "System prompt", placeholders filled) into
-   *Project settings → Instructions*. Paste as-is — no preamble.
-3. **Project knowledge**: upload the seven completed knowledge-base files
-   (`01-…` through `07-…`), keeping the numbered filenames so the section references
-   in the prompt (e.g. "knowledge base §5") resolve unambiguously. Attach both core skill
-   files named in the agent definition's setup notes. Name the attachments
-   `prospect-research-outreach.md` and `post-call-debrief.md`.
-4. **Model**: default to the best available general model on the client's plan.
-5. **First-run check, done with the client right there**: run the vocabulary check from
-   `agent-definition.md`'s notes — one prospect-research task, read the draft back to
-   them, "does this sound like you?"
-
-## If the client can't do steps 1–4 themselves
-
-Walk them through it live in the conversation, one click at a time — don't assume they know
-what "Project settings" means or where to find it. If they're on a plan without Projects,
-say so plainly and route them to the fallback in `chatgpt.md`'s "no plan" pattern (a
-persistent chat with the assembled prompt, knowledge-base files, and both core skill
-texts) adapted for Claude.
-
-## Known quirks
-
-- Project knowledge is retrieved automatically — don't paste KB contents into the
-  instructions as well (duplication drifts; the files are the single source).
-- Connectors/MCP inside Claude are **how the agent reaches the client's tools** —
-  connect the three the checklist names (CRM read-and-write, email read, draft and
-  send, calendar read) and nothing else. A claude.ai Project (the web chat) cannot send
-  or schedule on its own: here the agent scores by hand from `agent/risk-matrix.md`, says
-  so, and every message waits for the client in `status/waiting.md`, read out at the
-  start of each conversation. The Claude desktop app's Code tab is the `claude-code.md`
-  adapter, where a scheduled task does send once its send tool is allowed. The
-  gate is rule 1 of the agent definition, not the tool: every message is scored, goes
-  inside the client's risk level, and waits for them above it (agent-definition rule 1).
+On this unsupported surface, help only with setup and recovery guidance until the
+client moves to a supported tool. Never claim a check or signal happened here.
+Older website instructions described a supported path in earlier releases; their
+recorded radio choices remain historical during the one-time 30-day transition.
+See [the radio guide](../../docs/radio.md) for the operational-data disclosure.

@@ -781,44 +781,24 @@ test('tripwire: the tag menu in docs/radio.md is the menu in shapes.mjs', () => 
   assert.deepEqual(rows, Object.entries(WORK_TAGS));
 });
 
-test('tripwire: the consent sentence is the same words in AGENTS.md, the wizard, and docs/radio.md', (t) => {
-  const agents = readFileSync(join(repo, 'AGENTS.md'), 'utf8');
-  const quoted = agents.match(/\*"(Your\s+harness\s+checks\s+in[\s\S]+?)"\*/);
-  assert.ok(quoted, 'AGENTS.md should present the consent sentence in *"…"*');
-  const consent = squash(quoted[1]);
-  assert.match(consent, /Keep check-ins on\?$/);
-  for (const promise of ['what kind of task finished', 'a general tag such as "prospecting"', 'which skill or agent ran', 'Never the content', 'You can switch this off.']) {
-    assert.ok(consent.includes(promise), `the consent should say: ${promise}`);
+test('tripwire: required setup explanation agrees across brief, wizard and radio guide', (t) => {
+  const explanation = 'Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.';
+  for (const file of ['AGENTS.md', 'docs/radio.md', 'docs/setup.md']) {
+    assert.ok(squash(readFileSync(join(repo, file), 'utf8').replace(/^> ?/gm, '')).includes(explanation), `${file} must use the approved short explanation`);
   }
-
-  // docs/radio.md quotes it in full.
-  const radio = squash(readFileSync(join(repo, 'docs', 'radio.md'), 'utf8').replace(/^> ?/gm, ''));
-  assert.ok(radio.includes(consent), 'docs/radio.md should quote the consent word for word');
-
-  // The wizard, run for real in a scratch folder, declining check-ins so that
-  // nothing is ever dialled. Its fetch is a tripwire of its own.
-  const dir = mkdtempSync(join(tmpdir(), 'orion-wizard-'));
+  const dir = mkdtempSync(join(tmpdir(), 'orion-wizard-required-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, 'status'));
   copyFileSync(join(repo, 'start.mjs'), join(dir, 'start.mjs'));
   for (const f of ['shapes.mjs', 'guard.mjs', 'store.mjs', 'report.mjs', 'status.schema-template.json']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
   const noNetwork = join(dir, 'no-network.mjs');
-  writeFileSync(noNetwork, `
-    import { writeFileSync } from 'node:fs';
-    globalThis.fetch = async (url) => {
-      writeFileSync(${JSON.stringify(join(dir, 'dialled'))}, String(url));
-      throw new Error('the wizard must not dial out in this test');
-    };
-  `);
+  writeFileSync(noNetwork, `globalThis.fetch = async () => { throw new Error('unexpected network'); };`);
   const r = spawnSync(process.execPath, ['--import', pathToFileURL(noNetwork).href, join(dir, 'start.mjs'), '--checkins', 'no'], {
     encoding: 'utf8', input: '', cwd: dir,
   });
-  assert.equal(r.status, 0, r.stderr);
-  assert.equal(existsSync(join(dir, 'dialled')), false);
-  const said = squash(r.stdout);
-  const body = consent.replace(/ Keep check-ins on\?$/, '');
-  assert.ok(said.includes(body), `the wizard should say the consent word for word.\nExpected: ${body}\nSaid: ${said}`);
-  assert.ok(said.includes('Keep check-ins on?'));
+  assert.equal(r.status, 2, r.stderr);
+  assert.ok(squash(r.stdout).includes(explanation));
+  assert.doesNotMatch(r.stdout, /Read AGENTS.md and|Step 3 of 3|Keep check-ins on/);
 });
 
 test('tripwire: the release has one version, and it ships done.mjs', () => {

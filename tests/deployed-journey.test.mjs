@@ -144,11 +144,14 @@ for (const tool of ['claude-code', 'codex']) {
     };
     put(client, 'status/status.json', JSON.stringify(current));
     const mock = join(dirname(client), 'fetch.mjs');
-    writeFileSync(mock, `globalThis.fetch = async () => new Response(JSON.stringify({
+    writeFileSync(mock, `globalThis.fetch = async (url) => {
+      if (String(url).endsWith('/verify')) return Response.json({status: 'accepted', harness_id: '9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62'});
+      if (String(url).endsWith('/assets')) return Response.json({asset_id: 'asset-1', reported_at: '2026-11-18T12:00:00.000Z', replay: false}, {status: 201});
+      return new Response(JSON.stringify({
       slug: 'meeting-sizing', kind: 'skill', name: 'Meeting sizing',
       one_liner: 'Size meetings', family: 'value_building', tools_required: [],
       version: '1.0.0', content: '---\\nname: meeting-sizing\\n---\\nSize the meeting.\\n'
-    }), {status: 200, headers: {'content-type': 'application/json'}});\n`);
+    }), {status: 200, headers: {'content-type': 'application/json'}}); };\n`);
     const installed = spawnSync(process.execPath, [
       '--import', pathToFileURL(mock).href, join(client, 'status/radio.mjs'),
       'library', '--install', 'meeting-sizing', '--yes',

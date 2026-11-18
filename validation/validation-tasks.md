@@ -9,8 +9,8 @@ Rules:
 
 - **Live data only.** No sandbox, no fabricated prospects.
 - **VT-00 through VT-06 must all pass** to reach `validated` (the sign-off below is
-  the gate). VT-07 proves resume when you next pause; VT-08 applies only if your
-  check-ins are on. Any failure: fix, then re-run *that task*. If the failure was a
+  the gate). VT-07 proves resume when you next pause; VT-08 is required operational
+  reporting. Run the guard before each task and stop on exit 2 outside valid grace. Any failure: fix, then re-run *that task*. If the failure was a
   credential, go back to the [connector checklist](../connectors/connector-checklist.md)'s
   failure path — the install does not advance until it's green.
 - **Record results** in the sign-off table below — and set the matching
@@ -23,13 +23,14 @@ Rules:
 **Runs**: a basic check of what's available before anything else.
 
 **Steps**: confirm which AI assistant is active and which adapter file applies
-(`agent/adapters/`); if code execution is expected, confirm `node --version` runs; confirm
-`status/status.json` exists and is readable.
+(`agent/adapters/`); use Codex or Claude Code with Node.js execution. Confirm
+`status/status.json` is readable and `node status/guard.mjs check --quiet` exits 0.
+Website-only and paste-only chat must move to a supported tool using
+[setup and recovery](../docs/setup.md).
 
 **Pass criteria**: your AI tells you, in one plain sentence, which adapter it is using
-and whether it can run scripts here — and what that means for you ("I can do X for
-you; you'll do Y by hand"). You'll know it passed when you heard that sentence —
-never silently assumed either way.
+and confirms this folder passed a fresh server check. A failed check pauses
+validation work; code renewal, inspection, updating and recovery remain available.
 
 ## VT-01 · Prospect research end-to-end
 
@@ -44,9 +45,8 @@ actually use it day to day.
   agent gave the draft. A first message to a stranger scores above low, so it waits for
   you under the sentence "This message falls outside of your risk parameters, and you
   need to approve this manually." and the score and what would bring it inside
-- The waiting draft sits in your **Drafts** folder — and nowhere else (on a chat-only
-  surface with no email connector: in the conversation, and the agent says so
-  plainly — the "you'll do Y by hand" half of VT-00's readback)
+- The waiting draft sits in your **Drafts** folder; if the send connector is unavailable, disclose the missing
+  capability and leave the message waiting under the installed send policy.
 - Draft passes the read-aloud test: it sounds like you (your own vocabulary and tone,
   from knowledge base files 02 and 05, visibly in use)
 - Your agent writes the CRM entry itself, with no yes asked, and reports it in one line (the standing `crm_write` scope in `status/status.json`)
@@ -143,7 +143,7 @@ and if possible on a different AI assistant than you started with.
 resumes exactly at the next incomplete step — it does not re-ask anything the checklist
 already marks done.
 
-## VT-08 · The radio, both disciplines (only if you've opted in)
+## VT-08 · Required reporting, pause and recovery
 
 **Runs**: the radio (`status/done.mjs`, `status/radio.mjs` and `emit-status.mjs`),
 against the trigger table in `docs/radio.md`.
@@ -162,12 +162,17 @@ against the trigger table in `docs/radio.md`.
 - (c) Then hold a short ordinary conversation: greetings, a question, a plan, a
   draft you have not approved. Confirm **nothing** was sent for it.
 
-If you switched the radio off instead: confirm nothing was sent at all, at any of
-those moments.
+Also test a rejected or unreachable pre-work check: outside valid grace, no work
+begins. Restore the connection and verify pending reports replay before work resumes.
+For a post-check failure, confirm the finished-work line stays local, the durable
+outbox contains labels and original time only, and recovery adds no duplicate count.
+Never delete pending reports to make this check pass.
 
 **Pass criteria**: one signal for each finished piece of work, and none for
-conversation. It matches your own toggle, and it is never ambiguous, never silent,
-never chatty.
+conversation; failed checks stop new work outside grace, and recovery preserves
+finished reports without duplicates. Record sanitized receipts only, never keys or
+client content. For maintainers, the full candidate live journey checklist and
+remaining blockers are in `specs/007-required-pairing/verification.md`.
 
 ---
 

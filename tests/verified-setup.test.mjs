@@ -1,0 +1,102 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, cpSync, copyFileSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+import { plainEnv } from './helpers/env.mjs';
+const source = new URL('../', import.meta.url);
+function harness(t, initial = {}) {
+ const root = mkdtempSync(join(tmpdir(), 'orion-setup-')); t.after(() => rmSync(root,{recursive:true,force:true}));
+ cpSync(new URL('status/',source), join(root,'status'), {recursive:true}); copyFileSync(new URL('start.mjs',source),join(root,'start.mjs'));
+ const status = {...JSON.parse(readFileSync(new URL('status/status.schema-template.json',source))), ai_assistant:'codex', ...initial};
+ writeFileSync(join(root,'status/status.json'),JSON.stringify(status));
+ const mock=join(root,'fetch.mjs');
+ writeFileSync(mock, `import {appendFileSync} from 'node:fs'; globalThis.fetch = async (url, options={}) => {
+ const scenario=process.env.SCENARIO;
+ appendFileSync(${JSON.stringify(join(root,'requests'))}, JSON.stringify({url,body:options.body,headers:options.headers})+'\\n');
+ if(scenario==='network') throw new Error('secret-do-not-print');
+ if(url.endsWith('/pair')) {
+  if(scenario.startsWith('exchange-')) return new Response('{}',{status:Number(scenario.slice(9))});
+  return new Response(JSON.stringify(scenario==='incomplete'?{install_token:'orion_'+ 'a'.repeat(48)}:{install_token:'orion_'+ 'a'.repeat(48),harness_id:'12345678-1234-1234-1234-123456789abc',bridge_url:'https://www.dailypractice.world/api/bridge'}),{status:200});
+ }
+ if(url.endsWith('/verify')) {
+  if(scenario==='interrupt') process.exit(17);
+  if(scenario==='verify-network') throw new Error('secret-do-not-print');
+  return new Response(scenario==='verify-malformed'?'{}':JSON.stringify({status:'accepted',harness_id:scenario==='wrong-harness'?'87654321-1234-1234-1234-123456789abc':'12345678-1234-1234-1234-123456789abc'}),{status:scenario==='reject'?401:scenario==='verify-error'?503:200});
+ }
+ return new Response('{}',{status:201}); };`);
+ return {root, status:()=>JSON.parse(readFileSync(join(root,'status/status.json'))), run:(args=[],scenario='',env={})=>spawnSync(process.execPath,['--import',pathToFileURL(mock).href,join(root,'start.mjs'),...args],{input:'',encoding:'utf8',env:plainEnv({SCENARIO:scenario,...env})})};
+}
+test('new setup without a code pauses with self-service recovery and no handoff',t=>{
+ const h=harness(t); const r=h.run(['--checkins','no']);
+ assert.equal(r.status,2,r.stdout+r.stderr); assert.match(r.stdout,/Pair Orion with Daily Practice to finish setup\. This lets us support your harness, deliver updates, and see when it is running\. Sign in to Daily Practice to get your one-time code\./);
+ assert.match(r.stdout,/https:\/\/www.dailypractice.world\/home\/pair/); assert.doesNotMatch(r.stdout,/your AI takes it from here/); assert.equal(h.status().sharing.pairing.migration_started_at,null);
+});
+test('exchange is saved before rejected verification and resumes without spending another code',t=>{
+ const h=harness(t); const first=h.run(['--code','BCDF-GHJK-LMNP'],'reject');
+ assert.equal(first.status,2,first.stdout+first.stderr);
+ assert.equal(h.status().sharing.pairing.state,'exchanged');
+ assert.equal(h.status().sharing.pairing.last_check,'invalid');
+ assert.doesNotMatch(first.stdout,/your AI takes it from here|orion_|aaaa|secret-do-not-print/);
+ const second=h.run(); assert.equal(second.status,0,second.stdout+second.stderr);
+ assert.match(second.stdout,/your AI takes it from here/); assert.equal(h.status().sharing.pairing.state,'verified');
+ const calls=readFileSync(join(h.root,'requests'),'utf8').trim().split('\n').map(JSON.parse);
+ assert.equal(calls.filter(c=>c.url.endsWith('/pair')).length,1); assert.equal(calls.some(c=>c.url.includes('nudges')),false);
+});
+for (const scenario of ['network','exchange-400','exchange-404','exchange-429','exchange-503','incomplete','reject','verify-network','verify-error','verify-malformed','wrong-harness']) {
+ test(`setup stays resumable after ${scenario}`,t=>{
+  const h=harness(t); const r=h.run(['--code','BCDF-GHJK-LMNP'],scenario);
+  assert.equal(r.status,2,r.stdout+r.stderr); assert.doesNotMatch(r.stdout,/your AI takes it from here|orion_|aaaa|secret-do-not-print/);
+  assert.match(r.stdout,/node start.mjs/); assert.equal(h.status().sharing.pairing.migration_started_at,null);
+ });
+}
+for(const code of ['', 'short', 'ABCD-EFGH-IJKL']) {
+ test(`invalid or empty code ${JSON.stringify(code)} never finishes setup`,t=>{
+  const h=harness(t); const r=h.run(['--code',code]); assert.equal(r.status,2); assert.doesNotMatch(r.stdout,/your AI takes it from here/);
+ });
+}
+test('interrupted exchange resumes with saved answers and stored credential',t=>{
+ const h=harness(t); assert.equal(h.run(['--code','BCDF-GHJK-LMNP'],'interrupt').status,17);
+ assert.equal(h.status().sharing.pairing.state,'exchanged'); assert.equal(h.status().machine_profile.chosen_surface,'codex');
+ assert.equal(h.run().status,2); // Interrupted owner leaves a lock requiring explicit recovery.
+ const owner=JSON.parse(readFileSync(join(h.root,'status/.radio-lock/owner.json')));
+ assert.throws(()=>process.kill(owner.pid,0));
+ rmSync(join(h.root,'status/.radio-lock'),{recursive:true});
+ assert.equal(h.run().status,0); assert.equal(h.status().sharing.pairing.state,'verified');
+});
+test('homed setup keeps the credential outside status and resumes verification',t=>{
+ const h=harness(t,{home:{enabled:true,branch:'main'}}); const r=h.run(['--code','BCDF-GHJK-LMNP'],'reject');
+ assert.equal(r.status,2); assert.equal(h.status().sharing.install_token,null);
+ assert.match(readFileSync(join(h.root,'status/radio.key'),'utf8'),/^orion_/);
+ assert.equal(h.run().status,0);
+});
+test('existing unmarked progress gets its one-time migration before wizard mutation',t=>{
+ const sharing=JSON.parse(readFileSync(new URL('status/status.schema-template.json',source))).sharing;
+ delete sharing.pairing;
+ const h=harness(t,{sharing,started_at:'2026-01-01T00:00:00.000Z',business_name:'Saved business',machine_profile:{chosen_surface:'codex'}});
+ const r=h.run(); assert.equal(r.status,2); const after=h.status();
+ assert.ok(after.sharing.pairing.migration_started_at); assert.equal(after.business_name,'Saved business'); assert.equal(after.machine_profile.chosen_surface,'codex');
+ const start=after.sharing.pairing.migration_started_at; h.run(); assert.equal(h.status().sharing.pairing.migration_started_at,start);
+});
+test('cloud attached acceptance still requires matching fresh server verification',t=>{
+ const template=JSON.parse(readFileSync(new URL('status/status.schema-template.json',source)));
+ const sharing={...template.sharing,radio_choice:'accepted',status_signal_enabled:true,bridge_url:'https://www.dailypractice.world/api/bridge',harness_id:'12345678-1234-1234-1234-123456789abc'};
+ const h=harness(t,{sharing});
+ assert.equal(h.run([],'reject',{ORION_CLOUD:'1'}).status,2);
+ assert.equal(h.run([],'',{ORION_CLOUD:'1'}).status,0);
+ assert.equal(h.status().sharing.install_token,null);
+});
+test('pristine older status without the pairing marker never gains grace from wizard profile writes',t=>{
+ const sharing=JSON.parse(readFileSync(new URL('status/status.schema-template.json',source))).sharing; delete sharing.pairing;
+ const h=harness(t,{sharing}); assert.equal(h.run().status,2);
+ assert.equal(h.status().sharing.pairing.migration_started_at,null); assert.equal(h.run().status,2);
+ assert.equal(h.status().sharing.pairing.migration_started_at,null);
+});
+test('malformed pairing state stops before changing the saved machine profile',t=>{
+ const template=JSON.parse(readFileSync(new URL('status/status.schema-template.json',source)));
+ template.sharing.pairing.migration_started_at='invalid';
+ const h=harness(t,{sharing:template.sharing,machine_profile:{chosen_surface:'codex',detected_at:'saved'}});
+ assert.equal(h.run().status,2); assert.deepEqual(h.status().machine_profile,{chosen_surface:'codex',detected_at:'saved'});
+});

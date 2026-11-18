@@ -1,0 +1,4 @@
+interface:
+  display_name: "Apollo Phone Enrichment"
+  short_description: "Reveal and verify Apollo mobile numbers safely"
+  default_prompt: "Use $apollo-enrich-phone to reveal approved Apollo mobile numbers and map verified results into HubSpot without outreach."

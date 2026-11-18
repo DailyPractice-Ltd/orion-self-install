@@ -116,8 +116,8 @@ HUBSPOT_API_KEY=<the token you just generated> node apply-hubspot-template.mjs
 ```
 </details>
 
-Once validated (either way), deactivate the private app — ongoing workflows use their own
-separate credential (see `connectors/connector-checklist.md`).
+Once the setup works, deactivate the private app. Orion uses the CRM connector for
+ongoing work. See `connectors/connector-checklist.md`.
 
 ## After applying
 

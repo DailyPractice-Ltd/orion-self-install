@@ -12,6 +12,8 @@ Best fit when the client works in Codex — the CLI in a terminal, the IDE exten
 the desktop app. The wizard detects it (`codex` on PATH or `~/.codex` present) and hands
 off to exactly the same prompt as Claude Code.
 
+In a deployed Codex folder, installed skills live in `.agents/skills/`. `AGENTS.md` is the shared instruction file.
+
 ## The sandbox — why the radio needs one setting here
 
 Codex runs commands inside a safety sandbox, and by default that sandbox **allows file
@@ -47,36 +49,9 @@ network approval for the radio command once and retry once). If it is still bloc
 AGENTS.md's unreachable rule stands: one plain sentence, never silence, never a retry
 loop.
 
-## Scheduled work: how a hired agent's schedule fires here
+## Scheduled work
 
-A hired agent can work on a schedule with nobody watching (`library/HIRING.md`, step 6,
-"Wire the schedule"). Two ways, in this order:
-
-- **The Codex app's automations (rung A).** When the client works in the Codex app,
-  create an automation there with the shift prompt HIRING.md gives you and the
-  schedule from the job sheet. Nothing else to install. An automation runs under
-  the same sandbox as a session, so make the one-time `~/.codex/config.toml` fix
-  above first, or its report cannot reach the radio.
-- **The computer's own scheduler (rung B)**, when there is only the command line.
-  `node status/schedule.mjs wire` writes the wake-up and
-  `node status/schedule.mjs on` switches it on. What it starts is:
-
-```
-codex exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"
-```
-
-- `codex exec` is the form of Codex that runs without a person.
-- `--skip-git-repo-check` lets it run in a folder that was downloaded, not cloned.
-- **`network_access=true` is not optional.** The sandbox blocks the network unless
-  told otherwise. Without it the shift still does its work and writes its line to
-  `status/shift-log.md`, but its report cannot reach the radio, so "(radio
-  unreachable)" lands under the line and Daily Practice never hears the shift ran.
-  Setting it on the command line works even if the config fix was never made.
-- An old Codex command can be refused by the service ("requires a newer version of
-  Codex"). The wake-up then starts and stops at once. Update Codex, and step 7's
-  wake-up check will show it working.
-
-The one source for the command is `unattendedRunner('codex')` in `status/shapes.mjs`.
+Use Codex scheduled tasks for recurring Orion work. See [Schedule Orion](../../docs/scheduled-work.md).
 
 ## Known quirks
 
@@ -92,6 +67,6 @@ The one source for the command is `unattendedRunner('codex')` in `status/shapes.
   every run. Keep one thread the client names once and append to it with
   `codex exec resume <name>`. Verified 4 November 2026; a Composio route for Gmail is its
   own later research.
-- Sending follows the risk level (rule 1 of the agent definition). Codex's headless run
-  loads no mail, Slack or calendar tool, so on Codex every message waits for the client
-  with that reason; there is no tool gate here, only the prompt and the script.
+- Sending follows rule 1 in the agent definition. The scheduled environment's connector
+  permissions also apply. If a send tool is missing or requires interactive approval,
+  leave the message waiting for the user.

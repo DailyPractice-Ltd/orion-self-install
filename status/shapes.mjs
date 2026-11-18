@@ -439,72 +439,6 @@ export function parseInstallDirective(body) {
   return { slug, version };
 }
 
-/**
- * How this machine's agent software is started with nobody watching, so the
- * computer's own scheduler can wake a hired agent for its shift.
- *
- * The wake-up has to start the SAME agent software the client runs. It used to
- * be written as `claude -p` whatever the machine had, so on a Codex machine
- * the task could never start and no shift ever ran. Claude Code and Codex are
- * the two that can be started this way. Every other surface gets
- * `schedulable: false`, and library/HIRING.md stops the schedule honestly
- * instead of wiring a task that will never fire.
- *
- * This is the computer's-own-scheduler rung only (HIRING.md step 6, rung B).
- * A scheduled task that lives inside the agent software itself (Claude Code's
- * scheduled tasks, the Codex app's automations) needs no command at all.
- *
- * It gives the command's name and its arguments as a plain list, with
- * PROMPT_SLOT standing where the shift prompt goes. Where it goes matters:
- * Claude Code's --allowedTools takes every word after it as a tool name, so a
- * prompt placed last is swallowed and the run stops with "no prompt". It never
- * gives a ready-made command line: status/schedule.mjs is the one place that
- * finds the command's full path and quotes each argument for the file it is
- * writing.
- *
- * `tools` is the `tools:` line of the agent's job sheet. With nobody there to
- * answer a permission question, Claude Code is told to allow exactly those
- * tools and to refuse everything else without asking. The job sheet's standing
- * `crm_write` scope decides whether its CRM write tools are in that list
- * (status/schedule.mjs allowedTools); a send tool is only ever there if the
- * sheet names it, so a shift that is allowed to write notes still cannot send.
- */
-export const PROMPT_SLOT = '{prompt}';
-
-export function unattendedRunner(surface, { tools } = {}) {
-  switch (surface) {
-    case 'claude-code':
-      return {
-        schedulable: true,
-        bin: 'claude',
-        args: tools
-          ? ['-p', PROMPT_SLOT, '--permission-mode', 'dontAsk', '--allowedTools', tools]
-          : ['-p', PROMPT_SLOT, '--permission-mode', 'dontAsk'],
-      };
-    case 'codex':
-      // `codex exec` is the form that runs without a person.
-      // --skip-git-repo-check lets it run in a folder that was downloaded, not
-      // cloned. The workspace sandbox blocks the network unless told
-      // otherwise, and a shift's report has to reach the radio, so network
-      // access is switched on here rather than left to a config file that may
-      // never have been edited.
-      return {
-        schedulable: true,
-        bin: 'codex',
-        args: ['exec', '--skip-git-repo-check', '--sandbox', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=true', PROMPT_SLOT],
-      };
-    default:
-      // cursor, copilot-vscode, claude-desktop, chatgpt-app, website-chat, or
-      // nothing recorded.
-      return {
-        schedulable: false,
-        bin: null,
-        args: null,
-        note: 'The agent is hired and works when asked; its schedule stays "not yet wired".',
-      };
-  }
-}
-
 // ── Send Risk: one level, one matrix, one sentence (spec 007, K16) ──────────
 //
 // Every message to a person outside the folder is scored 0 to 100. The client
@@ -514,16 +448,6 @@ export function unattendedRunner(surface, { tools } = {}) {
 
 /** The levels, in the order a client can move through them. `off` is paused. */
 export const SEND_LEVELS = Object.freeze(['off', 'low', 'medium', 'high']);
-
-/**
- * A tool that sends a message to a person, by its last name part: the hosted
- * connectors' send, reply and forward tools, Slack's send, anything that sends
- * mail, a DM or a text, and a calendar tool that creates, changes or answers an
- * event, because an invite to an outside person is a message (spec 007, D10).
- * A draft tool is never a send tool, however it is spelled, and neither is a
- * search or a listing.
- */
-export const SEND_TOOL = /(^|__)(?!.*draft)([a-z0-9]+_)*(send|reply|forward|schedule_message|create_event|update_event|respond_to_event|send_invite)(_[a-z0-9]+)*$/i;
 
 /**
  * The matrix, v1. One label per factor; the points are summed and floored at 0.

@@ -7,7 +7,7 @@
  *
  * What it is for: a finished task is the unit this harness reports. Run this
  * once, as the last step, when a task your human set is done (they have the
- * thing they asked for, or the action is taken), or when a hired agent's shift
+ * thing they asked for, or the action is taken), or when a scheduled task
  * ends. Chat alone is not work: a greeting, a question, an answer, a plan, or a
  * draft still waiting on a yes runs nothing.
  *
@@ -17,9 +17,8 @@
  *             is 1. A finished task is at least 1. Only a shift may report 0:
  *             it ran and found nothing to do.
  *   --skill   The slug of the skill that did the work, when one did.
- *   --agent   The roster name of the hired agent that did the work, when one did.
- *   --shift   The work was a shift: a hired agent's schedule (a clock or a
- *             handoff) started it, not a person. Needs --agent.
+ *   --agent   Optional compatibility label for callers from older releases.
+ *   --shift   The work completed from a native scheduled task.
  *   --line    One line about what was done. It stays on this machine.
  *
  * It does three things, in this order.
@@ -56,7 +55,7 @@
  * script has no way to send any other outcome.
  *
  * Validation comes first. A tag that is not on the menu, a bad count, a name
- * that is not a label, --shift without --agent, a line longer than one short
+ * that is not a label, a line longer than one short
  * line, or a line that looks like a credential: one plain explanation, exit 1,
  * nothing written, nothing sent. After any valid report the exit code is 0,
  * even when the radio could not be reached: the local record is the half that
@@ -151,9 +150,6 @@ for (const [flag, kind] of [['skill', 'skill'], ['agent', 'agent']]) {
   if (problem) problems.push(`--${flag}: ${problem}`);
 }
 
-if (shift && flags.agent === undefined) {
-  problems.push('--shift needs --agent <roster name>. A shift is a hired agent\'s scheduled work, so it has to say whose.');
-}
 
 // One line means one line: a line break would split the shift log's
 // one-line-per-shift shape, so any run of whitespace becomes a single space.
@@ -186,6 +182,7 @@ if (problems.length > 0 || tagProblem) {
 
 const tag = flags.tag;
 const skill = flags.skill;
+// Legacy callers can still supply an agent label for historical reports.
 const agent = flags.agent;
 
 // ── The harness ─────────────────────────────────────────────────────────────
@@ -202,10 +199,13 @@ try {
   // shift its local line.
 }
 
+const ownName = status && typeof status.agent_name === 'string' ? status.agent_name.trim() : '';
+const who = agent || ownName || 'assistant';
+
 // One line saying what this report was understood to be. It never mentions the
 // radio, so it reads the same whether check-ins are on or off.
 console.log(shift
-  ? `Shift finished: agent ${agent}, tag ${tag}, count ${count}${skill ? `, skill ${skill}` : ''}.`
+  ? `${agent ? `Shift finished: agent ${agent}` : `Scheduled task finished: ${who}`}, tag ${tag}, count ${count}${skill ? `, skill ${skill}` : ''}.`
   : `Task finished: tag ${tag}, count ${count}${skill ? `, skill ${skill}` : ''}${agent ? `, agent ${agent}` : ''}.`);
 
 // ── 1. The local record ─────────────────────────────────────────────────────
@@ -234,12 +234,6 @@ function runSibling(script, args, timeoutMs) {
   return { out: String(run.stdout || '').trim(), ok: run.status === 0 && !run.error };
 }
 
-// Who did the work, for the local line. A hired agent's roster name, or else
-// this harness's own agent. A status file that will not parse leaves only the
-// first of those, which is enough for a line.
-const ownName = status && typeof status.agent_name === 'string' ? status.agent_name.trim() : '';
-const who = agent || ownName || 'assistant';
-
 // What gets recorded locally: one dated line, in the shape of the log it joins.
 // A shift goes to the shift log. Work a person asked for goes to the work log.
 // Neither depends on the radio, and neither depends on memory.
@@ -253,7 +247,7 @@ if (line !== null) {
     // The marker is how a schedule is proven. If the caller already wrote one
     // (auto-test: for a wiring test a person kicked off), it is kept as given.
     const note = /^auto(-test)?:/i.test(line) ? line : `auto: ${line}`;
-    localLine = `${stamp} | ${agent} | count: ${count} | ${note}`;
+    localLine = `${stamp} | ${who} | count: ${count} | ${note}`;
   } else {
     localLine = `${stamp} | ${who} | count: ${count} | ${tag} | ${line}`;
   }
@@ -291,7 +285,7 @@ if (radioOn(status, { keyFile: readRadioKeyFile(__dirname, { readFileSync }) }))
     '--tag', tag,
     '--count', String(count),
   ];
-  if (agent) args.push('--routine', agent);
+  if (shift || agent) args.push('--routine', agent || skill || 'orion');
   // A skill named here ran. That is the only outcome this script can report.
   if (skill) {
     args.push('--asset', skill, '--asset-kind', 'skill', '--outcome', 'run_completed',
@@ -317,7 +311,7 @@ if (radioOn(status, { keyFile: readRadioKeyFile(__dirname, { readFileSync }) }))
       ? '(radio unreachable)'
       : `(radio ${result})`;
     try {
-      appendLog(logPath, `${stamp} | ${shift ? agent : who} | ${why} the line above was not reported`);
+      appendLog(logPath, `${stamp} | ${who} | ${why} the line above was not reported`);
     } catch {
       // The line itself is already written. The marker is best effort.
     }
@@ -332,7 +326,7 @@ if (radioOn(status, { keyFile: readRadioKeyFile(__dirname, { readFileSync }) }))
 
 if (homeOn(status)) {
   const what = shift
-    ? `shift: ${agent}, ${tag}, count ${count}`
+    ? `${agent ? 'shift' : 'scheduled task'}: ${who}, ${tag}, count ${count}`
     : `task: ${tag}, count ${count}`;
   const home = runSibling('home.mjs', ['sync', '--message', what], 420000);
   if (home.out) console.log(home.out);

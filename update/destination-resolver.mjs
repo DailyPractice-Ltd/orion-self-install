@@ -1,0 +1,128 @@
+/** Resolve a deployed harness's selected destinations and file ownership. */
+import { createHash } from 'node:crypto';
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const RELEASE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+function readJson(path, name) {
+  try { return JSON.parse(readFileSync(path, 'utf8')); }
+  catch (error) { throw new Error(`Cannot read ${name} at ${path}: ${error.message}`); }
+}
+
+export function safePath(root, path) {
+  if (typeof path !== 'string' || !path || path === '.' || isAbsolute(path) || path.split(/[\\/]/).includes('..')) {
+    throw new Error(`Invalid deployment path: ${path}`);
+  }
+  const target = resolve(root, path);
+  if (target === resolve(root) || relative(root, target).startsWith(`..${sep}`)) {
+    throw new Error(`Deployment path escapes root: ${path}`);
+  }
+  let part = resolve(root);
+  for (const segment of path.split('/')) {
+    part = join(part, segment);
+    try { if (lstatSync(part).isSymbolicLink()) throw new Error(`Symlink collision: ${path}`); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  return target;
+}
+
+export function resolveAiAssistant(status, deployment, { legacyTool } = {}) {
+  const ai_assistant = status?.ai_assistant;
+  if (ai_assistant == null && legacyTool != null) {
+    if (legacyTool !== 'claude-code') throw new Error('Legacy migration requires explicit --legacy-tool claude-code');
+    return legacyTool;
+  }
+  if (ai_assistant == null) throw new Error('Missing status.ai_assistant; use --legacy-tool claude-code only for an explicit legacy migration');
+  if (!deployment.tools.includes(ai_assistant)) throw new Error(`Invalid status.ai_assistant: ${ai_assistant}`);
+  if (legacyTool != null) throw new Error('--legacy-tool applies only when the status has no recorded AI assistant');
+  return ai_assistant;
+}
+
+export function fingerprint(contents) {
+  return createHash('sha256').update(Buffer.from(contents).toString('utf8').replace(/\r\n/g, '\n')).digest('hex');
+}
+
+export function destinationState(root, entry, pristine) {
+  const target = safePath(root, entry.destination);
+  // A symlink anywhere in a destination is a collision, even if its target
+  // happens to have the expected bytes. Never read through it for ownership.
+  let part = resolve(root);
+  for (const segment of entry.destination.split('/')) {
+    part = join(part, segment);
+    try { if (lstatSync(part).isSymbolicLink()) return 'preserve'; }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  if (!existsSync(target)) return 'absent';
+  if (!lstatSync(target).isFile()) return 'preserve';
+  if (entry.ownership === 'client-template') return 'client-owned';
+  if (entry.source === 'update/pristine.json' && entry.destination === entry.source) return 'owned';
+  const known = pristine.files?.[entry.fingerprint_key] || [];
+  return known.includes(fingerprint(readFileSync(target))) ? 'owned' : 'preserve';
+}
+
+/** The sole source-to-destination mapper for release and deployed harnesses. */
+export function planForTool(deployment, ai_assistant, { releaseRoot = RELEASE_ROOT, root } = {}) {
+  if (!deployment.tools.includes(ai_assistant)) throw new Error(`Unsupported AI assistant: ${ai_assistant || '(missing)'}`);
+  const skillRoot = join(releaseRoot, 'skills');
+  const actualSkills = (existsSync(skillRoot) ? readdirSync(skillRoot, { recursive: true, withFileTypes: true }) : [])
+    .filter(item => item.isFile())
+    .map(item => relative(releaseRoot, join(item.parentPath, item.name)).split(sep).join('/')).sort();
+  const mappedSkills = deployment.entries.filter(entry => entry.source.startsWith('skills/'));
+  const skillSources = mappedSkills.map(entry => entry.source).sort();
+  if (JSON.stringify(actualSkills) !== JSON.stringify(skillSources)) {
+    throw new Error('Deployment skill mappings must cover every file under skills/ exactly once');
+  }
+  for (const entry of mappedSkills) for (const selected of deployment.tools) {
+    const expected = `${selected === 'codex' ? '.agents' : '.claude'}/skills/${entry.source.slice('skills/'.length)}`;
+    if (entry.destinations?.[selected] !== expected) throw new Error(`Invalid skill mapping for ${entry.source} (${selected})`);
+  }
+  const entries = [
+    ...deployment.common_sources.map((source) => ({ source, destination: source, ownership: 'release', fingerprint_key: source })),
+    ...deployment.entries.map((entry) => ({ source: entry.sources?.[ai_assistant] || entry.source, destination: entry.destinations[ai_assistant], ownership: entry.ownership, fingerprint_key: entry.sources?.[ai_assistant] || entry.fingerprint_key })),
+  ];
+  const destinations = new Set();
+  for (const entry of entries) {
+    safePath(releaseRoot, entry.source);
+    safePath(root || releaseRoot, entry.destination);
+    if (!existsSync(join(releaseRoot, entry.source))) throw new Error(`Missing release source: ${entry.source}`);
+    if (destinations.has(entry.destination)) throw new Error(`Duplicate destination: ${entry.destination}`);
+    destinations.add(entry.destination);
+  }
+  return entries;
+}
+
+export function resolveDestinations({ root, releaseRoot = RELEASE_ROOT, legacyTool } = {}) {
+  if (!root) throw new Error('A deployed harness root is required');
+  const manifest = readJson(join(releaseRoot, 'update/manifest.json'), 'release manifest');
+  const pristine = readJson(join(releaseRoot, 'update/pristine.json'), 'fingerprint registry');
+  const status = readJson(join(root, 'status/status.json'), 'harness status');
+  const ai_assistant = resolveAiAssistant(status, manifest.deployment, { legacyTool });
+  const entries = planForTool(manifest.deployment, ai_assistant, { releaseRoot, root });
+  return { ai_assistant, legacy_migration: status.ai_assistant == null, entries: entries.map((entry) => ({ ...entry, state: destinationState(root, entry, pristine) })) };
+}
+
+/** Paths used by a running client harness, from its recorded tool and release map. */
+export function runtimeLayout(root, { legacyTool } = {}) {
+  const manifest = readJson(join(root, 'update/manifest.json'), 'deployment manifest');
+  const status = readJson(join(root, 'status/status.json'), 'harness status');
+  const ai_assistant = resolveAiAssistant(status, manifest.deployment, { legacyTool });
+  const skill = manifest.deployment.entries.find((entry) => entry.source === 'skills/create-skill/SKILL.md');
+  if (!skill?.destinations?.[ai_assistant]) throw new Error(`Missing runtime destinations for ${ai_assistant}`);
+  const skillRoot = dirname(dirname(skill.destinations[ai_assistant]));
+  const rosterPath = ai_assistant === 'codex' ? 'agents/README.md' : '.claude/agents/README.md';
+  safePath(root, skillRoot);
+  safePath(root, rosterPath);
+  return { ai_assistant, skillRoot, rosterPath, jobRoot: dirname(rosterPath) };
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  try {
+    const value = (flag) => { const at = process.argv.indexOf(flag); return at < 0 ? undefined : process.argv[at + 1]; };
+    console.log(JSON.stringify(resolveDestinations({ root: value('--root'), legacyTool: value('--legacy-tool') }), null, 2));
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 2;
+  }
+}

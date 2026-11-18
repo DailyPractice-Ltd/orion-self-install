@@ -16,6 +16,34 @@ Write each section for the client who will read it there.
 
 ---
 
+## 2.0.0 — 2026-11-12
+
+**Your Orion folder is now separate from the release, with a layout chosen for Claude Code or Codex.**
+
+- Install from the downloaded release with `node install.mjs --tool codex --target
+  /path/to/my-orion` or `--tool claude-code`. The client folder has common runtime
+  files and only the chosen AI assistant's skills and team layout. Release sources, tests,
+  specs stay in the release checkout. All shipped skills and their supporting files deploy. The client constitution starts from an unfilled template. The
+  installer makes a local Git repository by default; `--github-repo OWNER/NAME`
+  creates a private GitHub home during installation, or a private remote can be
+  connected later with `node status/home.mjs prepare --remote <address> --yes`.
+- `AGENTS.md` is the shared instruction file. New installs omit `CLAUDE.md`.
+  Claude Code setups with Anthropic's `agents-md` plugin can load `AGENTS.md` when
+  there is no `CLAUDE.md` in scope. An older setup can use a `CLAUDE.md` containing
+  only `@AGENTS.md`.
+- Say "update my harness" to update from one pinned `main` commit using the file
+  destinations for your installed tool. Orion preserves edited and client-owned files
+  and backs up every replacement or retirement. Executable `status/*.mjs` scripts remain the documented
+  backed-up exception that update together.
+- A tool switch moves released skills and team routing to the new layout, carries
+  personalized skills and job sheets, and records the new selection only after
+  validation. Saved schedules must be rewired for the new tool. The switch has a
+  backup and recovery command. See [updating](docs/updating.md).
+- All release skill definitions now live under `skills/`. Each skill and its supporting files deploy to the chosen AI assistant.
+  Claude Code maintainers can generate local discovery copies with
+  `node .specify/scripts/generate-claude-skills.mjs`. Older same-path updaters leave
+  their existing skill copies in place until the harness is migrated.
+
 
 ## 1.5.0 — 2026-11-04
 
@@ -231,7 +259,7 @@ and Daily Practice never hears from it.
   scheduled task. In the Codex app it creates an automation. Where there is only a
   command line, it uses your computer's own scheduler.
 - **Your computer's scheduler is set up by one command, not by hand.**
-  `node status/schedule.mjs wire` writes a small wake-up file for the agent inside
+  The setup command writes a small wake-up file for the agent inside
   your Orion folder. Your assistant tells you what it will start and when, and
   switches it on only on your yes. Nothing outside the folder is changed before
   that, and one command switches it off again.
@@ -255,11 +283,6 @@ it starts correctly, sandbox and network included. Switching on through the Mac,
 Windows and Linux schedulers is tested against stand-ins and has not yet been run on
 a client's machine. That is why your assistant fires the schedule once and watches
 it land before it calls anything wired.
-
-For whoever maintains this: how each software is started lives in one place,
-`unattendedRunner` in `status/shapes.mjs`. `status/schedule.mjs` writes the files.
-`tests/unattended-runner.test.mjs` covers both and holds `library/HIRING.md` and the
-adapters to them.
 
 ## 1.1.4 — 2026-10-05
 

@@ -60,8 +60,8 @@ smoke test passes; read for shelf reports and for "what do I already have."
 
 | Field | Type | Notes |
 |---|---|---|
-| `packages.<slug>.kind` | `'agent' \| 'skill' \| 'workflow' \| 'program'` | Matches the package's directory |
-| `packages.<slug>.version` | `string` | From PACKAGE.md at install time |
+| `packages.<slug>.kind` | `'agent' \| 'skill' \| 'program'` (`'workflow'` in legacy records) | Preserve historical values |
+| `packages.<slug>.version` | `string` | Release version at install time |
 | `packages.<slug>.installed_at` | ISO 8601 | First install |
 | `packages.<slug>.smoke_test_passed` | `boolean` | Only `true` after the live check (Article VIII) |
 
@@ -88,12 +88,13 @@ blocker (US4 edge case).
 
 ---
 
-## Package (`library/<kind>/<slug>/PACKAGE.md`)
+## Historical package recipes
 
-The one packaging shape (FR-005), specified in
+Older releases shipped optional recipes at `library/<kind>/<slug>/PACKAGE.md`. Their shape is recorded in
 [contracts/package-shape.md](contracts/package-shape.md): name / kind / version /
 requires up top, install prompt as the **first block**, a smoke test on the client's own
-data, a changelog line. Kinds: `agents`, `skills`, `workflows`, `programs`.
+data, a changelog line. Built-in skills ship from `skills/<slug>/SKILL.md` through the
+deployment manifest. Daily Practice distributes optional skills over the radio.
 
 ---
 

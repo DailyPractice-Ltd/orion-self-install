@@ -106,10 +106,19 @@ satisfy migration immediately without a new code.
   alone means empty. Atomic same-directory temporary writes + rename preserve
   previous valid contents; durable flush before claiming success. Stale locks may
   be recovered only when owner death is established, never just an old timestamp.
+  This implementation waits five seconds then pauses: it does not reclaim locks
+  automatically. For interrupted-process recovery, inspect
+  `status/.radio-lock/owner.json`, establish that its PID on its named host has
+  stopped (or stop that command), and only then remove that lock directory. Never
+  remove an active/unknown owner's lock or replace status/outbox files. Leftover
+  same-directory `.tmp` files are never read as committed state.
 - `status/report.mjs` exports
   `reportSignal({root,signalType,payload,occurredAt,fetchImpl})`,
   `reportAsset({root,asset,fetchImpl})`, `replayOutbox({root,fetchImpl})`, and
-  `replayOutboxLocked(store,{status,fetchImpl})`. Optional fetchImpl defaults to
+  `replayOutboxLocked(store,{status,fetchImpl})`, and pure
+  `validateOutbox(entries)` (throws on invalid envelopes or labels). Guard validates
+  pending entries before checking connectivity, including while grace is active.
+  Optional fetchImpl defaults to
   global fetch; absent occurredAt is allocated once at original report creation.
   Wrappers obtain the store lock; guard calls the Locked sibling while holding it.
   Return `{status: 'sent'|'queued'|'off'|'invalid', pending}` plus plain reason as

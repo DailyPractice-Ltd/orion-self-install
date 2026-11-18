@@ -5,7 +5,6 @@ import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve, relative, sep, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { planForTool, fingerprint, safePath } from './update/destination-resolver.mjs';
-import { LEGACY_AI_ASSISTANT_KEY, recordedAiAssistant } from './status/shapes.mjs';
 
 const release = dirname(fileURLToPath(import.meta.url));
 const usage = 'Usage: node install.mjs --tool <claude-code|codex> --target <new client folder> [--migrate-from <legacy checkout>] [--github-repo OWNER/NAME | --remote https://github.com/OWNER/NAME.git | --local-only]';
@@ -20,9 +19,9 @@ function install() {
     console.log(usage);
     return;
   }
-  const tool = arg('--tool');
+  const ai_assistant = arg('--tool');
   const targetArg = arg('--target');
-  if (!tool || !targetArg || targetArg.startsWith('--')) throw new Error(usage);
+  if (!ai_assistant || !targetArg || targetArg.startsWith('--')) throw new Error(usage);
   const target = resolve(targetArg);
   const releaseReal = realpathSync(release);
   const manifest = JSON.parse(readFileSync(join(release, 'update/manifest.json'), 'utf8'));
@@ -34,7 +33,7 @@ function install() {
   if(githubRepo && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(githubRepo)) throw new Error('Expected --github-repo OWNER/NAME');
   const remoteRepo=remote?.match(/^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:\.git)?$/)?.[1];
   if(remote && !remoteRepo) throw new Error('Expected an HTTPS GitHub repository URL.');
-  const plan = planForTool(manifest.deployment, tool, { releaseRoot: release, root: target });
+  const plan = planForTool(manifest.deployment, ai_assistant, { releaseRoot: release, root: target });
   if(migration && migration===releaseReal) throw new Error('Use a distinct legacy checkout for migration.');
   const parent = dirname(target);
   if (!existsSync(parent) || !lstatSync(parent).isDirectory()) throw new Error('The client folder parent must already exist.');
@@ -54,7 +53,7 @@ function install() {
     // Record the choice before copying any release file into the staged harness.
     mkdirSync(join(stage, 'status'));
     const status = JSON.parse(readFileSync(join(release, 'status/status.schema-template.json'), 'utf8'));
-    status.ai_assistant = tool;
+    status.ai_assistant = ai_assistant;
     writeFileSync(join(stage, 'status/status.json'), JSON.stringify(status, null, 2) + '\n');
     for (const entry of plan) {
       const destination = join(stage, entry.destination);
@@ -65,15 +64,15 @@ function install() {
       const oldStatusPath=join(migration,'status/status.json');
       if(!existsSync(oldStatusPath)) throw new Error('Legacy checkout has no status/status.json');
       const oldStatus=JSON.parse(readFileSync(oldStatusPath,'utf8'));
-      const oldAssistant=recordedAiAssistant(oldStatus);
-      if(oldAssistant!=null && oldAssistant!==tool) throw new Error('Migrate with the AI assistant recorded in the legacy status, then switch.');
-      if(oldAssistant==null && tool!=='claude-code') throw new Error('Legacy layout without a recorded AI assistant requires --tool claude-code.');
+      const oldAssistant=oldStatus.ai_assistant;
+      if(oldAssistant!=null && oldAssistant!==ai_assistant) throw new Error('Migrate with the AI assistant recorded in the legacy status, then switch.');
+      if(oldAssistant==null && ai_assistant!=='claude-code') throw new Error('Legacy layout without a recorded AI assistant requires --tool claude-code.');
       const pristine=JSON.parse(readFileSync(join(release,'update/pristine.json'),'utf8'));
       const planned=new Map(plan.map(entry=>[entry.destination,entry]));
-      const excluded=['.git','.github','.codex','node_modules','install.mjs','n8n','.specify','update/scaffold',...(tool==='codex'?['team']:[]),...manifest.deployment.release_only.filter(path=>!path.includes('*')).map(path=>path.replace(/\/$/,'')),...(manifest.remove||[])];
-      const retired = new Map((manifest.deployment.retired || []).map(entry => [entry.destinations?.[tool], entry.fingerprint_key]));
-      const skillRoot=tool==='codex'?'.agents/skills':'.claude/skills';
-      const otherRoot=tool==='codex'?'.claude':'.agents';
+      const excluded=['.git','.github','.codex','node_modules','install.mjs','n8n','.specify','update/scaffold',...(ai_assistant==='codex'?['team']:[]),...manifest.deployment.release_only.filter(path=>!path.includes('*')).map(path=>path.replace(/\/$/,'')),...(manifest.remove||[])];
+      const retired = new Map((manifest.deployment.retired || []).map(entry => [entry.destinations?.[ai_assistant], entry.fingerprint_key]));
+      const skillRoot=ai_assistant==='codex'?'.agents/skills':'.claude/skills';
+      const otherRoot=ai_assistant==='codex'?'.claude':'.agents';
       const excludedPath=path=>excluded.some(prefix=>path===prefix || path.startsWith(`${prefix}/`)) ||
         path===otherRoot || path.startsWith(`${otherRoot}/`) ||
         path==='status/shifts' || path.startsWith('status/shifts/') ||
@@ -96,7 +95,7 @@ function install() {
           if (retiredKey && (pristine.files?.[retiredKey] || []).includes(fingerprint(readFileSync(source)))) return;
           const entry=planned.get(path);
           if(entry && entry.ownership!=='client-template') {
-            const sourceEntry=manifest.deployment.entries.find(item=>item.destinations?.[tool]===path);
+            const sourceEntry=manifest.deployment.entries.find(item=>item.destinations?.[ai_assistant]===path);
             const known=[...(pristine.files?.[entry.fingerprint_key]||[]),...(pristine.files?.[sourceEntry?.fingerprint_key]||[])];
             if(known.includes(fingerprint(readFileSync(source)))) return;
           }
@@ -107,7 +106,7 @@ function install() {
       };
       for(const name of readdirSync(migration)) copyTree(name);
       // Preserve Codex job sheets from the pre-split agents/ and team/ layouts.
-      if (tool === 'codex' && existsSync(safePath(migration, 'agents'))) {
+      if (ai_assistant === 'codex' && existsSync(safePath(migration, 'agents'))) {
         for (const name of readdirSync(safePath(migration, 'agents'))) {
           if (!/^[A-Za-z0-9][A-Za-z0-9_-]*\.md$/.test(name)) continue;
           const source = safePath(migration, `agents/${name}`);
@@ -118,7 +117,7 @@ function install() {
         }
       }
       // Keep historical team/ files at their original paths.
-      if(tool==='codex' && existsSync(safePath(migration,'team'))) {
+      if(ai_assistant==='codex' && existsSync(safePath(migration,'team'))) {
         const oldJobs=safePath(migration,'team');
         if(!lstatSync(oldJobs).isDirectory()) throw new Error('Legacy team/ is not a directory');
         for(const name of readdirSync(oldJobs)) {
@@ -139,8 +138,7 @@ function install() {
       oldStatus.scopes={...template.scopes,...oldStatus.scopes};
       oldStatus.memory={...template.memory,...oldStatus.memory};
       oldStatus.schema_version=template.schema_version;
-      oldStatus.ai_assistant=tool;
-      delete oldStatus[LEGACY_AI_ASSISTANT_KEY];
+      oldStatus.ai_assistant = ai_assistant;
       oldStatus.template_version=manifest.template_version;
       oldStatus.home={enabled:false,branch:'main'};
       oldStatus.notes=[oldStatus.notes||'','Review any schedules in the original folder before replacing them with native scheduled tasks.'].filter(Boolean).join('\n');
@@ -174,7 +172,7 @@ function install() {
     }
     if (existsSync(target)) rmdirSync(target);
     renameSync(stage, target);
-    console.log(`Created ${tool} client repository at ${target}`);
+    console.log(`Created ${ai_assistant} client repository at ${target}`);
     console.log(useLocal?'Local Git repository ready; a private GitHub remote can be added later.':`Private GitHub repository provisioned: ${githubRepo||remoteRepo}`);
     console.log(`Next: cd ${JSON.stringify(target)} and run node start.mjs`);
   } finally {

@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { LEGACY_AI_ASSISTANT_KEY } from '../status/shapes.mjs';
 
 const release = join(dirname(fileURLToPath(import.meta.url)), '..');
 const command = join(release, 'update/destination-resolver.mjs');
@@ -23,7 +22,7 @@ function run(root, ...args) {
 }
 
 test('recorded tool selects only its destinations and classifies absent files', (t) => {
-  const root = harness(t, { ai_assistant: 'codex', [LEGACY_AI_ASSISTANT_KEY]: 'claude-code', machine_profile: { chosen_surface: 'claude-code' } });
+  const root = harness(t, { ai_assistant: 'codex', machine_profile: { chosen_surface: 'claude-code' } });
   const result = run(root);
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);

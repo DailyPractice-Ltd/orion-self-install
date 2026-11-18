@@ -6,9 +6,9 @@ import { planForTool } from './destination-resolver.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(join(root, 'update/manifest.json'), 'utf8'));
-const tool = process.argv[process.argv.indexOf('--tool') + 1];
+const ai_assistant = process.argv[process.argv.indexOf('--tool') + 1];
 try {
-  console.log(JSON.stringify({ ai_assistant: tool, entries: planForTool(manifest.deployment, tool, { releaseRoot: root }) }, null, 2));
+  console.log(JSON.stringify({ ai_assistant, entries: planForTool(manifest.deployment, ai_assistant, { releaseRoot: root }) }, null, 2));
 } catch (error) {
   console.error(error.message);
   process.exitCode = 2;

@@ -23,8 +23,7 @@ Read the pinned `docs/updating.md` and follow its apply instructions. If the
 source version is older than the installed version, report both versions and
 stop. If the fetch fails in Codex, see the [network instructions](../agent/adapters/codex.md).
 Use [the migration procedure](#older-same-path-folders) for a separate deployed layout
-if status has no recorded AI assistant. The updater saves the assistant recorded by
-older installs under `ai_assistant`.
+if status has no recorded AI assistant.
 
 ## Apply the pinned update
 

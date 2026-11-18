@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { WAITING_SENTENCE, RISK_MATRIX, FACTOR_WORDS, SEND_THRESHOLDS, SEND_CEILING, HISTORY_DAYS, LEVEL_SENDS, LEGACY_AI_ASSISTANT_KEY } from '../status/shapes.mjs';
+import { WAITING_SENTENCE, RISK_MATRIX, FACTOR_WORDS, SEND_THRESHOLDS, SEND_CEILING, HISTORY_DAYS, LEVEL_SENDS } from '../status/shapes.mjs';
 import { RULE_ONE, RETIRED, retiredRe } from '../status/send.mjs';
 import { runRadio } from './helpers/run-radio.mjs';
 import { pathToFileURL } from 'node:url';
@@ -20,11 +20,11 @@ import { plainEnv } from './helpers/env.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** A harness folder with the real scripts in it, one level, and one hired agent. */
-function makeHarness(t, { level = 'low', sheetExtra = '', status = {}, tool = 'claude-code' } = {}) {
+function makeHarness(t, { level = 'low', sheetExtra = '', status = {}, ai_assistant = 'claude-code' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'orion-send-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, 'status'));
-  const jobRoot = tool === 'codex' ? 'agents' : '.claude/agents';
+  const jobRoot = ai_assistant === 'codex' ? 'agents' : '.claude/agents';
   mkdirSync(join(dir, jobRoot), { recursive: true });
   mkdirSync(join(dir, 'update'));
   for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(ROOT, 'update', f), join(dir, 'update', f));
@@ -33,7 +33,7 @@ function makeHarness(t, { level = 'low', sheetExtra = '', status = {}, tool = 'c
   }
   const scopes = level === null ? { crm_write: true } : { crm_write: true, send_risk: level, send_risk_set_by: 'Priya', send_risk_set_on: '2026-11-01' };
   writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
-    template_version: '1.5.0', ai_assistant: tool, agent_name: 'Orion', business_name: 'Northwind', client_name: 'Priya',
+    template_version: '1.5.0', ai_assistant, agent_name: 'Orion', business_name: 'Northwind', client_name: 'Priya',
     scopes, sharing: { status_signal_enabled: false }, ...status,
   }, null, 2));
   writeFileSync(join(dir, jobRoot, 'follow-up.md'), `---\nname: follow-up\ntools: Read, mcp__claude_ai_Gmail__search_threads, mcp__claude_ai_Gmail__send_message\ngo_live: true\ncrm_write: standing\n${sheetExtra}---\n# Follow-up\n`);
@@ -50,7 +50,7 @@ const score = (h, { relationship = 'reply', content = 'logistics', channel = 'em
   h.run('score', '--agent', 'follow-up', '--to', 'priya@northwind.example', '--channel', channel, '--relationship', relationship, '--content', content, ...more);
 
 test('Codex send gate reads and changes agents/ job sheets', (t) => {
-  const h = makeHarness(t, { tool: 'codex' });
+  const h = makeHarness(t, { ai_assistant: 'codex' });
   assert.equal(h.run('set-level', 'never', '--agent', 'follow-up').code, 0);
   assert.match(readFileSync(join(h.dir, 'agents', 'follow-up.md'), 'utf8'), /send_risk: never/);
   assert.match(score(h).out, /wait|never/i);
@@ -263,7 +263,7 @@ function releasedHarness(t, tag, { hand = null } = {}) {
   writeFileSync(def, readFileSync(def, 'utf8').replaceAll('{{CLIENT_NAME}}', 'Priya').replaceAll('{{AGENT_NAME}}', 'Orion').replaceAll('{{CLIENT_BUSINESS}}', 'Northwind'));
   if (hand) writeFileSync(def, hand(readFileSync(def, 'utf8')));
   const status = JSON.parse(readFileSync(join(dir, 'status', 'status.schema-template.json'), 'utf8'));
-  Object.assign(status, { template_version: tag.slice(1), [LEGACY_AI_ASSISTANT_KEY]: 'claude-code', business_name: 'Northwind', agent_name: 'Orion', client_name: 'Priya' });
+  Object.assign(status, { template_version: tag.slice(1), ai_assistant: 'claude-code', business_name: 'Northwind', agent_name: 'Orion', client_name: 'Priya' });
   writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify(status, null, 2));
   // A hired agent, written from that release's hiring template, with the client's own exception.
   mkdirSync(join(dir, '.claude', 'agents'), { recursive: true });
@@ -495,8 +495,7 @@ test('tripwire: on a fresh 1.5.0 folder migrate has nothing to change and finds 
   for (const rel of ['AGENTS.md', 'agent/agent-definition.md', 'agent/adapters/claude-code.md', 'agent/adapters/claude.md', 'agent/adapters/codex.md', 'agent/adapters/chatgpt.md', 'agent/adapters/copilot.md', 'status/send.mjs', 'status/shapes.mjs', 'update/manifest.json', 'update/destination-resolver.mjs']) copyFileSync(join(ROOT, rel), join(dir, rel));
   copyFileSync(join(dir, 'status', 'status.schema-template.json'), join(dir, 'status', 'status.json'));
   const freshStatus = JSON.parse(readFileSync(join(dir, 'status', 'status.json'), 'utf8'));
-  freshStatus.ai_assistant = 'claude-code';
-  writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify(freshStatus));
+  writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({ ...freshStatus, ai_assistant: 'claude-code' }));
   const run = (...args) => spawnSync(process.execPath, [join(dir, 'status', 'send.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: plainEnv() });
   const m = run('migrate');
   assert.equal(m.status, 0, m.stdout + m.stderr);

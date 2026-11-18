@@ -6,7 +6,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { LEGACY_AI_ASSISTANT_KEY } from '../status/shapes.mjs';
 
 const release = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -110,13 +109,12 @@ test('Codex migration preserves legacy team jobs in place', t => {
   const base=mkdtempSync(join(tmpdir(),'orion-codex-migrate-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
   const legacy=join(base,'legacy'),target=join(base,'client');mkdirSync(legacy);
   const put=(path,body)=>{const full=join(legacy,path);mkdirSync(dirname(full),{recursive:true});writeFileSync(full,body);};
-  put('status/status.json',JSON.stringify({template_version:'2.0.0',[LEGACY_AI_ASSISTANT_KEY]:'codex'}));
+  put('status/status.json',JSON.stringify({template_version:'2.0.0',ai_assistant:'codex'}));
   put('team/README.md','my roster\n');put('team/writer.md','my job\n');
   const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','codex','--target',target,'--migrate-from',legacy,'--local-only'],{encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);
   const migrated = JSON.parse(readFileSync(join(target, 'status/status.json'), 'utf8'));
   assert.equal(migrated.ai_assistant, 'codex');
-  assert.equal(Object.hasOwn(migrated, LEGACY_AI_ASSISTANT_KEY), false);
   assert.equal(readFileSync(join(target,'team/README.md'),'utf8'),'my roster\n');
   assert.equal(readFileSync(join(target,'team/writer.md'),'utf8'),'my job\n');
   assert.equal(existsSync(join(target,'agents')),false);

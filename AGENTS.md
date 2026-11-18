@@ -57,6 +57,23 @@ before the client closes the conversation, not only if they ask. Without this, "
 stop anytime and come back" silently stops being true the moment file upload isn't
 available, and that promise is made to every reader in `README.md` — keep it.
 
+## Before Orion work
+
+At each interactive task or scheduled run, run `node status/guard.mjs check --quiet`
+from this Orion folder before researching, executing skills, using work connectors,
+sending messages, writing CRM, or advancing installation stages. Continue only when
+it exits 0. It freshly verifies this folder and delivers pending finished-work reports;
+a previous successful check or a saved credential is not permission for this run.
+If it exits 2, tell the client its one recovery action and pause work. A grace reminder
+with exit 0 permits existing work until the displayed deadline.
+
+While paused, help with inspection, diagnosis, updates, code renewal and pairing;
+`node start.mjs --code <code>` is recovery. Keep recording already finished work with
+`done.mjs` or `radio.mjs signal`. Read `docs/radio.md` for connection recovery and
+`docs/scheduled-work.md` before creating or migrating native schedules. If this
+surface cannot execute the check, continue setup/recovery guidance and have the
+client run it in their connected Orion environment before work begins.
+
 ## Before you say anything to the client
 
 1. **Read `status/status.json`.** If it does not exist, this is session 1 — copy

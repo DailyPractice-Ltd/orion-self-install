@@ -191,7 +191,7 @@ function sentTodayOn(group, now = new Date()) {
   }).length;
 }
 
-function score(rest) {
+async function score(rest) {
   const { flags, problems } = parseFlags(rest, { values: ['agent', 'to', 'channel', 'relationship', 'content'], switches: ['customer', 'replied'] });
   for (const needed of ['agent', 'to', 'channel', 'relationship', 'content']) {
     if (flags[needed] === undefined || !String(flags[needed]).trim()) problems.push(`--${needed} is missing.`);
@@ -206,6 +206,10 @@ function score(rest) {
     console.log(USAGE);
     return 1;
   }
+  const {checkWork} = await import('./guard.mjs');
+  const permission = await checkWork({root:FOLDER});
+  if (!permission.allow || permission.grace) console.log(permission.reason);
+  if (!permission.allow) return 2;
   const status = readStatus();
   if (!status) {
     console.log('No status/status.json yet, so there is no level to score against. Run  node start.mjs  first.');
@@ -712,7 +716,7 @@ function migrate(rest) {
 
 const COMMANDS = { score, outcome, verdict, 'no-contact': noContact, 'set-level': setLevel, migrate };
 
-function main(argv) {
+async function main(argv) {
   const [command, ...rest] = argv;
   if (!command || command === '--help' || command === '-h') {
     console.log(USAGE);
@@ -731,4 +735,4 @@ function runAsCommand() {
   if (!process.argv[1]) return false;
   try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
 }
-if (runAsCommand()) process.exit(main(process.argv.slice(2)));
+if (runAsCommand()) process.exit(await main(process.argv.slice(2)));

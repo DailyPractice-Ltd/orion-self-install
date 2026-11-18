@@ -149,6 +149,14 @@ if (!command || !['check', 'reply', 'send', 'library', 'contribute', 'signal', '
   process.exit(command ? 1 : 0);
 }
 
+// Reporting follows completed work; reading messages and previews remain recovery paths.
+if (['send','reply'].includes(command) || (['contribute','library'].includes(command) && flags.yes !== undefined)) {
+  const {checkWork} = await import('./guard.mjs');
+  const permission = await checkWork({root:ROOT});
+  if (!permission.allow || permission.grace) console.log(permission.reason);
+  if (!permission.allow) process.exit(2);
+}
+
 // ── The radio-on gate ───────────────────────────────────────────────────────
 
 if (!existsSync(STATUS_PATH)) {

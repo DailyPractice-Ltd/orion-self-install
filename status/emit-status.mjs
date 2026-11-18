@@ -22,6 +22,7 @@ import { spawnSync } from 'node:child_process';
 import { wantsEnvProxy, envProxyEnv } from './shapes.mjs';
 
 import { withStatusLock } from './store.mjs';
+import { checkWork } from './guard.mjs';
 import { reportSignal } from './report.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -35,6 +36,19 @@ if (wantsEnvProxy()) {
 
 const STATUS_PATH = join(__dirname, 'status.json');
 const TEMPLATE_PATH = join(__dirname, 'status.schema-template.json');
+
+// Gate work-advancing flags before initialization or any stage/checklist mutation.
+// Notes and identity edits remain usable for recovery; post-work reports use done/radio.
+const workArgs = process.argv.slice(2);
+const advancesWork = workArgs.some((arg,index) =>
+  arg === '--ops_stage' ||
+  (arg === '--checklist' && workArgs[index+1]?.endsWith('=true')) ||
+  (arg === '--harness_status' && ['configured','connected','validated','installed','installed/running','running','formalised'].includes(workArgs[index+1])));
+if (advancesWork) {
+  const permission = await checkWork({root:join(__dirname,'..')});
+  if (!permission.allow || permission.grace) console.log(permission.reason);
+  if (!permission.allow) process.exit(2);
+}
 
 const now = new Date().toISOString();
 const status = await withStatusLock(join(__dirname,'..'), async store => {

@@ -44,7 +44,7 @@ export function runRadio(args, { reply, skill, writeSkill = writeRichSkill, stat
   const dir = mkdtempSync(join(tmpdir(), 'orion-radio-'));
   try {
     mkdirSync(join(dir, 'status'));
-    for (const f of ['radio.mjs', 'shapes.mjs', 'report.mjs', 'store.mjs']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
+    for (const f of ['radio.mjs', 'shapes.mjs', 'report.mjs', 'store.mjs', 'guard.mjs']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
     mkdirSync(join(dir, 'update'));
     for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(updateDir, f), join(dir, 'update', f));
     writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
@@ -68,6 +68,7 @@ export function runRadio(args, { reply, skill, writeSkill = writeRichSkill, stat
         appendFileSync(${JSON.stringify(log)}, JSON.stringify({
           method: init.method || 'GET', path: u.pathname, body: init.body ? JSON.parse(init.body) : null,
         }) + '\\n');
+        if (u.pathname === '/api/bridge/verify') return new Response(JSON.stringify({status:'accepted',harness_id:'9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62'}), {status:200});
         if (u.pathname === '/api/bridge/assets') return new Response('{"asset_id":"a1","reported_at":"2026-11-18T12:00:00.000Z","replay":false}', { status: 201, headers: { 'content-type': 'application/json' } });
         return new Response(JSON.stringify(reply.body), { status: reply.status, headers: { 'content-type': 'application/json' } });
       };
@@ -93,7 +94,7 @@ export function runRadio(args, { reply, skill, writeSkill = writeRichSkill, stat
       }
     }
     const statusAfter = JSON.parse(readFileSync(join(dir, 'status', 'status.json'), 'utf8'));
-    return { code: r.status, out: r.stdout, err: r.stderr, calls, trees, statusAfter };
+    return { code: r.status, out: r.stdout, err: r.stderr, calls: calls.filter(c=>c.path !== '/api/bridge/verify'), verificationCalls: calls.filter(c=>c.path === '/api/bridge/verify'), trees, statusAfter };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

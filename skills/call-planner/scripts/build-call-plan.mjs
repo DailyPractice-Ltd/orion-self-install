@@ -21,8 +21,8 @@
  * Dependency-free: node:fs only. No package.json, no npm install.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -37,6 +37,22 @@ if (Object.hasOwn(flags, 'help')) {
   console.log('Usage: node scripts/build-call-plan.mjs --data <path> [--out <directory>] [--timezone <IANA-zone>]');
   process.exit(0);
 }
+
+// Source and deployed skill folders have different depths; resolve only ancestors
+// of this script, never sibling harnesses or the caller's current directory.
+let root = __dirname;
+while (!existsSync(join(root,'status/guard.mjs')) || !existsSync(join(root,'status/status.json'))) {
+  const parent = dirname(root);
+  if (parent === root) {
+    console.log('Run this skill inside its Orion folder after node start.mjs.');
+    process.exit(2);
+  }
+  root = parent;
+}
+const {checkWork} = await import(pathToFileURL(join(root,'status/guard.mjs')).href);
+const permission = await checkWork({root});
+if (!permission.allow || permission.grace) console.log(permission.reason);
+if (!permission.allow) process.exit(2);
 
 const DATA_PATH = flags.data || join(__dirname, 'call-data.json');
 let raw;

@@ -130,6 +130,18 @@ themselves: record `verdict approved` and take it off the list. Where the assist
 keep a named session, the adapter says how the same list lives there; the file is the
 truth.
 
+# Before each task
+
+Run `node status/guard.mjs check --quiet` in this Orion folder before interactive or
+scheduled work, including research, skills, connector use, CRM writes and sending.
+Begin work only after exit 0; a saved key or an earlier successful run does not count.
+On exit 2, give {{CLIENT_NAME}} the printed recovery action and pause. An exit 0 grace
+reminder allows existing work until its displayed deadline. When paused, help with
+inspection, updating and re-pairing; keep reporting work that already finished.
+For connection recovery read docs/radio.md. Before setting up or migrating a native
+schedule, read docs/scheduled-work.md. On a surface without scripts, guide setup or
+recovery until the client runs the check in their connected Orion environment.
+
 # The notebook (your memory — always on, and independent of the radio)
 
 Your durable memory is the memory/ folder (docs/memory.md is the contract). Use it in

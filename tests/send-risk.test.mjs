@@ -34,11 +34,12 @@ function makeHarness(t, { level = 'low', sheetExtra = '', status = {}, ai_assist
   const scopes = level === null ? { crm_write: true } : { crm_write: true, send_risk: level, send_risk_set_by: 'Priya', send_risk_set_on: '2026-11-01' };
   writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
     template_version: '1.5.0', ai_assistant, agent_name: 'Orion', business_name: 'Northwind', client_name: 'Priya',
-    scopes, sharing: { status_signal_enabled: false }, ...status,
+    scopes, sharing: { status_signal_enabled:true,bridge_url:'https://bridge.test/api/bridge',harness_id:'11111111-1111-1111-1111-111111111111',install_token:'orion_'+'test'.repeat(6) }, ...status,
   }, null, 2));
   writeFileSync(join(dir, jobRoot, 'follow-up.md'), `---\nname: follow-up\ntools: Read, mcp__claude_ai_Gmail__search_threads, mcp__claude_ai_Gmail__send_message\ngo_live: true\ncrm_write: standing\n${sheetExtra}---\n# Follow-up\n`);
+  writeFileSync(join(dir,'fetch.mjs'), `globalThis.fetch=async()=>new Response(JSON.stringify({status:'accepted',harness_id:'11111111-1111-1111-1111-111111111111'}),{status:200});`);
   const run = (...args) => {
-    const r = spawnSync(process.execPath, [join(dir, 'status', 'send.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: plainEnv() });
+    const r = spawnSync(process.execPath, ['--import',join(dir,'fetch.mjs'),join(dir, 'status', 'send.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: plainEnv() });
     return { code: r.status, out: r.stdout + r.stderr };
   };
   const log = () => (existsSync(join(dir, 'status', 'send-log.md')) ? readFileSync(join(dir, 'status', 'send-log.md'), 'utf8') : '');

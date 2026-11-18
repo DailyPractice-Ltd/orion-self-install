@@ -20,6 +20,8 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { checkWork } from '../../status/guard.mjs';
 
 const API = 'https://api.hubapi.com';
 const KEY = process.env.HUBSPOT_API_KEY;
@@ -30,6 +32,9 @@ if (!KEY) {
 
 const templatePath = process.argv[2] ?? new URL('./hubspot-template.json', import.meta.url);
 const template = JSON.parse(readFileSync(templatePath, 'utf8'));
+const permission = await checkWork({root:fileURLToPath(new URL('../../',import.meta.url))});
+if (!permission.allow || permission.grace) console.log(permission.reason);
+if (!permission.allow) process.exit(2);
 
 async function hubspot(method, path, body) {
   const res = await fetch(`${API}${path}`, {

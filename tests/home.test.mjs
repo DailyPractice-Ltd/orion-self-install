@@ -716,7 +716,7 @@ test('pairing a folder that has a home puts the key in status/radio.key, never i
     status: { home: { enabled: true, branch: 'main' }, checklist: {}, packages: {}, stage_history: [], machine_profile: null },
   });
   copyFileSync(join(repo, 'start.mjs'), join(h.dir, 'start.mjs'));
-  copyFileSync(join(statusDir, 'status.schema-template.json'), join(h.dir, 'status', 'status.schema-template.json'));
+  for (const file of ['guard.mjs', 'store.mjs', 'report.mjs', 'status.schema-template.json']) copyFileSync(join(statusDir, file), join(h.dir, 'status', file));
   const r = h.run('start.mjs', ['--code', CODE]);
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /Paired\. Your key is saved on this machine only, in status\/radio\.key/);
@@ -739,7 +739,7 @@ test('the wizard still writes the key to status.json on a folder with no home', 
     status: { checklist: {}, packages: {}, stage_history: [], machine_profile: null },
   });
   copyFileSync(join(repo, 'start.mjs'), join(h.dir, 'start.mjs'));
-  copyFileSync(join(statusDir, 'status.schema-template.json'), join(h.dir, 'status', 'status.schema-template.json'));
+  for (const file of ['guard.mjs', 'store.mjs', 'report.mjs', 'status.schema-template.json']) copyFileSync(join(statusDir, file), join(h.dir, 'status', file));
   const r = h.run('start.mjs', ['--code', CODE]);
   assert.match(r.out, /your key is saved in your own bookmark file/);
   assert.equal(h.status().sharing.install_token, OTHER_KEY);

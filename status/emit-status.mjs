@@ -15,7 +15,7 @@
  * surface, edit status/status.json directly instead — it's plain JSON, no script needed.
  */
 
-import { existsSync, copyFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -36,13 +36,12 @@ if (wantsEnvProxy()) {
 const STATUS_PATH = join(__dirname, 'status.json');
 const TEMPLATE_PATH = join(__dirname, 'status.schema-template.json');
 
-if (!existsSync(STATUS_PATH)) {
-  copyFileSync(TEMPLATE_PATH, STATUS_PATH);
-  console.log('status/status.json did not exist — initialized from status.schema-template.json.');
-}
-
 const now = new Date().toISOString();
 const status = await withStatusLock(join(__dirname,'..'), async store => {
+  if (!existsSync(STATUS_PATH)) {
+    await store.writeStatus(JSON.parse(readFileSync(TEMPLATE_PATH, 'utf8')));
+    console.log('status/status.json did not exist — initialized from status.schema-template.json.');
+  }
   const status = await store.readStatus();
 
   // Parse --key value and --checklist key=value pairs from argv.

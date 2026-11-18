@@ -9,6 +9,7 @@ import { dirname, join, delimiter } from 'node:path';
 import os from 'node:os';
 import { open, rename, unlink } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+import { reportSignal, validateOutbox } from './status/report.mjs';
 import { checkWork } from './status/guard.mjs';
 import { withStatusLock } from './status/store.mjs';
 import {
@@ -492,7 +493,7 @@ async function main() {
     pauseSetup(verified.reason + ' Run node start.mjs again to resume your saved setup.'); return;
   }
   Object.assign(status.sharing, checked.sharing);
-  await sendFirstSignal(status); // Integration seam: ticket 05 routes this through reportSignal.
+  if (!(await sendFirstSignal())) return;
 
   // Step 3 — hand off to the client's own AI (FR-003).
   say('');
@@ -561,44 +562,48 @@ async function pairingStep(status) {
   return true;
 }
 
-/**
- * First signal, during the install session itself (FR-008). One try, honest
- * report, never a blocker — the same posture every outbound path here has.
- */
-async function sendFirstSignal(status) {
+/** The setup checkpoint has one durable identity, including across lost ACKs. */
+async function sendFirstSignal() {
   try {
-    const res = await fetch(status.sharing.bridge_url + '/signals', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...keyHeader(radioKey(status, keyPlaces())),
-      },
-      body: JSON.stringify({
-        harness_id: status.sharing.harness_id,
-        signal_type: 'install_checkpoint',
+    const checkpoint = await withStatusLock(__dirname, async store => {
+      const current = await store.readStatus();
+      current.setup_checkpoint ??= {
+        harness_id: current.sharing.harness_id,
         occurred_at: new Date().toISOString(),
         payload: {
-          ops_stage: status.ops_stage,
-          harness_status: status.harness_status,
-          template_version: status.template_version,
+          ops_stage: current.ops_stage,
+          harness_status: current.harness_status,
+          template_version: current.template_version,
         },
-      }),
-      signal: AbortSignal.timeout(NETWORK_TIMEOUT_MS),
+        delivered: false,
+      };
+      const saved = current.setup_checkpoint;
+      if (!saved || saved.harness_id !== current.sharing.harness_id || typeof saved.delivered !== 'boolean') throw new Error('Invalid setup checkpoint');
+      validateOutbox([{kind:'signal',body:{harness_id:saved.harness_id,signal_type:'install_checkpoint',occurred_at:saved.occurred_at,payload:saved.payload}}]);
+      await store.writeStatus(current);
+      return saved;
     });
-    if (res.ok) {
-      say('  ✓ The first check-in just landed with Daily Practice. That\'s the radio');
-      say('    working. Your system counts as running once it reports its first');
-      say('    finished task.');
-    } else if (res.status === 401) {
-      say('  • The radio says that key isn\'t valid (401) — unusual right after');
-      say('    pairing. Ask support@dailypractice.world. Nothing else is affected.');
-    } else {
-      say(`  • The radio answered with status ${res.status} — not retrying.`);
-      say('    Your settings are saved. Run node start.mjs again to retry.');
+    if (checkpoint.delivered) return true;
+    const report = await reportSignal({root:__dirname,signalType:'install_checkpoint',occurredAt:checkpoint.occurred_at,payload:checkpoint.payload});
+    if (report.status !== 'sent' || report.pending !== 0) {
+      pauseSetup((report.reason || 'The first check-in is waiting for recovery.') + ' Run node start.mjs again to resume your saved setup.');
+      return false;
     }
-  } catch (err) {
-    say('  • The radio could not be reached. Restore the connection and retry.');
-    say('    Your settings are saved. Run node start.mjs again to retry.');
+    // Preserve the fresh guard decision, but check for any concurrent reporter
+    // before completing setup. An unresolved report must suppress the handoff.
+    await withStatusLock(__dirname, async store => {
+      const current = await store.readStatus();
+      const pending = validateOutbox(await store.readOutbox());
+      if (pending.length || current.sharing.pairing.last_check !== 'accepted' || current.sharing.harness_id !== checkpoint.harness_id || current.sharing.status_signal_enabled !== true) throw new Error('Report recovery needed');
+      current.setup_checkpoint.delivered = true;
+      await store.writeStatus(current);
+    });
+    say('  ✓ The first check-in just landed with Daily Practice. Your system counts');
+    say('    as running once it reports its first finished task.');
+    return true;
+  } catch {
+    pauseSetup('The setup check-in needs recovery. Run node start.mjs again after recovering the saved status files or connection.');
+    return false;
   }
 }
 

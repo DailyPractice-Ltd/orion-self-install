@@ -26,7 +26,10 @@ function harness(t, initial = {}) {
   if(scenario==='verify-network') throw new Error('secret-do-not-print');
   return new Response(scenario==='verify-malformed'?'{}':JSON.stringify({status:'accepted',harness_id:scenario==='wrong-harness'?'87654321-1234-1234-1234-123456789abc':'12345678-1234-1234-1234-123456789abc'}),{status:scenario==='reject'?401:scenario==='verify-error'?503:200});
  }
- return new Response('{}',{status:201}); };`);
+ if(scenario==='checkpoint-malformed') return new Response('{}',{status:201});
+ if(scenario==='checkpoint-refuse') return new Response('{}',{status:401});
+ if(scenario==='checkpoint-network') throw new Error('secret-do-not-print');
+ return new Response(JSON.stringify({signal_id:'s1',recorded_at:'2026-11-18T12:00:00.000Z',replay:false}),{status:201}); };`);
  return {root, status:()=>JSON.parse(readFileSync(join(root,'status/status.json'))), run:(args=[],scenario='',env={})=>spawnSync(process.execPath,['--import',pathToFileURL(mock).href,join(root,'start.mjs'),...args],{input:'',encoding:'utf8',env:plainEnv({SCENARIO:scenario,...env})})};
 }
 test('new setup without a code pauses with self-service recovery and no handoff',t=>{
@@ -100,3 +103,20 @@ test('malformed pairing state stops before changing the saved machine profile',t
  const h=harness(t,{sharing:template.sharing,machine_profile:{chosen_surface:'codex',detected_at:'saved'}});
  assert.equal(h.run().status,2); assert.deepEqual(h.status().machine_profile,{chosen_surface:'codex',detected_at:'saved'});
 });
+test('first report failure suppresses handoff and resumes the original checkpoint exactly once',t=>{
+ const h=harness(t);const first=h.run(['--code','BCDF-GHJK-LMNP'],'checkpoint-network');
+ assert.equal(first.status,2,first.stdout+first.stderr);assert.doesNotMatch(first.stdout,/your AI takes it from here/);
+ const queued=JSON.parse(readFileSync(join(h.root,'status/radio-outbox.json')));assert.equal(queued.length,1);
+ const resumed=h.run();assert.equal(resumed.status,0,resumed.stdout+resumed.stderr);
+ const original=queued[0].body;const calls=readFileSync(join(h.root,'requests'),'utf8').trim().split('\n').map(JSON.parse).filter(c=>c.url.endsWith('/signals'));
+ assert.ok(calls.every(c=>JSON.parse(c.body).occurred_at===original.occurred_at));
+ const before=calls.length;assert.equal(h.run().status,0);
+ assert.equal(readFileSync(join(h.root,'requests'),'utf8').trim().split('\n').map(JSON.parse).filter(c=>c.url.endsWith('/signals')).length,before);
+});
+for (const scenario of ['checkpoint-malformed','checkpoint-refuse']) {
+ test(`first report ${scenario} stays queued and never permits handoff`,t=>{
+  const h=harness(t);const run=h.run(['--code','BCDF-GHJK-LMNP'],scenario);
+  assert.equal(run.status,2,run.stdout+run.stderr);assert.doesNotMatch(run.stdout,/your AI takes it from here/);
+  assert.equal(JSON.parse(readFileSync(join(h.root,'status/radio-outbox.json'))).length,1);
+ });
+}

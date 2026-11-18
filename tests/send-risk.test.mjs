@@ -427,7 +427,7 @@ test('the status template and wizard default to low, and the update prompts call
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, 'status'));
   copyFileSync(join(ROOT, 'start.mjs'), join(dir, 'start.mjs'));
-  for (const f of ['shapes.mjs', 'status.schema-template.json']) copyFileSync(join(ROOT, 'status', f), join(dir, 'status', f));
+  for (const f of ['shapes.mjs', 'guard.mjs', 'store.mjs', 'report.mjs', 'status.schema-template.json']) copyFileSync(join(ROOT, 'status', f), join(dir, 'status', f));
   const noNetwork = join(dir, 'no-network.mjs');
   writeFileSync(noNetwork, 'globalThis.fetch = async () => { throw new Error("the wizard must not dial out in this test"); };');
   const r = spawnSync(process.execPath, ['--import', pathToFileURL(noNetwork).href, join(dir, 'start.mjs'), '--checkins', 'no'], { encoding: 'utf8', input: '', cwd: dir });

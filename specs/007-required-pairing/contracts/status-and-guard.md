@@ -208,3 +208,12 @@ New runtime modules ship through both manifest refresh and common_sources. Pairi
 and outbox data remain client-owned; updates never replace them. Constitution is
 maintainer-only source. Editable local files/prompts cannot enforce tamper-proof
 licensing; this is supported-flow account pairing, never a payment gate.
+
+Setup additionally records optional local `status.setup_checkpoint` progress with
+`harness_id`, original `occurred_at`, frozen labels-only `payload`, and boolean
+`delivered`. This marker is outside `sharing.pairing`; it is neither a credential
+nor authorization. The wizard creates it under the shared lock before reporting,
+uses its original identity on recovery, and marks it delivered only after an
+acknowledged empty outbox and unchanged accepted folder association. Subsequent
+wizard resumes still run the fresh guard but do not create another checkpoint.
+A crash between ACK and marker persistence may retry the original identity safely.

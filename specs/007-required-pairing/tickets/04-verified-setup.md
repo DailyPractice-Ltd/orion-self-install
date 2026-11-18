@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 — Central guard and existing-user migration.
 
-**Status:** implemented; awaiting ticket 05 first-signal integration on the integration branch
+**Status:** implemented; durable first-signal integration complete
 
 - [x] Use the approved explanation verbatim: “Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.”
 - [x] Direct users to the self-service account page and use the shared guard and pairing states for both wizard and direct conversational installation.
@@ -21,4 +21,4 @@
 
 Validation: `node --check start.mjs`; `node --test tests/pairing-guard.test.mjs tests/verified-setup.test.mjs` (49 tests). The initial no-code/decline test failed against the previous successful handoff, then passed after the setup gate. Failure/restart coverage includes rejected/malformed/mismatched verification, exchange/network failures, ordinary/homed/cloud credentials, pre-profile migration detection and dead-owner lock recovery.
 
-Integration boundary: `sendFirstSignal` remains the existing sender for ticket 05/root to replace with `reportSignal`, followed by a guard check so queued or rejected first reports suppress handoff. No deployment or live account verification was attempted. Full-suite legacy setup/consent fixtures and manifest/version/pristine alignment remain ticket 07 work; `/private/tmp/ticket04-tests.log` records the intermediate 206-pass/15-fail run before two additional focused tests.
+Ticket 05 integration: `sendFirstSignal` uses `reportSignal` with a durable original checkpoint identity. Queued, rejected or malformed acknowledgements suppress handoff. After delivery the shared lock confirms an empty outbox and unchanged accepted folder association; completed checkpoints are not recreated on resume. No deployment or live account verification was attempted. Full-suite legacy setup/consent fixtures and manifest/version/pristine alignment remain ticket 07 work; `/private/tmp/ticket04-tests.log` records the intermediate 206-pass/15-fail run before two additional focused tests.

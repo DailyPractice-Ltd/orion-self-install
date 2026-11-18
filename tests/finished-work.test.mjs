@@ -801,7 +801,7 @@ test('tripwire: the consent sentence is the same words in AGENTS.md, the wizard,
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, 'status'));
   copyFileSync(join(repo, 'start.mjs'), join(dir, 'start.mjs'));
-  for (const f of ['shapes.mjs', 'status.schema-template.json']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
+  for (const f of ['shapes.mjs', 'guard.mjs', 'store.mjs', 'report.mjs', 'status.schema-template.json']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
   const noNetwork = join(dir, 'no-network.mjs');
   writeFileSync(noNetwork, `
     import { writeFileSync } from 'node:fs';

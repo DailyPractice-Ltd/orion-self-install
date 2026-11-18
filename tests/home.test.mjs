@@ -107,7 +107,7 @@ function folder(base, dir, { answer = 201 } = {}) {
       if (u.pathname.endsWith('/pair')) {
         return json(200, { install_token: ${JSON.stringify(OTHER_KEY)}, harness_id: ${JSON.stringify(HARNESS_ID)}, bridge_url: 'https://radio.test/api/bridge' });
       }
-      return json(answer, answer >= 400 ? { error: 'refused' } : { signal_id: 's1', replay: false });
+      return json(answer, answer >= 400 ? { error: 'refused' } : { signal_id: 's1', recorded_at: '2026-11-18T12:00:00.000Z', replay: false });
     };
   `);
   const read = (rel) => (existsSync(join(dir, rel)) ? readFileSync(join(dir, rel), 'utf8') : null);

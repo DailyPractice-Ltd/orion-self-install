@@ -87,6 +87,7 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, lstatS
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { reportSignal, reportAsset } from './report.mjs';
 import { runtimeLayout } from '../update/destination-resolver.mjs';
 import {
   radioOn as radioIsOn, radioKey, readRadioKeyFile, keyHeader, wantsEnvProxy, envProxyEnv, isCloudRun,
@@ -163,7 +164,7 @@ const keyPlaces = { keyFile: readRadioKeyFile(__dirname, { readFileSync }) };
 const key = radioKey(status, keyPlaces);
 const radioOn = radioIsOn(status, keyPlaces);
 
-if (!radioOn) {
+if (!radioOn && !['signal','report-install'].includes(command)) {
   console.log('Radio is off (or not configured) — nothing sent, nothing checked. Local work is unaffected.');
   process.exit(0);
 }
@@ -540,16 +541,13 @@ if (command === 'library') {
   console.log('A skill never sets your send level: that lives in status/status.json and on each job sheet, and this install touched neither.');
 
   // The shelf is how Daily Practice knows who is affected when this improves.
-  const report = await call('POST', '/assets', {
-    harness_id: sharing.harness_id,
-    slug,
-    kind: asset.kind || 'skill',
-    version: asset.version || '0.0.0',
-    installed_at: new Date().toISOString(),
-  });
-  console.log(report.ok
+  const report = await reportAsset({root:ROOT,asset:{
+    slug, kind:asset.kind || 'skill', version:asset.version || '0.0.0',
+    installed_at:new Date().toISOString(),
+  }});
+  console.log(report.status === 'sent'
     ? `Daily Practice knows this machine now runs ${slug}.`
-    : 'Written locally; the shelf report did not go through, which changes nothing here.');
+    : report.reason || 'Written locally; the shelf report is saved for recovery.');
   console.log('');
   console.log('--- for the assistant, not to be read aloud ---');
   if (fill.open.length > 0) {
@@ -764,21 +762,11 @@ if (command === 'signal') {
     }
   }
 
-  const res = await call('POST', '/signals', {
-    harness_id: sharing.harness_id,
-    signal_type: flags.type,
-    // Server name for the client-clock timestamp; it anchors replay idempotence.
-    occurred_at: new Date().toISOString(),
-    payload: {
-      ops_stage: status.ops_stage,
-      harness_status: status.harness_status,
-      template_version: status.template_version,
-      ...work,
-    },
-  });
-  if (res.status === 401) reportAuthProblem();
-  console.log(res.ok ? `Signal sent (${flags.type}).` : `Signal answered ${res.status} — not retried.`);
-  resultLine(res.ok ? 'sent' : `refused ${res.status}`);
+  const report = await reportSignal({root:ROOT,signalType:flags.type,payload:work});
+  if (report.result === 'refused 401') reportAuthProblem();
+  if (report.result === 'unreachable' && isCloudRun()) console.log(`On a cloud run this usually means the cloud environment may not reach ${new URL(base).host}.`);
+  console.log(report.status === 'sent' ? `Signal sent (${flags.type}).` : report.status === 'off' ? 'Radio is off (or not configured) — report saved locally for recovery.' : report.reason || 'Signal saved locally for recovery.');
+  resultLine(report.status === 'sent' ? 'sent' : report.result || report.status);
   process.exit(0);
 }
 
@@ -835,18 +823,20 @@ if (command === 'report-install') {
     console.log('a company, or a figure. Reword it (e.g. "warms CRM leads toward booked meetings"). Not sent.');
     process.exit(1);
   }
-  const res = await call('POST', '/assets', {
-    harness_id: sharing.harness_id,
-    slug: flags.slug,
-    kind: flags.kind,
-    version: flags.version,
-    installed_at: new Date().toISOString(),
-    ...(role ? { role } : {}),
-    ...(purpose ? { purpose } : {}),
-  });
-  if (res.status === 401) reportAuthProblem();
-  console.log(res.ok
-    ? `Shelf updated — Daily Practice knows this machine runs ${flags.slug} v${flags.version}.`
-    : `Shelf report answered ${res.status} — not retried; the install itself is unaffected.`);
+  const asset = {
+    slug:flags.slug, kind:flags.kind, version:flags.version,
+    installed_at:new Date().toISOString(), ...(role ? {role} : {}),
+  };
+  // Always preserve the ambient shelf labels. Explicit purpose words travel only
+  // in this consented invocation and are never copied into the durable queue.
+  const report = await reportAsset({root:ROOT,asset});
+  if (purpose && report.status === 'sent') {
+    const res = await call('POST','/assets',{harness_id:sharing.harness_id,...asset,purpose});
+    if (res.status === 401) reportAuthProblem();
+    console.log(res.ok ? `Shelf updated — Daily Practice knows this machine runs ${flags.slug} v${flags.version}.` : `Shelf labels delivered; purpose report answered ${res.status}. Retry the consented purpose separately.`);
+  } else {
+    console.log(report.status === 'sent' ? `Shelf updated — Daily Practice knows this machine runs ${flags.slug} v${flags.version}.` : report.reason || 'Shelf report saved for recovery.');
+    if (purpose) console.log('The consented purpose was not delivered. Retry that explicit report when connected; only shelf labels were saved.');
+  }
   process.exit(0);
 }

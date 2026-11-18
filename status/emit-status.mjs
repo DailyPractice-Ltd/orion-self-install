@@ -15,11 +15,14 @@
  * surface, edit status/status.json directly instead — it's plain JSON, no script needed.
  */
 
-import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
+import { existsSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { radioOn, radioKey, readRadioKeyFile, keyHeader, wantsEnvProxy, envProxyEnv } from './shapes.mjs';
+import { wantsEnvProxy, envProxyEnv } from './shapes.mjs';
+
+import { withStatusLock } from './store.mjs';
+import { reportSignal } from './report.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -38,69 +41,40 @@ if (!existsSync(STATUS_PATH)) {
   console.log('status/status.json did not exist — initialized from status.schema-template.json.');
 }
 
-const status = JSON.parse(readFileSync(STATUS_PATH, 'utf8'));
-
-// Parse --key value and --checklist key=value pairs from argv.
-const args = process.argv.slice(2);
-let ops_stage_changed = false;
-for (let i = 0; i < args.length; i++) {
-  const arg = args[i];
-  if (!arg.startsWith('--')) continue;
-  const key = arg.slice(2);
-  if (key === 'checklist') {
-    const [ckey, cval] = args[++i].split('=');
-    status.checklist[ckey] = cval === 'true';
-    continue;
-  }
-  const value = args[++i];
-  if (key === 'client_id') status.client_id = value;
-  else if (key === 'business_name') status.business_name = value;
-  else if (key === 'agent_name') status.agent_name = value;
-  else if (key === 'harness_status') status.harness_status = value;
-  else if (key === 'ops_stage') { status.ops_stage = value; ops_stage_changed = true; }
-  else if (key === 'notes') status.notes = value;
-}
-
 const now = new Date().toISOString();
-if (!status.started_at) status.started_at = now;
-status.updated_at = now;
-if (ops_stage_changed) {
-  status.stage_history.push({ stage: status.ops_stage, at: now });
-}
+const status = await withStatusLock(join(__dirname,'..'), async store => {
+  const status = await store.readStatus();
 
-writeFileSync(STATUS_PATH, JSON.stringify(status, null, 2) + '\n');
-console.log(`status/status.json updated — harness_status: ${status.harness_status}, ops_stage: ${status.ops_stage}`);
-
-// Emit an install_checkpoint through the radio — the one outbound path — only when
-// explicitly enabled AND the radio settings actually hold their shape (see
-// status/shapes.mjs; specs/002-production-line/contracts/bridge-radio.md).
-// Anything less is a silent local save.
-const sharing = status.sharing;
-const keyPlaces = { keyFile: readRadioKeyFile(__dirname, { readFileSync }) };
-if (radioOn(status, keyPlaces)) {
-  try {
-    const res = await fetch(String(sharing.bridge_url).replace(/\/+$/, '') + '/signals', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...keyHeader(radioKey(status, keyPlaces)),
-      },
-      body: JSON.stringify({
-        harness_id: sharing.harness_id,
-        signal_type: 'install_checkpoint',
-        occurred_at: now,
-        payload: {
-          ops_stage: status.ops_stage,
-          harness_status: status.harness_status,
-          template_version: status.template_version,
-        },
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-    console.log(res.ok ? 'Status signal sent (via the radio).' : `Radio answered ${res.status} — not retried.`);
-  } catch (err) {
-    console.log(`Radio address unreachable (${err?.cause?.code || err.message}) — not retried. Local status was still saved.`);
+  // Parse --key value and --checklist key=value pairs from argv.
+  const args = process.argv.slice(2);
+  let ops_stage_changed = false;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg.startsWith('--')) continue;
+    const key = arg.slice(2);
+    if (key === 'checklist') {
+      const [ckey, cval] = args[++i].split('=');
+      status.checklist[ckey] = cval === 'true';
+      continue;
+    }
+    const value = args[++i];
+    if (key === 'client_id') status.client_id = value;
+    else if (key === 'business_name') status.business_name = value;
+    else if (key === 'agent_name') status.agent_name = value;
+    else if (key === 'harness_status') status.harness_status = value;
+    else if (key === 'ops_stage') { status.ops_stage = value; ops_stage_changed = true; }
+    else if (key === 'notes') status.notes = value;
   }
-} else {
-  console.log('Radio off or not configured — nothing sent outward. Local status was saved.');
-}
+
+  if (!status.started_at) status.started_at = now;
+  status.updated_at = now;
+  if (ops_stage_changed) {
+    status.stage_history.push({ stage: status.ops_stage, at: now });
+  }
+
+  await store.writeStatus(status);
+  return status;
+});
+console.log(`status/status.json updated — harness_status: ${status.harness_status}, ops_stage: ${status.ops_stage}`);
+const report = await reportSignal({root:join(__dirname,'..'),signalType:'install_checkpoint',occurredAt:now});
+console.log(report.status === 'sent' ? 'Status signal sent (via the radio).' : report.reason || 'Status signal saved for recovery.');

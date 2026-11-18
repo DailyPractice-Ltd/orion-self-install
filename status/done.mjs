@@ -278,7 +278,7 @@ if (localLine !== null && memoryOn(status) && (agent || ownName)) {
 // ── 2. The radio half: labels only ──────────────────────────────────────────
 // The line is never passed below. Off means off: nothing sent, nothing said.
 
-if (radioOn(status, { keyFile: readRadioKeyFile(__dirname, { readFileSync }) })) {
+{
   const args = [
     'signal',
     '--type', shift ? 'routine_completed' : 'task_completed',
@@ -294,19 +294,19 @@ if (radioOn(status, { keyFile: readRadioKeyFile(__dirname, { readFileSync }) }))
   // Ask the radio to say what happened in one line a script can read, so this
   // never depends on the wording of the sentences it prints for people.
   args.push('--result-line', 'yes');
-  const radio = runSibling('radio.mjs', args, 30000);
+  const radio = runSibling('radio.mjs', args, 0);
   const lines = radio.out ? radio.out.split('\n') : [];
   const resultAt = lines.findIndex((l) => l.startsWith('[radio-result] '));
   const result = resultAt === -1 ? null : lines[resultAt].slice('[radio-result] '.length).trim();
   const forPeople = lines.filter((_, i) => i !== resultAt).join('\n').trim();
-  if (forPeople) console.log(forPeople);
+  if (forPeople && result !== 'off') console.log(forPeople);
   else if (result === null) console.log('The radio script could not finish, so nothing was sent. Nothing is lost locally.');
 
   // Anything but "sent" means Daily Practice did not get this piece of work. Say
   // so under the local line, as one more appended line. Never by rewriting the
   // log: two agents can finish at the same minute, and an append cannot lose the
   // other one's line.
-  if (logged && result !== 'sent') {
+  if (logged && result !== 'sent' && result !== 'off') {
     const why = result === null || result === 'unreachable'
       ? '(radio unreachable)'
       : `(radio ${result})`;

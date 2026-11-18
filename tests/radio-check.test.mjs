@@ -77,7 +77,7 @@ function checkRadio({ thread, sharing = {} }) {
   const dir = mkdtempSync(join(tmpdir(), 'orion-radio-'));
   try {
     mkdirSync(join(dir, 'status'));
-    for (const f of ['radio.mjs', 'shapes.mjs']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
+    for (const f of ['radio.mjs', 'shapes.mjs', 'report.mjs', 'store.mjs']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
     mkdirSync(join(dir, 'update'));
     for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(statusDir, '..', 'update', f), join(dir, 'update', f));
     writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({

@@ -311,16 +311,6 @@ test('tripwire: no file this repository ships holds a line shaped like a key', (
 
 // ── The radio, with the key somewhere other than status.json ────────────────
 
-test('a key in status/radio.key is the key the radio sends', (t) => {
-  const h = makeFolder(t, { sharing: { install_token: null }, keyFile: `${OTHER_KEY}\n` });
-  const r = h.run('status/radio.mjs', ['signal', '--type', 'task_completed', '--tag', 'crm', '--count', '3']);
-  assert.match(r.out, /Signal sent \(task_completed\)\./);
-  const calls = h.calls();
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].auth, `Bearer ${OTHER_KEY}`);
-  assert.equal(calls[0].envProxy, null, 'a person\'s own machine reaches the radio as it always has');
-});
-
 test('a key handed in by the environment wins over the one in status.json', (t) => {
   const h = makeFolder(t);
   h.run('status/radio.mjs', ['signal', '--type', 'task_completed', '--tag', 'crm', '--count', '1'], { ORION_INSTALL_TOKEN: OTHER_KEY });

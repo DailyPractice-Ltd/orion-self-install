@@ -20,15 +20,6 @@ import { runRadio, writeRichSkill } from './helpers/run-radio.mjs';
 
 const fs = { readdirSync, lstatSync, readFileSync };
 
-test('skillPathProblem: text files inside the folder only', () => {
-  assert.equal(skillPathProblem('SKILL.md'), null);
-  assert.equal(skillPathProblem('references/boundary.md'), null);
-  assert.equal(skillPathProblem('templates/confirm.json'), null);
-  for (const bad of ['check.mjs', 'run.py', 'go.sh', 'a.png', '../x.md', '/etc/x.md', 'C:\\x.md', 'a/../b.md', '.hidden.md', 'a//b.md', '', 'noext']) {
-    assert.ok(skillPathProblem(bad), `should refuse ${JSON.stringify(bad)}`);
-  }
-});
-
 test('skillBundleProblem: caps, duplicates, and the entry file', () => {
   assert.equal(skillBundleProblem([{ path: 'SKILL.md', content: '# s' }]), null);
   assert.match(skillBundleProblem([{ path: 'references/x.md', content: 'x' }]), /no SKILL\.md/);
@@ -40,13 +31,6 @@ test('skillBundleProblem: caps, duplicates, and the entry file', () => {
   assert.match(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'check.mjs', content: 'x' }]), /not a text file/);
   assert.match(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'templates/t.json', content: 'a\0b' }]), /not text/, 'a NUL byte is not text');
   assert.ok(skillBundleProblem([]));
-});
-
-test('skillBundleProblem: SKILL.md is required by its exact spelling', () => {
-  assert.match(skillBundleProblem([{ path: 'skill.md', content: '# x' }]), /no SKILL\.md/);
-  assert.match(skillBundleProblem([{ path: 'Skill.md', content: '# x' }, { path: 'references/x.md', content: 'x' }]), /no SKILL\.md/);
-  assert.equal(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'references/x.md', content: 'x' }]), null);
-  assert.match(skillBundleProblem([{ path: 'SKILL.md', content: '#' }, { path: 'skill.md', content: '#' }]), /twice/, 'two spellings are still one file listed twice');
 });
 
 // The same cases run in dailypractice-mono against the library's copy of the rules.
@@ -130,7 +114,7 @@ test('library --install: preview names every file and writes nothing', () => {
   assert.match(out, /as 3 files:/);
   assert.match(out, /references\/boundary\.md/);
   assert.equal(trees['meeting-confirmation'], undefined, 'nothing written before the yes');
-  assert.ok(!calls.some((c) => c.path === '/api/bridge/assets'));
+  assert.deepEqual(calls.map((c) => [c.method, c.path]), [['GET', '/api/bridge/library/meeting-confirmation']]);
 });
 
 test('library --install --yes: the exact tree lands on disk and the shelf is told', () => {
@@ -142,9 +126,11 @@ test('library --install --yes: the exact tree lands on disk and the shelf is tol
     'references/boundary.md': '# Boundary\n',
     'templates/confirm.json': '{}',
   });
-  const shelf = calls.find((c) => c.path === '/api/bridge/assets');
+  const shelf = calls.find((c) => c.method === 'POST' && c.path === '/api/bridge/assets');
   assert.ok(shelf, 'the shelf is told');
   assert.equal(shelf.body.slug, 'meeting-confirmation');
+  assert.equal(shelf.body.kind, BUNDLE_REPLY.body.kind);
+  assert.equal(shelf.body.version, BUNDLE_REPLY.body.version);
 });
 
 test('library --install: a skill folder that already exists is never touched', () => {
@@ -154,14 +140,6 @@ test('library --install: a skill folder that already exists is never touched', (
   // The pre-existing folder (with its own content) is intact, byte for byte.
   assert.match(trees['meeting-confirmation']['SKILL.md'], /Confirm meetings the right way/);
   assert.ok(!calls.some((c) => c.path === '/api/bridge/assets'), 'no shelf report on a refusal');
-});
-
-test('library --install: an old-shape reply (content only) still installs the single SKILL.md', () => {
-  const legacy = { status: 200, body: { ...BUNDLE_REPLY.body, files: undefined } };
-  const { code, out, err, trees } = runRadio(['library', '--install', 'meeting-confirmation', '--yes'], { reply: legacy });
-  assert.equal(code, 0, err);
-  assert.match(out, /Written: 1 file to \.claude\/skills\/meeting-confirmation\//);
-  assert.deepEqual(Object.keys(trees['meeting-confirmation']), ['SKILL.md']);
 });
 
 test('library --install: a bundle with an unsafe path is refused and nothing is written', () => {

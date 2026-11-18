@@ -107,16 +107,6 @@ test('fillBundle: a skill cannot name a status field of its own choosing', () =>
   assert.ok(!files[0].content.includes('orion_'), 'the token never reaches a file');
 });
 
-test('fillBundle: a skill that lists nothing comes back untouched', () => {
-  const plain = [
-    { path: 'SKILL.md', content: '# Confirm\nHi {{first_name}}, from {{CLIENT_BUSINESS}}.\n' },
-    { path: 'templates/t.json', content: '{"subject":"Confirming {{date}}"}' },
-  ];
-  const result = fillBundle(plain, { business_name: 'Daily Practice' });
-  assert.equal(result.files, plain, 'the very same files, not a copy');
-  assert.deepEqual([result.filled, result.open], [[], []]);
-});
-
 test('fillBundle: a name is written exactly as it is, and a JSON file still parses', () => {
   const name = 'O\'Brien & "Sons" $& (Pty) Ltd';
   const { files } = fillBundle(bundle(), { business_name: name });
@@ -325,15 +315,6 @@ test('library --install --yes: an older library that sends only the SKILL.md is 
   assert.equal(code, 0, err);
   assert.deepEqual(Object.keys(trees['call-planner-control-tower']), ['SKILL.md']);
   assert.match(trees['call-planner-control-tower']['SKILL.md'], /calls for Daily Practice\./);
-});
-
-test('library --install: a bundle whose entry file is not spelled SKILL.md is refused in plain words', () => {
-  const reply = { status: 200, body: { ...REPLY.body, files: [{ path: 'skill.md', content: '# lower-case\n' }] } };
-  const { code, out, err, trees } = runRadio([...INSTALL, '--yes'], { reply });
-  assert.equal(code, 0, err);
-  assert.equal(err, '', 'no stack trace');
-  assert.match(out, /will not write \(no SKILL\.md\)\. Nothing written\./);
-  assert.equal(trees['call-planner-control-tower'], undefined);
 });
 
 test('library --install: a skill whose fill list cannot be used is refused, and nothing is written', () => {

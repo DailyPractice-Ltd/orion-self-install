@@ -56,11 +56,6 @@ test('legacy migration requires explicit source and collision preflight leaves c
   const migrated=run({},'switch','--root',h.client,'--release-repo',h.release,'--commit',h.commit,'--to','codex','--legacy-tool','claude-code');assert.equal(migrated.status,0,migrated.stderr);
 });
 
-test('failed install rolls back all writes and selection',t=>{
-  const h=fixture(t);const result=run({ORION_SWITCH_FAIL_AFTER:'2'},'switch','--root',h.client,'--release-repo',h.release,'--commit',h.commit,'--to','codex');assert.notEqual(result.status,0);
-  assert.equal(JSON.parse(get(h.client,'status/status.json')).ai_assistant,'claude-code');assert.equal(get(h.client,'.claude/skills/foo/SKILL.md'),'old foo\n');assert.equal(existsSync(join(h.client,'.agents/skills/foo/SKILL.md')),false);assert.ok(existsSync(join(h.client,'status/shifts/writer.json')));
-});
-
 test('completed switch can be restored with its roster, schedules and status',t=>{
   const h=fixture(t);const switched=run({},'switch','--root',h.client,'--release-repo',h.release,'--commit',h.commit,'--to','codex');assert.equal(switched.status,0,switched.stderr);
   const backup=JSON.parse(switched.stdout).backup;

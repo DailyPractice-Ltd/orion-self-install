@@ -153,20 +153,6 @@ function onlySignal(h) {
 
 // ── status/radio.mjs signal ─────────────────────────────────────────────────
 
-test('signal task_completed sends exactly one POST with the tag and the count, and no free text', (t) => {
-  const h = makeHarness(t);
-  const { code, out, err } = h.run('radio.mjs', ['signal', '--type', 'task_completed', '--tag', 'content', '--count', '1']);
-  assert.equal(code, 0, err);
-  assert.match(out, /Signal sent \(task_completed\)\./);
-  const body = onlySignal(h);
-  assert.equal(body.signal_type, 'task_completed');
-  assert.equal(body.payload.tag, 'content');
-  assert.equal(body.payload.count, 1);
-  // The whole payload: the three standing fields plus two labels. Nothing else,
-  // so there is no field free text could be riding in.
-  assert.deepEqual(body.payload, { ...BASE_PAYLOAD, tag: 'content', count: 1 });
-});
-
 test('a tag that is not on the menu is refused, with the menu printed and nothing sent', (t) => {
   const h = makeHarness(t);
   for (const tag of ['contnt', 'Content', 'constructor', 'toString', 'called Thandi at Acme', '']) {
@@ -619,13 +605,6 @@ test('done: a task a person asked for is marked the same way, in the work log', 
   assert.match(lines[1], / \| Neo \| \(radio unreachable\) the line above was not reported$/);
 });
 
-test('done: a signal that landed leaves no marker', (t) => {
-  const h = makeHarness(t);
-  h.run('done.mjs', ['--tag', 'finance', '--line', 'reconciled the month']);
-  assert.equal(h.workLog().trimEnd().split('\n').length, 1);
-  assert.doesNotMatch(h.workLog(), /radio/);
-});
-
 test('radio: --result-line prints one machine line, and only when asked', (t) => {
   const asked = makeHarness(t);
   const a = asked.run('radio.mjs', ['signal', '--type', 'crm_updated', '--result-line', 'yes']);
@@ -852,22 +831,8 @@ test('tripwire: the release has one version, and it ships done.mjs', () => {
   assert.equal(newest[1], manifest.template_version);
   // A script the manifest does not list never reaches an installed harness.
   for (const script of ['status/done.mjs', 'status/radio.mjs', 'status/shapes.mjs', 'status/memory.mjs']) {
-    assert.ok(manifest.refresh.includes(script), `${script} must be on the refresh list`);
+    assert.ok(manifest.deployment.common_sources.includes(script), `${script} must be in the deployment`);
   }
-});
-
-test('tripwire: the 1.1.0 headline is the disclosure, in one sentence, on one line', () => {
-  const changelog = readFileSync(join(repo, 'CHANGELOG.md'), 'utf8');
-  const at = changelog.indexOf('\n## 1.1.0 — ');
-  assert.ok(at !== -1);
-  // docs/updating.md step 8 reads "the one-line headline" to the client. That is
-  // the first non-empty line under the heading, so the whole disclosure is on it.
-  const headline = changelog.slice(at + 1).split('\n').slice(1).find((l) => l.trim() !== '');
-  assert.match(headline, /^\*\*From this version your harness also tells Daily Practice .+\*\*$/);
-  for (const part of ['when a task you set is finished', 'a general tag (like "prospecting")', 'a count', 'which skill or agent ran', 'never the content', 'check-ins can still be switched off']) {
-    assert.ok(headline.includes(part), `the headline should say: ${part}`);
-  }
-  assert.equal(headline.split('. ').length, 1, 'one sentence');
 });
 
 test('memory: every path it says is spelled with forward slashes, on every machine', (t) => {

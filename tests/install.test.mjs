@@ -27,7 +27,8 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(existsSync(join(target, tool === 'codex' ? 'agents' : '.claude/agents')), false);
     assert.equal(existsSync(join(target, '.specify')), false);
     assert.equal(existsSync(join(target, 'update/scaffold')), false);
-    assert.ok(existsSync(join(target,'.git')));
+    assert.ok(existsSync(join(target, '.git')));
+    assert.equal(JSON.parse(read('status/status.json')).home.enabled, false);
     for (const path of ['skills', 'tests', 'specs', 'CLAUDE.md', tool === 'codex' ? '.claude' : '.agents', ...(tool === 'codex' ? [] : ['agents'])]) {
       assert.equal(existsSync(join(target, path)), false, `${path} leaked into client`);
     }
@@ -118,15 +119,6 @@ test('Codex migration preserves legacy team jobs in place', t => {
   assert.equal(readFileSync(join(target,'team/README.md'),'utf8'),'my roster\n');
   assert.equal(readFileSync(join(target,'team/writer.md'),'utf8'),'my job\n');
   assert.equal(existsSync(join(target,'agents')),false);
-});
-
-test('install defaults to a local repository',t=>{
-  const base=mkdtempSync(join(tmpdir(),'orion-install-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
-  const target=join(base,'client');
-  const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','codex','--target',target],{encoding:'utf8'});
-  assert.equal(result.status,0,result.stderr);
-  assert.ok(existsSync(join(target,'.git')));
-  assert.equal(JSON.parse(readFileSync(join(target,'status/status.json'),'utf8')).home.enabled,false);
 });
 
 test('remote setup rejects a repository that is not verified private',t=>{

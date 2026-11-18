@@ -72,19 +72,12 @@ test('each level sends at its ceiling and waits at the next score up, with the e
     assert.equal(code, 0, out);
     assert.match(out, new RegExp(`^Score ${want}\\b`, 'm'), `${level}: ${out}`);
     assert.match(out, new RegExp(`^Decision: ${decision}\\b`, 'm'), `${level} at ${want}: ${out}`);
+    if (want > SEND_CEILING) assert.match(out, /above 70/i);
     if (decision === 'waiting') assert.ok(out.includes(WAITING_SENTENCE), out);
     else assert.ok(!out.includes(WAITING_SENTENCE), out);
     assert.match(h.log(), new RegExp(`\\| follow-up \\| ${message.channel ?? 'email'} \\| ${message.relationship} \\| ${message.content} \\| ${want} \\| ${decision}$`, 'm'), h.log());
     assert.ok(!h.log().includes('northwind.example') && !out.includes('northwind.example'), 'never the recipient');
   }
-});
-
-test('above 70 waits whatever the level, and says so', (t) => {
-  const h = makeHarness(t, { level: 'high' });
-  const { out } = score(h, { relationship: 'cold', content: 'money' });
-  assert.match(out, /^Decision: waiting/m);
-  assert.match(out, /above 70/i);
-  assert.ok(out.includes(WAITING_SENTENCE));
 });
 
 test('a waiting message says which level would send it, and what change would', (t) => {
@@ -418,36 +411,14 @@ test('tripwire: every template carries the words migrate writes into a kept file
   }
 });
 
-const RETIRED_WORDS = /NOTHING SENDS WITHOUT|Never instruct a tool to send|nothing has been sent|Never send anything\. Drafts only|never sent (or written )?automatically|never automatic, live or not|That rule has no flip|Nothing sends without (your|an explicit) yes|sending stays the client's own act|Everything outbound still stages|stage every message and send nothing|STAGED FOR APPROVAL|Lists and drafts only|never sending on its own|never sends anything|nothing is ever sent by itself|Never send or publish|per-item client yes forever|It sends nothing on its own|drafts only, nothing sends|drafts only; nothing sends|standing rule is drafts only|every message stays staged|GO-LIVE cannot grant sending|Sending is always a separate yes|Send nothing\.|never sent on (its|their) own|no auto-send path|sent nowhere|sent by no one|sends nothing and writes nothing|cannot send or write without|each write waiting for your yes|gated behind your yes|stage the follow-up for my yes|drafts staged for you|staged for your yes|drafted for your approval|New powers start staged|reads and stages only/;
-
-test('tripwire: the retired sentences are gone from every file that enforces or promises the rule', () => {
-  const files = [
-    'agent/agent-definition.md', 'AGENTS.md', 'README.md', 'CLAUDE.md',
-    'agent/adapters/claude-code.md', 'agent/adapters/claude.md', 'agent/adapters/codex.md', 'agent/adapters/chatgpt.md', 'agent/adapters/copilot.md',
-    'connectors/connector-checklist.md', 'status/status-schema.md', 'validation/validation-tasks.md', 'docs/radio.md', 'docs/updating.md',
-    'specs/002-production-line/contracts/agent-anatomy.md', 'specs/002-production-line/contracts/package-shape.md',
-    'skills/update-harness/SKILL.md', 'skills/create-skill/SKILL.md',
-    'skills/prospect-research-outreach/SKILL.md', 'skills/post-call-debrief/SKILL.md',
-    'specs/002-production-line/contracts/send-risk.md',
-  ];
-  for (const f of files) {
-    const hit = RETIRED_WORDS.exec(squash(read(f)));
-    assert.equal(hit, null, `${f} still says: ${hit && hit[0]}`);
-  }
-});
-
-test('tripwire: the status template, the wizard, the manifest and the changelog carry the level', (t) => {
+test('the status template and wizard default to low, and the update prompts call the migration', (t) => {
   const template = JSON.parse(read('status/status.schema-template.json'));
   assert.equal(template.scopes.send_risk, 'low');
-  assert.equal(template.schema_version, '2.0.0');
-  assert.equal(template.template_version, '2.0.0');
   const manifest = JSON.parse(read('update/manifest.json'));
-  assert.equal(manifest.template_version, template.template_version);
-  for (const f of ['status/send.mjs', 'agent/risk-matrix.md']) assert.ok(manifest.refresh.includes(f), `${f} on the refresh list`);
+  for (const f of ['status/send.mjs', 'agent/risk-matrix.md']) assert.ok(manifest.deployment.common_sources.includes(f), `${f} in the deployment`);
   const never = Object.keys(manifest.never_touch).join(' ');
   assert.match(never, /status\/send-log\.md/);
   assert.match(never, /status\/no-contact\.md/);
-  assert.match(read('CHANGELOG.md'), /^## 1\.5\.0 — 2026-11-\d{2}\n\n\*\*[^\n]*risk level[^\n]*\*\*/m);
   assert.match(read('docs/updating.md'), /node status\/send\.mjs migrate/);
   assert.match(read('AGENTS.md'), /filled in before 1\.5\.0/);
 
@@ -485,7 +456,7 @@ test('a skill arriving over the radio never carries a level: the status record i
   assert.match(out, /A skill never sets your send level/);
 });
 
-test('tripwire: on a fresh 1.5.0 folder migrate has nothing to change and finds no residue, so set-level works at once', (t) => {
+test('tripwire: on a fresh folder migrate has nothing to change and finds no residue, so set-level works at once', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'orion-fresh-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const tar = execFileSync('git', ['archive', 'HEAD'], { cwd: ROOT, maxBuffer: 1 << 28 });

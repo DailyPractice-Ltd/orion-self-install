@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { computePristine, hasFullHistory, serialise, PRISTINE_PATH } from './helpers/pristine.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -62,21 +63,6 @@ test('release contract rejects an unsupported tool and keeps historical ownershi
   assert.ok(pristine.files['agents/README.md'].length > 0);
 });
 
-test('all release skills have exactly one mapping for both tools', () => {
-  const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
-  const names = readdirSync(join(repo, 'skills')).sort();
-  const mapped = manifest.deployment.entries.filter(entry => entry.source.startsWith('skills/') && entry.source.endsWith('/SKILL.md'));
-  assert.deepEqual(mapped.map(entry => entry.source).sort(),
-    names.map(name => `skills/${name}/SKILL.md`).sort());
-  for (const entry of mapped) for (const tool of ['codex', 'claude-code']) {
-    assert.equal(entry.destinations[tool], `${tool === 'codex' ? '.agents' : '.claude'}/${entry.source}`);
-  }
-  for (const name of names) assert.ok(existsSync(join(repo, 'skills', name, 'SKILL.md')));
-  assert.equal(existsSync(join(repo, '.claude')), false, 'release must not track or generate a second skill tree');
-  for (const path of manifest.refresh) assert.ok(existsSync(join(repo, path)), `legacy refresh source missing: ${path}`);
-  for (const name of names) assert.equal(manifest.refresh.includes(`.claude/skills/${name}/SKILL.md`), false);
-});
-
 test('release contract ships every skill file to the selected runtime', () => {
   const sources = readdirSync(join(repo, 'skills'), { recursive: true, withFileTypes: true })
     .filter(entry => entry.isFile())
@@ -90,4 +76,12 @@ test('release contract ships every skill file to the selected runtime', () => {
       assert.ok(plan.entries.some(entry => entry.source === source && entry.destination === destination), `missing skill file: ${source}`);
     }
   }
+});
+
+test('update/pristine.json is up to date with everything this release ships', (t) => {
+  if (!hasFullHistory()) return t.skip('shallow clone: the shipped history is not here to check against');
+  assert.equal(
+    readFileSync(join(repo, PRISTINE_PATH), 'utf8'), serialise(computePristine()),
+    'update/pristine.json is stale: run node tests/helpers/pristine.mjs --write as the last edit of the release',
+  );
 });

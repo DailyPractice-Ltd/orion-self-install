@@ -1,8 +1,7 @@
 # `status/status.json` — field reference
 
-Human-readable companion to `status.schema-template.json` and
-`specs/001-self-install/data-model.md`. If you're an agent reading this without wanting to
-parse JSON Schema, this is the quick version.
+Human-readable companion to `status.schema-template.json`. Use this reference
+and [setup and recovery](../docs/setup.md) for status fields and operational guidance.
 
 **On session 1**: `status/status.json` doesn't exist yet. Copy
 `status.schema-template.json` to `status.json` and start filling it in — the template file
@@ -54,10 +53,10 @@ clear the connection time. Temporary outages allow silent work until exactly 48
 elapsed hours after the last complete cycle; updates and restarts never reset it.
 
 Read [setup and recovery](../docs/setup.md) in an installed folder for outcomes,
-credential recovery and lock handling. Maintainers use the
-[required-pairing contract](../specs/007-required-pairing/contracts/status-and-guard.md)
-for full field definitions and typed labels-only `status/radio-outbox.json`.
-Pending reports survive restart; the guard attempts replay before each new task.
+credential recovery and lock handling. `status/radio-outbox.json` holds typed
+operational labels only; `status/report.mjs` and `status/store.mjs` implement its
+validation and persistence.
+Pending reports survive restart and are replayed before work outside valid grace;
 no log text, purpose sentence, token or artifact belongs in that queue. Status and
 outbox are client-owned and are not replaced by an update.
 

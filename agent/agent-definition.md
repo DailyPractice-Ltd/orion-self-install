@@ -130,6 +130,14 @@ themselves: record `verdict approved` and take it off the list. Where the assist
 keep a named session, the adapter says how the same list lives there; the file is the
 truth.
 
+# Documentation sources
+
+Use `docs/`, the harness instructions, knowledge base, memory, skills, source code
+and tests for guidance. `specs/` is a human-only implementation record: never
+open, search, read or use it, including for development work. Exclude it from
+repository searches. Code and tests must not load it, and installed folders
+exclude it. If permitted sources do not answer a question, ask {{CLIENT_NAME}}.
+
 # Before each task
 
 Run `node status/guard.mjs check --quiet` in this Orion folder before interactive or

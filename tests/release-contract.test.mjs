@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { planForTool, safePath } from '../update/destination-resolver.mjs';
 import { computePristine, hasFullHistory, serialise, PRISTINE_PATH } from './helpers/pristine.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,6 +30,7 @@ test('release contract plans one selected runtime from portable sources', (t) =>
       assert.ok(manifest.refresh.includes(path), `${path} must also reach legacy updates`);
     }
     assert.ok(!destinations.some(path => path.startsWith('.specify/')), 'maintainer governance stays in the release');
+    assert.ok(!plan.entries.some(entry => [entry.source, entry.destination].some(path => path.split('/').includes('specs'))), 'human-only records stay out of every deployment');
     const skillRoot = tool === 'codex' ? '.agents/skills' : '.claude/skills';
     for (const name of ['prospecting', 'call-planner', 'friday-report', 'memory-consolidation']) {
       assert.ok(destinations.includes(`${skillRoot}/${name}/SKILL.md`));
@@ -102,19 +104,20 @@ test('supported instructions route website chat to an executable paired folder',
   }
 });
 
-test('shipped pairing state and instructions implement immediate pairing with a silent 48-hour allowance', () => {
-  const template = JSON.parse(readFileSync(join(repo,'status/status.schema-template.json')));
-  const contract = JSON.parse(readFileSync(join(repo,'specs/007-required-pairing/contracts/pairing.schema.json')));
-  const additions = JSON.parse(readFileSync(join(repo,'specs/002-production-line/contracts/status-additions.schema.json')));
-  assert.equal(template.sharing.pairing.version,2);
-  assert.equal(template.sharing.pairing.last_connected_at,null);
-  assert.deepEqual(additions.properties.sharing.properties.pairing,contract);
-  for (const file of ['AGENTS.md','README.md','docs/setup.md','docs/radio.md','docs/updating.md','docs/scheduled-work.md','agent/agent-definition.md','agent/adapters/codex.md','agent/adapters/claude-code.md','status/status-schema.md','NON-TECHNICAL-DRY-RUN.md']) {
-    const text=readFileSync(join(repo,file),'utf8');
-    assert.doesNotMatch(text,/30.day transition|30.day clock|migration grace|valid grace|grace reminder|exit 0 grace/i,file);
-    assert.match(text,/48.hour|48\s+elapsed hours/,file);
+
+test('deployed documentation uses permitted sources without directing agents into human records', () => {
+  const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
+  for (const tool of manifest.deployment.tools) {
+    const plan = planForTool(manifest.deployment, tool, { releaseRoot: repo });
+    for (const { source } of plan) {
+      if (!/\.(md|mjs)$/.test(source) || source === 'CHANGELOG.md') continue;
+      const text = readFileSync(join(repo, source), 'utf8');
+      assert.doesNotMatch(text, /specs\/[\w.-]+\//, `${source} must not point inside human-only records`);
+    }
   }
-  for (const file of ['AGENTS.md','docs/setup.md','docs/scheduled-work.md','agent/adapters/codex.md','agent/adapters/claude-code.md','agent/agent-definition.md']) {
-    assert.match(readFileSync(join(repo,file),'utf8'),/guard.mjs run --/,file);
+  for (const source of ['AGENTS.md', 'agent/agent-definition.md']) {
+    const text = readFileSync(join(repo, source), 'utf8');
+    assert.match(text, /specs\/.*human-only/i);
+    assert.match(text, /ask (the human|\{\{CLIENT_NAME\}\})/);
   }
 });

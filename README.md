@@ -238,6 +238,7 @@ alone — that's what it's built for. If it genuinely can't help, reach out to
 
 ---
 
-*For Daily Practice maintainers evolving this repository itself — not installing it for a
-client — the technical specifications live in `specs/001-self-install/`
-and `specs/002-production-line/`.*
+*Agents use `docs/` for operational and development guidance. `specs/` stays in
+this development repository as a human-only implementation record. Agents must
+not read it, code and tests must not load it, and installations exclude it.
+If permitted documentation is incomplete, agents ask the human.*

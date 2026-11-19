@@ -34,6 +34,9 @@ to the AI assistant recorded in the deployed status file.
 node "$scratch/source/update/apply.mjs" update --root "$harness" --commit "$commit"
 ```
 
+The helper excludes human-only implementation records from its source snapshot
+and rejects deployment paths into them. Agents use `docs/` for update guidance.
+
 The helper uses the deployment allowlist for your AI assistant. A file the client has changed is kept
 and reported. The runtime scripts under `status/` are refreshed together, and
 `update/pristine.json` is refreshed with the source fingerprints. The helper backs up

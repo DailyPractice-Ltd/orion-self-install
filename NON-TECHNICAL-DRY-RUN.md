@@ -56,7 +56,8 @@ prior declined choice is history until explicit pairing.
 Record only sanitized outcomes, never credentials, screen codes or client content.
 
 No real-account run of this candidate has been completed. The maintainer deferred
-live testing; see `specs/007-required-pairing/verification.md`. A simulated walkthrough
+live testing. Follow this protocol and `validation/validation-tasks.md` for the
+real-account checks. A simulated walkthrough
 or automated fake bridge does not count as this protocol's real-world pass.
 
 ## Setup

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync, writeFileSync, chmodSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -101,6 +101,14 @@ test('legacy migration carries personal work into a separate deployed repository
   put('client-notes.md','my top-level notes\n');put('docs/my-playbook.md','my playbook\n');
   put('skills/maintainer/SKILL.md','release source\n');put('tests/private.test.mjs','release test\n');
   put('n8n/old-workflow.json','retired release file\n');
+  // A broken link proves migration skips human records before traversing them.
+  mkdirSync(join(legacy, 'specs'));
+  try {
+    symlinkSync(join(base, 'missing-human-record'), join(legacy, 'specs', 'unreadable.md'));
+  } catch (error) {
+    if (process.platform !== 'win32' || error.code !== 'EPERM') throw error;
+    put('specs/unreadable.md', 'human-only fixture\n');
+  }
   const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','claude-code','--target',target,'--migrate-from',legacy,'--local-only'],{encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);
   const read=path=>readFileSync(join(target,path),'utf8');
@@ -116,7 +124,7 @@ test('legacy migration carries personal work into a separate deployed repository
   assert.equal(read('legacy/claude-agents/writer.md'),'my job\n');
   assert.equal(read('client-notes.md'),'my top-level notes\n');
   assert.equal(read('docs/my-playbook.md'),'my playbook\n');
-  for(const path of ['skills','tests','n8n']) assert.equal(existsSync(join(target,path)),false);
+  for(const path of ['skills','tests','n8n','specs']) assert.equal(existsSync(join(target,path)),false);
   assert.equal(existsSync(join(target,'.specify')),false);
   assert.equal(existsSync(join(target,'.claude/skills/speckit-plan/SKILL.md')),false);
   assert.equal(JSON.parse(read('status/status.json')).schema_version,'2.0.0');

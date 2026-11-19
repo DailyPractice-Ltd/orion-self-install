@@ -51,6 +51,7 @@ At expiry the next task blocks; admitted tasks finish and report.
 ## Evidence boundary
 
 No step above was performed against a real account. Ticket 07 remains incomplete
-until the maintainer runs the database and signed-in live journey recorded in
-`specs/007-required-pairing/verification.md`. Keep observed friction in the real
-protocol's log and record only sanitized outcomes.
+until the maintainer completes the real-account checks in
+`../validation/validation-tasks.md` and the observed journey in
+`../NON-TECHNICAL-DRY-RUN.md`. Keep observed friction in the real protocol's log
+and record only sanitized outcomes.

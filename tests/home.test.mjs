@@ -31,7 +31,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import {
   radioKey, radioConfigured, radioOn, keyHeader, isCloudRun, wantsEnvProxy, envProxyEnv,
-  homeOn, homeBlock, isHomeBranch, httpsTwin, looksLikeKey, looksLikeCredential,
+  homeOn, homeBlock, isHomeBranch, looksLikeKey, looksLikeCredential,
 } from '../status/shapes.mjs';
 import { plainEnv } from './helpers/env.mjs';
 
@@ -151,7 +151,6 @@ function makeFolder(t, { base = scratch(t), name = 'harness', sharing = {}, stat
     agent_name: 'Neo',
     ops_stage: 'seven_day_checkin',
     harness_status: 'validated',
-    memory: { enabled: true, backend: 'folder', remote: null, path: 'memory' },
     ...status,
     sharing: {
       status_signal_enabled: true,
@@ -263,14 +262,6 @@ test('the home is off until it is switched on, and a branch name is held to a pl
   }
 });
 
-test('an ssh address has an https twin, and nothing else does', () => {
-  assert.equal(httpsTwin('git@github.com:acme/notebook.git'), 'https://github.com/acme/notebook.git');
-  assert.equal(httpsTwin('git@github.com:acme/notebook'), 'https://github.com/acme/notebook.git');
-  assert.equal(httpsTwin('https://github.com/acme/notebook.git'), null);
-  assert.equal(httpsTwin('/shared/drive/notebook'), null);
-  assert.equal(httpsTwin(null), null);
-});
-
 test('a key shape is caught, and a sentence about a password is not', () => {
   for (const line of [
     `token ${FAKE_KEY}`,
@@ -327,7 +318,7 @@ test('with no key anywhere, on a machine that is not a cloud run, the radio stay
 
 test('a cloud run sends its call once, with no key, and through the machine\'s proxy', (t) => {
   const h = makeFolder(t, { sharing: { install_token: null } });
-  const r = h.run('status/radio.mjs', ['signal', '--type', 'routine_completed', '--routine', 'dream', '--tag', 'ops', '--count', '2', '--result-line', 'yes'],
+  const r = h.run('status/radio.mjs', ['signal', '--type', 'routine_completed', '--routine', 'friday-report', '--tag', 'ops', '--count', '2', '--result-line', 'yes'],
     { ...CLOUD, HTTPS_PROXY: 'http://127.0.0.1:9' });
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /Signal sent \(routine_completed\)\./);
@@ -338,7 +329,7 @@ test('a cloud run sends its call once, with no key, and through the machine\'s p
   assert.equal(calls[0].envProxy, '1');
   assert.deepEqual(calls[0].body.payload, {
     ops_stage: 'seven_day_checkin', harness_status: 'validated', template_version: '1.3.0',
-    count: 2, routine: 'dream', tag: 'ops',
+    count: 2, routine: 'friday-report', tag: 'ops',
   });
 });
 
@@ -396,7 +387,7 @@ test('prepare without --yes says what it would do and changes nothing', (t) => {
 });
 
 test('prepare moves the key out, sets the rules, switches the home on, and never prints the key', (t) => {
-  const h = makeFolder(t, { files: { '.gitignore': 'status/status.json\n.DS_Store\nmemory/*\n!memory/README.md\nmy-own-notes/\n' } });
+  const h = makeFolder(t, { files: { '.gitignore': 'status/status.json\n.DS_Store\nmy-own-notes/\n' } });
   const r = h.run('status/home.mjs', ['prepare', '--yes']);
   assert.equal(r.code, 0, r.err);
   assert.ok(!r.out.includes(FAKE_KEY) && !r.err.includes(FAKE_KEY), 'the key is never printed');
@@ -414,8 +405,6 @@ test('prepare moves the key out, sets the rules, switches the home on, and never
   assert.ok(!ignore.includes('status/status.json'), 'status.json travels, now that it holds no key');
   assert.ok(ignore.includes('my-own-notes/'), 'the owner\'s own lines are kept');
   assert.ok(ignore.includes('.DS_Store'));
-  // A notebook in a plain folder has nowhere else to be saved: it travels.
-  assert.ok(!ignore.includes('memory/*') && !ignore.includes('!memory/README.md'));
   for (const rule of ['status/shifts/', '.update-backup/', 'node_modules/', '.env', '.claude/settings.local.json', '.claude/worktrees/']) {
     assert.ok(ignore.includes(rule), rule);
   }
@@ -431,18 +420,6 @@ test('prepare moves the key out, sets the rules, switches the home on, and never
   const again = h.run('status/home.mjs', ['prepare', '--yes']);
   assert.match(again.out, /Nothing to prepare: this folder is already set up for a home\./);
   assert.equal(h.read('.gitignore').split('\n').filter((l) => l === 'status/radio.key').length, 1);
-});
-
-test('a notebook with a repository of its own stays out of the home whole', (t) => {
-  const h = makeFolder(t, {
-    status: { memory: { enabled: true, backend: 'git', remote: 'git@github.com:acme/notebook.git', path: 'memory' } },
-    files: { '.gitignore': 'status/status.json\nmemory/*\n!memory/README.md\n', 'memory/README.md': 'the notebook\n' },
-  });
-  h.run('status/home.mjs', ['prepare', '--yes']);
-  const ignore = h.read('.gitignore').split('\n');
-  assert.ok(ignore.includes('memory/'));
-  assert.ok(!ignore.includes('!memory/README.md'), 'its README belongs to the notebook\'s own repository');
-  assert.ok(h.git(['check-ignore', '-q', 'memory/README.md']).ok);
 });
 
 test('prepare refuses an address git could not save to, and notes a good one', (t) => {
@@ -480,10 +457,10 @@ test('check names what stands in the way, changes nothing, and says ready when n
 // ── sync: what reaches the home, and what never does ────────────────────────
 
 test('the first save carries status.json and the scripts, and never the key', (t) => {
-  const { local, home } = homed(t, { files: { 'agent/knowledge-base/01-business-context.md': 'We sell tea.\n', 'memory/shared/inbox.md': '# Inbox\n' } });
+  const { local, home } = homed(t, { files: { 'agent/knowledge-base/01-business-context.md': 'We sell tea.\n', 'notes/custom.md': '# Notes\n' } });
   const files = homeFiles(local.base, home);
   for (const expected of ['status/status.json', 'status/done.mjs', 'status/home.mjs', '.gitignore', '.gitattributes',
-    'agent/knowledge-base/01-business-context.md', 'memory/shared/inbox.md']) {
+    'agent/knowledge-base/01-business-context.md', 'notes/custom.md']) {
     assert.ok(files.includes(expected), expected);
   }
   assert.ok(!files.includes('status/radio.key'));
@@ -503,9 +480,9 @@ test('a cloud run reports its shift and leaves its line in the home, and the own
   // The cloud: a fresh copy, no key file, no branch checked out, thrown away after.
   const cloud = freshCopy(local, home, 'cloud');
   assert.equal(cloud.exists('status/radio.key'), false);
-  const shift = cloud.run('status/done.mjs', shiftArgs('dream', 'tidied the notebook'), { ...CLOUD, HTTPS_PROXY: 'http://127.0.0.1:9' });
+  const shift = cloud.run('status/done.mjs', shiftArgs('friday-report', 'prepared the weekly report'), { ...CLOUD, HTTPS_PROXY: 'http://127.0.0.1:9' });
   assert.equal(shift.code, 0, shift.err);
-  assert.match(shift.out, /Shift finished: agent dream, tag ops, count 2\./);
+  assert.match(shift.out, /Shift finished: agent friday-report, tag ops, count 2\./);
   assert.match(shift.out, /Signal sent \(routine_completed\)\./);
   assert.match(shift.out, /Saved to the folder's home\./);
 
@@ -515,17 +492,17 @@ test('a cloud run reports its shift and leaves its line in the home, and the own
   assert.equal(calls[0].body.signal_type, 'routine_completed');
   assert.equal(calls[0].body.harness_id, HARNESS_ID);
   assert.equal(calls[0].body.payload.tag, 'ops');
-  assert.equal(calls[0].body.payload.routine, 'dream');
+  assert.equal(calls[0].body.payload.routine, 'friday-report');
 
-  assert.match(inHome(local.base, home, 'status/shift-log.md'), /\| dream \| count: 2 \| auto: tidied the notebook$/);
-  assert.equal(git(local.base, home, ['log', '-1', '--format=%s', 'main']).out, 'shift: dream, ops, count 2 (a cloud run)');
+  assert.match(inHome(local.base, home, 'status/shift-log.md'), /\| friday-report \| count: 2 \| auto: prepared the weekly report$/);
+  assert.equal(git(local.base, home, ['log', '-1', '--format=%s', 'main']).out, 'shift: friday-report, ops, count 2 (a cloud run)');
 
   // Meanwhile the owner's machine finished a shift of its own, without knowing.
   const own = local.run('status/done.mjs', shiftArgs('inbox', 'triaged the morning mail', '5'));
   assert.match(own.out, /Saved to the folder's home\. Brought in 1 newer save from there\./);
   const lines = local.read('status/shift-log.md').trim().split('\n');
   assert.equal(lines.length, 2, 'both lines, neither one lost');
-  assert.ok(lines.some((l) => l.includes('| dream |')) && lines.some((l) => l.includes('| inbox |')));
+  assert.ok(lines.some((l) => l.includes('| friday-report |')) && lines.some((l) => l.includes('| inbox |')));
   assert.equal(inHome(local.base, home, 'status/shift-log.md').split('\n').length, 2);
   assert.equal(local.calls()[0].auth, `Bearer ${FAKE_KEY}`, 'the owner\'s machine still sends its own key');
 });
@@ -748,38 +725,4 @@ test('the wizard still writes the key to status.json on a folder with no home', 
   assert.equal(h.status().sharing.install_token, OTHER_KEY);
   assert.equal(h.exists('status/radio.key'), false);
   assert.deepEqual(h.status().home, { enabled: false, branch: 'main' }, 'an older bookmark gains the home block, switched off');
-});
-
-// ── The notebook on a cloud run ─────────────────────────────────────────────
-
-test('a cloud run fetches the notebook by itself and takes the repository\'s copy as it is', (t) => {
-  // An absolute path stands in for the notebook's address, and only a POSIX
-  // path has the shape the memory block accepts.
-  if (process.platform === 'win32') return t.skip('needs a POSIX path as the notebook address');
-  const base = scratch(t);
-  const notebook = makeHome(base, 'notebook.git');
-  const seed = join(base, 'seed');
-  assert.ok(git(base, base, ['clone', '-q', notebook, seed]).ok);
-  writeFileSync(join(seed, 'README.md'), 'the notebook, as its own repository has it\n');
-  writeFileSync(join(seed, 'INDEX.md'), '# Memory index\n');
-  git(base, seed, ['add', '-A']);
-  assert.ok(git(base, seed, ['commit', '-q', '-m', 'notebook']).ok);
-  assert.ok(git(base, seed, ['push', '-q', 'origin', 'HEAD:refs/heads/main']).ok);
-
-  const h = makeFolder(t, {
-    base,
-    status: { memory: { enabled: true, backend: 'git', remote: notebook, path: 'memory' } },
-    files: { 'memory/README.md': 'an old copy that came along with the harness\n' },
-  });
-  // On a person's own machine, joining a team notebook is never done silently.
-  assert.match(h.run('status/memory.mjs', ['sync']).out, /not a clone — run init/);
-  assert.equal(h.exists('memory/.git'), false);
-
-  const r = h.run('status/memory.mjs', ['sync'], CLOUD);
-  assert.match(r.out, /Memory synced\./);
-  assert.ok(h.exists('memory/.git'));
-  assert.equal(h.read('memory/README.md'), 'the notebook, as its own repository has it\n');
-  assert.equal(h.read('memory/INDEX.md'), '# Memory index\n');
-  // Nothing from the harness's stale copy was pushed back over the notebook.
-  assert.equal(git(base, notebook, ['log', '--format=%s', 'main']).out, 'notebook');
 });

@@ -20,7 +20,14 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(JSON.parse(read('status/status.json')).ai_assistant, tool);
     assert.ok(existsSync(join(target, 'AGENTS.md')));
     const skillRoot = tool === 'codex' ? '.agents/skills' : '.claude/skills';
-    for (const name of ['prospecting', 'call-planner', 'friday-report', 'memory-consolidation', 'prospect-research-outreach', 'post-call-debrief']) {
+    for (const path of ['memory', 'status/memory.mjs', 'docs/memory.md', `${skillRoot}/memory-consolidation`]) {
+      assert.equal(existsSync(join(target, path)), false, `${path} leaked into fresh install`);
+    }
+    assert.equal('memory' in JSON.parse(read('status/status.json')), false);
+    for (const path of ['AGENTS.md', 'agent/agent-definition.md']) {
+      assert.doesNotMatch(read(path), /memory\/|memory\.mjs|memory-consolidation/);
+    }
+    for (const name of ['prospecting', 'call-planner', 'friday-report', 'prospect-research-outreach', 'post-call-debrief']) {
       assert.ok(existsSync(join(target, skillRoot, name, 'SKILL.md')));
     }
     assert.equal(existsSync(join(target, 'library')), false);
@@ -53,6 +60,8 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(saved.sharing.pairing.state, 'verified');
     assert.equal(saved.setup_checkpoint.delivered, true);
     assert.equal(saved.machine_profile.chosen_surface, tool);
+    assert.equal('memory' in saved, false, 'wizard must not recreate retired configuration');
+    assert.equal(existsSync(join(target, 'memory')), false);
 
     const second = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', target, '--local-only'], { encoding: 'utf8' });
     assert.notEqual(second.status, 0);
@@ -95,7 +104,7 @@ test('legacy migration carries personal work into a separate deployed repository
   put('status/work-log.md','sold to client\n');put('status/radio.key','private-key\n');
   put('status/shifts/writer.json',JSON.stringify({wake_up:join(legacy,'status/shifts/writer.sh')}));
   put('agent/knowledge-base/01-business-context.md','my business\n');
-  put('memory/INDEX.md','my memory\n');
+  put('notes/client.md','my notes\n');
   put('.claude/skills/custom/SKILL.md','my skill\n');
   put('.claude/agents/README.md','my roster\n');put('.claude/agents/writer.md','my job\n');
   put('client-notes.md','my top-level notes\n');put('docs/my-playbook.md','my playbook\n');
@@ -118,7 +127,7 @@ test('legacy migration carries personal work into a separate deployed repository
   assert.equal(existsSync(join(target,'status/shifts')),false);
   assert.equal(JSON.parse(read('status/status.json')).home.enabled,false);
   assert.equal(read('agent/knowledge-base/01-business-context.md'),'my business\n');
-  assert.equal(read('memory/INDEX.md'),'my memory\n');
+  assert.equal(read('notes/client.md'),'my notes\n');
   assert.equal(read('.claude/skills/custom/SKILL.md'),'my skill\n');
   assert.equal(read('legacy/claude-agents/README.md'),'my roster\n');
   assert.equal(read('legacy/claude-agents/writer.md'),'my job\n');

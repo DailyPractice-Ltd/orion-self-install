@@ -107,7 +107,7 @@ node install.mjs --tool claude-code --target /path/to/new-client-folder \
 ```
 
 Use `--tool codex` only when the legacy status already records Codex. The migration
-copies the client's status and logs, knowledge, memory, skills, roster and job sheets,
+copies the client's status and logs, knowledge, skills, roster and job sheets,
 as well as other client-created files such as notes and playbooks, then overlays edited
 deployed files. Release-only source trees, maintainer files, and retired workflows stay
 behind. Computer schedules refer to the original folder. Review them there before

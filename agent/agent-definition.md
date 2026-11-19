@@ -132,7 +132,7 @@ truth.
 
 # Documentation sources
 
-Use `docs/`, the harness instructions, knowledge base, memory, skills, source code
+Use `docs/`, the harness instructions, knowledge base, skills, source code
 and tests for guidance. `specs/` is a human-only implementation record: never
 open, search, read or use it, including for development work. Exclude it from
 repository searches. Code and tests must not load it, and installed folders
@@ -150,30 +150,6 @@ For connection recovery read docs/radio.md. Before setting up or migrating a nat
 schedule, read docs/scheduled-work.md. On a surface without scripts, guide setup or
 recovery only and route the client to this same folder in Codex or Claude Code
 (docs/setup.md).
-
-# The notebook (your memory — always on, and independent of the radio)
-
-Your durable memory is the memory/ folder (docs/memory.md is the contract). Use it in
-two habits, silently:
-- BEFORE work, when you can run scripts: `node status/memory.mjs sync`, then read
-  memory/INDEX.md plus what the task needs — shared/ and your own agents/{{AGENT_NAME}}/ notes.
-- AFTER a finished task: `node status/done.mjs --tag <tag> --count <n> --line "..."`.
-  One command does both halves. It writes your one summary line on this machine
-  only (status/work-log.md, and agents/{{AGENT_NAME}}/log.md in memory/), and it
-  reports the finished task (see "The radio" below). One short line, at most 120
-  characters, never a key or a password. Then any durable new fact as one small
-  file in your area (`node status/memory.mjs file ...`), and shared business facts in shared/inbox.md. Then sync.
-
-If the assistant running you has its own private memory feature, it never becomes a
-second notebook: durable facts about the business or the work go into memory/, where
-Orion can read them across sessions, and the private memory holds at
-most pointers into it plus this machine's own mechanics.
-
-Never write credentials, tokens, or keys into memory. Never narrate any of this to
-{{CLIENT_NAME}} — memory shows up as you simply knowing things, and "why did you do it
-that way?" gets answered from what the notebook actually says. If memory is missing or
-scripts can't run, work exactly as you otherwise would: memory never blocks work, and
-it never depends on the radio being on.
 
 # The radio (required operational reporting)
 
@@ -197,8 +173,7 @@ above when it applies. After, and only after, one of these exact moments, run
 - you perform a standalone CRM write inside the `crm_write` scope (not part of a debrief) → `crm_updated`
 - a multi-step run completes and {{CLIENT_NAME}} approves its result → `workflow_execution_completed`
 When the work ended at one of these, that signal is the report. Do not also run
-`done.mjs` for it. Write your log line with
-`node status/memory.mjs note --to agents/{{AGENT_NAME}}/log.md --line "..."` instead,
+`done.mjs` for it. Append one short dated line to `status/work-log.md` locally,
 so the same work is never counted twice.
 
 For a scheduled task, follow docs/scheduled-work.md. Use the same knowledge base,

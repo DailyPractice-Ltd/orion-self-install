@@ -61,7 +61,7 @@
  *       never two: a shift that used a skill is the same report, now naming the
  *       skill. Labels, a count, and a timestamp. Never content: there is no flag
  *       for a note or a description, and the story of the work stays on this
- *       machine, in the memory log and, for a shift, in status/shift-log.md.
+ *       machine, in status/work-log.md or, for a shift, in status/shift-log.md.
  *
  *   node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>
  *                                        [--role <slug|custom> --purpose "<sentence>"]
@@ -659,7 +659,7 @@ if (command === 'signal') {
   //   --tag     the kind of work, from the menu in shapes.mjs
   //   --asset   the slug of the skill, or other installed capability, that ran
   // There is deliberately no free-text field. The one-line story of the work lives
-  // on this machine, in the memory log and status/shift-log.md. The radio carries
+  // on this machine, in status/work-log.md or status/shift-log.md. The radio carries
   // labels, a count, and a time, never content (constitution Article V;
   // docs/radio.md).
   const work = {};

@@ -177,7 +177,7 @@ it'll explain what it's for before asking you to do it.
 
 ## Once installed, use Orion from any project
 
-The folder you homed in Step 2 is Orion's memory — your knowledge base, your bookmark
+The folder you homed in Step 2 holds your knowledge base, your bookmark
 file, your installed packages all live there. But you don't have to "go there" to work:
 your AI remembers it as one of your projects. Tomorrow, next month, mid-way through
 something else entirely — open your AI, switch to your Orion project (desktop agents

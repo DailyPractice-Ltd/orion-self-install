@@ -25,8 +25,7 @@
  *                 status/radio.key, a file that is never saved to the home
  *               - sets the ignore rules: the key, this machine's wake-up files
  *                 and local settings stay behind, and status.json, now holding
- *                 no key, travels. A notebook kept in a plain folder travels
- *                 too. A notebook with a repository of its own stays out.
+ *                 no key, travels.
  *               - marks the logs as append-only, so two machines adding a
  *                 line each never clash
  *               - notes the home's address when --remote gives one
@@ -65,7 +64,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  homeBlock, homeOn, isHomeBranch, isCloudRun, memoryBlock, looksLikeKey, looksLikeCredential,
+  homeBlock, homeOn, isHomeBranch, isCloudRun, looksLikeKey, looksLikeCredential,
   INSTALL_TOKEN_RE, RADIO_KEY_FILE,
 } from './shapes.mjs';
 
@@ -220,13 +219,9 @@ const NEVER_SAVED = [
   '.claude/settings.local.json',    // one machine's own permissions
   '.claude/worktrees/',             // working copies an app made, each a repository of its own
 ];
-/** The template's own two notebook lines: everything in memory/ stays out, bar its README. */
-const NOTEBOOK_RULES = ['memory/*', '!memory/README.md'];
 const APPEND_ONLY = [
   'status/shift-log.md',
   'status/work-log.md',
-  'memory/**/log.md',
-  'memory/shared/inbox.md',
 ];
 
 const readLines = (file) => {
@@ -240,21 +235,11 @@ const sameRule = (a, b) => a.trim().replace(/^\//, '') === b;
 
 /**
  * What .gitignore should say once the folder has a home. The owner's own lines
- * are kept as they are. A notebook in a plain folder has nowhere else to be
- * saved, so it travels with the folder. A notebook with a repository of its
- * own is saved there, and stays out of this one.
+ * are kept as they are; credentials and machine-local files stay behind.
  */
-function wantedIgnore(status) {
-  const memory = memoryBlock(status);
-  const ownRepository = memory.enabled === true && memory.backend === 'git';
-  // The template's two notebook lines go either way. In a plain folder the
-  // notebook then travels. With a repository of its own it stays out whole,
-  // README included: that README belongs to the notebook's repository and a
-  // second copy here would only go stale. A `memory/` line the owner wrote
-  // themselves is theirs and is never removed.
-  const drop = ['status/status.json', ...NOTEBOOK_RULES];
-  const need = [...NEVER_SAVED, ...(ownRepository ? ['memory/'] : [])];
-
+function wantedIgnore() {
+  const drop = ['status/status.json'];
+  const need = NEVER_SAVED;
   const kept = readLines('.gitignore').filter((line) => !drop.some((rule) => sameRule(line, rule)));
   while (kept.length > 0 && kept[kept.length - 1].trim() === '') kept.pop();
   const missing = need.filter((rule) => !kept.some((line) => sameRule(line, rule)));
@@ -471,19 +456,11 @@ if (command === 'prepare') {
       run: () => moveKeyOut(status),
     });
   }
-  const ignore = wantedIgnore(status);
+  const ignore = wantedIgnore();
   if (ignore !== fileText('.gitignore')) {
     steps.push({
       what: `Set the ignore rules: ${KEY_REL} and this machine's own files stay behind, and status/status.json travels.`,
       run: () => fs.writeFileSync(path.join(ROOT, '.gitignore'), ignore),
-    });
-  }
-  const notebook = memoryBlock(status);
-  if (notebook.enabled === true && notebook.backend === 'git' && repo.state === 'own' &&
-      git(['ls-files', '--', 'memory']).out.trim() !== '') {
-    steps.push({
-      what: 'Stop following the files in memory/: that notebook has a repository of its own, and a second copy here would only go stale.',
-      run: () => { git(['rm', '-r', '--cached', '--quiet', '--', 'memory']); },
     });
   }
   const attributes = wantedAttributes();

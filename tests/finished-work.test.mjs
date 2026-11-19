@@ -77,7 +77,6 @@ function makeHarness(t, { sharing = {}, status = {}, unreachable = false, refuse
     writeFileSync(join(dir, 'status', 'status.json'), JSON.stringify({
       ...BASE_PAYLOAD, ai_assistant: 'claude-code',
       agent_name: 'Neo',
-      memory: { enabled: true, backend: 'folder', remote: null, path: 'memory' },
       ...status,
       sharing: {
         status_signal_enabled: true,
@@ -133,7 +132,6 @@ function makeHarness(t, { sharing = {}, status = {}, unreachable = false, refuse
     wire: () => read('fetch.log') || '',
     shiftLog: () => read('status/shift-log.md'),
     workLog: () => read('status/work-log.md'),
-    memoryLog: (who) => read(`memory/agents/${who}/log.md`),
     exists: (rel) => existsSync(join(dir, rel)),
   };
 }
@@ -354,13 +352,10 @@ test('done: the --line text is written locally and appears in no request body', 
   const line = 'drafted the Q4 webinar deck for Acme Freight, three slides still thin';
   const { code, out, err } = h.run('done.mjs', ['--tag', 'content', '--count', '1', '--line', line]);
   assert.equal(code, 0, err);
-  // The local half: one dated line in the work log, and the same line in the
-  // harness's own log in memory.
+  // The local half: one dated line in the work log.
   const stamped = new RegExp(`^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} \\| Neo \\| count: 1 \\| content \\| ${line}\\n$`);
   assert.match(h.workLog(), stamped);
-  assert.equal(h.memoryLog('Neo'), h.workLog());
   assert.match(out, /Written to status\/work-log\.md\./);
-  assert.match(out, /Noted in agents\/Neo\/log\.md\./);
   assert.equal(h.shiftLog(), null, 'a task a person asked for never touches the shift log');
   // The radio half: labels only.
   assert.deepEqual(onlySignal(h).payload, { ...BASE_PAYLOAD, tag: 'content', count: 1 });
@@ -399,15 +394,13 @@ test('done: the radio script is handed labels only, never the line', (t) => {
     for (const arg of args) assert.ok(!/Thandi|Acme|Durban|pricing/.test(arg), `the line must not be handed over: ${arg}`);
   }
   // While the line itself is safe on this machine: in the work log for the two
-  // tasks, in the shift log for the shift, and in each one's memory log.
+  // tasks, and in the shift log for the shift.
   assert.ok(h.workLog().includes(`| Neo | count: 1 | calls | ${line}`));
   assert.ok(h.workLog().includes(`| research | count: 2 | calls | ${line}`));
-  assert.ok(h.memoryLog('Neo').includes(line));
-  assert.ok(h.memoryLog('research').includes(line));
   assert.ok(h.shiftLog().includes(`auto: ${line}`));
 });
 
-test('done: --shift sends routine_completed and writes an auto: line to the shift log and to memory', (t) => {
+test('done: --shift sends routine_completed and writes an auto: line to the shift log', (t) => {
   const h = makeHarness(t);
   const { code, out, err } = h.run('done.mjs', [
     '--tag', 'prospecting', '--count', '18', '--agent', 'prospecting', '--skill', 'meeting-sizing',
@@ -433,7 +426,6 @@ test('done: --shift sends routine_completed and writes an auto: line to the shif
     /^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \| prospecting \| count: 18 \| auto: 18 new candidates, 2 skipped as duplicates\n$/,
   );
   assert.ok(log.includes('auto:'));
-  assert.equal(h.memoryLog('prospecting'), log, 'the agent\'s memory log gets the same line');
   assert.ok(!h.wire().includes('candidates'), 'the line stays local on a shift too');
 });
 
@@ -452,12 +444,12 @@ test('a native scheduled skill reports under Orion without a hired agent', (t) =
 
 test('done: the auto: marker is never doubled, and a wiring test keeps its auto-test: marker', (t) => {
   const h = makeHarness(t);
-  h.run('done.mjs', ['--tag', 'ops', '--agent', 'dream', '--shift', '--line', 'auto: merged 4 duplicate notes']);
-  h.run('done.mjs', ['--tag', 'ops', '--agent', 'dream', '--shift', '--line', 'auto-test: wiring check, kicked by hand']);
+  h.run('done.mjs', ['--tag', 'ops', '--agent', 'friday-report', '--shift', '--line', 'auto: prepared 4 report sections']);
+  h.run('done.mjs', ['--tag', 'ops', '--agent', 'friday-report', '--shift', '--line', 'auto-test: wiring check, kicked by hand']);
   const lines = h.shiftLog().trimEnd().split('\n');
   assert.equal(lines.length, 2);
-  assert.match(lines[0], / \| dream \| count: 1 \| auto: merged 4 duplicate notes$/);
-  assert.match(lines[1], / \| dream \| count: 1 \| auto-test: wiring check, kicked by hand$/);
+  assert.match(lines[0], / \| friday-report \| count: 1 \| auto: prepared 4 report sections$/);
+  assert.match(lines[1], / \| friday-report \| count: 1 \| auto-test: wiring check, kicked by hand$/);
   assert.ok(!h.shiftLog().includes('auto: auto'));
 });
 
@@ -473,7 +465,6 @@ test('done: radio off sends nothing and says nothing about it, and a shift line 
   }
   assert.deepEqual(h.calls(), [], 'nothing leaves the machine with the radio off');
   assert.match(h.shiftLog(), / \| friday-report \| count: 1 \| auto: the week in one page\n$/);
-  assert.equal(h.memoryLog('friday-report'), h.shiftLog(), 'memory does not depend on the radio');
 });
 
 test('done: an unpaired harness is radio off too', (t) => {
@@ -483,7 +474,6 @@ test('done: an unpaired harness is radio off too', (t) => {
   assert.doesNotMatch(out, /radio/i);
   assert.deepEqual(h.calls(), []);
   assert.match(h.workLog(), / \| Neo \| count: 1 \| admin \| cleared the inbox\n$/);
-  assert.equal(h.memoryLog('Neo'), h.workLog());
 });
 
 test('done: a bad tag exits 1, prints the menu, and writes and sends nothing', (t) => {
@@ -632,13 +622,13 @@ test('done: the shift log is appended to, never rewritten', (t) => {
 
 test('done: a line break in --line cannot split the one-line shape', (t) => {
   const h = makeHarness(t);
-  h.run('done.mjs', ['--tag', 'ops', '--agent', 'dream', '--shift', '--line', 'merged 4 notes\n  and pruned 2']);
-  assert.match(h.shiftLog(), / \| dream \| count: 1 \| auto: merged 4 notes and pruned 2\n$/);
+  h.run('done.mjs', ['--tag', 'ops', '--agent', 'friday-report', '--shift', '--line', 'prepared 4 sections\n  and reviewed 2']);
+  assert.match(h.shiftLog(), / \| friday-report \| count: 1 \| auto: prepared 4 sections and reviewed 2\n$/);
   assert.equal(h.shiftLog().trimEnd().split('\n').length, 1);
 });
 
-test('done: memory off skips the note silently, and the shift log still gets its line', (t) => {
-  const h = makeHarness(t, { status: { memory: { enabled: false, backend: 'folder', remote: null, path: 'memory' } } });
+test('done: a shift writes only its operational log', (t) => {
+  const h = makeHarness(t);
   const { code, out, err } = h.run('done.mjs', [
     '--tag', 'reporting', '--agent', 'friday-report', '--shift', '--line', 'the week in one page',
   ]);
@@ -649,11 +639,9 @@ test('done: memory off skips the note silently, and the shift log still gets its
   assert.equal(h.calls().length, 1);
 });
 
-test('done: memory off, radio off: a task a person asked for still leaves its line', (t) => {
-  // The promise is that the local line never skips. It used to live only in the
-  // memory log, so a harness with memory off recorded nothing at all.
+test('done: radio off: a task a person asked for still leaves its line', (t) => {
+  // The local record is independent of reporting.
   const h = makeHarness(t, {
-    status: { memory: { enabled: false, backend: 'folder', remote: null, path: 'memory' } },
     sharing: { status_signal_enabled: false },
   });
   const { code, out } = h.run('done.mjs', ['--tag', 'crm', '--count', '3', '--line', 'updated three records']);
@@ -692,7 +680,7 @@ test('done: one line means one short line', (t) => {
 
 test('done: no status/status.json is one plain line, exit 0, nothing written or sent', (t) => {
   const h = makeHarness(t, { noStatus: true });
-  const { code, out } = h.run('done.mjs', ['--tag', 'ops', '--agent', 'dream', '--shift', '--line', 'ran']);
+  const { code, out } = h.run('done.mjs', ['--tag', 'ops', '--agent', 'friday-report', '--shift', '--line', 'ran']);
   assert.equal(code, 0);
   assert.equal(out, 'No status/status.json yet, so there is nothing to report from. Run  node start.mjs  first.\n');
   assert.deepEqual(h.calls(), []);
@@ -703,10 +691,10 @@ test('done: no status/status.json is one plain line, exit 0, nothing written or 
 
 test('done: a status file that will not parse costs a shift nothing locally, and sends nothing', (t) => {
   const h = makeHarness(t, { noStatus: true, files: { 'status/status.json': '{ "sharing": ' } });
-  const { code, out } = h.run('done.mjs', ['--tag', 'ops', '--agent', 'dream', '--shift', '--line', 'ran']);
+  const { code, out } = h.run('done.mjs', ['--tag', 'ops', '--agent', 'friday-report', '--shift', '--line', 'ran']);
   assert.equal(code, 0);
   assert.match(out, /status\/status\.json could not be read/);
-  assert.match(h.shiftLog(), / \| dream \| count: 1 \| auto: ran\n$/);
+  assert.match(h.shiftLog(), / \| friday-report \| count: 1 \| auto: ran\n$/);
   assert.deepEqual(h.calls(), []);
 });
 
@@ -810,26 +798,7 @@ test('tripwire: the release has one version, and it ships done.mjs', () => {
   assert.equal(template.template_version, manifest.template_version);
   assert.equal(newest[1], manifest.template_version);
   // A script the manifest does not list never reaches an installed harness.
-  for (const script of ['status/done.mjs', 'status/radio.mjs', 'status/shapes.mjs', 'status/memory.mjs']) {
+  for (const script of ['status/done.mjs', 'status/radio.mjs', 'status/shapes.mjs']) {
     assert.ok(manifest.deployment.common_sources.includes(script), `${script} must be in the deployment`);
   }
-});
-
-test('memory: every path it says is spelled with forward slashes, on every machine', (t) => {
-  // On Windows a path comes back with backslashes. What the assistant reads
-  // here has to match what docs/memory.md and its own commands spell.
-  const h = makeHarness(t);
-  // The notebook script takes the folder it is run from as the harness.
-  const memory = (...args) => spawnSync(process.execPath, [join(h.dir, 'status', 'memory.mjs'), ...args], { encoding: 'utf8', cwd: h.dir }).stdout;
-  const said = [
-    memory('init'),
-    memory('note', '--to', 'agents/Neo/log.md', '--line', 'one line'),
-    memory('file', '--path', 'agents/Neo/facts/pricing.md', '--content', 'the fact'),
-    memory('file', '--path', 'agents/Neo/facts/pricing.md', '--content', 'again'),
-    memory('check'),
-  ];
-  assert.match(said[1], /Noted in agents\/Neo\/log\.md\./);
-  assert.match(said[2], /Saved agents\/Neo\/facts\/pricing\.md\./);
-  assert.match(said[3], /agents\/Neo\/facts\/pricing\.md already exists/);
-  for (const line of said) assert.equal(line.includes('\\'), false, `a backslash in: ${line}`);
 });

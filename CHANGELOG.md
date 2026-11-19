@@ -2,6 +2,11 @@
 
 ## Unreleased — revised required pairing
 
+Removed the learned-memory folder, synchronization, consolidation skill and agent
+habits. Fresh installs retain the knowledge base, setup state, permissions,
+approval queue and operational logs. Reinstall to adopt this version; no memory
+migration or deletion of old installations is provided.
+
 All unpaired folders must pair before normal work, including the first updated
 run. Paired folders work silently through temporary connection or reporting
 failures for 48 elapsed hours after accepted verification and complete acknowledged
@@ -518,8 +523,7 @@ from what the notebook actually says.
   other agent.
 - **Private, like everything else.** The notebook's contents never ride the
   radio, and "update my harness" refreshes the notebook's binding — the scripts
-  and guides — never its pages. `docs/memory.md` is the whole contract in plain
-  words.
+  and guides — never its pages. The feature had its own documented contract.
 
 ## 0.6.6 — 2026-09-22
 

@@ -232,9 +232,8 @@ know why, just that the names are load-bearing; don't rename them.
    **What crosses the radio.** The tag, the count, the time, and the name of the
    skill or agent. Never the content, never who it was for. The line you give
    `--line` stays on this machine. A task your human asked for goes to
-   `status/work-log.md`, a shift goes to `status/shift-log.md`, and both also go to
-   your memory log when memory is on. Keep it to one short line, at most 120
-   characters, and never put a key, a token or a password in it: the script refuses
+   `status/work-log.md`, a shift goes to `status/shift-log.md`.
+   Keep it to one short line, at most 120 characters, and never put a key, a token or a password in it: the script refuses
    a line that looks like one.
 
    **Reporting after work.** Run the same command even if the connection failed
@@ -257,7 +256,7 @@ know why, just that the names are load-bearing; don't rename them.
 ## Skills and schedules
 
 One Orion serves this business. It uses the connected tools and the same knowledge
-base, memory, and permissions across tasks. Add reusable procedures as skills.
+base and permissions across tasks. Add reusable procedures as skills.
 For "teach Orion" or an equivalent request, follow the `create-skill` procedure
 from your AI assistant's skills directory. The [README](README.md) lists the built-in skills.
 
@@ -265,9 +264,7 @@ For recurring work, follow `docs/scheduled-work.md` and use Codex scheduled task
 or Claude Routines. If a legacy prompt requests a roster or job sheet run, refer
 the client to the migration section of that document.
 
-At session start, run `node status/memory.mjs sync` and read `memory/INDEX.md`.
-Memory is independent of the radio. Keep durable knowledge in `memory/`. A recent
-unreported-work entry in `status/shift-log.md` or `status/work-log.md` calls for
+A recent unreported-work entry in `status/shift-log.md` or `status/work-log.md` calls for
 the same session-start radio message and adapter fix, once per session.
 
 ## Updating — "update my harness"

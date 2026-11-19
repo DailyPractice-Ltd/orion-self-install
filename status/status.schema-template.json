@@ -36,12 +36,6 @@
     "vt09_send_gate": false
   },
   "packages": {},
-  "memory": {
-    "enabled": true,
-    "backend": "folder",
-    "remote": "",
-    "path": "memory"
-  },
   "home": {
     "enabled": false,
     "branch": "main"

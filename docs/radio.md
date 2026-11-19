@@ -115,8 +115,8 @@ names the skill.
 
 Third, it's **the labels, the count, and the time. Never the content.** When your AI
 reports finished work it also writes one line about it for your own records: in
-`status/work-log.md` for a task you asked for, in `status/shift-log.md` for a shift,
-and in your memory log too when memory is on. That line never leaves your machine.
+`status/work-log.md` for a task you asked for, in `status/shift-log.md` for a shift.
+That line never leaves your machine.
 The script that reports (`status/done.mjs`) does not pass it to the radio, and it
 has no way to send free text at all. It also refuses a line that looks like a key,
 a token or a password, so one never lands in a log.

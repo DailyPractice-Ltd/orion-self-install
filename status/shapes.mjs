@@ -208,61 +208,6 @@ export function homeOn(status) {
 }
 
 /**
- * The memory block (docs/memory.md is the contract). Shape, not mere presence,
- * for the same 2026-07-28 reason as the radio: a poisoned value must read as
- * unconfigured, not as configured-and-broken-forever.
- *
- * Backends: 'folder' (a plain local folder — the client may open it in Obsidian
- * and sync it with any tool of their own) and 'git' (a private repo the CLIENT
- * owns; agents pull and push silently). Daily Practice hosts none of it.
- */
-export const MEMORY_BACKENDS = ['folder', 'git'];
-// https, ssh, or an absolute local path (a repo on a shared drive counts).
-export const MEMORY_GIT_REMOTE_RE = /^(https:\/\/|git@|\/)[^\s]+$/;
-
-/**
- * A status.json with NO memory block gets the defaults: memory on, plain local
- * folder. Updates never touch status.json, so a harness that reached the
- * notebook by UPDATE rather than fresh install would otherwise sit silently
- * memory-off forever — found live on a real harness, 5 Oct 2026. The folder
- * backend writes only inside this folder, so defaulting on shares nothing.
- * An explicit `enabled: false` is still respected absolutely.
- */
-const MEMORY_DEFAULTS = Object.freeze({ enabled: true, backend: 'folder', remote: '', path: 'memory' });
-
-export function memoryBlock(status) {
-  return { ...MEMORY_DEFAULTS, ...(status?.memory ?? {}) };
-}
-
-/**
- * The same repository over https, for a machine with no ssh key of its own. A
- * laptop reaches a notebook at git@github.com:owner/notebook.git. A cloud run
- * is given that repository over https and nothing else. Null when the address
- * is not the git@host:path kind.
- */
-export function httpsTwin(remote) {
-  const m = /^git@([A-Za-z0-9.-]+):([A-Za-z0-9._/-]+?)(?:\.git)?$/.exec(String(remote ?? ''));
-  return m ? `https://${m[1]}/${m[2]}.git` : null;
-}
-
-export function memoryConfigured(status) {
-  const m = memoryBlock(status);
-  if (m.enabled !== true) return false;
-  if (!MEMORY_BACKENDS.includes(m.backend)) return false;
-  if (typeof m.path !== 'string' || m.path.length === 0 || m.path.includes('..')) return false;
-  if (m.backend === 'git' && !MEMORY_GIT_REMOTE_RE.test(m.remote || '')) return false;
-  return true;
-}
-
-/**
- * Memory is deliberately independent of radioOn(): the shift-log asymmetry
- * extends here — the local memory write never skips because the radio is off.
- */
-export function memoryOn(status) {
-  return memoryConfigured(status);
-}
-
-/**
  * The tag menu: the kind of work a finished task was, in one word.
  *
  * What it is for: every finished task reports one tag, so Daily Practice can see
@@ -367,9 +312,8 @@ export function countProblem(text, { allowZero = false } = {}) {
 
 /**
  * The credential tripwire. Narrow on purpose: broad patterns would refuse honest
- * lines. status/memory.mjs refuses a note that matches, and status/done.mjs
- * refuses a line that matches before it is written anywhere, because the same
- * line goes to the local logs that other agents read.
+ * lines. status/done.mjs refuses a line that matches before it is written
+ * anywhere, because the same line goes to the local logs that other agents read.
  */
 const UNMISTAKABLE_KEY_RES = [
   /orion_[A-Za-z0-9_-]{20,}/,            // an install token

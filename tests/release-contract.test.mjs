@@ -32,7 +32,7 @@ test('release contract plans one selected runtime from portable sources', (t) =>
     assert.ok(!destinations.some(path => path.startsWith('.specify/')), 'maintainer governance stays in the release');
     assert.ok(!plan.entries.some(entry => [entry.source, entry.destination].some(path => path.split('/').includes('specs'))), 'human-only records stay out of every deployment');
     const skillRoot = tool === 'codex' ? '.agents/skills' : '.claude/skills';
-    for (const name of ['prospecting', 'call-planner', 'friday-report', 'memory-consolidation']) {
+    for (const name of ['prospecting', 'call-planner', 'friday-report']) {
       assert.ok(destinations.includes(`${skillRoot}/${name}/SKILL.md`));
     }
     assert.ok(destinations.includes(`${skillRoot}/call-planner/scripts/build-call-plan.mjs`));

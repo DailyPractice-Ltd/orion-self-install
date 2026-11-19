@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { planForTool, safePath } from '../update/destination-resolver.mjs';
 import { computePristine, hasFullHistory, serialise, PRISTINE_PATH } from './helpers/pristine.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,6 +30,7 @@ test('release contract plans one selected runtime from portable sources', (t) =>
       assert.ok(manifest.refresh.includes(path), `${path} must also reach legacy updates`);
     }
     assert.ok(!destinations.some(path => path.startsWith('.specify/')), 'maintainer governance stays in the release');
+    assert.ok(!plan.entries.some(entry => [entry.source, entry.destination].some(path => path.split('/').includes('specs'))), 'human-only records stay out of every deployment');
     const skillRoot = tool === 'codex' ? '.agents/skills' : '.claude/skills';
     for (const name of ['prospecting', 'call-planner', 'friday-report', 'memory-consolidation']) {
       assert.ok(destinations.includes(`${skillRoot}/${name}/SKILL.md`));
@@ -99,5 +101,37 @@ test('supported instructions route website chat to an executable paired folder',
     assert.match(text, /website|paste-only/i, `${file} explains the unsupported surface`);
     assert.match(text, /docs\/setup\.md|setup\.md/, `${file} points at executable setup and recovery`);
     assert.doesNotMatch(text, /always works|works just as well|nothing else about your install is affected|your work is unaffected|You can switch this off\. Keep check-ins on/);
+  }
+});
+
+
+test('deployment rejects human-only sources and destinations before inspecting their files', () => {
+  const base = { tools: ['codex'], common_sources: [], entries: [] };
+  for (const path of ['specs', 'specs/missing.md', 'docs/specs/missing.md', 'specs\\missing.md']) {
+    assert.throws(() => safePath(repo, path), /Human-only specs/);
+  }
+  for (const deployment of [
+    { ...base, common_sources: ['specs/missing.md'] },
+    { ...base, entries: [{ source: 'specs/missing.md', destinations: { codex: 'docs/missing.md' } }] },
+    { ...base, entries: [{ source: 'README.md', destinations: { codex: 'specs/missing.md' } }] },
+  ]) {
+    assert.throws(() => planForTool(deployment, 'codex', { releaseRoot: join(repo, 'tests/fixtures') }), /Human-only specs/);
+  }
+});
+
+test('deployed documentation uses permitted sources without directing agents into human records', () => {
+  const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
+  for (const tool of manifest.deployment.tools) {
+    const plan = planForTool(manifest.deployment, tool, { releaseRoot: repo });
+    for (const { source } of plan) {
+      if (!/\.(md|mjs)$/.test(source) || source === 'CHANGELOG.md') continue;
+      const text = readFileSync(join(repo, source), 'utf8');
+      assert.doesNotMatch(text, /specs\/[\w.-]+\//, `${source} must not point inside human-only records`);
+    }
+  }
+  for (const source of ['AGENTS.md', 'agent/agent-definition.md']) {
+    const text = readFileSync(join(repo, source), 'utf8');
+    assert.match(text, /specs\/.*human-only/i);
+    assert.match(text, /ask (the human|\{\{CLIENT_NAME\}\})/);
   }
 });

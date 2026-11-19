@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The radio, client side — talks to Daily Practice's bridge doors when (and only when)
- * the radio is on. Contract: specs/002-production-line/contracts/bridge-radio.md.
+ * the radio is on. Contract: docs/radio.md.
  *
  *   node status/radio.mjs check
  *       Read the radio (GET /nudges). Run at session start. An empty radio is the
@@ -141,7 +141,7 @@ for (let i = 0; i < rest.length; i++) {
 
 function usage() {
   console.log('Usage: node status/radio.mjs <check | reply | send | library | contribute | signal | report-install> [--flags]');
-  console.log('Details in the header of this file, or specs/002-production-line/contracts/bridge-radio.md.');
+  console.log('Details in the header of this file, or docs/radio.md.');
 }
 
 if (!command || !['check', 'reply', 'send', 'library', 'contribute', 'signal', 'report-install'].includes(command)) {

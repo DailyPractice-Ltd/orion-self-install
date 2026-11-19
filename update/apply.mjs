@@ -16,8 +16,12 @@ function sourceSnapshot(repo, commit) {
   if (!/^[0-9a-f]{40,64}$/.test(commit||'')) throw new Error('A full pinned commit hash is required');
   const head=execFileSync('git',['rev-parse',`${commit}^{commit}`],{cwd:repo,encoding:'utf8'}).trim();
   if (head!==commit) throw new Error('Commit must resolve exactly');
+  // Select top-level paths by name so the snapshot never loads human-only records.
+  const paths = execFileSync('git', ['ls-tree', '--name-only', '-z', commit], {cwd:repo,encoding:'utf8'})
+    .split('\0').filter(path => path && path !== 'specs' && path !== '.specify');
+  if (!paths.length) throw new Error('Release has no permitted source paths');
+  const archive=execFileSync('git',['archive',commit,'--',...paths],{cwd:repo,maxBuffer:1<<28});
   const dir=mkdtempSync(join(tmpdir(),'orion-pinned-release-'));
-  const archive=execFileSync('git',['archive',commit],{cwd:repo,maxBuffer:1<<28});
   execFileSync('tar',['-xf','-','-C',dir],{input:archive});
   return dir;
 }

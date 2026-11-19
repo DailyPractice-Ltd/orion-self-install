@@ -171,8 +171,9 @@ Never delete pending reports to make this check pass.
 **Pass criteria**: one signal for each finished piece of work, and none for
 conversation; failed checks stop new work outside grace, and recovery preserves
 finished reports without duplicates. Record sanitized receipts only, never keys or
-client content. For maintainers, the full candidate live journey checklist and
-remaining blockers are in `specs/007-required-pairing/verification.md`.
+client content. Use `NON-TECHNICAL-DRY-RUN.md` for the observed live journey and
+`docs/setup.md` for setup and recovery. Record remaining blockers with the
+sanitized validation results.
 
 ---
 

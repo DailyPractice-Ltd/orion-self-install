@@ -21,7 +21,7 @@ deserve a template, which validation tasks catch real problems).
 ## What it is not
 
 It is not the lifecycle status signal described in `README.md` and
-`specs/001-self-install/spec.md` (US5) — that's a separate, much narrower channel (just
+[the radio guide](radio.md) — that's a separate, much narrower channel (just
 your install stage and a timestamp) that's on by default because it's how Daily Practice
 knows to check in if you need help. This Intelligence Library channel is additional,
 richer, and entirely separate — turning this off has no effect on that one, and vice

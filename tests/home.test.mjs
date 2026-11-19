@@ -351,12 +351,11 @@ test('a cloud run whose environment holds no key says where the key belongs', (t
   assert.doesNotMatch(r.out, /pairing code/, 'a fresh pairing code is the wrong fix on a cloud run');
 });
 
-test('a cloud run that cannot reach the radio says the environment may not be allowed to', (t) => {
+test('a cloud report transport failure is silent apart from its machine-readable result', (t) => {
   const h = makeFolder(t, { sharing: { install_token: null }, answer: 'unreachable' });
   const r = h.run('status/radio.mjs', ['signal', '--type', 'task_completed', '--tag', 'crm', '--count', '1', '--result-line', 'yes'], CLOUD);
   assert.equal(r.code, 0);
-  assert.match(r.out, /This assistant's sandbox is blocking the network, or this machine is offline \(ENOTFOUND\)/);
-  assert.match(r.out, /the cloud environment may not reach radio\.test\./);
+  assert.doesNotMatch(r.out, /sandbox|offline|cloud environment|recovery/i);
   assert.match(r.out, /\[radio-result\] unreachable/);
   // The same silence on a person's own machine gets no cloud advice.
   const own = makeFolder(t, { name: 'own', answer: 'unreachable' });

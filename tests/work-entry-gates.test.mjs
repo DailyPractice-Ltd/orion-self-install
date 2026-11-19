@@ -83,3 +83,15 @@ test('post-work signals, support inspection and policy recovery remain usable wh
  assert.match(readFileSync(join(h.root,'status/no-contact.md'),'utf8'),/stop@example.test/);
  assert.equal(JSON.parse(readFileSync(join(h.root,'status/status.json'))).notes,'Recovering pairing');
 });
+
+for(const outcome of ['unreachable','server_error','pending_failure']) for(const [name,args] of commands) test(`${name} permits silent ${outcome} within the shared allowance`,t=>{
+ const h=harness(t,outcome,outcome==='pending_failure');const path=join(h.root,'status/status.json');const s=JSON.parse(readFileSync(path));
+ const connected=new Date(Date.now()-24*60*60*1000).toISOString();s.sharing.pairing={version:2,state:'verified',verified_at:connected,last_check:'accepted',last_connected_at:connected};writeFileSync(path,JSON.stringify(s));
+ const r=h.run(args);assert.equal(r.status,0,r.output);assert.doesNotMatch(r.output,/could not be reached|could not verify|still waiting|restore the connection|saved for recovery|radio did not acknowledge/i);
+ assert.equal(JSON.parse(readFileSync(path)).sharing.pairing.last_connected_at,connected);
+ if(name==='stage advancement')assert.equal(JSON.parse(readFileSync(path)).ops_stage,'day1_encode');
+ if(name==='send authorization')assert.equal(existsSync(join(h.root,'status/send-log.md')),true);
+ if(name==='call plan')assert.match(r.output,/Day sheet written:/);
+ if(name.endsWith('configuration'))assert.ok(h.calls().some(c=>c.method==='POST'&&!c.url.startsWith('https://bridge.test')));
+ if(name==='library installation')assert.match(r.output,/Written: 1 file/);
+});

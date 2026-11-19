@@ -4,13 +4,13 @@
 
 **Blocked by:** 03 — Central guard and 48-hour connection allowance.
 
-**Status:** revision integration and regression checks pending; original setup gate implemented in the earlier candidate.
+**Status:** revised client implementation complete; fresh local evidence is recorded in verification.md. Database and real-account verification remain deferred.
 
-- [ ] Preserve the approved pairing explanation, self-service route, saved answers, interrupted-exchange recovery and credential secrecy.
-- [ ] Keep missing/invalid codes, failed verification and undelivered setup checkpoints in resumable setup; no handoff on stored credentials or the connection allowance alone.
-- [ ] Remove migration detection from setup. Existing accepted credentials can complete the current check without a new code; unpaired users must pair immediately.
-- [ ] Establish the connection timestamp only after accepted verification and acknowledged outbox delivery; keep durable setup checkpoint identity unchanged.
-- [ ] Verify new/existing installation, resumption, ordinary/homed/cloud credentials, historical state and concurrent wizard persistence under the revised contract.
+- [x] Preserve the approved pairing explanation, self-service route, saved answers, interrupted-exchange recovery and credential secrecy.
+- [x] Keep missing/invalid codes, failed verification and undelivered setup checkpoints in resumable setup; no handoff on stored credentials or the connection allowance alone.
+- [x] Remove migration detection from setup. Existing accepted credentials can complete the current check without a new code; unpaired users must pair immediately.
+- [x] Establish the connection timestamp only after accepted verification and acknowledged outbox delivery; keep durable setup checkpoint identity unchanged.
+- [x] Verify new/existing installation, resumption, ordinary/homed/cloud credentials, historical state and concurrent wizard persistence under the revised contract.
 
 ## Historical candidate evidence — superseded policy
 

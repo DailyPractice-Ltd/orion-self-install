@@ -18,7 +18,7 @@ In a deployed Codex folder, installed skills live in `.agents/skills/`. `AGENTS.
 
 Follow [setup and recovery](../../docs/setup.md). This deployed Codex folder must
 run `node status/guard.mjs check --quiet` before each interactive or scheduled task.
-Exit 0 permits work, including a displayed existing-user grace reminder; exit 2
+Exit 0 permits work, silently during temporary failures within the 48-hour allowance; exit 2
 pauses work and gives the next recovery action. Check support messages separately
 with `node status/radio.mjs check` after allowance.
 
@@ -46,3 +46,13 @@ Use Codex scheduled tasks for recurring Orion work. See [Schedule Orion](../../d
 - Sending follows rule 1 in the agent definition. The scheduled environment's connector
   permissions also apply. If a send tool is missing or requires interactive approval,
   leave the message waiting for the user.
+
+
+For a task composed of script commands, admit the whole invocation with
+`node status/guard.mjs run -- <command> [args]` (for a shell sequence, use
+`run -- sh -c '<commands>'`). Nested gated commands use the live parent admission
+until that command exits, so authorized actions and reporting can finish after
+expiry. The scope stays in that invocation's descendants and ends with its parent;
+never save or reuse its environment for another task. For interactive connector
+work, run `check --quiet` once at the task boundary and finish the admitted task;
+do not add a new mid-task check. Run the guard again for the next task or shift.

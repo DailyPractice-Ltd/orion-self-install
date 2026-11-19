@@ -58,7 +58,7 @@ Pair Orion with Daily Practice to finish setup. This lets us support your harnes
 
 Get your code at [Daily Practice](https://www.dailypractice.world/home/pair).
 [Setup and recovery](docs/setup.md) covers interrupted setup, connection failures,
-and the one-time 30-day transition for existing folders. Keep this client folder as your business's
+and the silent 48-hour connection allowance after verified pairing. Keep this client folder as your business's
 Orion home. The downloaded release folder is only the source for installing and
 updating it. If you already created an empty
 private repository, use `--remote https://github.com/YOUR-USERNAME/my-orion.git`

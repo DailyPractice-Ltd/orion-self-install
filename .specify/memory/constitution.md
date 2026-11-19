@@ -1,6 +1,17 @@
 # Orion Self-Install Constitution
 
-**Version**: 2.0.0 | **Ratified**: 2026-07-12 | **Last Amended**: 2026-11-18
+**Version**: 2.1.0 | **Ratified**: 2026-07-12 | **Last Amended**: 2026-11-19
+
+**Sync Impact Report** (amendment 2.1.0, 2026-11-19):
+- Maintainer approval is recorded in spec 007's written constitution amendment.
+- All unpaired harnesses must pair immediately; historical migration data is inert.
+- Temporary verification or reporting failures permit silent work for 48 elapsed
+  hours after accepted verification and complete acknowledged report delivery.
+  Only that complete cycle renews the clock. Invalid/revoked credentials clear it;
+  disabled radio and unsafe state require recovery. Expiry gates the next task,
+  while admitted tasks finish and report. Setup still needs current acceptance
+  and acknowledged reporting. Payload tiers and recovery access are unchanged.
+- Earlier Sync Impact Reports preserve historical approval and superseded policy.
 
 **Sync Impact Report** (amendment 2.0.0, 2026-11-18):
 - Recovered the actual self-install constitution v1.4.0 from `feffff9^`; its removal
@@ -214,12 +225,17 @@ a EULA, never implied.
    **Tier 1 — ambient labels.** Required and disclosed for supported Orion use.
    Pair to a signed-in Daily Practice account and verify its credential with the
    server before install completion and every supported session or scheduled shift.
-   A failed check or undelivered operational report pauses new work; diagnosis,
-   updating, inspection and re-pairing remain available. Existing harnesses have a
-   one-time 30 × 24-hour transition, durably recorded at first updated run, never
-   restarted. At the exact deadline the gate applies. A prior decline is preserved
-   until explicit pairing; successful verification permanently satisfies migration.
-   Turning off the operational connection pauses supported work after that transition.
+   New and existing unpaired harnesses must pair immediately. Temporary connection
+   or report-delivery failures allow work silently for 48 elapsed hours after the
+   last accepted verification and acknowledged delivery of all queued reports.
+   Only that complete cycle refreshes last_connected_at; failed or partial replay,
+   updates and restarts never do. At exactly 48 hours pause new tasks and shifts;
+   an admitted task may finish and report. Invalid/revoked credentials invalidate
+   the allowance immediately. Disabled radio and unsafe local state also block.
+   Diagnosis, updating, inspection, pairing and recording finished work remain
+   available. Show recovery guidance only when blocking new work. Preserve prior
+   decline until explicit pairing; legacy migration fields never authorize work.
+   Setup requires current accepted verification and acknowledged setup reporting.
    Local credential shape and timestamps cannot prove acceptance. Enumerated in
    full, and nothing else rides here: (a) install-stage signals (client identity,
    current install stage, a timestamp); (b) work heartbeats, for any finished piece

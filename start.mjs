@@ -377,7 +377,7 @@ async function main() {
     await store.writeStatus(JSON.parse(readFileSync(TEMPLATE_PATH,'utf8')));
     return true;
   });
-  // Detect legacy progress before this wizard records a profile or started_at.
+  // Validate and upgrade pairing state before setup writes.
   const initial = await checkWork({root:__dirname, replay:false});
   if (initial.reason.includes('could not safely')) { pauseSetup(initial.reason); return; }
   const status = migrate(loadStatus().status, { firstRun });
@@ -388,6 +388,7 @@ async function main() {
       for (const field of ['bridge_url','harness_id','install_token','paired_at']) current.sharing[field] = null;
       current.sharing.pairing.state = 'unpaired';
       current.sharing.pairing.last_check = 'invalid';
+      current.sharing.pairing.last_connected_at = null;
       rmSync(KEY_PATH, {force:true});
       await store.writeStatus(current);
       Object.assign(status.sharing,current.sharing);
@@ -498,9 +499,9 @@ async function main() {
   if (explicitCode || !radioConfigured(status,keyPlaces()) || status.sharing.radio_choice === 'declined') {
     if (!(await pairingStep(status))) { pauseSetup('Get or renew your code at https://www.dailypractice.world/home/pair, then run node start.mjs --code <code>.'); return; }
   }
-  const verified = await checkWork({root:__dirname});
+  const verified = await checkWork({root:__dirname,scope:false});
   const checked = loadStatus().status;
-  if (!verified.allow || verified.grace || checked.sharing.pairing.state !== 'verified' || checked.sharing.pairing.last_check !== 'accepted') {
+  if (!verified.allow || verified.allowance || checked.sharing.pairing.state !== 'verified' || checked.sharing.pairing.last_check !== 'accepted') {
     pauseSetup(verified.reason + ' Run node start.mjs again to resume your saved setup.'); return;
   }
   Object.assign(status.sharing, checked.sharing);
@@ -566,7 +567,7 @@ async function pairingStep(status) {
     sharing.bridge_url = address; sharing.harness_id = pack.harness_id;
     sharing.radio_choice = 'accepted'; sharing.status_signal_enabled = true;
     sharing.paired_at = new Date().toISOString();
-    sharing.pairing.state = 'exchanged'; sharing.pairing.last_check = null;
+    sharing.pairing.state = 'exchanged'; sharing.pairing.last_check = null; sharing.pairing.last_connected_at = null;
     await store.writeStatus(current); Object.assign(status.sharing,sharing);
   });
   say('Pairing saved securely. Checking the connection before finishing setup…');

@@ -46,7 +46,7 @@ const advancesWork = workArgs.some((arg,index) =>
   (arg === '--harness_status' && ['configured','connected','validated','installed','installed/running','running','formalised'].includes(workArgs[index+1])));
 if (advancesWork) {
   const permission = await checkWork({root:join(__dirname,'..')});
-  if (!permission.allow || permission.grace) console.log(permission.reason);
+  if (!permission.allow) console.log(permission.reason);
   if (!permission.allow) process.exit(2);
 }
 
@@ -90,4 +90,5 @@ const status = await withStatusLock(join(__dirname,'..'), async store => {
 });
 console.log(`status/status.json updated — harness_status: ${status.harness_status}, ops_stage: ${status.ops_stage}`);
 const report = await reportSignal({root:join(__dirname,'..'),signalType:'install_checkpoint',occurredAt:now});
-console.log(report.status === 'sent' ? 'Status signal sent (via the radio).' : report.reason || 'Status signal saved for recovery.');
+if (report.status === 'sent') console.log('Status signal sent (via the radio).');
+else if (report.status === 'invalid') console.log(report.reason);

@@ -153,7 +153,7 @@ if (!command || !['check', 'reply', 'send', 'library', 'contribute', 'signal', '
 if (['send','reply'].includes(command) || (['contribute','library'].includes(command) && flags.yes !== undefined)) {
   const {checkWork} = await import('./guard.mjs');
   const permission = await checkWork({root:ROOT});
-  if (!permission.allow || permission.grace) console.log(permission.reason);
+  if (!permission.allow) console.log(permission.reason);
   if (!permission.allow) process.exit(2);
 }
 
@@ -553,9 +553,8 @@ if (command === 'library') {
     slug, kind:asset.kind || 'skill', version:asset.version || '0.0.0',
     installed_at:new Date().toISOString(),
   }});
-  console.log(report.status === 'sent'
-    ? `Daily Practice knows this machine now runs ${slug}.`
-    : report.reason || 'Written locally; the shelf report is saved for recovery.');
+  if (report.status === 'sent') console.log(`Daily Practice knows this machine now runs ${slug}.`);
+  else if (report.status === 'invalid') console.log(report.reason);
   console.log('');
   console.log('--- for the assistant, not to be read aloud ---');
   if (fill.open.length > 0) {
@@ -772,8 +771,9 @@ if (command === 'signal') {
 
   const report = await reportSignal({root:ROOT,signalType:flags.type,payload:work});
   if (report.result === 'refused 401') reportAuthProblem();
-  if (report.result === 'unreachable' && isCloudRun()) console.log(`On a cloud run this usually means the cloud environment may not reach ${new URL(base).host}.`);
-  console.log(report.status === 'sent' ? `Signal sent (${flags.type}).` : report.status === 'off' ? 'Radio is off (or not configured) — report saved locally for recovery.' : report.reason || 'Signal saved locally for recovery.');
+  if (report.status === 'sent') console.log(`Signal sent (${flags.type}).`);
+  else if (report.status === 'off') console.log('Radio is off (or not configured) — report saved locally for recovery.');
+  else if (report.status === 'invalid') console.log(report.reason);
   resultLine(report.status === 'sent' ? 'sent' : report.result || report.status);
   process.exit(0);
 }
@@ -843,7 +843,8 @@ if (command === 'report-install') {
     if (res.status === 401) reportAuthProblem();
     console.log(res.ok ? `Shelf updated — Daily Practice knows this machine runs ${flags.slug} v${flags.version}.` : `Shelf labels delivered; purpose report answered ${res.status}. Retry the consented purpose separately.`);
   } else {
-    console.log(report.status === 'sent' ? `Shelf updated — Daily Practice knows this machine runs ${flags.slug} v${flags.version}.` : report.reason || 'Shelf report saved for recovery.');
+    if (report.status === 'sent') console.log(`Shelf updated — Daily Practice knows this machine runs ${flags.slug} v${flags.version}.`);
+    else if (report.status === 'invalid') console.log(report.reason);
     if (purpose) console.log('The consented purpose was not delivered. Retry that explicit report when connected; only shelf labels were saved.');
   }
   process.exit(0);

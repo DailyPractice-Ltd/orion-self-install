@@ -4,18 +4,18 @@
 
 **Blocked by:** 02 — Align the revised required-pairing contracts.
 
-**Status:** reopened — previous migration implementation is superseded; revised behavior not implemented.
+**Status:** revised client implementation complete; fresh local evidence is recorded in verification.md. Database and real-account verification remain deferred.
 
-- [ ] Remove existing-harness progress detection, migration clocks, countdowns and reminders. An unpaired harness is blocked on its first updated run.
-- [ ] Upgrade absent/version-1 state compatibly to version 2. Ignore historical migration fields for authorization; never derive a connection allowance from them or `verified_at`.
-- [ ] Reuse accepted existing credentials without another code. Preserve a declined choice until explicit pairing.
-- [ ] Attempt authenticated verification at every task/shift entry. Only accepted verification plus fully acknowledged queued-report delivery refreshes `last_connected_at`, under the shared lock.
-- [ ] Allow temporary network/server/reporting failures while `now < last_connected_at + 48 hours`, without notices. Partial replay, failed attempts, successful verification alone with pending reports, restarts and updates never extend the clock.
-- [ ] Block invalid/revoked credentials immediately and invalidate the saved allowance. Disabled radio, mismatched identity, unsafe local state, malformed/future timestamps and unsafe locks also require recovery.
-- [ ] At the exact deadline block new tasks/shifts unless verification and delivery succeed. Let a task already admitted finish and report after expiry.
-- [ ] Keep diagnosis, inspection, updating, code renewal, re-pairing and finished-work reporting available. Explain recovery only when new work is blocked.
-- [ ] Test before/at/after the deadline, restart/update persistence, all failure classes, credential storage variants, historical state, concurrency and underway-task completion. Verify that allowed outage runs print no notice.
-- [ ] Share this policy with reporting and supported entry points rather than introducing separate clocks or gates.
+- [x] Remove existing-harness progress detection, migration clocks, countdowns and reminders. An unpaired harness is blocked on its first updated run.
+- [x] Upgrade absent/version-1 state compatibly to version 2. Ignore historical migration fields for authorization; never derive a connection allowance from them or `verified_at`.
+- [x] Reuse accepted existing credentials without another code. Preserve a declined choice until explicit pairing.
+- [x] Attempt authenticated verification at every task/shift entry. Only accepted verification plus fully acknowledged queued-report delivery refreshes `last_connected_at`, under the shared lock.
+- [x] Allow temporary network/server/reporting failures while `now < last_connected_at + 48 hours`, without notices. Partial replay, failed attempts, successful verification alone with pending reports, restarts and updates never extend the clock.
+- [x] Block invalid/revoked credentials immediately and invalidate the saved allowance. Disabled radio, mismatched identity, unsafe local state, malformed/future timestamps and unsafe locks also require recovery.
+- [x] At the exact deadline block new tasks/shifts unless verification and delivery succeed. Let a task already admitted finish and report after expiry.
+- [x] Keep diagnosis, inspection, updating, code renewal, re-pairing and finished-work reporting available. Explain recovery only when new work is blocked.
+- [x] Test before/at/after the deadline, restart/update persistence, all failure classes, credential storage variants, historical state, concurrency and underway-task completion. Verify that allowed outage runs print no notice.
+- [x] Share this policy with reporting and supported entry points rather than introducing separate clocks or gates.
 
 ## Historical candidate evidence — superseded policy
 

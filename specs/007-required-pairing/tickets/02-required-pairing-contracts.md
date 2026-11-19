@@ -4,13 +4,13 @@
 
 **Blocked by:** 01 — Self-service pairing and verification (existing server contract unchanged).
 
-**Status:** revised design recorded; ratified constitution and linked release contracts need alignment.
+**Status:** revised client implementation complete; fresh local evidence is recorded in verification.md. Database and real-account verification remain deferred.
 
 - [x] Record the maintainer-confirmed policy in spec 007, this amendment, and the target pairing/guard contracts.
-- [ ] Align ratified Article V and linked 001/002 contracts with immediate pairing and the silent 48-hour allowance. Preserve the historical approval evidence.
-- [ ] Align the runtime schema/reference/template with nested pairing version 2 and `last_connected_at`; legacy migration fields are readable but inert.
-- [ ] Preserve code exchange, authenticated verification, credential privacy, labels-only payloads, idempotent replay and the supported-flow limitation.
-- [ ] Validate target contract/schema agreement and upgrade handling without claiming old tests validate the new policy.
+- [x] Align ratified Article V and linked 001/002 contracts with immediate pairing and the silent 48-hour allowance. Preserve the historical approval evidence.
+- [x] Align the runtime schema/reference/template with nested pairing version 2 and `last_connected_at`; legacy migration fields are readable but inert.
+- [x] Preserve code exchange, authenticated verification, credential privacy, labels-only payloads, idempotent replay and the supported-flow limitation.
+- [x] Validate target contract/schema agreement and upgrade handling without claiming old tests validate the new policy.
 
 ## Historical candidate evidence — superseded policy
 

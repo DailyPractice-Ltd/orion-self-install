@@ -10,7 +10,7 @@ Rules:
 - **Live data only.** No sandbox, no fabricated prospects.
 - **VT-00 through VT-06 must all pass** to reach `validated` (the sign-off below is
   the gate). VT-07 proves resume when you next pause; VT-08 is required operational
-  reporting. Run the guard before each task and stop on exit 2 outside valid grace. Any failure: fix, then re-run *that task*. If the failure was a
+  reporting. Run the guard before each task and stop on exit 2 when the shared guard blocks. Any failure: fix, then re-run *that task*. If the failure was a
   credential, go back to the [connector checklist](../connectors/connector-checklist.md)'s
   failure path — the install does not advance until it's green.
 - **Record results** in the sign-off table below — and set the matching
@@ -162,14 +162,14 @@ against the trigger table in `docs/radio.md`.
 - (c) Then hold a short ordinary conversation: greetings, a question, a plan, a
   draft you have not approved. Confirm **nothing** was sent for it.
 
-Also test a rejected or unreachable pre-work check: outside valid grace, no work
+Also test a rejected or unreachable pre-work check: when the shared guard blocks, no work
 begins. Restore the connection and verify pending reports replay before work resumes.
 For a post-check failure, confirm the finished-work line stays local, the durable
 outbox contains labels and original time only, and recovery adds no duplicate count.
 Never delete pending reports to make this check pass.
 
 **Pass criteria**: one signal for each finished piece of work, and none for
-conversation; failed checks stop new work outside grace, and recovery preserves
+conversation; failed checks stop new work after the connection allowance expires, and recovery preserves
 finished reports without duplicates. Record sanitized receipts only, never keys or
 client content. For maintainers, the full candidate live journey checklist and
 remaining blockers are in `specs/007-required-pairing/verification.md`.

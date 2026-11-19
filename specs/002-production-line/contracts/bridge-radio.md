@@ -45,10 +45,11 @@ identity mismatch invalid; network failure unreachable. Never use nudges as a ch
   written on any auth failure.
 - Radio-on gate before any call: `sharing.status_signal_enabled` AND `bridge_url` AND
   `harness_id` AND a token from one of the places above (or a cloud run, where it is
-  attached outside the machine). Anything less pauses supported work outside valid migration grace; report labels
+  attached outside the machine). Anything less pauses supported work immediately; report labels
   remain durable locally. Explicit words/artifacts retain per-item consent.
-- Required supported work passes fresh verification and durable outbox delivery first,
-  except valid one-time existing-user grace. Recovery remains available. Operational
+- Every task attempts fresh verification and durable outbox delivery. Temporary
+  failures permit silent work for 48 elapsed hours after the last complete cycle;
+  invalid/revoked credentials invalidate that allowance. Unpaired work is blocked. Recovery remains available. Operational
   reports are written ahead and replayed with original identity under the shared lock.
 - No PII or client-authored words in ambient operational payloads: no message content,
   KB content or prospect data. Explicit send/reply/contribute are separately consented tiers.

@@ -63,13 +63,11 @@
     "radio_seen_through": null,
     "intelligence_library_opt_in": false,
     "pairing": {
-      "version": 1,
+      "version": 2,
       "state": "unpaired",
       "verified_at": null,
       "last_check": null,
-      "migration_started_at": null,
-      "migration_deadline_at": null,
-      "migration_satisfied_at": null
+      "last_connected_at": null
     }
   },
   "notes": ""

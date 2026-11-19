@@ -1,8 +1,8 @@
 # Contract: required pairing and work guard
 
-**Target policy approved 2026-11-19; implementation and verification pending.**
-The earlier constitution 2.0.0 ratification covered the old policy. Align Article V
-with this revision before changing release behavior. Client schema remains 2.0.0;
+**Policy approved and client implementation aligned 2026-11-19.**
+Constitution 2.1.0 ratifies this revision. See verification.md for fresh local
+evidence and the deferred database/live requirements. Client schema remains 2.0.0;
 the nested pairing marker advances to version 2.
 
 ## Server contract and evidence
@@ -108,14 +108,28 @@ this is supported-flow policy rather than tamper-proof licensing.
 ## Shared runtime interfaces (tickets 03–05)
 
 - `status/guard.mjs` exports
-  `checkWork({root, now = () => new Date(), fetchImpl = globalThis.fetch, replay = true})`
+  `checkWork({root, now = () => new Date(), fetchImpl = globalThis.fetch, replay = true, scope = true})`
   -> Promise `{allow, reason, allowance, deadlineAt}` (target structured outcome;
-  replace the old migration-oriented `grace` field).
+  replacing the old migration-oriented `grace` field).
   reason is plain language, deadlineAt nullable ISO. `node status/guard.mjs check
   [--quiet]` exits 0 allow, 2 pause. Allowed results show no outage notice, with
   or without quiet mode. Quiet also suppresses routine success. Blocking results
   remain actionable. `replay:false` is for controlled setup verification only;
   it neither refreshes the connection clock nor grants work permission.
+- `runWork({root,command,args,now,fetchImpl})` and
+  `node status/guard.mjs run -- <command> [args]` admit a command invocation once.
+  A random capability in its descendant environment reaches a live loopback
+  listener owned by the parent, bound to this canonical folder. After the command
+  exits the listener closes; a saved environment cannot authorize later tasks.
+  Nested checks validate local state, known credential refusal, radio enablement
+  and queue identity, without imposing another deadline or network gate.
+  Failure to open the local listener prevents effects and gives a recovery action.
+  Setup passes `scope:false` for its final check and always verifies currently.
+  For interactive connector tasks, check once at task admission, finish authorized
+  actions and reporting, then check again at the next task boundary. Compose
+  scripted tasks inside the runner rather than a separate check followed by
+  independent nested gates. This is supported-flow scope, not a security boundary
+  against user-edited programs or credentials.
 - `status/store.mjs` exports `withStatusLock(root, async store => result)`;
   store exposes `readStatus()`, `writeStatus(status)`, `readOutbox()`,
   `writeOutbox(entries)`. Reads/writes are awaited-compatible. All guard, pairing,
@@ -134,7 +148,7 @@ this is supported-flow policy rather than tamper-proof licensing.
 - `status/report.mjs` exports
   `reportSignal({root,signalType,payload,occurredAt,fetchImpl})`,
   `reportAsset({root,asset,fetchImpl})`, `replayOutbox({root,fetchImpl})`, and
-  `replayOutboxLocked(store,{status,fetchImpl})`, and pure
+  `replayOutboxLocked(store,{status,fetchImpl,now})`, and pure
   `validateOutbox(entries)` (throws on invalid envelopes or labels). Guard validates
   pending entries before checking connectivity, including while the connection
   allowance is active. Optional fetchImpl defaults to global fetch; absent

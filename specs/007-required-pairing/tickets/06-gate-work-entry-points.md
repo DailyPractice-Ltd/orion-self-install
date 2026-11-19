@@ -4,15 +4,15 @@
 
 **Blocked by:** 05 — Preserve and replay failed work reports.
 
-**Status:** reopened — existing gate wiring needs revised behavior and instructions verified.
+**Status:** revised client implementation complete; fresh local evidence is recorded in verification.md. Database and real-account verification remain deferred.
 
-- [ ] Apply the shared guard before each supported interactive task and scheduled shift, including scripts, outbound actions, CRM writes and advancing installation stages as applicable. Avoid redundant checks within one admitted task.
-- [ ] Permit temporary verification/reporting failures only within the shared allowance. Emit no outage notice/countdown or repeated scheduled alerts while work is allowed.
-- [ ] Block unpaired users immediately; block invalid/revoked credentials immediately; block expired allowance at the next task/shift boundary with one recovery action.
-- [ ] Let work admitted before expiry finish and report. Nested entry points in that task must not introduce a contradictory mid-task deadline stop; authorization remains bounded to that invocation, never a reusable saved bypass.
-- [ ] Keep diagnosis, inspection, updating, renewal, pairing and finished-work reporting available while blocked.
-- [ ] Update agent instructions and generated/native schedule prompts; test allowed/blocked cases against actual effects, including underway-task completion and silence during outages.
-- [ ] Preserve the documented limitation for arbitrary user-edited local prompts and scripts.
+- [x] Apply the shared guard before each supported interactive task and scheduled shift, including scripts, outbound actions, CRM writes and advancing installation stages as applicable. Avoid redundant checks within one admitted task.
+- [x] Permit temporary verification/reporting failures only within the shared allowance. Emit no outage notice/countdown or repeated scheduled alerts while work is allowed.
+- [x] Block unpaired users immediately; block invalid/revoked credentials immediately; block expired allowance at the next task/shift boundary with one recovery action.
+- [x] Let work admitted before expiry finish and report. Nested entry points in that task must not introduce a contradictory mid-task deadline stop; authorization remains bounded to that invocation, never a reusable saved bypass.
+- [x] Keep diagnosis, inspection, updating, renewal, pairing and finished-work reporting available while blocked.
+- [x] Update agent instructions and generated/native schedule prompts; test allowed/blocked cases against actual effects, including underway-task completion and silence during outages.
+- [x] Preserve the documented limitation for arbitrary user-edited local prompts and scripts.
 
 ## Historical candidate evidence — superseded policy
 

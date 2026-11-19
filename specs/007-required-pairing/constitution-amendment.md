@@ -1,6 +1,6 @@
 # Revised constitution amendment: required pairing and connection allowance
 
-**Revision approved: 2026-11-19.** The maintainer confirmed the revised policy after the design interview. This written revision supersedes the original 30-day transition and immediate outage-pause policy below. Updating the ratified constitution and implementation remains open; this document does not claim those changes have happened.
+**Revision approved: 2026-11-19.** The maintainer confirmed the revised policy after the design interview. This written revision supersedes the original 30-day transition and immediate outage-pause policy below. The revision is now ratified in constitution 2.1.0 and implemented in the local client; verification.md records fresh automated evidence and the deferred database/live requirements.
 
 ## Principle changed
 

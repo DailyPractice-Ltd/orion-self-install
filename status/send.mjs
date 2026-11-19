@@ -208,7 +208,7 @@ async function score(rest) {
   }
   const {checkWork} = await import('./guard.mjs');
   const permission = await checkWork({root:FOLDER});
-  if (!permission.allow || permission.grace) console.log(permission.reason);
+  if (!permission.allow) console.log(permission.reason);
   if (!permission.allow) return 2;
   const status = readStatus();
   if (!status) {

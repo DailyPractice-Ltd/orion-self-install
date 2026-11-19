@@ -101,3 +101,20 @@ test('supported instructions route website chat to an executable paired folder',
     assert.doesNotMatch(text, /always works|works just as well|nothing else about your install is affected|your work is unaffected|You can switch this off\. Keep check-ins on/);
   }
 });
+
+test('shipped pairing state and instructions implement immediate pairing with a silent 48-hour allowance', () => {
+  const template = JSON.parse(readFileSync(join(repo,'status/status.schema-template.json')));
+  const contract = JSON.parse(readFileSync(join(repo,'specs/007-required-pairing/contracts/pairing.schema.json')));
+  const additions = JSON.parse(readFileSync(join(repo,'specs/002-production-line/contracts/status-additions.schema.json')));
+  assert.equal(template.sharing.pairing.version,2);
+  assert.equal(template.sharing.pairing.last_connected_at,null);
+  assert.deepEqual(additions.properties.sharing.properties.pairing,contract);
+  for (const file of ['AGENTS.md','README.md','docs/setup.md','docs/radio.md','docs/updating.md','docs/scheduled-work.md','agent/agent-definition.md','agent/adapters/codex.md','agent/adapters/claude-code.md','status/status-schema.md','NON-TECHNICAL-DRY-RUN.md']) {
+    const text=readFileSync(join(repo,file),'utf8');
+    assert.doesNotMatch(text,/30.day transition|30.day clock|migration grace|valid grace|grace reminder|exit 0 grace/i,file);
+    assert.match(text,/48.hour|48\s+elapsed hours/,file);
+  }
+  for (const file of ['AGENTS.md','docs/setup.md','docs/scheduled-work.md','agent/adapters/codex.md','agent/adapters/claude-code.md','agent/agent-definition.md']) {
+    assert.match(readFileSync(join(repo,file),'utf8'),/guard.mjs run --/,file);
+  }
+});

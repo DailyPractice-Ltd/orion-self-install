@@ -67,34 +67,27 @@ export async function withStatusLock(root, action) {
   }
 }
 
-/** Shared migration policy: every first pairing marker preserves legacy eligibility. */
-const MONTH = 30 * 24 * 60 * 60 * 1000;
-const defaults = () => ({version:1,state:'unpaired',verified_at:null,last_check:null,migration_started_at:null,migration_deadline_at:null,migration_satisfied_at:null});
+/** Version-2 state upgrade. Historical migration fields are inert. */
+export const CONNECTION_ALLOWANCE_MS = 48 * 60 * 60 * 1000;
+const defaults = () => ({version:2,state:'unpaired',verified_at:null,last_check:null,last_connected_at:null});
 function instant(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) return false;
   const [year,month,day] = value.slice(0,10).split('-').map(Number);
   const calendar = new Date(0); calendar.setUTCFullYear(year,month-1,day);
   return calendar.getUTCFullYear() === year && calendar.getUTCMonth() === month-1 && calendar.getUTCDate() === day && Number(value.slice(11,13)) < 24;
 }
-export function pairingMigration(status, time) {
+export function pairingState(status, time) {
   const sharing = status.sharing ??= {};
   if (typeof sharing !== 'object' || Array.isArray(sharing)) throw new Error('Invalid sharing settings');
-  const unmarked = !Object.hasOwn(sharing, 'pairing');
-  if (!unmarked && (!sharing.pairing || typeof sharing.pairing !== 'object' || Array.isArray(sharing.pairing))) throw new Error('Invalid pairing state');
-  const pairing = sharing.pairing ??= defaults();
-  if (pairing.state != null && !['unpaired','exchanged','verified'].includes(pairing.state)) throw new Error('Invalid pairing state');
-  if (pairing.last_check != null && !['accepted','invalid','unreachable','server_error'].includes(pairing.last_check)) throw new Error('Invalid verification state');
-  if (pairing.version !== 1) throw new Error('Unsupported pairing state');
-  const existing = status.started_at != null || status.machine_profile != null || Object.values(status.checklist || {}).some(value => value === true) || (status.ops_stage && status.ops_stage !== 'booked');
-  const start = pairing.migration_started_at, deadline = pairing.migration_deadline_at, satisfied = pairing.migration_satisfied_at;
-  for (const value of [start,deadline,satisfied,pairing.verified_at]) if (value != null && !instant(value)) throw new Error('Invalid pairing timestamp');
-  if (satisfied != null && Date.parse(satisfied) > time) throw new Error('Future pairing timestamp');
-  if ((start != null) !== (deadline != null)) throw new Error('Incomplete migration timestamps');
-  if (start != null && Date.parse(start) > time) throw new Error('Future migration timestamp');
-  if (unmarked && existing && start == null && satisfied == null) {
-    pairing.migration_started_at = new Date(time).toISOString();
-    pairing.migration_deadline_at = new Date(time + MONTH).toISOString();
-  }
-  const deadlineAt = pairing.migration_started_at == null ? null : new Date(Math.min(Date.parse(pairing.migration_deadline_at), Date.parse(pairing.migration_started_at) + MONTH)).toISOString();
-  return {pairing, deadlineAt, grace:satisfied == null && deadlineAt != null && time < Date.parse(deadlineAt)};
+  if (!Object.hasOwn(sharing,'pairing')) sharing.pairing = defaults();
+  const pairing = sharing.pairing;
+  if (!pairing || typeof pairing !== 'object' || Array.isArray(pairing)) throw new Error('Invalid pairing state');
+  if (![1,2].includes(pairing.version)) throw new Error('Unsupported pairing state');
+  if (!['unpaired','exchanged','verified'].includes(pairing.state)) throw new Error('Invalid pairing state');
+  if (![null,'accepted','invalid','unreachable','server_error'].includes(pairing.last_check)) throw new Error('Invalid verification state');
+  if (pairing.verified_at !== null && (!instant(pairing.verified_at) || Date.parse(pairing.verified_at) > time)) throw new Error('Invalid verification timestamp');
+  if (pairing.version === 1) { pairing.version = 2; pairing.last_connected_at = null; }
+  if (pairing.last_connected_at !== null && (!instant(pairing.last_connected_at) || Date.parse(pairing.last_connected_at) > time)) throw new Error('Invalid connection timestamp');
+  const deadlineAt = pairing.last_connected_at === null ? null : new Date(Date.parse(pairing.last_connected_at) + CONNECTION_ALLOWANCE_MS).toISOString();
+  return {pairing,deadlineAt,allowance:pairing.state === 'verified' && pairing.last_check !== 'invalid' && deadlineAt !== null && time < Date.parse(deadlineAt)};
 }

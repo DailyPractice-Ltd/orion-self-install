@@ -29,24 +29,25 @@ The [radio guide](radio.md) explains exactly which operational labels are shared
 At every interactive session and before every scheduled run, execute
 `node status/guard.mjs check --quiet` in this folder **before** Orion tasks,
 outbound messages or CRM writes. Exit 0 allows work; exit 2 pauses it. The check
-uses the read-only `/verify` endpoint, then delivers pending reports before allowing
+uses the read-only `/verify` endpoint, then attempts delivery of pending reports before deciding whether to allow
 new work. A previous successful check or `state: verified` is not permission now.
 Check support messages separately with `node status/radio.mjs check` after allowance.
 Use the [native scheduling instructions](scheduled-work.md) for recurring tasks.
 
-## Existing folders: one 30-day transition
+## Pairing and temporary connection failures
 
-An existing folder with recorded progress receives a one-time 30-day transition
-from its **first updated run**, saved before work. A pristine copied status file
-is a new install. The start and deadline survive restarts and updates; the clock
-does not reset. During valid grace, existing work may continue with a concise
-reminder, even when offline, while operational reports remain queued locally.
-An enabled, already paired folder can satisfy this transition by verification
-without a new code. A prior declined choice remains recorded until explicit pairing.
-
-At the exact deadline, or after migration has already been satisfied, enabled
-pairing, fresh acceptance and delivered pending reports are required. Invalid,
-partial or future clock state requires repair; it never creates more grace.
+All unpaired harnesses must pair before normal work, including the first updated
+run. Existing accepted credentials need no new code. Temporary verification or
+reporting failures permit work silently for 48 elapsed hours after accepted
+verification and acknowledged delivery of all queued reports. Only that complete
+cycle refreshes `last_connected_at`; partial replay, failures, restarts and updates
+never do. At exactly 48 hours, block the next task or scheduled run unless current
+verification and delivery succeed. An admitted task may finish and report afterward.
+Invalid/revoked credentials clear the allowance immediately. Disabled radio and
+unsafe local state require recovery. Historical migration fields are readable but
+inert; never infer the connection time from old verification or migration dates.
+Preserve a declined choice until explicit pairing. Setup still requires current
+accepted verification and acknowledged setup reporting.
 
 ## When work pauses
 
@@ -66,7 +67,7 @@ partial or future clock state requires repair; it never creates more grace.
 Diagnosis, status inspection, updating, re-pairing and recovery remain available
 while work is paused. A failed report after an allowed task does not undo that work:
 its operational labels and original event time stay in `status/radio-outbox.json`,
-and subsequent work waits for recovery outside valid grace. Keep local work-log
+and subsequent work waits for recovery when the shared guard blocks. Keep local work-log
 text, client messages and credentials out of that queue and all evidence.
 
 Ordinary folders hold the key in `sharing.install_token`; homed folders keep it in
@@ -77,3 +78,13 @@ delivery result; it is progress, never authorization.
 
 This is a supported-flow policy in an editable local folder. Scripts and native
 AI prompts are user-owned and cannot enforce tamper-proof licensing.
+
+
+For a task composed of script commands, admit the whole invocation with
+`node status/guard.mjs run -- <command> [args]` (for a shell sequence, use
+`run -- sh -c '<commands>'`). Nested gated commands use the live parent admission
+until that command exits, so authorized actions and reporting can finish after
+expiry. The scope stays in that invocation's descendants and ends with its parent;
+never save or reuse its environment for another task. For interactive connector
+work, run `check --quiet` once at the task boundary and finish the admitted task;
+do not add a new mid-task check. Run the guard again for the next task or shift.

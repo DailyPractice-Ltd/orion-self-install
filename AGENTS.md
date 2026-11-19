@@ -34,17 +34,17 @@ Use an installed folder in **Codex or Claude Code**, with file access and Node.j
 execution. Website-only and paste-only chat cannot run required pairing or fresh
 connection checks. If encountered there, explain the requirement and route the
 client to the same folder in a supported tool; guide recovery only until then.
-Read `docs/setup.md` for setup, the 30-day transition, and recovery.
+Read `docs/setup.md` for setup, the 48-hour connection allowance, and recovery.
 
 ## Before Orion work
 
 At each interactive task or scheduled run, run `node status/guard.mjs check --quiet`
 from this Orion folder before researching, executing skills, using work connectors,
 sending messages, writing CRM, or advancing installation stages. Continue only when
-it exits 0. It freshly verifies this folder and delivers pending finished-work reports;
+it exits 0. It attempts fresh verification and pending finished-work delivery;
 a previous successful check or a saved credential is not permission for this run.
-If it exits 2, tell the client its one recovery action and pause work. A grace reminder
-with exit 0 permits existing work until the displayed deadline.
+If it exits 2, tell the client its one recovery action and pause work. Temporary connection/reporting failures permit silent work within the shared
+48-hour allowance. Expiry applies to the next task; an admitted task may finish.
 
 While paused, help with inspection, diagnosis, updates, code renewal and pairing;
 `node start.mjs --code <code>` is recovery. Keep recording already finished work with
@@ -69,7 +69,7 @@ continue only setup/recovery guidance on the unsupported surface.
      Run `node start.mjs` in this client folder. It records the exchange and verifies
      it before handoff. A missing/failed code or check keeps setup unfinished.
      Preserve saved answers and previous `radio_choice: "declined"` until explicit
-     pairing; the guard owns migration timing. Read `docs/setup.md` for recovery
+     pairing; legacy migration fields are inert. Read `docs/setup.md` for recovery
      and `docs/radio.md` for the precise operational-data disclosure.
    - **Credentials remain private.** Never print `sharing.install_token`,
      `ORION_INSTALL_TOKEN` or `status/radio.key`, even a suffix. Redact them entirely
@@ -113,9 +113,9 @@ continue only setup/recovery guidance on the unsupported surface.
    every Friday." On their yes, `send` it in their words, starting with "Feature
    request:", and tell them it went. On a no, drop it, and don't offer the same wish
    again. When the radio is off or can't run, say they can tell Daily Practice directly.
-   If the support-message check fails, explain the recovery action once. Run the
-   shared guard before new work; outside valid migration grace, a failed connection
-   pauses work. See `docs/setup.md` and the matching code-capable adapter.
+   If the support-message check fails during an admitted task, continue without
+   an outage notice. The next task runs the shared guard. When that guard blocks,
+   explain its recovery action once. See `docs/setup.md` and the matching adapter.
 3. **Read `agent/agent-definition.md`.** That is the system prompt / identity you adopt for
    the actual day-to-day Orion agent you're helping build — not for this install
    conversation itself, but you'll be assembling it with the client as you go (their
@@ -228,13 +228,12 @@ know why, just that the names are load-bearing; don't rename them.
 
    **Reporting after work.** Run the same command even if the connection failed
    after the pre-work check. It records local work and durably queues only operational
-   labels and original event time. Outside valid grace, subsequent work waits for
-   replay and accepted verification. Never claim delivery before acknowledgment. Radio on but the signal did not land: `done.mjs` adds one more line
+   labels and original event time. Subsequent work uses the same remaining 48-hour connection
+   allowance. Only accepted verification and complete delivery renew it. Never claim delivery before acknowledgment. Radio on but the signal did not land: `done.mjs` adds one more line
    under the one it just wrote, saying so. It reads "(radio unreachable)" when the
    radio did not answer, or "(radio refused 401)" and the like when it answered and
-   did not accept the report. The client hears the session-start one-liner (step 2,
-   "Check the radio") once this session. An unreachable radio is a fixable fact, not
-   a secret.
+   did not accept the report. Keep temporary transport failures silent while work is allowed.
+   Explain recovery only when the next task guard blocks.
 
    **If this folder's agent definition was filled in before 1.1.0.** An update does
    not replace the `agent/agent-definition.md` you filled in with your human unless
@@ -318,3 +317,13 @@ for an update. In Claude Code and Codex, the same procedure is available as
 - Anything you're unsure about is more likely answered in a file here than not. This repo
   is written to brief you, specifically — read before asking the client something the repo
   already tells you.
+
+
+For a task composed of script commands, admit the whole invocation with
+`node status/guard.mjs run -- <command> [args]` (for a shell sequence, use
+`run -- sh -c '<commands>'`). Nested gated commands use the live parent admission
+until that command exits, so authorized actions and reporting can finish after
+expiry. The scope stays in that invocation's descendants and ends with its parent;
+never save or reuse its environment for another task. For interactive connector
+work, run `check --quiet` once at the task boundary and finish the admitted task;
+do not add a new mid-task check. Run the guard again for the next task or shift.

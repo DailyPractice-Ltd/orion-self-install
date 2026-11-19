@@ -20,12 +20,13 @@ test('pinned selected update preserves collisions and restores additions and ret
   const hash=s=>requireHash(s); const pristine={files:{'AGENTS.md':[hash('old instructions\n')],'status/a.mjs':[hash('old a\n')],'status/b.mjs':[hash('old b\n')],'skills/foo/SKILL.md':[hash('old skill\n')],'skills/old/SKILL.md':[hash('old retired\n')]}};
   put(source,'update/pristine.json',JSON.stringify(pristine));
   git(source,'init','-q'); git(source,'add','.'); git(source,'-c','user.email=test@example.com','-c','user.name=Test','commit','-qm','release'); const commit=git(source,'rev-parse','HEAD'); put(source,'AGENTS.md','uncommitted instructions\n');
-  put(client,'status/status.json',JSON.stringify({template_version:'1.0.0',ai_assistant:'codex',notes:'before',checklist:{n8n_wf01_imported:true,connector_crm_live:true}}));
+  put(client,'status/status.json',JSON.stringify({template_version:'1.0.0',ai_assistant:'codex',notes:'before',sharing:{pairing:{version:2,state:'verified',verified_at:'2026-11-18T12:00:00.000Z',last_check:'unreachable',last_connected_at:'2026-11-18T12:00:00.000Z'}},checklist:{n8n_wf01_imported:true,connector_crm_live:true}}));
   put(client,'AGENTS.md','old instructions\r\n'); put(client,'status/a.mjs','client edited script\n'); put(client,'status/b.mjs','old b\n'); put(client,'.agents/skills/foo/SKILL.md','client edit\n'); put(client,'.agents/skills/old/SKILL.md','old retired\n'); put(client,'agents/README.md','personalized roster\n'); put(client,'.claude/skills/foo/SKILL.md','other tool content\n');
   const updated=run('update','--root',client,'--release-repo',source,'--commit',commit); assert.equal(updated.status,0,updated.stderr); const report=JSON.parse(updated.stdout);
   assert.equal(report.ai_assistant, 'codex');
   const updatedStatus = JSON.parse(get(client, 'status/status.json'));
   assert.equal(updatedStatus.ai_assistant, 'codex');
+  assert.deepEqual(updatedStatus.sharing.pairing,{version:2,state:'verified',verified_at:'2026-11-18T12:00:00.000Z',last_check:'unreachable',last_connected_at:'2026-11-18T12:00:00.000Z'});
   assert.deepEqual(updatedStatus.checklist, { connector_crm_live: true });
   put(client, 'status/status.json', JSON.stringify({ ...updatedStatus, agent_name: 'Orion' }));
   assert.equal(get(client,'AGENTS.md'),'new instructions\n'); assert.equal(get(client,'status/a.mjs'),'console.log("new a")\n'); assert.equal(get(client,'status/b.mjs'),'console.log("new b")\n'); assert.equal(get(client,'.agents/skills/foo/SKILL.md'),'client edit\n'); assert.equal(get(client,'agents/README.md'),'personalized roster\n'); assert.equal(get(client,'.claude/skills/foo/SKILL.md'),'other tool content\n'); assert.equal(existsSync(join(client,'.agents/skills/old/SKILL.md')),false); assert.ok(report.kept.includes('.agents/skills/foo/SKILL.md')); assert.ok(report.replaced_edited_scripts.includes('status/a.mjs')); assert.ok(report.collisions.includes('agents/README.md'));
@@ -33,6 +34,7 @@ test('pinned selected update preserves collisions and restores additions and ret
   const restoredStatus = JSON.parse(get(client, 'status/status.json'));
   assert.equal(restoredStatus.ai_assistant, 'codex');
   assert.equal(restoredStatus.agent_name, 'Orion');
+  assert.deepEqual(restoredStatus.sharing,updatedStatus.sharing);
   assert.deepEqual(restoredStatus.checklist, { connector_crm_live: true, n8n_wf01_imported: true });
 });
 function requireHash(s) { return createHash('sha256').update(s).digest('hex'); }

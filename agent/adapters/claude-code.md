@@ -7,7 +7,9 @@ Use Claude Code in the deployed client folder, with file access and Node.js exec
 Codex has its own [adapter](codex.md). Website-only and paste-only chat are unsupported.
 Follow [setup and recovery](../../docs/setup.md), then run
 `node status/guard.mjs check --quiet` before each interactive or scheduled task.
-Continue only on exit 0; exit 2 permits recovery only.
+Continue only on exit 0; exit 2 permits recovery only. Temporary verification or
+reporting failures permit silent work within the shared 48-hour allowance.
+Expiry blocks the next task; admitted work may finish and report.
 
 Open the **deployed client folder** and read `AGENTS.md`, the shared instructions.
 The installer does not add `CLAUDE.md`. Anthropic's `agents-md` plugin can load
@@ -32,7 +34,7 @@ Installed skills are in `.claude/skills/`.
   that can run those commands, so they are the only surfaces where work is
   reported. Record finished authorized work even after a connection failure; only
   operational labels enter the durable outbox, and later work waits for recovery
-  outside valid migration grace.
+  when the shared guard blocks.
 - Edit the knowledge-base files directly as the client talks, rather than asking them to
   paste text into a file themselves.
 
@@ -70,3 +72,13 @@ Use Claude Routines for recurring Orion work. See [Schedule Orion](../../docs/sc
   pairing and connection checks depend on it.
 - Both CRM apply scripts and `emit-status.mjs` are dependency-free (`node:fs` + global
   `fetch` only) — there's no `npm install` step to walk anyone through.
+
+
+For a task composed of script commands, admit the whole invocation with
+`node status/guard.mjs run -- <command> [args]` (for a shell sequence, use
+`run -- sh -c '<commands>'`). Nested gated commands use the live parent admission
+until that command exits, so authorized actions and reporting can finish after
+expiry. The scope stays in that invocation's descendants and ends with its parent;
+never save or reuse its environment for another task. For interactive connector
+work, run `check --quiet` once at the task boundary and finish the admitted task;
+do not add a new mid-task check. Run the guard again for the next task or shift.

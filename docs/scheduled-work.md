@@ -27,24 +27,3 @@ reports outside a valid existing-user grace period. Quiet checks still print pau
 and grace actions. Verification reads no support messages. Diagnosis, updates and
 re-pairing stay available while work is paused; see [radio recovery](radio.md).
 
-## Migrate existing schedules
-
-Before enabling the next run, inspect each existing task in the native scheduler
-attached to this Orion project. Edit its prompt in place to put the guard sequence
-above before all work, keeping its existing time, timezone, connector selection and
-authorization limits. Save and inspect the prompt to confirm exit 2 stops execution
-before the first work action. A missing or inaccessible task remains paused until its
-owner updates it. Local updates cannot rewrite prompts held by the scheduler.
-
-For legacy roster/job-sheet prompts, move the authorized procedure into a supported
-skill and replace the old prompt with the native sequence above. Preserve any
-client-owned `status/shifts/` records as history. This release has no hired-agent
-runtime or job-sheet scheduler to launch or migrate automatically.
-
-## Supported boundary
-
-The shared guard covers shipped work commands and these interactive/scheduled
-instructions. Direct work commands verify independently, even when called from a
-scheduled run. Completed-work reporting, inspection and recovery remain available
-while paused. User-edited prompts, arbitrary scripts and third-party connectors can
-bypass instructions; this is supported-flow pairing, not tamper-proof enforcement.

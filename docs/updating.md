@@ -120,29 +120,3 @@ or follow the pinned update procedure in an already deployed folder. It maps the
 copies by fingerprint. `deployment` is the contract for separate client folders.
 Maintainers run
 `node tests/helpers/pristine.mjs --write` after release edits and before tagging.
-
-
-## Required pairing in the 3.0.0 candidate
-
-This installation-sequence change is a 3.0.0 release candidate in source, not a
-published release. Client schema stays 2.0.0; the maintainer constitution is 2.0.0.
-[Setup and recovery](setup.md) explains the required signed-in pairing, exact
-30-day existing-user transition, pause and durable report replay. The first updated
-runtime use identifies existing progress before mutating setup fields and records
-its start/deadline once in `sharing.pairing`. It never uses the old 2.0.0 version as
-an age detector, resets a clock, or silently changes a previous declined choice.
-An already paired enabled folder can satisfy migration through fresh verification.
-
-The updater preserves client-owned `status/status.json`, `status/radio.key`,
-`status/radio-outbox.json`, lock state and saved setup checkpoint. Its narrow
-version/notes/checklist edits and send-level migration do not authorize replacing
-these files. The shared guard makes its own atomic pairing/migration state changes
-at runtime. Pending reports retain their original identities across update/restore.
-New guard, store and reporting modules deploy together through both legacy refresh
-and `deployment.common_sources`, with this release's setup instructions.
-
-Inspect existing native scheduler prompts and migrate them in place before the
-next enabled run as described in [Schedule Orion](scheduled-work.md). Local file
-updates cannot edit app-owned prompts. Review preserved edits to AGENTS, adapters
-and agent definition so they also put the guard before work. Constitution and
-specification sources remain maintainer-only; they are not client package data.

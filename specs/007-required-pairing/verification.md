@@ -1,6 +1,35 @@
 # Required pairing verification
 
-## Scope and remaining live work
+## Revised policy: pending implementation and verification (2026-11-19)
+
+The maintainer confirmed immediate pairing for all unpaired harnesses and a silent
+48-hour connection allowance for paired harnesses. See spec.md and
+contracts/status-and-guard.md. Tickets 02–07 are reopened or require revision
+integration. The automated results below describe the earlier candidate only;
+they do not validate the new policy. No new runtime tests or live checks have run.
+
+Required new automated coverage:
+
+- First updated run blocks unpaired/declined harnesses; accepted existing credentials
+  work without another code. Old migration fields never grant work permission.
+- Version-2 state persists `last_connected_at` only after accepted verification and
+  complete acknowledged delivery. No inferred timestamp from older state.
+- Temporary verification/reporting failures allow tasks silently before 48 hours;
+  the exact boundary and later attempts block. Interactive and scheduled paths agree.
+- Partial/failed replay never renews the timestamp despite accepted verification;
+  full verification-and-delivery recovery does. Restarts and updates do not reset it.
+- Invalid/revoked credentials invalidate the allowance and block immediately.
+  Disabled radio, future/malformed timestamps, corrupt/unwritable queues and unsafe
+  locks require recovery even inside the nominal window.
+- A task admitted before expiry finishes its authorized effects and reporting after
+  expiry; the next task/shift is blocked. Finished-work reporting remains available.
+- Allowed outage runs show no connection notice/countdown or repeated alerts;
+  blocked runs give one recovery action. Setup still needs current accepted
+  verification and acknowledged reporting before handoff.
+- Existing privacy, identity, lost-ACK replay, concurrency and credential-storage
+  regressions still pass. Record fresh suite/package results after implementation.
+
+## Historical scope and remaining live work
 
 Implementation stays on `feature/required-pairing` in both repositories. No tag,
 deployment, migration against a live database, or release publication has run.
@@ -70,7 +99,7 @@ website/ChatGPT/desktop selections move to the recorded supported tool or reques
 an executable choice while preserving saved business answers. Test key fixtures are
 constructed rather than committed as complete credential-shaped literals.
 
-Template candidate is 3.0.0, additive client schema remains 2.0.0 and maintainer
+Template candidate additive client schema remains 2.0.0 and maintainer
 constitution is 2.0.0. Guard/store/report plus setup guidance ship in both legacy
 refresh and common deployment sources. Pairing state, setup checkpoint, machine-local
 key, outbox and runtime lock remain client-owned. Native scheduler prompts held in
@@ -108,7 +137,7 @@ These are local client regressions. Mono was unchanged; ticket 01's database
 runner and ticket 07's real account/bridge journey remain unexecuted and open.
 No deployment, release publication or live feature claim follows from this pass.
 
-## Pending database and live checklist
+## Pending database and live checklist — revised target
 
 **Status: not run; ticket 07 incomplete.** The maintainer explicitly said “will test
 later.” No deployment, account request, database migration or release publication
@@ -117,7 +146,7 @@ provided database runner passed; no tooling install or network access was approv
 The completed local checks above do not remove either verification requirement.
 
 When the maintainer resumes live testing, use a selected test account and installed
-test folder, with the reviewed migration and routes available. Record outcomes in
+test folder, with the revised client policy and required routes available. Record outcomes in
 the table below, including time, relevant source/deployment revision, observed exit
 status and sanitized receipt/result. Never record a code, token, token suffix,
 Authorization header, account identity, customer information or work-log content.
@@ -147,17 +176,23 @@ Authorization header, account identity, customer information or work-log content
    before interactive work. Create an authorized native test task using
    `docs/scheduled-work.md` with that guard first. Inspect saved prompt and observe
    one unattended run, confirming no work precedes exit 0.
-5. **Pre-work failure pause.** In the disposable test setup demonstrate rejected,
-   unreachable and server-error checks. Observe exit 2 and no task output, outbound
-   messages, CRM writes or scheduled work. Confirm inspection, updates and re-pairing
-   remain available. Restore service or renew pairing without resetting migration.
-6. **Post-check report failure and recovery.** After an accepted check, complete one
-   harmless authorized test task and interrupt report delivery in the controlled
-   test environment. Confirm local completion survives restart and the outbox holds
-   only allowlisted labels with original event time. Restore the connection, rerun
-   the guard, and observe replay acknowledgment and empty outbox before new work.
-   Inspect authorized bridge evidence for one event/count despite retry; do not
-   substitute a client mock for this server observation.
+5. **Connection allowance and immediate refusal.** In the disposable paired
+   setup, establish an accepted verification-and-delivery timestamp. Demonstrate
+   unreachable and server-error checks permit interactive/scheduled work silently
+   before expiry; use controlled clock injection to verify refusal at exactly
+   48 hours and afterward without waiting two days. Confirm a previously admitted
+   task finishes after expiry. Demonstrate invalid/revoked credentials block
+   immediately and invalidate the allowance, while unpaired users cannot work at
+   all. Recovery/inspection/update commands remain available. Record simulated
+   clock checks distinctly from real server observations.
+6. **Reporting failure and recovery.** Complete a harmless authorized test task,
+   interrupt reporting, and confirm local completion and the labels-only outbox
+   survive restart. Confirm work continues silently within the same allowance.
+   Accepted verification with failed/partial replay must not refresh the timestamp;
+   expiry blocks the next task. Restore reporting, rerun the guard and confirm
+   accepted verification plus acknowledged empty outbox refreshes the connection
+   time. Inspect authorized bridge evidence for one event/count despite retry;
+   do not substitute mocks for the real server observation.
 7. **Finalize evidence.** Fill each pending row with sanitized observations. Only
    after all required live/database checks pass may ticket 07 be completed. No tag,
    publishing or deployment follows implicitly from that completion.
@@ -168,6 +203,6 @@ Authorization header, account identity, customer information or work-log content
 | Signed-in code issue/renew and invalid-code refusal | Not run — maintainer deferred | Pending |
 | Exchange, matching verification, setup/resume and key storage | Not run — maintainer deferred | Pending |
 | Interactive and unattended scheduled pre-work check | Not run — maintainer deferred | Pending |
-| Failed-check pause and recovery-only commands | Not run — maintainer deferred | Pending |
+| Silent 48-hour allowance, exact expiry and immediate credential refusal | Not run — maintainer deferred | Pending |
 | Post-check failed report, restart and durable replay | Not run — maintainer deferred | Pending |
 | Bridge confirms no duplicate event/count | Not run — maintainer deferred | Pending |

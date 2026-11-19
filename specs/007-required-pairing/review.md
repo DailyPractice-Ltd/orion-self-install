@@ -1,4 +1,10 @@
-# Required pairing final review
+# Required pairing historical candidate review
+
+**Superseded policy:** This review predates the 2026-11-19 decision to remove the
+30-day migration and introduce a silent 48-hour connection allowance. Its findings
+and passing results are historical; implementation/review of the revision remains
+open in tickets 02–07. Historical migration fixes below are not requirements for
+the revised implementation.
 
 Reviewed the integrated candidate once along two independent axes, then applied
 one fix pass. Review points:

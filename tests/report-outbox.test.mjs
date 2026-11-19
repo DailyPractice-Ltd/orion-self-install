@@ -19,7 +19,7 @@ async function fixture(t) {
     JSON.stringify({
       ops_stage: 'formalised',
       harness_status: 'running',
-      template_version: '3.0.0',
+      template_version: '2.0.0',
       sharing: {
         status_signal_enabled: true,
         bridge_url: 'https://example.com/api/bridge',

@@ -1,8 +1,9 @@
 # Contract: required pairing and work guard
 
-Ratified under self-install constitution 2.0.0 and its recorded written approval.
-Client schema remains 2.0.0; release candidate template is 3.0.0. Neither version
-number detects legacy users: both were already 2.0.0 before this feature.
+**Target policy approved 2026-11-19; implementation and verification pending.**
+The earlier constitution 2.0.0 ratification covered the old policy. Align Article V
+with this revision before changing release behavior. Client schema remains 2.0.0;
+the nested pairing marker advances to version 2.
 
 ## Server contract and evidence
 
@@ -37,18 +38,20 @@ implementation evidence, not a claim that the new routes are live.
 
 ## Persistent pairing and credential recovery
 
-`sharing.pairing` has `version: 1` (the feature marker), `state` (`unpaired`,
-`exchanged`, `verified`), nullable `verified_at`, `last_check` (null, `accepted`,
-`invalid`, `unreachable`, `server_error`), `migration_started_at`,
-`migration_deadline_at`, and `migration_satisfied_at`. See `pairing.schema.json`.
-All timestamps are full ISO instants, not date-only. Absent older fields are read
-compatibly; present malformed fields require recovery, never a new grace clock.
+`sharing.pairing` has `version: 2`, `state` (`unpaired`, `exchanged`,
+`verified`), nullable `verified_at`, `last_check` (null, `accepted`, `invalid`,
+`unreachable`, `server_error`), and nullable `last_connected_at`. See
+`pairing.schema.json`. Timestamps are full ISO UTC instants, not date-only.
+`verified_at` records accepted authentication; `last_connected_at` records the
+completed verification-and-delivery cycle that starts the connection allowance.
 
 Exchange stores identity/key durably before `exchanged`; only matching accepted
-verification sets `verified` and `verified_at`. Prior verified time is diagnostic,
-never authorization. Failed later checks preserve the exchange identity and last
-successful time, record failure and pause. `state: verified` means accepted before,
-not permission now. No code/verification failure may finish setup or print handoff.
+verification sets `verified` and `verified_at`. No code/verification failure may
+finish setup or print handoff. Setup still needs current accepted verification
+and acknowledged setup reporting; the allowance never completes installation.
+`state: verified` alone is not authorization. Failed temporary checks preserve the
+last successful connection time; invalid/revoked credentials clear
+`last_connected_at` so a later outage cannot revive an invalidated allowance.
 
 Ordinary folders store key in `sharing.install_token`. Homed folders keep it only
 in machine-local `status/radio.key` (0600 where supported), with status token null;
@@ -61,42 +64,58 @@ uses the shared lock. Resume after stored exchange by verifying it, without aski
 previous answers. A spent code with no recoverable saved key requires a new code.
 An interrupted key/status write must pause/recover, not silently claim pairing.
 
-## One-time existing-user migration
+## Immediate pairing and 48-hour connection allowance
 
-Detect before wizard profile, started_at or checklist mutation. An existing harness
-has no feature marker AND recorded progress: non-null started_at, existing machine
-profile, any true checklist item, or an ops stage beyond booked. A pristine copied
-status file is new. Newly created pairing defaults never themselves grant grace.
+No existing-harness progress detection or 30-day transition remains. New and
+existing unpaired harnesses pause normal work until explicit pairing. Preserve
+`radio_choice: declined` until explicit pairing; checking existing credentials
+must not rewrite the choice. An already paired enabled folder can use its current
+credential without a new code.
 
-Under the shared lock, a genuine existing unmarked harness with neither migration
-timestamp receives version 1, start now, deadline start + 30 × 24 hours, durably
-before work. Both timestamps are written together. No reset on resume or update.
-Any present partial/malformed timestamp or future start fails closed. A future
-recorded deadline is normal only within start + 30 days; effective deadline is
-min(recorded valid deadline, start + 30 days). Deadline <= start is expired. At
-`now == effective deadline` grace ends. Unknown marker versions require recovery.
-A malformed or future satisfied marker also fails closed rather than granting grace.
+Upgrade absent/version-1 pairing state to version 2 under the shared lock. Keep
+legacy migration fields readable but inert; do not create or honor their clocks.
+Do not derive `last_connected_at` from `verified_at` or migration timestamps.
+Without a saved qualifying connection time, the first updated run needs accepted
+verification and complete queued-report delivery. Unknown marker versions or
+malformed active state require recovery rather than a replacement allowance.
 
-Accepted enabled verification durably sets migration_satisfied_at once; subsequent
-revocation, disablement or connectivity failure never grants fresh grace. Preserve
-radio_choice declined until explicit code pairing; merely checking a credential
-must not silently rewrite it. During unsatisfied, valid grace allow existing work
-with a concise reminder even on connection failure or pending reports; connected
-reports retain original identities and replay when possible. New installs and
-expired/satisfied migrations require enabled connection, fresh acceptance and an
-empty successfully delivered outbox. Malformed/unwritable local state is a recovery
-failure, not permission under grace. An already paired enabled legacy folder can
-satisfy migration immediately without a new code.
+Every task/shift guard attempts verification. If accepted, attempt replay. Refresh
+`last_connected_at` to the completed cycle's current time only after all reports
+are acknowledged and the outbox is empty, under the same lock. Acceptance alone,
+partial replay, failed reporting, updates and restarts never refresh it. Empty
+outboxes need no report request: accepted verification and confirmed emptiness
+are sufficient. Report send success outside this guarded cycle does not itself
+refresh the clock.
+
+For temporary `unreachable`/`server_error` verification or reporting failures,
+allow work only with prior verified pairing, enabled radio, valid local state,
+and `last_connected_at <= now < last_connected_at + 48 * 60 * 60 * 1000`.
+Use elapsed UTC time; at the exact deadline pause new work unless the current
+verification-and-delivery cycle succeeds. Missing, malformed or future connection
+times cannot grant an allowance. Invalid/revoked credentials, mismatched folder
+identity, disabled radio, corrupt/unwritable status or queue, and unsafe locks
+pause immediately regardless of the timestamp. Never treat them as outages.
+
+Show no connection notice or countdown while allowing work, including scheduled
+runs. Record operational state locally without sending repeated outage alerts.
+When blocking, give one plain reason and recovery action. Recovery remains
+available. A task admitted before expiry may finish, perform its already-authorized
+actions and report afterward; the next task or shift must run the guard again.
+The guard does not hold a lock or enforce a mid-task deadline during sales work.
+Updates or failures never start a new allowance. Local clocks/files are editable;
+this is supported-flow policy rather than tamper-proof licensing.
 
 ## Shared runtime interfaces (tickets 03–05)
 
 - `status/guard.mjs` exports
   `checkWork({root, now = () => new Date(), fetchImpl = globalThis.fetch, replay = true})`
-  -> Promise `{allow, reason, grace, deadlineAt}` (optional structured outcome).
+  -> Promise `{allow, reason, allowance, deadlineAt}` (target structured outcome;
+  replace the old migration-oriented `grace` field).
   reason is plain language, deadlineAt nullable ISO. `node status/guard.mjs check
-  [--quiet]` exits 0 allow, 2 pause. Quiet suppresses routine success only; failures
-  and grace reminders remain actionable. `replay:false` is for controlled setup
-  verification only and cannot authorize work while pending reports exist.
+  [--quiet]` exits 0 allow, 2 pause. Allowed results show no outage notice, with
+  or without quiet mode. Quiet also suppresses routine success. Blocking results
+  remain actionable. `replay:false` is for controlled setup verification only;
+  it neither refreshes the connection clock nor grants work permission.
 - `status/store.mjs` exports `withStatusLock(root, async store => result)`;
   store exposes `readStatus()`, `writeStatus(status)`, `readOutbox()`,
   `writeOutbox(entries)`. Reads/writes are awaited-compatible. All guard, pairing,
@@ -117,13 +136,14 @@ satisfy migration immediately without a new code.
   `reportAsset({root,asset,fetchImpl})`, `replayOutbox({root,fetchImpl})`, and
   `replayOutboxLocked(store,{status,fetchImpl})`, and pure
   `validateOutbox(entries)` (throws on invalid envelopes or labels). Guard validates
-  pending entries before checking connectivity, including while grace is active.
-  Optional fetchImpl defaults to
-  global fetch; absent occurredAt is allocated once at original report creation.
+  pending entries before checking connectivity, including while the connection
+  allowance is active. Optional fetchImpl defaults to global fetch; absent
+  occurredAt is allocated once at original report creation.
   Wrappers obtain the store lock; guard calls the Locked sibling while holding it.
   Return `{status: 'sent'|'queued'|'off'|'invalid', pending}` plus plain reason as
   needed. Replay reports sent only if no entries remain. No reporting function
-  calls guard. Preserve radio result-line behavior consumed by done.mjs.
+  calls guard. Preserve machine-readable reporting outcomes consumed by done.mjs;
+  do not surface temporary transport warnings to the user while work is allowed.
 
 Verification, replay and final pending inspection remain inside one lock before
 allow returns. Report writers hold it across write-ahead/send/ack removal. A writer
@@ -149,8 +169,9 @@ asset_kind against capability kinds, outcome/surface against bridge enums, versi
 as bounded version labels. No legacy free-form routine enters the ambient queue;
 reject it visibly for repair. Task requires tag/count; routine requires routine/count;
 asset requires outcome/surface. Flat scalar labels only, <=20 keys and <=2 KB.
-Optional harness_id may be absent for work completed during unpaired grace: freeze
-all other identity fields then attach the verified folder identity once at delivery.
+Optional harness_id may be absent for historical queued reports or setup reporting
+before verified identity is available: freeze all other identity fields, then attach
+the verified folder identity once at delivery. This does not authorize unpaired work.
 Never replay a recorded harness_id through a different credential/account: pause
 for explicit recovery rather than reassign it.
 
@@ -171,8 +192,10 @@ Correlate to the exact in-flight envelope: responses do not echo event identity.
 Any malformed/missing/lost ACK keeps the original envelope. Remove only that
 acknowledged entry atomically; interruption after send/removal failure retains it
 for safe replay. Stop on failure, preserve remaining entries and mark last_check
-invalid/unreachable/server_error as appropriate. Pending entries block new work
-outside valid grace. Successful verification alone never clears pending reports.
+invalid/unreachable/server_error as appropriate. Temporary delivery failures with
+pending entries allow new work only within the remaining 48-hour connection
+allowance. Invalid/revoked credentials block immediately.
+Successful verification alone never clears pending reports or refreshes the clock.
 
 A valid queued example (local work-log text is deliberately absent):
 
@@ -183,7 +206,7 @@ A valid queued example (local work-log text is deliberately absent):
     "body": {
       "signal_type": "task_completed",
       "occurred_at": "2026-11-18T12:00:00.000Z",
-      "payload": { "ops_stage": "formalised", "harness_status": "running", "template_version": "3.0.0", "tag": "research", "count": 1 }
+      "payload": { "ops_stage": "formalised", "harness_status": "running", "template_version": "2.0.0", "tag": "research", "count": 1 }
     }
   },
   {

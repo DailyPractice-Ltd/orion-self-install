@@ -1,4 +1,30 @@
-# Proposed constitution amendment: required pairing
+# Revised constitution amendment: required pairing and connection allowance
+
+**Revision approved: 2026-11-19.** The maintainer confirmed the revised policy after the design interview. This written revision supersedes the original 30-day transition and immediate outage-pause policy below. Updating the ratified constitution and implementation remains open; this document does not claim those changes have happened.
+
+## Principle changed
+
+Supported Orion use requires verified account pairing. New and existing unpaired harnesses must pair before normal work, including on the first run after updating. There is no migration grace period. Existing paired harnesses reuse their credentials without a new code when accepted by the server.
+
+Before each interactive task or scheduled shift, attempt authenticated verification and delivery of queued operational reports. Temporary network, server or reporting failures permit work for up to 48 elapsed hours after the last successful verification and complete report delivery. Failed attempts, partial replay, restarts and updates never renew that allowance. Revoked or invalid credentials block immediately and invalidate the allowance. A disabled radio or unsafe local state also blocks work.
+
+At expiry, pause new tasks and shifts; a task already admitted may finish and report. Show no outage notices while work is allowed. When work is blocked, explain the reason and next recovery action. Diagnosis, status inspection, updating, code renewal and re-pairing remain available.
+
+## Rationale and disclosure
+
+The account link supports each harness, delivers updates and records operational activity. A 48-hour allowance accommodates temporary connection issues without losing finished-work reports: save labels locally and replay them with their original identity and time. Only a successful verification-and-delivery cycle resets the clock.
+
+The Intelligence Library remains separately optional. The radio payload and per-item consent for client words and artifacts are unchanged. Keep the approved short pairing explanation in setup and the precise operational-data disclosure in the radio guide. Website-only and paste-only chat remain unsupported for installation and execution. Editable local files and clocks make this supported-flow policy, not tamper-proof licensing or a payment gate.
+
+## Existing installations and implementation
+
+Remove migration eligibility detection, countdowns and reminders. Historical migration fields remain readable but never authorize work. Do not manufacture a connection timestamp from an old migration or verification timestamp; establish it with accepted verification and complete delivery. Preserve a declined radio choice until explicit pairing.
+
+Align Article V, the linked contracts, client state/schema, guard, setup, reporting, work entry points, user guides and validation in the implementation pass. Tests and live evidence for the old candidate do not validate this revision.
+
+## Historical approval and superseded wording
+
+The following records the original approval and rationale; its 30-day transition and immediate outage pause are superseded by the revision above.
 
 **Status:** Approved by the Daily Practice maintainer in this implementation session. The pre-existing approval evidence below authorizes restoration of the historical self-install constitution (v1.4.0 from `feffff9^`) and the Article V amendment in `.specify/memory/constitution.md` version 2.0.0. This maintainer source is not deployed to client folders.
 

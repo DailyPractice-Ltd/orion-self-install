@@ -1,21 +1,25 @@
-# 03: Central guard and existing-user migration
+# 03: Central guard and 48-hour connection allowance
 
-**What to build:** Orion has one shared pre-work decision that checks the server and gives a clear recovery path. Existing harnesses receive a durable, one-time transition rather than unexpectedly losing access on update.
+**What to build:** One pre-work gate for all harnesses: immediate pairing, then a silent 48-hour allowance for temporary connection or reporting failures.
 
-**Blocked by:** 02 — Ratify the required-pairing contracts.
+**Blocked by:** 02 — Align the revised required-pairing contracts.
 
-**Status:** implemented — supported entry-point adoption follows in ticket 04; replay delivery follows in ticket 05
+**Status:** reopened — previous migration implementation is superseded; revised behavior not implemented.
 
-- [x] Implement a shared guard used by supported entry points, with explicit allow/pause results and a command suitable for interactive and quiet scheduled use.
-- [x] Authenticate against the verification route on each pre-work invocation. Stored verification time and credential shape never authorize new work by themselves.
-- [x] Persist pairing state and distinguish accepted, invalid/revoked, unreachable, and server-error outcomes. Give one plain-language reason and a specific next action on failure.
-- [x] Detect existing harnesses using recorded pre-upgrade progress; a pristine template with a status file remains a new install.
-- [x] On an existing harness's first updated run, durably record the migration start and deadline exactly 30 × 24 hours apart. Never reset or extend them on later runs or updates.
-- [x] During grace, permit existing work with a concise session reminder and retain connected-radio behavior. Apply the required gate at the exact deadline; test before, at, and after it and the agreed malformed/future timestamp rules.
-- [x] An already paired, enabled harness can satisfy migration with accepted credentials and no new code. Preserve a prior declined choice until the user explicitly completes pairing; disabled radio or revoked credentials require recovery under the migration policy.
-- [x] Keep status inspection, diagnosis, updating, code renewal, and re-pairing available while paused.
-- [x] Test new and existing paired, unpaired, and previously declined harnesses; repeat runs and updates; interruption during migration persistence; all verification outcomes; and ordinary, homed, and cloud-attached credentials where applicable.
-- [x] Expose the shared recovery/replay integration needed by ticket 05 without creating separate competing authorization rules.
+- [ ] Remove existing-harness progress detection, migration clocks, countdowns and reminders. An unpaired harness is blocked on its first updated run.
+- [ ] Upgrade absent/version-1 state compatibly to version 2. Ignore historical migration fields for authorization; never derive a connection allowance from them or `verified_at`.
+- [ ] Reuse accepted existing credentials without another code. Preserve a declined choice until explicit pairing.
+- [ ] Attempt authenticated verification at every task/shift entry. Only accepted verification plus fully acknowledged queued-report delivery refreshes `last_connected_at`, under the shared lock.
+- [ ] Allow temporary network/server/reporting failures while `now < last_connected_at + 48 hours`, without notices. Partial replay, failed attempts, successful verification alone with pending reports, restarts and updates never extend the clock.
+- [ ] Block invalid/revoked credentials immediately and invalidate the saved allowance. Disabled radio, mismatched identity, unsafe local state, malformed/future timestamps and unsafe locks also require recovery.
+- [ ] At the exact deadline block new tasks/shifts unless verification and delivery succeed. Let a task already admitted finish and report after expiry.
+- [ ] Keep diagnosis, inspection, updating, code renewal, re-pairing and finished-work reporting available. Explain recovery only when new work is blocked.
+- [ ] Test before/at/after the deadline, restart/update persistence, all failure classes, credential storage variants, historical state, concurrency and underway-task completion. Verify that allowed outage runs print no notice.
+- [ ] Share this policy with reporting and supported entry points rather than introducing separate clocks or gates.
+
+## Historical candidate evidence — superseded policy
+
+The following evidence predates the 2026-11-19 revision. It does not demonstrate the revised behavior.
 
 ## Implementation evidence
 
@@ -35,9 +39,3 @@
   fail closed if the reporting runtime is missing; empty queues work independently.
 - Ticket 04 owns entry-point adoption; inspection/update/recovery are not gated by
   this module. Ticket 07 owns deployment manifests and pristine fingerprints.
-
-Full suite evidence at this ticket boundary: `node --test` ran 201 tests,
-193 passed and 8 failed. Six deployed/update journeys reject the template 3.0.0
-versus still-pinned release 2.0.0; the version tripwire and pristine registry also
-fail pending ticket 07 release alignment. Those files are intentionally owned by
-07 and were not changed here. Syntax checks and `git diff --check` passed.

@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-12
 
-**Status**: Updated for required-pairing source candidate 3.0.0 (007; live verification pending)
+**Status**: Updated for required-pairing source
 
 **Input**: A non-technical entrepreneur, salesperson, or go-to-market person clones or
 downloads this repository and, guided entirely by Codex or Claude Code —

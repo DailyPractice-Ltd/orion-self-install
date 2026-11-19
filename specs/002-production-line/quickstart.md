@@ -1,4 +1,4 @@
-# Current quickstart — required pairing (3.0.0 source candidate)
+# Current quickstart — required pairing
 
 Use [setup and recovery](../../docs/setup.md) in an installed Codex or Claude Code
 folder. Website-only and paste-only chat cannot execute the guard. Get a one-time

@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-25
 
-**Status**: Updated for required-pairing candidate 3.0.0; real-account verification pending
+**Status**: Updated for required-pairing candidate
 
 **Input**: "The production line: setup wizard, README control panel, library packaging,
 client-side bridge wiring." Builds on feature `001-self-install` (the foundation repo).

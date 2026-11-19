@@ -1,0 +1,2 @@
+# Human-only implementation records stay out of default repository searches.
+/specs/

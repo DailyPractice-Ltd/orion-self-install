@@ -246,7 +246,7 @@ const haveTag = (tag) => spawnSync('git', ['rev-parse', '--verify', `${tag}^{com
 function releasedHarness(t, tag, { hand = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), `orion-migrate-${tag}-`));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const tar = execFileSync('git', ['archive', tag], { cwd: ROOT, maxBuffer: 1 << 28 });
+  const tar = execFileSync('git', ['archive', tag, '--', 'AGENTS.md', 'agent', 'status', 'update'], { cwd: ROOT, maxBuffer: 1 << 28 });
   writeFileSync(join(dir, 'tree.tar'), tar);
   execFileSync('tar', ['-xf', join(dir, 'tree.tar'), '-C', dir]);
   rmSync(join(dir, 'tree.tar'));
@@ -461,7 +461,7 @@ test('a skill arriving over the radio never carries a level: the status record i
 test('tripwire: on a fresh folder migrate has nothing to change and finds no residue, so set-level works at once', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'orion-fresh-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const tar = execFileSync('git', ['archive', 'HEAD'], { cwd: ROOT, maxBuffer: 1 << 28 });
+  const tar = execFileSync('git', ['archive', 'HEAD', '--', 'AGENTS.md', 'agent', 'status', 'update'], { cwd: ROOT, maxBuffer: 1 << 28 });
   writeFileSync(join(dir, 'tree.tar'), tar);
   execFileSync('tar', ['-xf', join(dir, 'tree.tar'), '-C', dir]);
   // The working tree's own copies, so an uncommitted edit is checked too.
@@ -494,6 +494,4 @@ test('tripwire: the "waiting for you" words and the route sentences are in the a
   for (const a of ['claude-code', 'codex']) assert.match(read(`agent/adapters/${a}.md`), /status\/waiting\.md/, `${a} says where the waiting list lives`);
   const manifest = JSON.parse(read('update/manifest.json'));
   assert.ok(Object.keys(manifest.never_touch).some((k) => k.includes('status/waiting.md')));
-  const contract = read('specs/002-production-line/contracts/send-risk.md');
-  for (const words of ['send-log.md', 'no-contact.md', 'waiting.md', 'send_risk', 'node_dir']) assert.ok(contract.includes(words), `the contract names ${words}`);
 });

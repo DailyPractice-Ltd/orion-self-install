@@ -5,6 +5,18 @@ their own sales practice. There is no coach in this session. You are the install
 the canonical shared instruction file, regardless of which AI product you are (Claude, ChatGPT, Copilot,
 Claude Code, or anything else that can read this repo).
 
+## Documentation boundary — applies to every agent
+
+Use `docs/` for operational and development guidance, alongside this file, the
+agent definition, skills, source code and tests. If those permitted sources do
+not answer a question, ask the human before proceeding.
+
+`specs/` is a human-only implementation record. Agents must never open, search,
+read or use its contents, including when implementing, debugging or reviewing
+Orion. Exclude it from repository searches. Code and tests must not load files
+from it. Keep it in the development repository for human tracking and exclude
+it from installed folders. Put guidance needed by agents in `docs/`.
+
 ## Which harness you are, and staying in its own folder
 
 Read this first, whether you are installing Orion or working in a harness that is
@@ -193,8 +205,7 @@ know why, just that the names are load-bearing; don't rename them.
      `outreach_rejected`, `debrief_completed`, `crm_updated`,
      `workflow_execution_completed`.
 
-   The trigger table for all of them lives in `docs/radio.md` (canonical form in
-   `specs/002-production-line/contracts/bridge-radio.md`).
+   The trigger table for all of them lives in `docs/radio.md`.
 
    **One signal per piece of work, and the most specific one wins.** A CRM
    write is `crm_updated`, never also a finished task.
@@ -308,13 +319,9 @@ for an update. In Claude Code and Codex, the same procedure is available as
 
 ## Where the fuller detail lives
 
-- `specs/001-self-install/spec.md` and `specs/002-production-line/spec.md` — the
-  design background behind these rules.
-- `specs/001-self-install/spec.md` — the foundation user-journey spec this repo
-  implements; `specs/002-production-line/spec.md` — the wizard, Library, and radio layer
-  on top of it.
 - `docs/radio.md` — the check-in system in plain words, including what to do on a
   surface that can't run commands.
-- Anything you're unsure about is more likely answered in a file here than not. This repo
-  is written to brief you, specifically — read before asking the client something the repo
-  already tells you.
+- `docs/setup.md` — supported setup and connection recovery.
+- `docs/updating.md` — updating, restoring and switching tools.
+- Read the relevant permitted documentation before asking the client. If it does
+  not answer the question, ask them; follow the documentation boundary above.

@@ -4,17 +4,17 @@
 
 **Blocked by:** 04 — Require verified pairing to finish setup; 06 — Gate interactive and scheduled work.
 
-**Status:** reopened — revised policy not implemented or verified; prior database/live checks also remain outstanding.
+**Status:** revised client implementation and local checks complete; database/live checks remain outstanding. This ticket remains incomplete.
 
-- [ ] Align the ratified constitution, linked specs/contracts, runtime schema/template, installer brief, README, radio/setup/update guides, adapters, schedule prompts, validation and changelog.
-- [ ] Remove 30-day migration promises, progress detection, reminders and immediate outage-blocking wording. Preserve historical choices and readable legacy state without honoring saved migration deadlines.
-- [ ] Keep the approved short pairing explanation and unchanged operational-data disclosure. Show no allowed-outage notices or countdowns.
-- [ ] Verify immediate pairing for all unpaired cohorts, credential reuse, setup handoff requirements and compatible historical-state upgrades.
-- [ ] Verify the 48-hour boundary, persistent verification-and-delivery timestamp, no resets on failures/restarts/updates, immediate revocation blocking, silent allowed failures, and underway-task completion.
-- [ ] Verify durable labels-only replay and no duplicate counts; passing verification with partial delivery must never renew the allowance.
-- [ ] Run appropriate automated checks, documentation consistency, both package plans and required fingerprint generation after implementation. Record new results separately from historical evidence.
+- [x] Align the ratified constitution, linked specs/contracts, runtime schema/template, installer brief, README, radio/setup/update guides, adapters, schedule prompts, validation and changelog.
+- [x] Remove 30-day migration promises, progress detection, reminders and immediate outage-blocking wording. Preserve historical choices and readable legacy state without honoring saved migration deadlines.
+- [x] Keep the approved short pairing explanation and unchanged operational-data disclosure. Show no allowed-outage notices or countdowns.
+- [x] Verify immediate pairing for all unpaired cohorts, credential reuse, setup handoff requirements and compatible historical-state upgrades.
+- [x] Verify the 48-hour boundary, persistent verification-and-delivery timestamp, no resets on failures/restarts/updates, immediate revocation blocking, silent allowed failures, and underway-task completion.
+- [x] Verify durable labels-only replay and no duplicate counts; passing verification with partial delivery must never renew the allowance.
+- [x] Run appropriate automated checks, documentation consistency, both package plans and required fingerprint generation after implementation. Record new results separately from historical evidence.
 - [ ] Complete the outstanding database runner and real signed-in account/bridge journey, including connection/reporting outages within the allowance and blocking at expiry. Leave incomplete if unavailable.
-- [ ] Record sanitized observations without secrets or business content. No deployment, tag or publication is implicitly authorized by this ticket.
+- [x] Record sanitized observations without secrets or business content. No deployment, tag or publication is implicitly authorized by this ticket.
 
 See [verification evidence and pending checklist](../verification.md).
 

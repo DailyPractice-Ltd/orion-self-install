@@ -1,14 +1,49 @@
 # Required pairing verification
 
-## Revised policy: pending implementation and verification (2026-11-19)
+## Revised policy: fresh local client evidence (2026-11-19)
 
-The maintainer confirmed immediate pairing for all unpaired harnesses and a silent
-48-hour connection allowance for paired harnesses. See spec.md and
-contracts/status-and-guard.md. Tickets 02–07 are reopened or require revision
-integration. The automated results below describe the earlier candidate only;
-they do not validate the new policy. No new runtime tests or live checks have run.
+Implemented on `feature/require-pairing-48h`, created from the existing
+`feature/required-pairing` branch (there was no `feature/require-pairing` branch).
+The initial working-tree status was clean; existing on-disk design and prior
+candidate work were preserved. No server endpoint or other installed harness was
+changed. The implementation and evidence remain uncommitted for review.
 
-Required new automated coverage:
+Using existing Node v26.9.0, without dependency installation:
+
+- `node --test`: **343 passed, 0 failed, 0 skipped, 0 cancelled**.
+- Focused revised guard/report/setup/entry coverage: 138 passed before final
+  refinements. Final guard/scope/setup/entry/release subset: 135 passed.
+- Both `node update/release-contract.mjs --tool codex` and `--tool claude-code`
+  passed. They validate local package plans, not deployment.
+- `node tests/helpers/pristine.mjs --write` regenerated shipped fingerprints;
+  the full suite's freshness check passed. `git diff --check` passed.
+- Loopback task-scope tests required execution outside the assistant sandbox;
+  HTTP services remain simulated. No live account or database result is claimed.
+
+The new connection-allowance suite covers exact 48-hour expiry, persistent state,
+invalid/revoked credentials, absent/version-1 upgrade without inferred connection
+time, malformed/future state, partial replay despite accepted verification, complete
+recovery, reporting without clock renewal, disabled radio, corrupt/mismatched
+queues, setup-only verification, quiet and normal CLI silence, and admitted nested
+effects/reporting after expiry. A stale invocation environment cannot admit another
+task. Live scopes still refuse known invalid credentials, disabled radio and
+unsafe state. Existing lost-ACK, privacy, concurrent writers, lock recovery and
+credential storage regressions continue to pass.
+
+Actual entry-point effect tests cover all nine gated commands during unreachable,
+server and pending-report failures within the allowance. Setup inside an admitted
+invocation still performs current verification; the allowance never completes
+setup. Update/restore regressions preserve the connection timestamp. Stage and
+Library reporting keep temporary delivery warnings out of allowed work output.
+
+**Remaining limits:** ticket 07 stays incomplete for the previously deferred
+PostgreSQL runner and signed-in account/bridge journey. Local mocks cannot prove
+server counts, deployed routes or unattended scheduler behavior against a real
+account. Existing saved native prompts require an in-place scheduler edit as
+explained in docs/scheduled-work.md. No deployment, tag or publication occurred.
+Editable local state, clocks and programs remain a supported-flow limitation.
+
+Coverage required by the revised policy (implemented locally):
 
 - First updated run blocks unpaired/declined harnesses; accepted existing credentials
   work without another code. Old migration fields never grant work permission.

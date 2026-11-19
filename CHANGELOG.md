@@ -1,5 +1,16 @@
 # Orion self-install — Changelog
 
+## Unreleased — revised required pairing
+
+All unpaired folders must pair before normal work, including the first updated
+run. Paired folders work silently through temporary connection or reporting
+failures for 48 elapsed hours after accepted verification and complete acknowledged
+report delivery. Only that cycle renews the clock. Revocation blocks immediately;
+expiry blocks new tasks while admitted work can finish and report. Setup still
+needs current acceptance and acknowledged reporting. Version-2 pairing state keeps
+legacy migration fields readable but inert. No payload expansion.
+
+
 Semantic versioning: a real self-serve install's corrections/learnings → minor; a change
 to the install sequence or repo structure → major; wording/clarity fixes → patch.
 

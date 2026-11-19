@@ -121,7 +121,7 @@ Support messages remain separate; replies and contributions need per-item consen
 **Independent test**: self-service code issuance, transactional exchange, matching
 read-only verification, stable setup report acknowledgment and handoff. Before
 interactive/scheduled work, fresh accepted verification and pending-report delivery
-are required outside the one-time 30-day existing-user grace period.
+establish the shared silent 48-hour connection allowance; unpaired work is blocked.
 
 **Acceptance scenarios**:
 
@@ -129,10 +129,10 @@ are required outside the one-time 30-day existing-user grace period.
    unfinished with saved answers and no handoff. Resume by verifying saved exchange
    or obtaining a fresh code when no credential survived.
 2. A failed pre-work check pauses tasks, messages, CRM writes and scheduled work
-   outside grace; diagnosis, inspection, updating and re-pairing remain available.
+   after the connection allowance expires; diagnosis, inspection, updating and re-pairing remain available.
 3. A report failure after allowed work keeps its labels and original event time in
    a durable local outbox. Verified recovery replays the original identities without
-   duplicate counts before new work outside grace.
+   duplicate counts before new work after the connection allowance expires.
 4. A support nudge is delivered in plain words after allowance; send a reply only
    with the client's explicit yes. Verification never consumes support messages.
 
@@ -142,11 +142,12 @@ are required outside the one-time 30-day existing-user grace period.
 
 - Node absent: help install it, then resume saved setup in Codex or Claude Code.
 - No code: obtain or renew it from signed-in `/home/pair`, without support or payment.
-- Previously declined/unpaired existing folder: one durable 30-day clock from first
-  updated use, never reset; prior decline remains historical until explicit pairing.
-- Already paired enabled legacy folder: matching fresh acceptance satisfies migration
-  without a new code. Subsequent revocation never grants another grace period.
-- Exactly at deadline, malformed/partial timestamps, or future starts: no new grace.
+- Previously declined/unpaired existing folder: pair before any normal work;
+  preserve historical decline until explicit pairing.
+- Already paired enabled legacy folder: reuse accepted credentials without a new
+  code. Establish connection time through verification and complete delivery.
+- At exactly 48 elapsed hours, block new tasks; admitted tasks finish and report.
+  Revocation invalidates the allowance; unsafe local state requires recovery.
 - Wizard interruption: saved exchange/progress is resumed, never claimed complete
   until accepted verification and the stable setup report's acknowledgment.
 
@@ -174,7 +175,7 @@ are required outside the one-time 30-day existing-user grace period.
   before entering the repo.
 - **FR-007**: Operational package reports MUST persist allowlisted labels with original installation identity before network delivery; failed reports survive restart and replay idempotently.
 - **FR-008**: The wizard MUST use the approved short explanation from 007, obtain a self-service single-use code, save the exchanged credential privately and verify matching server acceptance before setup completes. Pairing is account linkage, not payment.
-- **FR-009**: Every interactive session and scheduled run MUST perform the shared fresh guard before work, deliver pending reports outside valid grace, and pause on failure. Support messages are checked separately; replies require explicit per-item consent.
+- **FR-009**: Every task and scheduled run MUST attempt verification and pending-report delivery with the shared guard. Temporary failures permit silent work within the shared 48-hour allowance; credential refusal or expiry blocks new work. Support messages are checked separately; replies require explicit per-item consent.
 - **FR-010**: Direct conversational installs in executable supported folders MUST run the same wizard/guard. Website-only and paste-only chat can provide recovery guidance but cannot finish installation or authorize work.
 - **FR-011**: Sending follows the chosen risk level and CRM standing scope. Operational labels follow required pairing; words and artifacts to Daily Practice retain per-item consent.
 ### Key Entities
@@ -206,7 +207,7 @@ are required outside the one-time 30-day existing-user grace period.
   identifiers returns zero hits in the public repo.
 - **SC-005**: With the radio on: first signal lands during the install session; a nudge
   posted before a session is presented at that session's start; the reply arrives back.
-  With the radio disabled: no new work outside valid migration grace; recovery remains available.
+  With the radio disabled: no new work when the shared guard blocks; recovery remains available.
 - **SC-006**: The standing acceptance gate holds: a real non-technical person reaches
   `validated` unassisted (`NON-TECHNICAL-DRY-RUN.md`, feature 001 T033).
 

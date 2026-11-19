@@ -51,7 +51,7 @@ while (!existsSync(join(root,'status/guard.mjs')) || !existsSync(join(root,'stat
 }
 const {checkWork} = await import(pathToFileURL(join(root,'status/guard.mjs')).href);
 const permission = await checkWork({root});
-if (!permission.allow || permission.grace) console.log(permission.reason);
+if (!permission.allow) console.log(permission.reason);
 if (!permission.allow) process.exit(2);
 
 const DATA_PATH = flags.data || join(__dirname, 'call-data.json');

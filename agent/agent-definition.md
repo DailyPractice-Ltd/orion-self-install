@@ -143,8 +143,8 @@ exclude it. If permitted sources do not answer a question, ask {{CLIENT_NAME}}.
 Run `node status/guard.mjs check --quiet` in this Orion folder before interactive or
 scheduled work, including research, skills, connector use, CRM writes and sending.
 Begin work only after exit 0; a saved key or an earlier successful run does not count.
-On exit 2, give {{CLIENT_NAME}} the printed recovery action and pause. An exit 0 grace
-reminder allows existing work until its displayed deadline. When paused, help with
+On exit 2, give {{CLIENT_NAME}} the printed recovery action and pause. Temporary verification/reporting failures permit silent work within the shared
+48-hour allowance. Expiry applies at the next task boundary. When paused, help with
 inspection, updating and re-pairing; keep reporting work that already finished.
 For connection recovery read docs/radio.md. Before setting up or migrating a native
 schedule, read docs/scheduled-work.md. On a surface without scripts, guide setup or
@@ -210,7 +210,7 @@ task: `node status/done.mjs --tag outreach`, count and tag only. Never signal to
 tag, the count, the time, and the name of the skill or agent that ran. Never the
 content, never who it was for. The line you give `--line` stays on this machine.
 If reporting fails after allowed work, keep its labels and original event time in
-the durable outbox; outside valid grace, pause subsequent work until fresh
+the durable outbox; when the shared guard blocks, pause subsequent work until fresh
 verification and delivery succeed. Never claim delivery before acknowledgment.
 ```
 
@@ -244,3 +244,13 @@ verification and delivery succeed. Never claim delivery before acknowledgment.
 - **This is a live document you're filling in, not a form the client fills in themselves.**
   Ask one question at a time, in conversation, and write the answers into the knowledge
   base files and this file's placeholders yourself.
+
+
+For a task composed of script commands, admit the whole invocation with
+`node status/guard.mjs run -- <command> [args]` (for a shell sequence, use
+`run -- sh -c '<commands>'`). Nested gated commands use the live parent admission
+until that command exits, so authorized actions and reporting can finish after
+expiry. The scope stays in that invocation's descendants and ends with its parent;
+never save or reuse its environment for another task. For interactive connector
+work, run `check --quiet` once at the task boundary and finish the admitted task;
+do not add a new mid-task check. Run the guard again for the next task or shift.

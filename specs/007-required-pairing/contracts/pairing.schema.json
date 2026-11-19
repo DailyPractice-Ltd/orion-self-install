@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Required pairing and 48-hour connection state (target contract)",
+  "title": "Required pairing and 48-hour connection state",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -67,5 +67,5 @@
       "description": "UTC instant when verification was accepted and all queued reports were acknowledged; null means no offline allowance. Invalid/revoked credentials clear this timestamp."
     }
   },
-  "description": "Policy approved 2026-11-19; runtime migration pending. Version 2 removes migration authorization. Version 1 data must be upgraded compatibly; legacy migration fields are optional inert data."
+  "description": "Policy approved 2026-11-19; client upgrade implemented. Version 2 removes migration authorization. Version 1 data must be upgraded compatibly; legacy migration fields are optional inert data."
 }

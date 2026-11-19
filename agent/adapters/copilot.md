@@ -20,5 +20,5 @@ path. An uploaded knowledge base or pasted agent prompt does not satisfy the gat
 On this unsupported surface, help only with setup and recovery guidance until the
 client moves to a supported tool. Never claim a check or signal happened here.
 Older website instructions described a supported path in earlier releases; their
-recorded radio choices remain historical during the one-time 30-day transition.
+recorded radio choices remain historical until explicit pairing. Unpaired work is blocked immediately.
 See [the radio guide](../../docs/radio.md) for the operational-data disclosure.

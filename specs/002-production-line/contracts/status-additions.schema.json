@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://orion-self-install/contracts/status-additions.schema.json",
   "title": "status.json additions \u2014 schema 2.0.0, required-pairing feature marker 1",
-  "description": "Current additive regions; missing regions in older files are tolerated. Required pairing migration is determined by feature marker and pre-existing progress, never schema version.",
+  "description": "Current additive regions; missing regions in older files are tolerated. Pairing version 2 records a nullable connection timestamp; historical migration fields are inert.",
   "type": "object",
   "properties": {
     "schema_version": {
@@ -77,7 +77,7 @@
     },
     "sharing": {
       "type": "object",
-      "description": "Operational connection required for supported work, subject to one-time existing-user grace; fresh server verification required. See 007 contract.",
+      "description": "Operational connection required for supported work; temporary failures use the shared silent 48-hour connection allowance. See 007 contract.",
       "properties": {
         "radio_choice": {
           "type": [
@@ -113,7 +113,75 @@
           "description": "Exchange-only credential, never displayed or pasted. Null in homed folders; machine-local radio.key or established cloud attachment supplies it."
         },
         "pairing": {
-          "$ref": "../../007-required-pairing/contracts/pairing.schema.json"
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "Required pairing and 48-hour connection state",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "state",
+            "last_check",
+            "verified_at",
+            "last_connected_at"
+          ],
+          "properties": {
+            "version": {
+              "const": 2
+            },
+            "state": {
+              "enum": [
+                "unpaired",
+                "exchanged",
+                "verified"
+              ]
+            },
+            "last_check": {
+              "enum": [
+                null,
+                "accepted",
+                "invalid",
+                "unreachable",
+                "server_error"
+              ]
+            },
+            "verified_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "migration_started_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Legacy candidate field; optional, retained for compatibility only, never authorizes work."
+            },
+            "migration_deadline_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Legacy candidate field; optional, retained for compatibility only, never authorizes work."
+            },
+            "migration_satisfied_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Legacy candidate field; optional, retained for compatibility only, never authorizes work."
+            },
+            "last_connected_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time",
+              "description": "UTC instant when verification was accepted and all queued reports were acknowledged; null means no offline allowance. Invalid/revoked credentials clear this timestamp."
+            }
+          },
+          "description": "Policy approved 2026-11-19; client upgrade implemented. Version 2 removes migration authorization. Version 1 data must be upgraded compatibly; legacy migration fields are optional inert data."
         }
       }
     },

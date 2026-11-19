@@ -1,7 +1,7 @@
 /** Durable, labels-only operational reporting. All mutation shares the guard lock. */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { withStatusLock, pairingMigration } from './store.mjs';
+import { withStatusLock, pairingState } from './store.mjs';
 import {
   radioOn,
   radioKey,
@@ -165,14 +165,15 @@ async function connection(root, status) {
     key: radioKey(status, { keyFile }),
   };
 }
-async function failure(store, status, outcome) {
-  pairingMigration(status, Date.now());
+async function failure(store, status, outcome, time = Date.now()) {
+  pairingState(status, time);
   status.sharing.pairing.last_check = outcome;
+  if (outcome === 'invalid') status.sharing.pairing.last_connected_at = null;
   await store.writeStatus(status);
 }
 export async function replayOutboxLocked(
   store,
-  { status, fetchImpl = globalThis.fetch } = {},
+  { status, fetchImpl = globalThis.fetch, now = () => new Date() } = {},
 ) {
   let entries = validateOutbox(await store.readOutbox());
   if (!entries.length) return { status: 'sent', pending: 0 };
@@ -188,7 +189,7 @@ export async function replayOutboxLocked(
     const entry = entries[0];
     const id = status.sharing.harness_id;
     if (entry.body.harness_id && entry.body.harness_id !== id) {
-      await failure(store, status, 'invalid');
+      await failure(store, status, 'invalid', new Date(now()).getTime());
       return {
         status: 'invalid',
         pending: entries.length,
@@ -212,7 +213,7 @@ export async function replayOutboxLocked(
         },
       );
     } catch (error) {
-      await failure(store, status, 'unreachable');
+      await failure(store, status, 'unreachable', new Date(now()).getTime());
       const networkCode = error?.cause?.code || error?.code;
       return {
         status: 'queued',
@@ -243,7 +244,8 @@ export async function replayOutboxLocked(
       await failure(
         store,
         status,
-        response.status === 401 ? 'invalid' : 'server_error',
+        [401,403].includes(response.status) ? 'invalid' : 'server_error',
+        new Date(now()).getTime(),
       );
       return {
         status: 'queued',

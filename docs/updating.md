@@ -46,6 +46,10 @@ On the same version it reports an up-to-date result when there is no work.
 
 When upgrading a harness that predates the 1.5.0 sending rule, run
 `node status/send.mjs migrate` as described in [AGENTS.md](../AGENTS.md).
+Updates never start or renew a connection allowance. All unpaired folders must
+pair before normal work. Older pairing markers upgrade to version 2 without
+inferring last_connected_at from verification or migration dates. A successful
+verification and complete report delivery establish the silent 48-hour allowance.
 Before resuming Orion work, run `node status/guard.mjs check --quiet`; exit 2
 keeps work paused while diagnosis, updating and re-pairing remain available. Then
 check support messages separately with `node status/radio.mjs check`. Report the version, changed files, preserved edits,

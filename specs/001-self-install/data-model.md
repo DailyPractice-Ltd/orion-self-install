@@ -27,8 +27,8 @@ unit of work thereafter.
 | `updated_at` | `ISO 8601 \| null` | Set on every write |
 | `checklist` | `object` | Boolean per install unit — see below |
 | `stage_history` | `array` | `{ stage, at }` entries, append-only, never edited in place |
-| `sharing.status_signal_enabled` | `bool` | Required enabled connection outside valid one-time grace — constitution Article V channel 1 |
-| `sharing.pairing` | `object` | Feature marker, exchanged/verified history and one-time migration clock; [007 contract](../007-required-pairing/contracts/status-and-guard.md) |
+| `sharing.status_signal_enabled` | `bool` | Required enabled connection for normal work — constitution Article V channel 1 |
+| `sharing.pairing` | `object` | Feature marker, exchanged/verified history and version-2 connection timestamp; [007 contract](../007-required-pairing/contracts/status-and-guard.md) |
 | `setup_checkpoint` | `object`, optional | Original setup report identity and delivery progress; never authorization |
 | `sharing.intelligence_library_opt_in` | `bool` | Default `false` — constitution Article V channel 2, separate and explicit |
 | `notes` | `string` | Free text; the installing agent's own scratch notes across sessions |
@@ -55,7 +55,7 @@ A minimal, deliberately narrow subset of `status.json`, defined formally in
 includes KB content, prospect data, or message content — identity + stage + timestamp
 only. `status/emit-status.mjs` runs the shared guard before advancing a stage.
 The authenticated bridge report persists its original identity before sending;
-failed reports replay before new work outside valid existing-user grace.
+failed reports replay before new work when the shared guard blocks.
 No business-name/client-id content is part of that operational payload.
 
 ---

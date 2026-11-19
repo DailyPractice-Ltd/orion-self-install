@@ -1,6 +1,6 @@
 # Require Daily Practice pairing and active radio for Orion
 
-**Policy revision approved: 2026-11-19.** This specification supersedes the candidate’s 30-day migration and immediate outage-pause policy. The revised client behavior is not implemented or verified yet; earlier passing tests are historical evidence only.
+**Policy revision approved: 2026-11-19.** This specification supersedes the candidate’s 30-day migration and immediate outage-pause policy. The revised client behavior is implemented and locally tested; see verification.md for fresh evidence and deferred database/live work. Earlier candidate results remain historical evidence only.
 
 ## Goal
 

@@ -35,7 +35,7 @@ function harness(t, initial = {}) {
 test('new setup without a code pauses with self-service recovery and no handoff',t=>{
  const h=harness(t); const r=h.run(['--checkins','no']);
  assert.equal(r.status,2,r.stdout+r.stderr); assert.match(r.stdout,/Pair Orion with Daily Practice to finish setup\. This lets us support your harness, deliver updates, and see when it is running\. Sign in to Daily Practice to get your one-time code\./);
- assert.match(r.stdout,/https:\/\/www.dailypractice.world\/home\/pair/); assert.doesNotMatch(r.stdout,/your AI takes it from here/); assert.equal(h.status().sharing.pairing.migration_started_at,null);
+ assert.match(r.stdout,/https:\/\/www.dailypractice.world\/home\/pair/); assert.doesNotMatch(r.stdout,/your AI takes it from here/); assert.equal(h.status().sharing.pairing.last_connected_at,null);
 });
 test('exchange is saved before rejected verification and resumes without spending another code',t=>{
  const h=harness(t); const first=h.run(['--code','BCDF-GHJK-LMNP'],'reject');
@@ -52,7 +52,7 @@ for (const scenario of ['network','exchange-400','exchange-404','exchange-429','
  test(`setup stays resumable after ${scenario}`,t=>{
   const h=harness(t); const r=h.run(['--code','BCDF-GHJK-LMNP'],scenario);
   assert.equal(r.status,2,r.stdout+r.stderr); assert.doesNotMatch(r.stdout,/your AI takes it from here|orion_|aaaa|secret-do-not-print/);
-  assert.match(r.stdout,/node start.mjs/); assert.equal(h.status().sharing.pairing.migration_started_at,null);
+  assert.match(r.stdout,/node start.mjs/); assert.equal(h.status().sharing.pairing.last_connected_at,null);
  });
 }
 for(const code of ['', 'short', 'ABCD-EFGH-IJKL']) {
@@ -75,13 +75,13 @@ test('homed setup keeps the credential outside status and resumes verification',
  assert.match(readFileSync(join(h.root,'status/radio.key'),'utf8'),/^orion_/);
  assert.equal(h.run().status,0);
 });
-test('existing unmarked progress gets its one-time migration before wizard mutation',t=>{
+test('existing unmarked progress requires pairing without a connection allowance',t=>{
  const sharing=JSON.parse(readFileSync(new URL('status/status.schema-template.json',source))).sharing;
  delete sharing.pairing;
  const h=harness(t,{sharing,started_at:'2026-01-01T00:00:00.000Z',business_name:'Saved business',machine_profile:{chosen_surface:'codex'}});
  const r=h.run(); assert.equal(r.status,2); const after=h.status();
- assert.ok(after.sharing.pairing.migration_started_at); assert.equal(after.business_name,'Saved business'); assert.equal(after.machine_profile.chosen_surface,'codex');
- const start=after.sharing.pairing.migration_started_at; h.run(); assert.equal(h.status().sharing.pairing.migration_started_at,start);
+ assert.equal(after.sharing.pairing.last_connected_at,null); assert.equal(after.business_name,'Saved business'); assert.equal(after.machine_profile.chosen_surface,'codex');
+ const start=after.sharing.pairing.last_connected_at; h.run(); assert.equal(h.status().sharing.pairing.last_connected_at,start);
 });
 test('cloud attached acceptance still requires matching fresh server verification',t=>{
  const template=JSON.parse(readFileSync(new URL('status/status.schema-template.json',source)));
@@ -94,12 +94,12 @@ test('cloud attached acceptance still requires matching fresh server verificatio
 test('pristine older status without the pairing marker never gains grace from wizard profile writes',t=>{
  const sharing=JSON.parse(readFileSync(new URL('status/status.schema-template.json',source))).sharing; delete sharing.pairing;
  const h=harness(t,{sharing}); assert.equal(h.run().status,2);
- assert.equal(h.status().sharing.pairing.migration_started_at,null); assert.equal(h.run().status,2);
- assert.equal(h.status().sharing.pairing.migration_started_at,null);
+ assert.equal(h.status().sharing.pairing.last_connected_at,null); assert.equal(h.run().status,2);
+ assert.equal(h.status().sharing.pairing.last_connected_at,null);
 });
 test('malformed pairing state stops before changing the saved machine profile',t=>{
  const template=JSON.parse(readFileSync(new URL('status/status.schema-template.json',source)));
- template.sharing.pairing.migration_started_at='invalid';
+ template.sharing.pairing.last_connected_at='invalid';
  const h=harness(t,{sharing:template.sharing,machine_profile:{chosen_surface:'codex',detected_at:'saved'}});
  assert.equal(h.run().status,2); assert.deepEqual(h.status().machine_profile,{chosen_surface:'codex',detected_at:'saved'});
 });
@@ -171,4 +171,12 @@ test('no detected app routes setup to Codex or Claude Code installation',t=>{
  assert.match(run.stdout,/Install Codex or Claude Code, then open this folder there/);
  assert.match(run.stdout,/docs\/setup\.md/);
  assert.doesNotMatch(run.stdout,/websites .*work for everyone|README.s Step 4 shows that lane/);
+});
+
+test('setup within an admitted invocation still requires its own current verification', t => {
+ const h=harness(t);assert.equal(h.run(['--code','BCDF-GHJK-LMNP']).status,0);
+ const preload=join(h.root,'scope-setup.mjs');const count=join(h.root,'verify-count');writeFileSync(count,'0');
+ writeFileSync(preload,`import {readFileSync,writeFileSync} from 'node:fs';globalThis.fetch=async()=>{const n=Number(readFileSync(${JSON.stringify(count)},'utf8'))+1;writeFileSync(${JSON.stringify(count)},String(n));if(n>=3)throw Error('offline');return new Response(JSON.stringify({status:'accepted',harness_id:'12345678-1234-1234-1234-123456789abc'}),{status:200});};`);
+ const r=spawnSync(process.execPath,['--import',preload,join(h.root,'status/guard.mjs'),'run','--',process.execPath,'--import',preload,join(h.root,'start.mjs')],{cwd:h.root,input:'',encoding:'utf8',env:plainEnv()});
+ assert.equal(r.status,2,r.stdout+r.stderr);assert.doesNotMatch(r.stdout,/your AI takes it from here/);assert.ok(Number(readFileSync(count))>=3);
 });

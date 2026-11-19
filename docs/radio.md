@@ -7,8 +7,8 @@ transition. This is constitution Article V, channel 1, in plain words.
 
 Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.
 
-[Setup and recovery](setup.md) covers code renewal, interrupted setup, the 30-day
-transition and paused-work recovery.
+[Setup and recovery](setup.md) covers code renewal, interrupted setup, the 48-hour
+connection allowance and paused-work recovery.
 
 ## What goes out, exactly
 
@@ -150,23 +150,28 @@ or renew your one-time code. It has twelve consonants in three groups, such as
 `BCDF-GHJK-LMNP`, and expires in 15 minutes. Run `node start.mjs --code YOUR-CODE`
 in your installed folder. It exchanges the code, saves the credential, verifies
 that the server accepts this folder, and delivers the setup report before handoff.
-No code, failed verification or failed report leaves setup unfinished.
+Missing codes, failed verification and failed reports leave setup unfinished.
 
 Ordinary folders store the returned key in `sharing.install_token`; a homed folder
 uses machine-local `status/radio.key`, excluded from its home repository. Never
 print a key or any suffix. Environment and supported cloud-attached credentials
 still require a matching server check; local key shape is not proof of acceptance.
 
-Older releases allowed a declined radio choice. Existing folders receive one
-30-day transition from their first updated run; the start and deadline are saved
-once and never reset. During valid grace, existing work can continue with a
-reminder, including while disconnected. Prior decline remains historical until
-explicit pairing. An enabled paired folder can satisfy the requirement without
-another code. At the exact deadline, or after pairing has already satisfied the
-transition, fresh accepted verification and delivered pending reports are required.
-A disabled radio pauses supported work outside that grace. Updating, inspection,
-diagnosis and re-pairing remain available. Website-only or paste-only chat cannot
-run the guard; open the same folder in Codex or Claude Code instead.
+All unpaired harnesses must pair before normal work, including the first updated
+run. Existing accepted credentials need no new code. Temporary verification or
+reporting failures permit work silently for 48 elapsed hours after accepted
+verification and acknowledged delivery of all queued reports. Only that complete
+cycle refreshes `last_connected_at`; partial replay, failures, restarts and updates
+never do. At exactly 48 hours, block the next task or scheduled run unless current
+verification and delivery succeed. An admitted task may finish and report afterward.
+Invalid/revoked credentials clear the allowance immediately. Disabled radio and
+unsafe local state require recovery. Historical migration fields are readable but
+inert; never infer the connection time from old verification or migration dates.
+Preserve a declined choice until explicit pairing. Setup still requires current
+accepted verification and acknowledged setup reporting.
+
+Updating, inspection, diagnosis and re-pairing remain available. Website-only or
+paste-only chat cannot run the guard; use Codex or Claude Code in this folder.
 
 ## If the radio can't get through
 
@@ -179,19 +184,20 @@ support-message `/nudges` endpoint. A saved `verified` state is only history.
 |---|---|
 | Accepted and no pending reports | Continue work; check support messages separately |
 | Invalid or revoked key | Renew your code and run `node start.mjs --code YOUR-CODE` |
-| Unreachable service | Restore the network, then rerun the guard |
-| Server error | Rerun the guard once service is restored; preserve saved state |
-| Pending reports or local state error | Follow [recovery](setup.md); keep the outbox and original identities |
+| Unreachable service after the allowance expires | Restore the network, then rerun the guard |
+| Server error after the allowance expires | Rerun the guard once service is restored; preserve saved state |
+| Pending reports after expiry, or unsafe local state at any time | Follow [recovery](setup.md); keep the outbox and original identities |
 
 If the assistant's sandbox blocks the network, approve the required command and
 retry. The [Codex adapter](../agent/adapters/codex.md) explains that surface. On a
-company network, ask IT to allow HTTPS to `www.dailypractice.world`. Outside valid
-grace, work remains paused until the guard succeeds.
+company network, ask IT to allow HTTPS to `www.dailypractice.world`. Temporary failures permit silent work within the shared 48-hour allowance;
+after expiry, new work waits for verified connection and complete delivery.
 
 A report can fail after an allowed task. The task still happened: `done.mjs` keeps
 its local work-log line, and the reporting helper writes its **labels and original
 event time** to `status/radio-outbox.json` before attempting delivery. The guard
-replays pending reports before new work outside grace. Retry preserves the original
+attempts replay at each task boundary. Pending reports use the same remaining
+48-hour allowance, and never create a separate blocker or renew the clock. Retry preserves the original
 identity, and bridge deduplication prevents duplicate counts. Lost or malformed
 receipts keep the report pending; a successful connection alone never deletes it.
 

@@ -8,9 +8,9 @@ import {spawnSync} from 'node:child_process';
 import {checkWork} from '../status/guard.mjs';
 import {plainEnv} from './helpers/env.mjs';
 const time='2026-11-18T12:00:00.000Z';
-const deadline='2026-12-18T12:00:00.000Z';
+const deadline='2026-11-20T12:00:00.000Z';
 const id='11111111-1111-1111-1111-111111111111';
-for(const entry of ['done','signal','report']) test(`${entry}-first failure preserves the legacy transition clock and queued labels`,async t=>{
+for(const entry of ['done','signal','report']) test(`${entry}-first failure queues labels without creating an allowance`,async t=>{
  const root=mkdtempSync(join(tmpdir(),'report-first-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
  cpSync(new URL('../status/',import.meta.url),join(root,'status'),{recursive:true});
  cpSync(new URL('../update/',import.meta.url),join(root,'update'),{recursive:true});
@@ -19,16 +19,16 @@ for(const entry of ['done','signal','report']) test(`${entry}-first failure pres
  const args=entry==='done'?[join(root,'status/done.mjs'),'--tag','research','--line','Private finished work']:entry==='signal'?[join(root,'status/radio.mjs'),'signal','--type','task_completed','--tag','research','--count','1']:['--input-type=module','-e',`import {reportSignal} from ${JSON.stringify(pathToFileURL(join(root,'status/report.mjs')).href)};await reportSignal({root:${JSON.stringify(root)},signalType:'task_completed',payload:{tag:'research',count:1}});`];
  const result=spawnSync(process.execPath,args,{encoding:'utf8',env:plainEnv({NODE_OPTIONS:`--import=${pathToFileURL(preload).href}`})});assert.equal(result.status,0,result.stdout+result.stderr);
  const read=()=>JSON.parse(readFileSync(join(root,'status/status.json')));
- assert.equal(read().sharing.pairing.migration_started_at,time);assert.equal(read().sharing.pairing.migration_deadline_at,deadline);
+ assert.equal(read().sharing.pairing.last_connected_at,null);
  const queued=readFileSync(join(root,'status/radio-outbox.json'),'utf8');assert.doesNotMatch(queued,/Private finished work/);assert.equal(JSON.parse(queued).length,1);
  if(entry==='done')assert.match(readFileSync(join(root,'status/work-log.md'),'utf8'),/Private finished work/);
  const offline=async()=>{throw Error('offline');};
  const later=()=>new Date('2026-11-19T12:00:00.000Z');
- assert.equal((await checkWork({root,now:later,fetchImpl:offline})).grace,true);
+ assert.equal((await checkWork({root,now:later,fetchImpl:offline})).allow,false);
  assert.equal((await checkWork({root,now:()=>new Date(deadline),fetchImpl:offline})).allow,false);
- assert.equal(read().sharing.pairing.migration_started_at,time);assert.equal(read().sharing.pairing.migration_deadline_at,deadline);
+ assert.equal(read().sharing.pairing.last_connected_at,null);
  const online=async url=>({status:url.endsWith('/verify')?200:201,json:async()=>url.endsWith('/verify')?{status:'accepted',harness_id:id}:{signal_id:'s',recorded_at:deadline,replay:false}});
  assert.equal((await checkWork({root,now:()=>new Date(deadline),fetchImpl:online})).allow,true);
- assert.equal(read().sharing.pairing.migration_started_at,time);assert.equal(read().sharing.pairing.migration_deadline_at,deadline);
+ assert.equal(read().sharing.pairing.last_connected_at,deadline);
  assert.deepEqual(JSON.parse(readFileSync(join(root,'status/radio-outbox.json'))),[]);
 });

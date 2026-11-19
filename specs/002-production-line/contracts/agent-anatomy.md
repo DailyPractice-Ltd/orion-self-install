@@ -5,7 +5,7 @@ runtime or hiring workflow. Existing client-owned job sheets and schedules are
 preserved as history. Migrate native prompts in place using
 [scheduled work](../../../docs/scheduled-work.md); every interactive, scheduled or
 handoff invocation must run `node status/guard.mjs check --quiet` first and stop
-on exit 2 outside valid migration grace. The following anatomy documents legacy
+on exit 2 when the shared guard blocks. The following anatomy documents legacy
 job sheets, not an alternate ungated work path.
 
 **Historical scope**: the artefacts `library/HIRING.md` produces. Article X: agent setup is inside
@@ -141,7 +141,7 @@ outcome from a machine-readable line `radio.mjs signal` prints on request
 (`--result-line`), never from the sentences written for people. A marker line
 carries no `auto:`, so it can never read as proof that a schedule fired. Pending
 labels retain original event identity in the durable outbox and replay before new
-work outside valid grace; verification alone never discards pending reports.
+work when the shared guard blocks; verification alone never discards pending reports.
 
 `routine_completed` has been live server-side since 14 Aug 2026 (mono PR #20): the
 replay key is

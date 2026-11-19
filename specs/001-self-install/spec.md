@@ -152,8 +152,8 @@ knowledge-base content, prospect data or message text. See the current
 
 **Independent test**: after a fresh guard allows a stage change, one original
 `install_checkpoint` identity is durably recorded and acknowledged. A failed report
-is retained, and outside valid grace subsequent work pauses until verified recovery
-and replay. A disabled connection cannot authorize new work outside valid grace.
+is retained, and when the shared guard blocks subsequent work pauses until verified recovery
+and replay. A disabled connection cannot authorize new work when the shared guard blocks.
 The separate Intelligence Library remains default-off, requiring explicit consent.
 
 ---
@@ -165,7 +165,7 @@ The separate Intelligence Library remains default-off, requiring explicit consen
 - **Unsupported website-only or paste-only surface**: route to the same installed
   folder in Codex or Claude Code. It cannot run pairing or pre-work checks.
 - **No Node.js**: help install Node before Orion work; it is required for the guard.
-- **Pairing/check failure**: keep setup unfinished or pause work outside valid grace;
+- **Pairing/check failure**: keep setup unfinished or pause work when the shared guard blocks;
   inspection, updating, diagnosis and re-pairing remain available.
 - **Client loses their local working copy entirely** (not just pauses — the folder is
   gone). This is an honest, disclosed limitation: because there is deliberately no
@@ -210,7 +210,7 @@ The separate Intelligence Library remains default-off, requiring explicit consen
 - **FR-011**: A validation pass equivalent to `validation/validation-tasks.md`'s VT tasks
   MUST run against the client's own live CRM, Gmail, Calendar, and prospects before the
   install is considered `validated`.
-- **FR-012**: A stage change records local progress and a labels-only bridge report with stable original identity. Durable replay and fresh verification precede later work outside valid existing-user grace.
+- **FR-012**: A stage change records local progress and a labels-only bridge report with stable original identity. Durable replay and fresh verification precede later work when the shared guard blocks.
 - **FR-013**: Intelligence-Library-style signal contribution MUST be a distinct, explicit,
   **default-off** opt-in, disclosed separately from FR-012's status signal.
 - **FR-014**: The repository supports Codex and Claude Code executable folders. Other adapters route website-only and paste-only users to those tools before work; pasted instructions cannot satisfy the guard.
@@ -254,13 +254,13 @@ The separate Intelligence Library remains default-off, requiring explicit consen
   point, with zero already-completed steps re-asked.
 - **SC-04**: Messages respect the chosen send-risk level, CRM writes the standing
   scope, and Daily Practice words/artifacts their per-item consent. None bypasses
-  the fresh work guard outside valid grace.
+  the fresh work guard when the shared guard blocks.
 - **SC-05**: A client reaching `validated` can, unassisted, drive one full staged task
   (prospect research or post-call debrief) end to end.
 - **SC-06**: A client whose AI assistant isn't supported is told before, not during, the
   install.
 - **SC-07**: An allowed stage change produces one schema-conformant report identity;
-  failures persist for replay and subsequent work pauses outside valid migration grace.
+  failures persist for replay and subsequent work pauses when the shared guard blocks.
 
 ---
 
@@ -272,8 +272,8 @@ The separate Intelligence Library remains default-off, requiring explicit consen
   restarting, and that trade-off is accepted in exchange for never holding client data
   centrally without an explicit, disclosed channel.
 - **Supported AI surfaces**: Codex and Claude Code with file and Node.js execution.
-  The 007 one-time transition preserves existing progress for 30 days from first
-  updated use; new installs must pair before handoff. Account linkage is not payment.
+  All unpaired harnesses must pair immediately; paired harnesses use the shared
+  silent 48-hour connection allowance. Account linkage is not payment.
 - **CRM templates at launch**: Attio and HubSpot, matching the coach-led kit. A third CRM
   or no CRM routes to the manual-shape path, not a dead end.
 - **Content-template layer (Instagram/LinkedIn) and the Skool support system are

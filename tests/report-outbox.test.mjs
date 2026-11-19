@@ -25,7 +25,7 @@ async function fixture(t) {
         bridge_url: 'https://example.com/api/bridge',
         harness_id: id,
         install_token: 'orion_' + 'test'.repeat(6),
-        pairing: { version: 1, last_check: 'accepted' },
+        pairing: { version: 1, state:'verified', verified_at:null, last_check: 'accepted' },
       },
     }),
   );
@@ -203,7 +203,7 @@ test('concurrent reporters and replay serialize without dropping rows', async (t
   assert.equal(seen.size, 9);
   assert.deepEqual(await outbox(root), []);
 });
-test('disabled unpaired grace freezes labels and time then attaches identity once; never reassigns account', async (t) => {
+test('disabled unpaired reporting freezes labels and time then attaches identity once; never reassigns account', async (t) => {
   const root = await fixture(t);
   const path = join(root, 'status/status.json');
   const s = JSON.parse(await readFile(path, 'utf8'));
@@ -298,7 +298,7 @@ test('process interruption after send retains original report for safe replay', 
   assert.deepEqual(bodies, [retained[0].body]);
 });
 
-test('failure after accepted pre-work check pauses work until verification and delivery recover', async (t) => {
+test('failure after accepted pre-work check permits work within the same allowance', async (t) => {
   const root = await fixture(t);
   const { checkWork } = await import('../status/guard.mjs');
   const online = async (url) =>
@@ -326,7 +326,7 @@ test('failure after accepted pre-work check pauses work until verification and d
     url.endsWith('/verify')
       ? online(url)
       : { status: 503, json: async () => ({}) };
-  assert.equal((await checkWork({ root, fetchImpl: refused })).allow, false);
+  assert.equal((await checkWork({ root, fetchImpl: refused })).allow, true);
   assert.equal((await outbox(root)).length, 1);
   assert.equal((await checkWork({ root, fetchImpl: online })).allow, true);
   assert.deepEqual(await outbox(root), []);

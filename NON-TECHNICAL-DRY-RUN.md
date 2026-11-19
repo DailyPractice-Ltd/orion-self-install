@@ -48,9 +48,11 @@ pairing or failed verification keeps setup unfinished with no work handoff.
 
 Observe the participant requesting and renewing their own code, resuming setup
 without repeated answers, and receiving a fresh successful pre-work check before
-validation. Observe a failed check pause work and successful recovery replay pending
-reports without duplicate counts. Existing folders have one 30-day transition from
-first updated use; a prior declined choice is history until explicit pairing.
+validation. Observe silent temporary verification/reporting failures within the 48-hour
+connection allowance, blocking at exact expiry and immediate credential refusal.
+Observe admitted work finish after expiry and recovery replay pending reports
+without duplicate counts. All unpaired folders require pairing immediately; a
+prior declined choice is history until explicit pairing.
 Record only sanitized outcomes, never credentials, screen codes or client content.
 
 No real-account run of this candidate has been completed. The maintainer deferred

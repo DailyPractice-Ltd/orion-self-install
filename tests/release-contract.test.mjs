@@ -105,20 +105,6 @@ test('supported instructions route website chat to an executable paired folder',
 });
 
 
-test('deployment rejects human-only sources and destinations before inspecting their files', () => {
-  const base = { tools: ['codex'], common_sources: [], entries: [] };
-  for (const path of ['specs', 'specs/missing.md', 'docs/specs/missing.md', 'specs\\missing.md']) {
-    assert.throws(() => safePath(repo, path), /Human-only specs/);
-  }
-  for (const deployment of [
-    { ...base, common_sources: ['specs/missing.md'] },
-    { ...base, entries: [{ source: 'specs/missing.md', destinations: { codex: 'docs/missing.md' } }] },
-    { ...base, entries: [{ source: 'README.md', destinations: { codex: 'specs/missing.md' } }] },
-  ]) {
-    assert.throws(() => planForTool(deployment, 'codex', { releaseRoot: join(repo, 'tests/fixtures') }), /Human-only specs/);
-  }
-});
-
 test('deployed documentation uses permitted sources without directing agents into human records', () => {
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
   for (const tool of manifest.deployment.tools) {

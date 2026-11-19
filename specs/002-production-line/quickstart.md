@@ -8,11 +8,21 @@ complete setup. No-code, failed exchange or failed verification/report leaves sa
 setup unfinished without handoff. Resume without repeating saved answers.
 
 Run `node status/guard.mjs check --quiet` before interactive and native scheduled
-work. Exit 2 pauses all tasks, messages and CRM writes outside valid grace; recovery
+work. Exit 2 pauses all tasks, messages and CRM writes when the shared guard blocks; recovery
 and updating remain available. Post-check report failures persist labels and original
 time in the outbox; accepted recovery replays before new work without duplicate counts.
-Existing folders receive one 30-day clock from first updated use, never reset;
-past decline stays historical until explicit pairing. Exact expiry ends grace.
+All unpaired harnesses must pair before normal work, including the first updated
+run. Existing accepted credentials need no new code. Temporary verification or
+reporting failures permit work silently for 48 elapsed hours after accepted
+verification and acknowledged delivery of all queued reports. Only that complete
+cycle refreshes `last_connected_at`; partial replay, failures, restarts and updates
+never do. At exactly 48 hours, block the next task or scheduled run unless current
+verification and delivery succeed. An admitted task may finish and report afterward.
+Invalid/revoked credentials clear the allowance immediately. Disabled radio and
+unsafe local state require recovery. Historical migration fields are readable but
+inert; never infer the connection time from old verification or migration dates.
+Preserve a declined choice until explicit pairing. Setup still requires current
+accepted verification and acknowledged setup reporting.
 
 For automated maintainer checks run `node --test` and validate both packaged plans
 with `node update/release-contract.mjs --tool codex` and `--tool claude-code`.

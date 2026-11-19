@@ -14,8 +14,8 @@ const status = root => JSON.parse(readFileSync(join(root,'status/status.json')))
 test('new install pauses without a verified connection and does not acquire legacy grace', async t => {
  const root=harness(t); const {checkWork}=await import(moduleUrl);
  const result=await checkWork({root,now:at});
- assert.equal(result.allow,false); assert.equal(result.grace,false);
- assert.equal(status(root).sharing.pairing.migration_started_at,null);
+ assert.equal(result.allow,false); assert.equal(result.allowance,false);
+ assert.equal(status(root).sharing.pairing.last_connected_at,null);
 });
 const identity = '11111111-1111-1111-1111-111111111111';
 const token = 'orion_' + '123456'.repeat(4);
@@ -36,17 +36,14 @@ test('malformed feature marker fails closed even with accepted credentials', asy
  assert.equal(status(root).sharing.pairing,null);
 });
 const marker = extra => ({version:1,state:'unpaired',verified_at:null,last_check:null,migration_started_at:null,migration_deadline_at:null,migration_satisfied_at:null,...extra});
-test('existing 2.0 progress receives one durable 30-day clock and keeps declined choice',async t=>{
- const root=harness(t,{schema_version:'2.0.0',template_version:'2.0.0',checklist:{kb_business_context:true},sharing:{status_signal_enabled:false,radio_choice:'declined'}});
+test('existing progress and declined choice require pairing immediately without migration clocks',async t=>{
+ const root=harness(t,{ops_stage:'formalised',sharing:{status_signal_enabled:false,radio_choice:'declined'}});
  const {checkWork}=await import(moduleUrl);
- assert.equal((await checkWork({root,now:at})).grace,true);
- const first=status(root); assert.equal(first.sharing.pairing.migration_started_at,'2026-11-18T12:00:00.000Z');
- assert.equal(first.sharing.pairing.migration_deadline_at,'2026-12-18T12:00:00.000Z');
- for(const [instant,allow] of [['2026-12-18T11:59:59.999Z',true],['2026-12-18T12:00:00.000Z',false],['2026-12-19T12:00:00.000Z',false]]) {
-   const result=await checkWork({root,now:()=>new Date(instant)});assert.equal(result.allow,allow);
- }
- assert.deepEqual(status(root).sharing.pairing,first.sharing.pairing);
+ assert.equal((await checkWork({root,now:at})).allow,false);
  assert.equal(status(root).sharing.radio_choice,'declined');
+ assert.equal(status(root).sharing.pairing.version,2);
+ assert.equal(status(root).sharing.pairing.last_connected_at,null);
+ assert.equal(status(root).sharing.pairing.migration_started_at,undefined);
 });
 test('progress under the new marker never gains migration grace',async t=>{
  const root=harness(t,{started_at:'2026-11-17T12:00:00.000Z',sharing:{pairing:marker()}});
@@ -58,22 +55,23 @@ for(const timestamps of [
  {migration_started_at:'2026-11-19T12:00:00.000Z',migration_deadline_at:'2026-12-19T12:00:00.000Z'},
  {migration_satisfied_at:'2026-11-19T12:00:00.000Z'},
  {migration_satisfied_at:'2026-11-18'},
-]) test(`invalid migration requires recovery: ${JSON.stringify(timestamps)}`,async t=>{
+]) test(`legacy migration fields remain inert: ${JSON.stringify(timestamps)}`,async t=>{
  const root=harness(t,{sharing:{...paired(),pairing:marker(timestamps)}});const before=status(root);
- const {checkWork}=await import(moduleUrl); assert.equal((await checkWork({root,now:at,fetchImpl:accepted})).allow,false);
- assert.deepEqual(status(root),before);
+ const {checkWork}=await import(moduleUrl); assert.equal((await checkWork({root,now:at,fetchImpl:accepted})).allow,true);
+ for (const [key,value] of Object.entries(timestamps)) assert.equal(status(root).sharing.pairing[key],value);
+ assert.equal(status(root).sharing.pairing.last_connected_at,at().toISOString());
 });
-test('overlong deadline is capped and earlier deadline is respected',async t=>{
+test('historical deadlines of any length never grant unpaired work',async t=>{
  const {checkWork}=await import(moduleUrl);
  for(const [deadline,now,allow] of [['2027-12-18T12:00:00.000Z','2026-12-18T12:00:00.000Z',false],['2026-11-19T12:00:00.000Z','2026-11-19T12:00:00.000Z',false],['2026-11-17T12:00:00.000Z','2026-11-18T12:00:00.000Z',false]]) {
  const root=harness(t,{sharing:{pairing:marker({migration_started_at:'2026-11-18T12:00:00.000Z',migration_deadline_at:deadline})}});
  assert.equal((await checkWork({root,now:()=>new Date(now)})).allow,allow);
  }
 });
-test('legacy paired connection satisfies migration once; revocation and disablement do not restore grace',async t=>{
+test('accepted legacy credential establishes connection; revocation and disablement block',async t=>{
  const root=harness(t,{ops_stage:'formalised',sharing:paired()});const {checkWork}=await import(moduleUrl);
  assert.equal((await checkWork({root,now:at,fetchImpl:accepted})).allow,true);
- const first=status(root);assert.equal(first.sharing.pairing.migration_satisfied_at,at().toISOString());
+ const first=status(root);assert.equal(first.sharing.pairing.last_connected_at,at().toISOString());
  assert.equal((await checkWork({root,now:at,fetchImpl:async()=>({status:401})})).allow,false);
  assert.equal(status(root).sharing.pairing.verified_at,at().toISOString());
  const value=status(root);value.sharing.status_signal_enabled=false;writeFileSync(join(root,'status/status.json'),JSON.stringify(value));
@@ -95,12 +93,12 @@ test('pending reports block accepted new work even when replay is disabled',asyn
  assert.equal((await checkWork({root,now:at,fetchImpl:accepted,replay:false})).allow,false);
  assert.equal(JSON.parse(readFileSync(join(root,'status/radio-outbox.json'))).length,1);
 });
-test('unreachable existing grace retains pending reports',async t=>{
+test('legacy progress without a complete connection cycle cannot authorize outages',async t=>{
  const root=harness(t,{started_at:'2026-11-17T00:00:00.000Z',sharing:paired()});writeFileSync(join(root,'status/radio-outbox.json'),'[]');
  const {checkWork}=await import(moduleUrl);const result=await checkWork({root,now:at,fetchImpl:async()=>{throw Error('offline')}});
- assert.equal(result.allow,true);assert.equal(result.grace,true);
+ assert.equal(result.allow,false);assert.equal(result.allowance,false);
 });
-test('malformed pending report pauses even an existing grace harness',async t=>{
+test('malformed pending report pauses an existing harness',async t=>{
  const root=harness(t,{started_at:'2026-11-17T00:00:00.000Z'});writeFileSync(join(root,'status/radio-outbox.json'),'[{}]');
  const {checkWork}=await import(moduleUrl);assert.equal((await checkWork({root,now:at})).allow,false);
 });
@@ -123,7 +121,7 @@ test('homed, environment and cloud-attached credentials use established preceden
  assert.equal((await checkWork({root,now:at,fetchImpl:async()=>({status:401})})).allow,false);
  }
 });
-test('CLI quiet suppresses accepted success but preserves actionable pauses and grace reminders',async t=>{
+test('CLI quiet suppresses accepted success and preserves actionable pauses',async t=>{
  const root=harness(t,{sharing:paired()});
  for(const name of ['guard.mjs','store.mjs','shapes.mjs']) copyFileSync(new URL(`../status/${name}`,import.meta.url),join(root,'status',name));
  const preload=join(root,'fetch.mjs');writeFileSync(preload,`globalThis.fetch=async()=>({status:200,json:async()=>({status:'accepted',harness_id:'${identity}'})});`);
@@ -132,7 +130,7 @@ test('CLI quiet suppresses accepted success but preserves actionable pauses and 
  let value=status(root);value.sharing.status_signal_enabled=false;writeFileSync(join(root,'status/status.json'),JSON.stringify(value));
  result=await run(command);assert.equal(result.code,2);assert.match(result.output,/Run node start.mjs/);
  value={ops_stage:'formalised',sharing:{status_signal_enabled:false}};writeFileSync(join(root,'status/status.json'),JSON.stringify(value));
- result=await run(command);assert.equal(result.code,0);assert.match(result.output,/Pair Orion by/);
+ result=await run(command);assert.equal(result.code,2);assert.match(result.output,/Run node start.mjs/);
 });
 test('independent processes serialize fresh status edits and outbox appends without lost updates',async t=>{
  const root=harness(t,{count:0});const storeUrl=new URL('../status/store.mjs',import.meta.url).href;
@@ -150,7 +148,7 @@ test('corrupt status or outbox is preserved and cannot authorize work',async t=>
  assert.equal((await checkWork({root:other,now:at})).allow,false);
  assert.equal(readFileSync(join(other,'status/radio-outbox.json'),'utf8'),'{partial');
 });
-test('interrupted process leaves durable state and pauses for lock recovery without resetting grace',async t=>{
+test('interrupted process leaves durable state and pauses for lock recovery without creating an allowance',async t=>{
  const root=harness(t);const storeUrl=new URL('../status/store.mjs',import.meta.url).href;
  const script=`import {withStatusLock} from ${JSON.stringify(storeUrl)};await withStatusLock(process.argv[1],async store=>{const s=await store.readStatus();s.sharing.pairing=${JSON.stringify(marker({migration_started_at:'2026-11-18T12:00:00.000Z',migration_deadline_at:'2026-12-18T12:00:00.000Z'}))};await store.writeStatus(s);console.log('saved');await new Promise(()=>{});});`;
  const child=spawn(process.execPath,['--input-type=module','-e',script,root],{env:plainEnv()});
@@ -159,7 +157,7 @@ test('interrupted process leaves durable state and pauses for lock recovery with
  const before=status(root);const {checkWork}=await import(moduleUrl);const result=await checkWork({root,now:at});
  assert.equal(result.allow,false);assert.match(result.reason,/lock/);assert.deepEqual(status(root),before);
 });
-test('impossible calendar date does not create a migration window',async t=>{
+test('impossible legacy calendar date cannot authorize unpaired work',async t=>{
  const root=harness(t,{sharing:{pairing:marker({migration_started_at:'2026-02-30T12:00:00.000Z',migration_deadline_at:'2026-12-18T12:00:00.000Z'})}});
  const {checkWork}=await import(moduleUrl);assert.equal((await checkWork({root,now:()=>new Date('2026-03-03T12:00:00.000Z')})).allow,false);
 });

@@ -4,15 +4,15 @@
 
 **Blocked by:** 03 — Central guard and 48-hour connection allowance.
 
-**Status:** reopened — durable reporting exists; revised authorization and clock behavior pending.
+**Status:** revised client implementation complete; fresh local evidence is recorded in verification.md. Database and real-account verification remain deferred.
 
-- [ ] Preserve write-ahead atomic persistence, payload allowlists, original timestamps and identities, strict acknowledgments, concurrency safety and idempotent replay.
-- [ ] Temporary failed or partial report delivery must not immediately block subsequent work while the connection allowance is valid. It must never start or extend an allowance. Keep transport outcomes machine-readable without showing allowed-outage warnings to the user.
-- [ ] Only the guard's accepted verification plus complete delivery refreshes `last_connected_at`; verification with a nonempty outbox does not. A successful report send alone does not refresh it.
-- [ ] Invalid/revoked credentials block immediately and invalidate the allowance. Malformed/unwritable queues and cross-harness identity mismatches remain recovery failures, not outages.
-- [ ] Keep reports across restarts and expiry; an admitted task may finish and queue its report after the deadline. Reporting already finished work remains available while blocked.
-- [ ] Preserve historical identity-less reports for verified-identity attachment without authorizing new unpaired work.
-- [ ] Test reporting outages before/at/after expiry, repeated accepted verification with failed replay, partial replay, full recovery, lost ACKs, concurrent writers and no duplicate counts. Retain privacy and persistence-failure coverage.
+- [x] Preserve write-ahead atomic persistence, payload allowlists, original timestamps and identities, strict acknowledgments, concurrency safety and idempotent replay.
+- [x] Temporary failed or partial report delivery must not immediately block subsequent work while the connection allowance is valid. It must never start or extend an allowance. Keep transport outcomes machine-readable without showing allowed-outage warnings to the user.
+- [x] Only the guard's accepted verification plus complete delivery refreshes `last_connected_at`; verification with a nonempty outbox does not. A successful report send alone does not refresh it.
+- [x] Invalid/revoked credentials block immediately and invalidate the allowance. Malformed/unwritable queues and cross-harness identity mismatches remain recovery failures, not outages.
+- [x] Keep reports across restarts and expiry; an admitted task may finish and queue its report after the deadline. Reporting already finished work remains available while blocked.
+- [x] Preserve historical identity-less reports for verified-identity attachment without authorizing new unpaired work.
+- [x] Test reporting outages before/at/after expiry, repeated accepted verification with failed replay, partial replay, full recovery, lost ACKs, concurrent writers and no duplicate counts. Retain privacy and persistence-failure coverage.
 
 ## Historical candidate evidence — superseded policy
 

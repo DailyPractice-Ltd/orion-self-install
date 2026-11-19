@@ -44,10 +44,9 @@ Restart and replay keep the same identity, so duplicate acknowledgments do not a
 counts. The assistant claims delivery only after acknowledgment and an empty queue.
 
 An existing previously declined folder is a separate cohort: first updated use
-records its one-time start and 30-day deadline before work. Existing work continues
-with a reminder during valid grace; the deadline never resets. Exact expiry pauses
-work until verification and replay succeed. Explicit pairing updates the historical
-choice; accepted legacy credentials can satisfy migration without a new code.
+requires pairing before work. Paired folders continue silently through temporary
+failures for 48 elapsed hours after verified connection and complete report delivery.
+At expiry the next task blocks; admitted tasks finish and report.
 
 ## Evidence boundary
 

@@ -5,7 +5,6 @@
 No database. Every entity below lives as a plain file inside the client's own copy of this
 repository. Failed operational reports persist in a labels-only local outbox; all
 pairing/report/replay mutations share a cross-process atomic store lock (007).
-Schema remains 2.0.0; template candidate 3.0.0 uses pairing feature marker 1.
 
 ---
 

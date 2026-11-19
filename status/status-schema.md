@@ -42,7 +42,7 @@ when a session ends — the client might close their laptop mid-sentence. If a c
 step isn't written back yet when that happens, it's lost, and the client will be asked
 the same question twice next time. That's the exact failure this file exists to prevent.
 
-## Required pairing (template 3.0.0; schema remains 2.0.0)
+## Required pairing
 
 `sharing.pairing` is the version-1 feature marker and resumable state. The shipped
 example has unpaired state and null verification/migration timestamps. Missing

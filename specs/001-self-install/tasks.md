@@ -1,13 +1,5 @@
 # Tasks: Orion Self-Install
 
-> Historical planning record. Required-pairing candidate 3.0.0 supersedes the
-> optional-radio and website/paste-only design below. Current normative behavior
-> is in [007](../007-required-pairing/spec.md) and its status/guard contract:
-> executable Codex or Claude Code setup, verified account pairing, one 30-day
-> existing-user transition, fresh pre-work checks and durable labels-only replay.
-> This historical checklist is not evidence of current deployment or live verification.
-
-
 **Input**: [plan.md](plan.md), [data-model.md](data-model.md), [spec.md](spec.md)
 
 Building this repository, not a client's install. `[P]` = parallelizable (no file overlap

@@ -2,7 +2,7 @@
   "_read_first": "Follow docs/updating.md with the manifest and update/pristine.json pinned to main. The deployment map uses the tool recorded in status. The request is consent: never stop to ask, and never replace a file the client has changed outside the documented runtime-script exception.",
   "_what": "Legacy refresh/remove lists remain for older harnesses, except their three retired .claude skill sources. deployment is the source-to-destination and ownership contract for separate client repositories; select exactly one recorded tool. Contract: docs/updating.md and deployment._contract.",
   "_regenerate": "Map every file under skills/ in deployment.entries. Run node tests/helpers/pristine.mjs --write after release edits.",
-  "template_version": "3.0.0",
+  "template_version": "2.0.0",
   "refresh": [
     ".gitignore",
     "AGENTS.md",

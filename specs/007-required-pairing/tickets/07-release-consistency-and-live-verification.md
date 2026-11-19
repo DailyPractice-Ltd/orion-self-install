@@ -1,10 +1,26 @@
 # 07: Align documentation and verify the complete journey
 
-**What to build:** The release presents one consistent supported installation and recovery journey, backed by automated checks and a live account-and-bridge demonstration of pairing, pause, reporting, and recovery.
+**What to build:** One consistent release journey for immediate pairing and a silent 48-hour connection allowance, backed by new automated and live evidence.
 
 **Blocked by:** 04 — Require verified pairing to finish setup; 06 — Gate interactive and scheduled work.
 
-**Status:** implemented-reviewed-awaiting-live — incomplete
+**Status:** reopened — revised policy not implemented or verified; prior database/live checks also remain outstanding.
+
+- [ ] Align the ratified constitution, linked specs/contracts, runtime schema/template, installer brief, README, radio/setup/update guides, adapters, schedule prompts, validation and changelog.
+- [ ] Remove 30-day migration promises, progress detection, reminders and immediate outage-blocking wording. Preserve historical choices and readable legacy state without honoring saved migration deadlines.
+- [ ] Keep the approved short pairing explanation and unchanged operational-data disclosure. Show no allowed-outage notices or countdowns.
+- [ ] Verify immediate pairing for all unpaired cohorts, credential reuse, setup handoff requirements and compatible historical-state upgrades.
+- [ ] Verify the 48-hour boundary, persistent verification-and-delivery timestamp, no resets on failures/restarts/updates, immediate revocation blocking, silent allowed failures, and underway-task completion.
+- [ ] Verify durable labels-only replay and no duplicate counts; passing verification with partial delivery must never renew the allowance.
+- [ ] Run appropriate automated checks, documentation consistency, both package plans and required fingerprint generation after implementation. Record new results separately from historical evidence.
+- [ ] Complete the outstanding database runner and real signed-in account/bridge journey, including connection/reporting outages within the allowance and blocking at expiry. Leave incomplete if unavailable.
+- [ ] Record sanitized observations without secrets or business content. No deployment, tag or publication is implicitly authorized by this ticket.
+
+See [verification evidence and pending checklist](../verification.md).
+
+## Historical candidate evidence — superseded policy
+
+The following evidence predates the 2026-11-19 revision. It does not demonstrate the revised behavior.
 
 Automated client suite after final review fixes: 297 passed, 0 failed/skipped. Both deployment plans passed.
 See [verification evidence and pending live checklist](../verification.md).

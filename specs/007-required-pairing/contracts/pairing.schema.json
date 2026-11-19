@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Required pairing feature marker and state",
+  "title": "Required pairing and 48-hour connection state (target contract)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -8,13 +8,11 @@
     "state",
     "last_check",
     "verified_at",
-    "migration_started_at",
-    "migration_deadline_at",
-    "migration_satisfied_at"
+    "last_connected_at"
   ],
   "properties": {
     "version": {
-      "const": 1
+      "const": 2
     },
     "state": {
       "enum": [
@@ -44,21 +42,30 @@
         "string",
         "null"
       ],
-      "format": "date-time"
+      "description": "Legacy candidate field; optional, retained for compatibility only, never authorizes work."
     },
     "migration_deadline_at": {
       "type": [
         "string",
         "null"
       ],
-      "format": "date-time"
+      "description": "Legacy candidate field; optional, retained for compatibility only, never authorizes work."
     },
     "migration_satisfied_at": {
       "type": [
         "string",
         "null"
       ],
-      "format": "date-time"
+      "description": "Legacy candidate field; optional, retained for compatibility only, never authorizes work."
+    },
+    "last_connected_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "UTC instant when verification was accepted and all queued reports were acknowledged; null means no offline allowance. Invalid/revoked credentials clear this timestamp."
     }
-  }
+  },
+  "description": "Policy approved 2026-11-19; runtime migration pending. Version 2 removes migration authorization. Version 1 data must be upgraded compatibly; legacy migration fields are optional inert data."
 }

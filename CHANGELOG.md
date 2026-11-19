@@ -16,33 +16,6 @@ Write each section for the client who will read it there.
 
 ---
 
-## 3.0.0 — 2026-11-18
-
-**Source candidate — unpublished; real-account verification is deferred.** This
-installation-sequence change requires pairing with a signed-in Daily Practice
-account and a fresh connection check before interactive or scheduled Orion work.
-Pairing is account linkage, not a payment check.
-
-- Press Start saves progress but completes setup only after accepted verification
-  and delivery of its stable setup report. Get or renew a single-use 15-minute
-  code at `/home/pair`; never copy an install token.
-- Existing folders receive one 30-day transition from first updated use. The saved
-  clock does not reset. Prior declined choices remain historical until explicit
-  pairing; already paired enabled folders can satisfy migration by verification.
-- Failed checks pause work outside valid grace. Updating, inspection and recovery
-  remain available. Failed operational reports persist labels and original event
-  time in a local outbox; recovery replays them before new work without duplicate
-  counts. Client messages and local work-log text stay outside that queue.
-- Codex and Claude Code are the supported executable paths. Website-only and
-  paste-only instructions now route to those tools. Native schedules must carry
-  the guard first; existing app-owned prompts need migration in place.
-- Runtime modules and setup guidance ship together. Schema remains 2.0.0 and the
-  maintainer-only constitution is 2.0.0. Operational-data disclosure is unchanged.
-
-Automated evidence and the remaining database/live checklist are in
-`specs/007-required-pairing/verification.md`. No deployment, tag or publication is
-part of this candidate. Ticket 07 stays incomplete until the live journey passes.
-
 ## 2.0.0 — 2026-11-12
 
 **Your Orion folder is now separate from the release, with a layout chosen for Claude Code or Codex.**

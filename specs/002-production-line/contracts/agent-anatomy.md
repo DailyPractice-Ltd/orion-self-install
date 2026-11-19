@@ -1,6 +1,6 @@
 # Contract — agent anatomy (the shape of a hired agent)
 
-**Current compatibility scope (3.0.0 candidate)**: this release ships no hired-agent
+**Current compatibility scope: this release ships no hired-agent
 runtime or hiring workflow. Existing client-owned job sheets and schedules are
 preserved as history. Migrate native prompts in place using
 [scheduled work](../../../docs/scheduled-work.md); every interactive, scheduled or

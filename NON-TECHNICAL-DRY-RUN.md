@@ -41,7 +41,7 @@ catch more than another read-through will.
 
 ## Required pairing candidate
 
-The 3.0.0 candidate supports Codex and Claude Code installed folders. A website-only
+The candidate supports Codex and Claude Code installed folders. A website-only
 or paste-only participant must be routed to one of those tools. Node.js execution,
 a signed-in Daily Practice account and an available bridge are required; missing
 pairing or failed verification keeps setup unfinished with no work handoff.

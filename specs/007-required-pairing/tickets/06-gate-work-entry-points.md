@@ -1,20 +1,22 @@
 # 06: Gate interactive and scheduled work
 
-**What to build:** Every supported interactive session, scheduled shift, and direct work entry point applies the same verified connection and pending-report policy before Orion does work. Recovery remains possible while paused.
+**What to build:** Supported entry points use the same immediate-pairing and silent 48-hour connection policy, with task-boundary expiry.
 
 **Blocked by:** 05 — Preserve and replay failed work reports.
 
-**Status:** complete
+**Status:** reopened — existing gate wiring needs revised behavior and instructions verified.
 
-- [x] Inventory supported work entry points and apply the shared guard before Orion tasks, outbound actions, CRM writes, work-advancing stage transitions, and scheduled shifts.
-- [x] Wire agent instructions, hired-agent scheduling, and generated native schedule prompts to check before work. Update existing supported schedule definitions through the documented migration path where applicable.
-- [x] Direct script invocations cannot authorize work solely from local credential shape or a previous successful check. Avoid recursive guard/report calls and unnecessary duplicate checks within one invocation.
-- [x] Successful checks deliver pending reports before new work; failed checks stop work with one plain-language recovery action, subject to the agreed existing-user grace policy.
-- [x] Keep diagnosis, status inspection, updating, code renewal, and re-pairing usable while paused. Read-only verification does not consume support messages.
-- [x] Test interactive and scheduled paths with accepted, revoked, unreachable, and server-error outcomes, including pending-report recovery. Assert failed checks prevent actual work and state-changing side effects rather than only checking an error string.
-- [x] Document the boundary for arbitrary user-edited prompts and scripts without claiming enforcement outside supported flows.
-- [x] Update entry-point and scheduling instructions with this slice so shipped examples call the same guard.
+- [ ] Apply the shared guard before each supported interactive task and scheduled shift, including scripts, outbound actions, CRM writes and advancing installation stages as applicable. Avoid redundant checks within one admitted task.
+- [ ] Permit temporary verification/reporting failures only within the shared allowance. Emit no outage notice/countdown or repeated scheduled alerts while work is allowed.
+- [ ] Block unpaired users immediately; block invalid/revoked credentials immediately; block expired allowance at the next task/shift boundary with one recovery action.
+- [ ] Let work admitted before expiry finish and report. Nested entry points in that task must not introduce a contradictory mid-task deadline stop; authorization remains bounded to that invocation, never a reusable saved bypass.
+- [ ] Keep diagnosis, inspection, updating, renewal, pairing and finished-work reporting available while blocked.
+- [ ] Update agent instructions and generated/native schedule prompts; test allowed/blocked cases against actual effects, including underway-task completion and silence during outages.
+- [ ] Preserve the documented limitation for arbitrary user-edited local prompts and scripts.
 
+## Historical candidate evidence — superseded policy
+
+The following evidence predates the 2026-11-19 revision. It does not demonstrate the revised behavior.
 
 Implementation: `send.mjs score`, advancing `emit-status` flags, both CRM template
 CLIs, source/deployed call-planner, radio send/reply/contribute and Library `--yes`

@@ -141,3 +141,34 @@ test('legacy unsupported surface without a recorded tool requests only executabl
  assert.match(run.stdout,/Choose Codex or Claude Code/);
  assert.doesNotMatch(run.stdout,/attach the file|Create a Project|your AI.s website|paste status.status.json/);
 });
+
+test('a waiting wizard preserves another wizard pairing, checkpoint and concurrent answers', async t => {
+ const {spawn}=await import('node:child_process');
+ const h=harness(t,{ai_assistant:null});
+ const home=join(h.root,'home'); mkdirSync(join(home,'.codex'),{recursive:true}); mkdirSync(join(home,'.claude'));
+ const a=spawn(process.execPath,['--import',pathToFileURL(join(h.root,'fetch.mjs')).href,join(h.root,'start.mjs')],{env:plainEnv({HOME:home,PATH:''}),stdio:['pipe','pipe','pipe']});
+ t.after(()=>a.kill()); let output='';
+ await new Promise((resolve,reject)=>{a.stdout.on('data',chunk=>{output+=chunk;if(output.includes('Type a number and press Enter'))resolve();});a.once('error',reject);a.once('exit',code=>reject(Error(`early exit ${code}: ${output}`)));});
+ const b=h.run(['--code','BCDF-GHJK-LMNP'],'',{HOME:home,PATH:''}); assert.equal(b.status,0,b.stdout+b.stderr);
+ const paired=h.status(); paired.business_name='Concurrent saved business'; paired.checklist.business_name_set=true;
+ writeFileSync(join(h.root,'status/status.json'),JSON.stringify(paired));
+ const ended=new Promise(resolve=>a.once('exit',resolve)); a.stdin.end('surface=2\n');
+ assert.equal(await ended,0,output);
+ const after=h.status(); assert.ok(after.sharing.install_token===paired.sharing.install_token);
+ assert.equal(after.sharing.harness_id,paired.sharing.harness_id); assert.equal(after.sharing.paired_at,paired.sharing.paired_at);
+ assert.equal(after.sharing.pairing.migration_satisfied_at,paired.sharing.pairing.migration_satisfied_at); assert.deepEqual(after.setup_checkpoint,paired.setup_checkpoint);
+ assert.equal(after.business_name,'Concurrent saved business'); assert.equal(after.checklist.business_name_set,true);
+ assert.equal(readFileSync(join(h.root,'requests'),'utf8').trim().split('\n').map(JSON.parse).filter(c=>c.url.endsWith('/pair')).length,1);
+ assert.doesNotMatch(output,/orion_|aaaa/);
+});
+
+test('no detected app routes setup to Codex or Claude Code installation',t=>{
+ const h=harness(t); const home=join(h.root,'empty-home');mkdirSync(home);
+ const detection=join(h.root,'no-apps.mjs');
+ writeFileSync(detection,`import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';const stat=fs.statSync;fs.statSync=(path,...args)=>{if(String(path).startsWith('/Applications/'))throw Object.assign(Error('not installed'),{code:'ENOENT'});return stat(path,...args);};syncBuiltinESMExports();`);
+ const run=h.run([],'',{HOME:home,PATH:'',NODE_OPTIONS:`--import=${pathToFileURL(detection).href}`});
+ assert.equal(run.status,2,run.stdout+run.stderr); assert.deepEqual(h.status().machine_profile.surfaces_found,[]);
+ assert.match(run.stdout,/Install Codex or Claude Code, then open this folder there/);
+ assert.match(run.stdout,/docs\/setup\.md/);
+ assert.doesNotMatch(run.stdout,/websites .*work for everyone|README.s Step 4 shows that lane/);
+});

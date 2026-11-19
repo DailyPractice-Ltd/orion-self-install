@@ -1,7 +1,7 @@
 /** Durable, labels-only operational reporting. All mutation shares the guard lock. */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { withStatusLock } from './store.mjs';
+import { withStatusLock, pairingMigration } from './store.mjs';
 import {
   radioOn,
   radioKey,
@@ -166,15 +166,7 @@ async function connection(root, status) {
   };
 }
 async function failure(store, status, outcome) {
-  status.sharing ??= {};
-  status.sharing.pairing ??= {
-    version: 1,
-    state: 'unpaired',
-    verified_at: null,
-    migration_started_at: null,
-    migration_deadline_at: null,
-    migration_satisfied_at: null,
-  };
+  pairingMigration(status, Date.now());
   status.sharing.pairing.last_check = outcome;
   await store.writeStatus(status);
 }

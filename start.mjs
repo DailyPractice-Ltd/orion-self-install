@@ -242,15 +242,26 @@ function migrate(status, { firstRun = false } = {}) {
 }
 
 /** Write after every completed unit, never batched to the end (Article II). */
-async function save(status) {
-  const now = new Date().toISOString();
-  if (!status.started_at) status.started_at = now;
-  status.updated_at = now;
+async function save(status, { chosenSurface = false } = {}) {
   await withStatusLock(__dirname, async store => {
-    const current = await store.readStatus();
-    // Guard owns pairing state; never overwrite a newer verification result.
-    status.sharing.pairing = current.sharing.pairing;
-    await store.writeStatus(status);
+    const current = migrate(await store.readStatus(), {
+      firstRun: status.scopes.send_risk_set_by === 'install',
+    });
+    if (chosenSurface) {
+      current.machine_profile.chosen_surface = status.machine_profile.chosen_surface;
+    } else {
+      current.machine_profile = {
+        ...current.machine_profile,
+        ...status.machine_profile,
+        chosen_surface: current.machine_profile?.chosen_surface ?? null,
+      };
+    }
+    const now = new Date().toISOString();
+    current.started_at ??= now;
+    current.updated_at = now;
+    await store.writeStatus(current);
+    // Later setup decisions must use the latest credential and saved answers.
+    Object.assign(status, current);
   });
 }
 
@@ -428,9 +439,9 @@ async function main() {
     say('  • AI tools that live on this computer:');
     for (const s of surfaces) say(`      – ${SURFACE_WORDS[s]}`);
   } else {
-    say("  • I didn't find an AI app installed here — no problem at all. The chat");
-    say('    websites (claude.ai, chatgpt.com, Copilot) work for everyone, and the');
-    say('    README\'s Step 4 shows that lane.');
+    say("  • I didn't find an AI app installed here.");
+    say('    Install Codex or Claude Code, then open this folder there.');
+    say('    See docs/setup.md for the supported installation route.');
   }
 
   status.machine_profile = {
@@ -454,7 +465,7 @@ async function main() {
   const { ai_assistant } = status;
   if (mp.chosen_surface !== ai_assistant && ['claude-code', 'codex'].includes(ai_assistant)) {
     mp.chosen_surface = ai_assistant;
-    await save(status);
+    await save(status, { chosenSurface: true });
   }
   if (!['claude-code', 'codex'].includes(mp.chosen_surface)) {
     const supported = surfaces.filter(surface => ['claude-code', 'codex'].includes(surface));
@@ -475,7 +486,7 @@ async function main() {
       mp.chosen_surface = choices[idx];
       say(`  ✓ Noted: ${SURFACE_WORDS[mp.chosen_surface]}.`);
     }
-    await save(status);
+    await save(status, { chosenSurface: true });
   } else {
     say(`  ✓ Your chosen lane (from last time): ${SURFACE_WORDS[mp.chosen_surface] || mp.chosen_surface}.`);
   }

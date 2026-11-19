@@ -37,7 +37,7 @@ while awaiting approval. Do not treat route mocks as database integration proof.
 ## Client candidate: automated checks
 
 Baseline before the feature: `node --test` passed 174 tests, zero skips.
-Final ticket 07 client source under test:
+Pre-review ticket 07 client source under test:
 `a0de7c92d05fca5ff067b39e2f8d88a51724d3f7`, branch
 `feature/required-pairing-ticket07` based on integration `8c79fab`.
 These changes are intended for `feature/required-pairing`; this is not a release tag.
@@ -75,6 +75,38 @@ constitution is 2.0.0. Guard/store/report plus setup guidance ship in both legac
 refresh and common deployment sources. Pairing state, setup checkpoint, machine-local
 key, outbox and runtime lock remain client-owned. Native scheduler prompts held in
 apps require in-place migration; local updates cannot rewrite those prompts.
+
+## Final review fixes: 2026-11-19
+
+Client source commit `398beb5` on `fix/required-pairing-review`, based on
+integration `98d6832`, resolves the final two-axis review's three P2 findings:
+
+- Wizard saves now apply machine detection or a selected surface to fresh locked
+  state, retaining concurrent credentials, identity, pairing, setup checkpoint and
+  saved answers. A deterministic two-process wizard regression waits at the public
+  surface prompt while the other wizard pairs and completes setup; the waiting
+  wizard then resumes successfully without a second exchange or checkpoint.
+- Reporting failures use the same migration policy as the work guard before
+  introducing the pairing marker. Public `done.mjs`, `radio.mjs signal` and report
+  entry regressions fix the clock at `2026-11-18T12:00:00.000Z`, assert the durable
+  `2026-12-18T12:00:00.000Z` deadline, permit grace before it, refuse at the exact
+  boundary and recover without resetting either timestamp. Reports remain queued
+  and local completion text stays in the local work log.
+- The public no-detected-app wizard branch directs installation to Codex or Claude
+  Code and `docs/setup.md`; it no longer promises website-only installation.
+
+Each finding was reproduced red before its fix and then passed green. Focused
+validation covered the wizard, migration, guard and reporting entrypoints; no
+second broad review was run. After the final source commit, candidate fingerprints
+were regenerated and the full client suite passed: **297 passed, 0 failed, 0
+skipped, 0 cancelled** (19.793 seconds), using existing Node v26.9.0 without any
+installation or network access. Both Codex and Claude Code package plans passed,
+as did `node --check start.mjs` and `git diff --check`. Evidence-only commits do
+not ship to client folders; regeneration after them must remain unchanged.
+
+These are local client regressions. Mono was unchanged; ticket 01's database
+runner and ticket 07's real account/bridge journey remain unexecuted and open.
+No deployment, release publication or live feature claim follows from this pass.
 
 ## Pending database and live checklist
 

@@ -95,44 +95,34 @@ source checkout after the operation.
 
 ## Switch AI assistants
 
-Use the pinned source with `switch` as the operation:
+Switching is local and needs no release clone: from the Orion folder root, run
 
 ```sh
-(
-  set -eu
-  cd /path/to/my-orion
-  release_tmp=$(mktemp -d)
-  trap 'rm -rf "$release_tmp"' EXIT
-  git clone --quiet --depth 1 --branch main https://github.com/DailyPractice-Ltd/orion-self-install.git "$release_tmp/release"
-  release_commit=$(git -C "$release_tmp/release" rev-parse HEAD)
-  node "$release_tmp/release/update/apply.mjs" switch --root "$PWD" --release-repo "$release_tmp/release" --commit "$release_commit" --to codex
-)
+node switch_ai.mjs
 ```
 
-Use `--to claude-code` to move the other way. For an older Claude harness with no recorded
-AI assistant, add `--legacy-tool claude-code` to migrate it explicitly. The switch
-requires the harness version, manifest, and common runtime scripts to match the pinned
-release. Run the pinned update command above first if it reports an older version.
-The switch reuses the same package, version and catalog identity. It writes the target
-tool's catalog and sets Orion up with that tool first. Only when the target tool's own
+It switches to the other assistant; add `--to claude-code` or `--to codex` to name one.
+It reuses the same package, version and catalog identity. It writes the target tool's
+catalog and sets Orion up with that tool first. Only when the target tool's own
 inspection shows the same discovery evidence as plugin setup (see
 [Finish the Orion plugin](setup.md#finish-the-orion-plugin): every shipped skill at this
 version, enabled for this folder only) does it move client skills to the new skill
 folder and record the new selection. After that commit it removes Orion from the
 previous tool, and then that tool's catalog, so a failure before the commit leaves the
 previous tool exactly as it was. For Codex, removing Orion means `codex plugin remove`
-and deleting Orion's two tables from `.codex/config.toml`. Other plugins, caches and settings of either tool are left alone.
+and deleting Orion's two tables from `.codex/config.toml`. Other plugins, caches and
+settings of either tool are left alone.
 If the target still needs a step (Codex's native install, a missing app), the switch is
-pending: `ai_assistant` keeps the current tool, `plugin.pending_switch` records the target,
-its backup and the remaining step. Do that step, then run the same switch command again
-to finish. To cancel it, restore its backup. If the target's setup fails, the switch is
-rolled back (exit 3) and the current tool keeps its Orion setup. Review your scheduled tasks in the app that owns them before switching. The switch reports
-its backup. If interrupted, run the pinned release script with `recover --root "$PWD"`
-before trying again. The temporary checkout is removed automatically.
+pending: `ai_assistant` keeps the current tool and `plugin.pending_switch` records the
+target and the remaining step. Do that step, then run `node switch_ai.mjs` again to
+finish. To cancel it, run `node switch_ai.mjs --to <the current tool>`. If the target's
+setup fails, nothing is switched (exit 3) and the current tool keeps its Orion setup.
+Review your scheduled tasks in the app that owns them before switching. The switch
+reports its backup of the old skills and status. To switch back, run it again.
 
 ## Restore
 
-Use the backup path printed by update or switch:
+Use the backup path printed by update:
 
 ```sh
 node update/apply.mjs restore --root . --backup .update-backup/VERSION-TIMESTAMP
@@ -146,10 +136,7 @@ own registration entries, leaving other settings as they are now. If the package
 changed after the update, restore stops before changing anything and says how to keep
 those edits. After a restore, the report says `reload_required`: start a fresh session,
 and confirm discovery with `node update/plugin-setup.mjs verify --discovered` before
-telling the client the previous version is running again. A completed switch can also
-be restored from its reported backup; any new-layout edits that conflict must be handled
-first. Then run `node update/plugin-setup.mjs resume` to register Orion with the restored
-tool again. Keep the backup for audit.
+telling the client the previous version is running again. Keep the backup for audit.
 
 ## Older same-path folders
 

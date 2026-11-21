@@ -1,5 +1,12 @@
 # Orion self-install — Changelog
 
+## Unreleased — Fixed Orion identity
+
+- Fresh installs record `agent_name: "Orion"` automatically. The installer and
+  agent definition use Orion directly and ask only for business context, tone
+  and working preferences. The status CLI no longer accepts name changes.
+- Existing clients reinstall from scratch. No agent-name migration is added.
+
 ## Unreleased — revised required pairing
 
 Removed the learned-memory folder, synchronization, consolidation skill and agent
@@ -22,14 +29,22 @@ progress under `plugin` in `status/status.json`. Plugin setup is separate from p
 It reports complete only after a fresh session confirms the skills
 (`node update/plugin-setup.mjs verify --discovered`). Unfinished setup resumes with
 `node update/plugin-setup.mjs resume`. Claude Code invokes the skills as `/orion:<skill>`.
-Codex installs Orion from its Plugins Directory or `/plugins`. Client-created and
-library skills stay in `.claude/skills/` or `.agents/skills/`. "Update my harness"
+Codex installs Orion from its Plugins Directory or `/plugins`. Client-created skills
+stay in `.claude/skills/` or `.agents/skills/`. "Update my harness"
 replaces the package as a unit, backs it up first, and keeps the previous release
 active until a fresh session confirms the new one. Restore and tool switch reuse the
 same package and catalog identity. Release preparation validates the packaging and a
 fresh deployment for both tools. `docs/plugin-validation.md` (release repository only)
 is the manual checklist for native installation. Native compatibility is unverified
 until it has been run. Existing installed harnesses are not converted.
+
+Switching AI assistants is now local: run `node switch_ai.mjs` in the deployed
+folder. It moves every client skill between `.agents/skills/` and `.claude/skills/`,
+records the new assistant and backs up first, with no release clone, commit or
+version check. Run it again to switch back. `update/apply.mjs switch` is retired.
+With the `orion` plugin, the switch sets Orion up in the other assistant first and
+changes the folder over only on its discovery evidence; until then it waits, and
+running it again finishes it.
 
 
 Semantic versioning: a real self-serve install's corrections/learnings → minor; a change

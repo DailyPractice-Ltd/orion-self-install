@@ -6,7 +6,6 @@ import { join } from 'node:path';
 import {
   reportSignal,
   replayOutbox,
-  reportAsset,
   validateOutbox,
 } from '../status/report.mjs';
 const id = '11111111-1111-1111-1111-111111111111';
@@ -113,16 +112,12 @@ test('partial delivery removes only strict endpoint ACKs and keeps remaining ori
     throw Error('offline');
   };
   await reportSignal({ ...task(root), fetchImpl: offline });
-  await reportAsset({
-    root,
-    asset: {
-      slug: 'call-planner',
-      kind: 'skill',
-      version: '1.0.0',
-      installed_at: time,
-    },
-    fetchImpl: offline,
-  });
+  // Simulate a pending installed-package report saved by an older release.
+  await writeFile(join(root, 'status/radio-outbox.json'), JSON.stringify([
+    ...await outbox(root),
+    { kind: 'asset', body: { harness_id: id, slug: 'call-planner', kind: 'skill',
+      version: '1.0.0', installed_at: time } },
+  ]));
   let calls = 0;
   const malformed = async () => {
     calls++;

@@ -12,7 +12,7 @@ connection allowance and paused-work recovery.
 
 ## What goes out, exactly
 
-Three tiers, by how your yes is given — and nothing besides:
+Two tiers, by how your yes is given — and nothing besides:
 
 **Tier 1 — required operational labels** (unchanged by the pairing requirement):
 
@@ -25,13 +25,11 @@ Three tiers, by how your yes is given — and nothing besides:
    covers a task you set your AI in a session, Orion's scheduled work (work it does
    on a schedule), and the named moments in the table below. Never what was in
    the work, never who it was for.
-3. **"This machine now runs X"** — a Library install shares the package's name, kind,
-   and version so Daily Practice knows whom to support when a package improves.
-4. **Which template version this folder is on** — included with operational signals
+3. **Which template version this folder is on** — included with operational signals
    and reporting/support-message call headers, so
    Daily Practice can tell whether an update reached you. A label about this folder,
    never about your work.
-5. **Messages arriving from Daily Practice** — the inbound half (see "What comes
+4. **Messages arriving from Daily Practice** — the inbound half (see "What comes
    in"). Reading a message out sends nothing back.
 
 **Tier 2 — your words, your yes each time**: your replies, and messages you choose to
@@ -41,12 +39,9 @@ Orion did something it doesn't yet, it asks once whether to pass that wish to Da
 Practice as a request. Your words go only if you say yes. Daily Practice looks at
 requests every Friday and tells you what it decided.
 
-**Tier 3 — your artifacts, shown to you first**: a skill you choose to offer the
-Library after reviewing exactly what it will send.
-
 **Never, under any setting**: the content of your messages or drafts, your knowledge
 base, your prospects or customers, anything from your CRM or email. The label tier
-never carries content or names; your words and files cross only with your per-item
+never carries content or names; your words cross only with your per-item
 yes, shown to you first.
 
 ## The tag menu
@@ -98,9 +93,7 @@ radio never learns your level, the score, or who it was to.
 | "Debrief done" (`debrief_completed`) | A post-call debrief finishes and its CRM update is written. No yes is asked: CRM writes are a standing scope | Your agent, right after the write |
 | "CRM updated" (`crm_updated`) | Your agent performs a standalone CRM write inside your standing scope (not part of a debrief). No yes is asked | Your agent, right after the write |
 | A scheduled task ran (`routine_completed`) | Orion completes a task in Codex scheduled tasks or Claude Routines. A run may report count zero when it checked for work and found none. | Orion runs `node status/done.mjs --shift` with a tag, count, and skill when applicable |
-| This machine runs X (`report-install`) | A package passes its real-data smoke test | Orion, after the pass |
 | Your message (`send`) | You have something to say to Daily Practice and say yes to sending it — your words | Your agent, on your yes in that conversation |
-| A skill offered up (`contribute`) | You choose to offer a skill to the library, after seeing exactly what would be sent | Your agent, on your yes to the shown preview |
 
 Three rules sit under that table.
 
@@ -128,17 +121,6 @@ run in 6 days — want us to take a look?"*. After the pre-work guard allows a s
 radio for support messages, reads anything waiting out loud, and asks what you'd like to do. **A reply is
 sent only when you say yes, in that conversation, and it's your words that go.** No
 reply happens on its own.
-
-Sometimes the message is an offer: a skill from the Daily Practice library. Your AI
-tells you which skill it is, what it needs and where it would go. Nothing is written
-until you say yes.
-
-A library skill is written for any business, so it leaves a gap where the business
-name goes. As it lands, your harness fills that gap with your business name, from what
-it already has on record. If the skill needs something your harness does not know,
-such as your CRM's stage names, your AI asks you, one question at a time, and writes
-your answer in. You see what will be filled in before you say yes. Nothing about you
-is sent anywhere to do this: it happens on your machine.
 
 Each message is read to you once. Your harness remembers what you have already heard,
 so nothing is repeated at the next session.
@@ -203,21 +185,13 @@ receipts keep the report pending; a successful connection alone never deletes it
 
 The queue contains only allowlisted signal and installed-package metadata: folder
 identity, event type/time, stage/status/template version, public tag, count, routine
-or skill/asset slug, kind/version and applicable enum labels. Package reports keep
-the original installation time and version. It never contains credentials, local
+or skill/asset slug, kind/version and applicable enum labels. Pending package reports
+from older releases retain their original installation time and version for replay. It never contains credentials, local
 work-log text, prospect names, client words, artifact content or a package's
-free-text purpose. Tier 2 messages and Tier 3 contributions remain separate explicit
+free-text purpose. Tier 2 messages remain separate explicit
 consent operations and never enter this operational queue. Corrupt data requires
 repair rather than deletion. See [setup](setup.md) for safe lock recovery.
 
 “Running” means finished work was reported in the last 14 days; a connection check
 alone does not create activity. The requirement is a supported flow in editable
 local files and native AI prompts, not tamper-proof licensing.
-
-## Not the same thing as the Intelligence Library
-
-There is one other, entirely separate channel: the **Intelligence Library** —
-richer, anonymised usage patterns used to improve future versions of this kit. It is
-**off by default** and stays off unless you explicitly turn it on; the radio's setting
-has no effect on it, and vice versa. Full detail:
-[intelligence-library-opt-in.md](intelligence-library-opt-in.md).

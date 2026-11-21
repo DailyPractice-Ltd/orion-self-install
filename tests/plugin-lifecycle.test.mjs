@@ -379,3 +379,28 @@ test('restoring a completed switch brings back the old catalog and asks for re-r
   assert.equal(has(w.client, CATALOG_PATH['claude-code']), false);
   assert.equal(get(w.client, '.agents/skills/mine/SKILL.md'), 'my own skill\n');
 });
+
+test('a switch commits only on the target tool\'s discovery evidence, not on its install record', (t) => {
+  const w = world(t, { tool: 'codex', at: '2.0.0', codexInstalled: '2.0.0', faults: { detailsSkills: ['hello'] } });
+  const run = w.switchTo('claude-code');
+  assert.equal(run.status, 0, out(run));
+  const r = report(run);
+  assert.equal(r.state, 'pending_switch');
+  assert.match(r.remaining_action, /fresh Claude Code session/);
+  assert.equal(w.status().ai_assistant, 'codex');
+  assert.ok(!nativeCalls(w).some((c) => c.startsWith('codex plugin remove')), 'the current tool keeps Orion');
+});
+
+test('the previous tool\'s Orion is retired only after the switch is committed', (t) => {
+  const w = world(t, { at: '2.0.0' });
+  assert.equal(report(w.switchTo('codex')).state, 'pending_switch');
+  assert.equal(w.humanInstall().status, 0);
+  const torn = w.switchTo('codex', { ORION_SWITCH_FAIL_BEFORE_COMMIT: '1' });
+  assert.equal(torn.status, 2, out(torn));
+  assert.match(torn.stderr, /Injected switch interruption/);
+  assert.equal(w.status().ai_assistant, 'claude-code');
+  assert.ok(!nativeCalls(w).some((c) => c.startsWith('claude plugin uninstall')), 'Claude Code keeps Orion');
+  assert.equal(Object.keys(w.native().claude.installs).length, 1);
+  assert.ok(has(w.client, CATALOG_PATH['claude-code']));
+  assert.equal(get(w.client, '.claude/skills/mine/SKILL.md'), 'my own skill\n');
+});

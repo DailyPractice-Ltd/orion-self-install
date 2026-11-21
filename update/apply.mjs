@@ -421,7 +421,8 @@ function commitSwitch({root,snapshot,deployment,pristine,from,to,backup,backupRe
     walk(base);
   };
   portable(oldSkill,newSkill);
-  // Only the previous tool's Orion catalog leaves; its other settings stay.
+  // Only the previous tool's Orion catalog leaves; its other settings stay. It is backed up
+  // with the other retired files but removed last, after that tool's Orion is retired.
   const oldCatalog=TOOL_LAYOUT[from].catalogPath;
   if (withPlugin && existsSync(safe(root,oldCatalog))) retire.push(oldCatalog);
   // Stage expected bytes and all backups before touching the deployed tree.
@@ -436,7 +437,6 @@ function commitSwitch({root,snapshot,deployment,pristine,from,to,backup,backupRe
   journal.retire=retired;
   journal.state='pending';
   writeJson(join(backup,'journal.json'),journal);
-  let oldRetired=null;
   try {
     for(const a of staged) {
       const dest=safe(root,a.destination);
@@ -444,9 +444,10 @@ function commitSwitch({root,snapshot,deployment,pristine,from,to,backup,backupRe
       if(fingerprint(readFileSync(dest))!==a.hash) throw new Error(`Validation failed: ${a.destination}`);
       step();
     }
-    if (withPlugin) oldRetired=retirePlugin({root,tool:from,catalogName:catalogName(status.plugin.catalog_identity)});
-    for(const destination of retired) rmSync(safe(root,destination));
-    pruneParents(root,retired);
+    const removeNow=retired.filter(path=>!(withPlugin && path===oldCatalog));
+    for(const destination of removeNow) rmSync(safe(root,destination));
+    pruneParents(root,removeNow);
+    if (process.env.ORION_SWITCH_FAIL_BEFORE_COMMIT) throw new Error('Injected switch interruption');
     status.ai_assistant = to;
     if (withPlugin) {
       const plugin=ensurePluginRegion(status);
@@ -459,19 +460,27 @@ function commitSwitch({root,snapshot,deployment,pristine,from,to,backup,backupRe
     writeStatus(root,status);
     journal.state='complete';
     writeJson(join(backup,'journal.json'),journal);
-    const result={state:'switched',from,to,selected:to,backup:backupRel,installed:journal.actions.map(a=>a.destination),retired};
-    if (withPlugin) {
-      result.active=false;
-      result.remaining_action=status.plugin.remaining_action;
-      if (oldRetired?.state!=='complete') result.previous_tool_action=`Remove Orion from ${product(from)} for this folder by hand (${oldRetired?.details?.reason || 'its CLI was not reachable'}); nothing else there was changed.`;
-    }
-    return result;
   } catch(error) {
     rollbackSwitch(root,backup,journal);
     if (withPlugin && journal.target_touched) retirePlugin({root,tool:to,catalogName:catalogName(status.plugin.catalog_identity)});
     journal.state='recovered';writeJson(join(backup,'journal.json'),journal);
     throw error;
   }
+  // Committed. Only now does the previous tool's Orion go, and its catalog after it, so a
+  // failure before this point leaves that tool exactly as it was.
+  const result={state:'switched',from,to,selected:to,backup:backupRel,installed:journal.actions.map(a=>a.destination),retired};
+  if (withPlugin) {
+    const oldRetired=retirePlugin({root,tool:from,catalogName:catalogName(status.plugin.catalog_identity)});
+    result.active=false;
+    result.remaining_action=status.plugin.remaining_action;
+    if (oldRetired.state==='complete') {
+      if (existsSync(safe(root,oldCatalog))) { rmSync(safe(root,oldCatalog)); pruneParents(root,[oldCatalog]); }
+    } else {
+      result.retired=retired.filter(path=>path!==oldCatalog);
+      result.previous_tool_action=`Orion could not remove itself from ${product(from)} for this folder (${oldRetired.details?.reason || 'its program was not reachable'}), so ${product(from)} may still offer the Orion skills here. Remove Orion there by hand; nothing else in ${product(from)} was changed, and ${oldCatalog} stays until then.`;
+    }
+  }
+  return result;
 }
 
 async function recoverPendingSwitches(root) {

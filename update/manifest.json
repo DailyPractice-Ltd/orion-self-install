@@ -29,7 +29,6 @@
     "crm/hubspot/apply-hubspot-template.mjs",
     "crm/hubspot/hubspot-template.json",
     "crm/other-crm-manual-setup.md",
-    "docs/intelligence-library-opt-in.md",
     "docs/radio.md",
     "docs/self-serve-learnings.md",
     "docs/simulated-dry-run-example.md",
@@ -74,7 +73,8 @@
   "remove": [
     "n8n/README.md",
     "n8n/wf-01-prospect-research-outreach.json",
-    "n8n/wf-02-post-call-debrief.json"
+    "n8n/wf-02-post-call-debrief.json",
+    "docs/intelligence-library-opt-in.md"
   ],
   "remove_status_checklist_keys": [
     "n8n_wf01_imported",
@@ -111,7 +111,6 @@
       "crm/hubspot/apply-hubspot-template.mjs",
       "crm/hubspot/hubspot-template.json",
       "crm/other-crm-manual-setup.md",
-      "docs/intelligence-library-opt-in.md",
       "docs/radio.md",
       "docs/scheduled-work.md",
       "docs/self-serve-learnings.md",

@@ -5,8 +5,7 @@
  *
  *   node status/radio.mjs check
  *       Read the radio (GET /nudges). Run at session start. An empty radio is the
- *       normal, silent case. A skill on offer is announced in words, and the exact
- *       library --install command is printed under the fence for the assistant.
+ *       normal, silent case.
  *       Each message is read out once: sharing.radio_seen_through in status.json
  *       remembers the newest one already heard, and nothing before it is repeated.
  *
@@ -17,21 +16,6 @@
  *   node status/radio.mjs send --message "what the client wants to say" --yes
  *       Start a conversation (POST /nudges). For when the client has something to say
  *       and there is nothing to reply to. Same rule as reply: their words, their yes.
- *
- *   node status/radio.mjs library --install <slug> --yes
- *       Collect a skill Daily Practice has put on the radio (GET /library/<slug>),
- *       write its folder to your AI assistant's skills directory, and report it to the shelf.
- *       What the skill lists under "Fill at install" is filled from status.json
- *       as it lands (the business name, the agent's name); the rest is printed
- *       for the assistant to ask. Never overwrites a skill already there. Their
- *       yes first, always.
- *
- *   node status/radio.mjs contribute --slug <slug> --yes
- *       Offer a skill this machine runs back up to the library (POST /contributions).
- *       Sends the whole skill folder, text files only (SKILL.md plus references,
- *       templates), for a curator to read; scripts and binaries never travel.
- *       Nothing is published by sending it. Same rule as send and reply: their
- *       yes first.
  *
  *   node status/radio.mjs signal --type <type> [--tag <tag>] [--count <n>] [--routine <name>]
  *                                [--asset <slug> --outcome <o> [--surface <s>] [--asset-kind <k>]]
@@ -63,13 +47,6 @@
  *       for a note or a description, and the story of the work stays on this
  *       machine, in status/work-log.md or, for a shift, in status/shift-log.md.
  *
- *   node status/radio.mjs report-install --slug <slug> --kind <kind> --version <v>
- *                                        [--role <slug|custom> --purpose "<sentence>"]
- *       Tell the shelf a Library package was installed here (POST /assets), after its
- *       smoke test passed. A hired agent adds --role (library/ROLES.md slug, or
- *       custom) and --purpose (≤140 chars, about the agent, never a person/company/
- *       number) — the labels that let the role bank become evidence-based.
- *
  * Radio-on means ALL of: sharing.status_signal_enabled is true, bridge_url and
  * harness_id are set (the welcome pack), and there is a key. Anything less → every
  * command prints one plain line, sends nothing, and exits 0. Network trouble never
@@ -83,22 +60,19 @@
  * Dependency-free: node:fs and global fetch only. No package.json, no npm install.
  */
 
-import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, lstatSync, renameSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { reportSignal, reportAsset } from './report.mjs';
-import { runtimeLayout } from '../update/destination-resolver.mjs';
+import { reportSignal } from './report.mjs';
 import {
   radioOn as radioIsOn, radioKey, readRadioKeyFile, keyHeader, wantsEnvProxy, envProxyEnv, isCloudRun,
-  parseInstallDirective, isWorkTag, workTagMenu, labelProblem, countProblem,
-  packSkillFolder, skillBundleProblem, fillBundle, SKILL_ENTRY_FILE,
+  isWorkTag, workTagMenu, labelProblem, countProblem,
 } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status.json');
 const ROOT = join(__dirname, '..');
-const skillRoot = () => runtimeLayout(ROOT).skillRoot;
 
 // A cloud machine reaches the radio only through its proxy, and Node has to be
 // started knowing that (status/shapes.mjs, wantsEnvProxy). So this script starts
@@ -140,17 +114,17 @@ for (let i = 0; i < rest.length; i++) {
 }
 
 function usage() {
-  console.log('Usage: node status/radio.mjs <check | reply | send | library | contribute | signal | report-install> [--flags]');
+  console.log('Usage: node status/radio.mjs <check | reply | send | signal> [--flags]');
   console.log('Details in the header of this file, or docs/radio.md.');
 }
 
-if (!command || !['check', 'reply', 'send', 'library', 'contribute', 'signal', 'report-install'].includes(command)) {
+if (!command || !['check', 'reply', 'send', 'signal'].includes(command)) {
   usage();
   process.exit(command ? 1 : 0);
 }
 
-// Reporting follows completed work; reading messages and previews remain recovery paths.
-if (['send','reply'].includes(command) || (['contribute','library'].includes(command) && flags.yes !== undefined)) {
+// Reporting follows completed work; reading support messages remains a recovery path.
+if (['send','reply'].includes(command)) {
   const {checkWork} = await import('./guard.mjs');
   const permission = await checkWork({root:ROOT});
   if (!permission.allow) console.log(permission.reason);
@@ -172,7 +146,7 @@ const keyPlaces = { keyFile: readRadioKeyFile(__dirname, { readFileSync }) };
 const key = radioKey(status, keyPlaces);
 const radioOn = radioIsOn(status, keyPlaces);
 
-if (!radioOn && !['signal','report-install'].includes(command)) {
+if (!radioOn && command !== 'signal') {
   console.log('Radio is off (or not configured) — nothing sent, nothing checked. Local work is unaffected.');
   process.exit(0);
 }
@@ -264,12 +238,7 @@ function whenWords(iso) {
   return days === 1 ? 'yesterday' : `${days} days ago`;
 }
 
-/**
- * A backstop against the one mistake that keeps happening: cramming a skill into
- * a message. `send` and `reply` carry a person's words; a skill goes up with
- * `contribute`. A SKILL.md opens with YAML frontmatter naming the skill, so that
- * is what we look for — and refuse to send, pointing at the right command.
- */
+/** Send and reply carry personal messages; skill files stay on this machine. */
 function looksLikeSkillFile(text) {
   const t = String(text ?? '').replace(/^﻿/, '').trimStart();
   return /^---\s*\r?\n[\s\S]{0,300}?\bname:\s*\S/.test(t);
@@ -342,21 +311,15 @@ if (command === 'check') {
   // What follows is for the client's ears. Read it to them as it is written:
   // it is a person talking to them, not a status report about a channel.
   const newest = waiting.reduce((a, b) => (Date.parse(b.at || '') > Date.parse(a.at || '') ? b : a));
-  const offers = [];
   for (const m of waiting) {
     console.log('');
     console.log(`From ${m.from_name || 'Daily Practice'}, ${whenWords(m.at)}:`);
     console.log('');
-    const lines = String(m.body).split('\n');
-    // A skill on offer arrives with a machine line first (shapes.mjs). The client
-    // hears what it means, never the line itself. The words the coach wrote after
-    // it are theirs to hear as written.
-    const offer = parseInstallDirective(m.body);
-    if (offer) {
-      if (!offers.some((o) => o.slug === offer.slug)) offers.push(offer);
-      console.log(`  Daily Practice is offering you a skill: ${offer.slug}, version ${offer.version}.`);
-      lines.shift();
-    }
+    // Compatibility: hide retired machine directives in old radio messages.
+    // Human prose still belongs to the client and is read without offering actions.
+    const lines = String(m.body).split('\n').filter(
+      (line) => !/^\s*\[library:install\](?:\s|$)/.test(line),
+    );
     for (const line of lines) console.log(`  ${line}`);
   }
   console.log('');
@@ -364,11 +327,6 @@ if (command === 'check') {
   console.log('Read the message above to the client in full. If they want to answer,');
   console.log('take their words and run this, replacing only the message:');
   console.log(`  node status/radio.mjs reply --nudge ${newest.key} --message "their words" --yes`);
-  for (const offer of offers) {
-    console.log(`A skill is on offer: ${offer.slug}. To show the client what it is, with nothing written yet:`);
-    console.log(`  node status/radio.mjs library --install ${offer.slug}`);
-    console.log('Run it again with --yes only when they say yes. Never before.');
-  }
   rememberHeard(newest.at);
   process.exit(0);
 }
@@ -385,8 +343,6 @@ if (command === 'send') {
   }
   if (looksLikeSkillFile(flags.message)) {
     console.log('That looks like a skill file, not a message — send carries words, not skills.');
-    console.log('To send a skill up to the library, use:');
-    console.log('  node status/radio.mjs contribute --slug <slug>');
     console.log('Nothing was sent.');
     process.exit(0);
   }
@@ -420,8 +376,6 @@ if (command === 'reply') {
   }
   if (looksLikeSkillFile(flags.message)) {
     console.log('That looks like a skill file, not a reply — reply carries words, not skills.');
-    console.log('To send a skill up to the library, use:');
-    console.log('  node status/radio.mjs contribute --slug <slug>');
     console.log('Nothing was sent.');
     process.exit(0);
   }
@@ -432,214 +386,6 @@ if (command === 'reply') {
   });
   if (res.status === 401) reportAuthProblem();
   console.log(res.ok ? 'Reply sent — it\'s with Daily Practice.' : `Reply answered ${res.status} — not retried; try again next session.`);
-  process.exit(0);
-}
-
-if (command === 'library') {
-  const slug = flags.install;
-  if (!slug || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
-    console.log('library needs --install <slug>, in lower-case words joined by hyphens.');
-    process.exit(1);
-  }
-
-  const res = await call('GET', `/library/${slug}`);
-  if (res.status === 401) reportAuthProblem();
-  if (res.status === 404) {
-    console.log(`Daily Practice has no published skill called "${slug}".`);
-    process.exit(0);
-  }
-  if (!res.ok) { console.log(`The library answered ${res.status} — nothing written, try next session.`); process.exit(0); }
-
-  const asset = await res.json().catch(() => null);
-  // A skill arrives as its whole folder when the library has one; an older
-  // library sends just the SKILL.md. Either way the other end is data: every
-  // path is checked here before a single byte is written.
-  const bundle = Array.isArray(asset?.files) && asset.files.length > 0 ? asset.files : null;
-  if (bundle) {
-    const problem = skillBundleProblem(bundle);
-    if (problem) {
-      console.log(`"${slug}" arrived in a shape this harness will not write (${problem}). Nothing written. Tell Daily Practice.`);
-      process.exit(0);
-    }
-  }
-  const content = bundle
-    ? bundle.find((f) => f.path === SKILL_ENTRY_FILE).content
-    : (typeof asset?.content === 'string' ? asset.content : '');
-  if (!content.trim()) {
-    console.log(`"${slug}" arrived empty — nothing written. Tell Daily Practice.`);
-    process.exit(0);
-  }
-  const arrived = bundle || [{ path: SKILL_ENTRY_FILE, content }];
-  const incoming = arrived.map((f) => f.path);
-
-  // A library skill is written for any business, and lists in its own SKILL.md
-  // what gets filled as it lands. What this harness already knows goes in here;
-  // what it does not is asked by the assistant once the skill is on disk. A
-  // skill that lists nothing lands exactly as it arrived.
-  const fill = fillBundle(arrived, { business_name: status.business_name, agent_name: status.agent_name });
-  if (fill.problem) {
-    console.log(`"${slug}" arrived in a shape this harness will not write (${fill.problem}). Nothing written. Tell Daily Practice.`);
-    process.exit(0);
-  }
-  const toWrite = fill.files;
-  const landing = toWrite.find((f) => f.path === SKILL_ENTRY_FILE).content;
-
-  const dir = join(ROOT, skillRoot(), slug);
-
-  // Their skill, their machine. A skill they have already taught or edited is
-  // never overwritten by something arriving over the radio — the whole folder
-  // is theirs, so an existing folder means hands off.
-  if (existsSync(dir)) {
-    console.log(`You already have a skill called "${slug}". Nothing was touched.`);
-    console.log('If you want the Daily Practice version instead, rename or delete yours first.');
-    process.exit(0);
-  }
-
-  if (flags.yes === undefined) {
-    // Show it before it lands. The client decides with the thing in front of them.
-    console.log(`${asset.name || slug} — from the Daily Practice library, version ${asset.version || '?'}`);
-    if (asset.one_liner) console.log(asset.one_liner);
-    if (Array.isArray(asset.tools_required) && asset.tools_required.length > 0) {
-      console.log(`Needs: ${asset.tools_required.join(', ')}`);
-    }
-    console.log('');
-    console.log(`It would be written to ${skillRoot()}/${slug}/ as ${incoming.length} file${incoming.length === 1 ? '' : 's'}:`);
-    for (const p of incoming) console.log(`  ${p}`);
-    console.log('');
-    if (fill.filled.length > 0) {
-      console.log('Filled in as it lands, so it reads as yours:');
-      for (const f of fill.filled) console.log(`  ${f.question}: ${f.value}`);
-      console.log('');
-    }
-    if (fill.open.length > 0) {
-      console.log('Your AI will ask you, before the skill is used:');
-      for (const o of fill.open) console.log(`  ${o.question}`);
-      console.log('');
-    }
-    console.log('The first lines of SKILL.md:');
-    for (const line of landing.split('\n').slice(0, 12)) console.log(`  ${line}`);
-    console.log('');
-    console.log('--- for the assistant, not to be read aloud ---');
-    console.log('Show the client what this is, in your own plain words. On their yes:');
-    console.log(`  node status/radio.mjs library --install ${slug} --yes`);
-    process.exit(0);
-  }
-
-  // All or nothing: the folder is built beside its final name and moved into
-  // place only once every file has landed, so a failure half-way never leaves
-  // a broken skill that the "already have it" rule would then protect forever.
-  const staging = join(dirname(dir), `.${slug}.installing-${process.pid}`);
-  try {
-    mkdirSync(staging, { recursive: true });
-    for (const f of toWrite) {
-      const target = join(staging, ...f.path.split('/'));
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, f.content, 'utf8');
-    }
-    renameSync(staging, dir);
-  } catch (err) {
-    rmSync(staging, { recursive: true, force: true });
-    console.log(`Could not write "${slug}" (${err?.code || err?.message || 'unknown'}). Nothing was changed on this machine.`);
-    process.exit(0);
-  }
-  console.log(`Written: ${incoming.length} file${incoming.length === 1 ? '' : 's'} to ${skillRoot()}/${slug}/`);
-  for (const f of fill.filled) console.log(`Filled in: ${f.question} (${f.value})`);
-  // A skill is text in its own folder and nothing else (K3). The send level lives in
-  // status/status.json and on each job sheet; no skill can set or move it.
-  console.log('A skill never sets your send level: that lives in status/status.json and on each job sheet, and this install touched neither.');
-
-  // The shelf is how Daily Practice knows who is affected when this improves.
-  const report = await reportAsset({root:ROOT,asset:{
-    slug, kind:asset.kind || 'skill', version:asset.version || '0.0.0',
-    installed_at:new Date().toISOString(),
-  }});
-  if (report.status === 'sent') console.log(`Daily Practice knows this machine now runs ${slug}.`);
-  else if (report.status === 'invalid') console.log(report.reason);
-  console.log('');
-  console.log('--- for the assistant, not to be read aloud ---');
-  if (fill.open.length > 0) {
-    console.log('This skill is not ready until these are filled. Ask the client, one at a time:');
-    for (const o of fill.open) console.log(`  {{${o.token}}}: ${o.question}`);
-    console.log('The answer is the client\'s, in their words: never take one from status.json or any other file.');
-    console.log(`Write each answer in place of its token in every file under ${skillRoot()}/${slug}/,`);
-    console.log('and change its line under "Fill at install" in SKILL.md to "- TOKEN: answer".');
-  }
-  console.log('Record it under packages in status/status.json, then try it on something real');
-  console.log('before telling the client it works.');
-  process.exit(0);
-}
-
-if (command === 'contribute') {
-  // Offer a skill this machine runs back up to the Daily Practice library.
-  // The markdown travels; a curator reads it and decides. Nothing is published
-  // by this call, and — like send and reply — it only goes on the client's yes.
-  const slug = flags.slug;
-  if (!slug || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
-    console.log('contribute needs --slug <slug>, the skill to offer, in lower-case words joined by hyphens.');
-    process.exit(1);
-  }
-
-  const dir = join(ROOT, skillRoot(), slug);
-  if (!existsSync(join(dir, SKILL_ENTRY_FILE))) {
-    console.log(`No skill called "${slug}" on this machine (looked for ${skillRoot()}/${slug}/SKILL.md).`);
-    process.exit(0);
-  }
-  // The whole folder travels: SKILL.md plus its references and templates, text
-  // files only. Scripts and binaries stay behind, and the person is told so.
-  const { files, skipped } = packSkillFolder(dir, { readdirSync, lstatSync, readFileSync });
-  // The shape first: a main file under another spelling is a naming problem,
-  // and must not be reported as an empty skill.
-  const problem = skillBundleProblem(files);
-  if (problem) {
-    console.log(`"${slug}" cannot be sent as it is (${problem}). Nothing sent.`);
-    console.log('Tell Daily Practice and we will sort the shape.');
-    process.exit(0);
-  }
-  const entry = files.find((f) => f.path === SKILL_ENTRY_FILE);
-  const content = entry ? entry.content : '';
-  if (!content.trim()) {
-    console.log(`"${slug}" is empty — nothing to offer.`);
-    process.exit(0);
-  }
-  const total = files.reduce((n, f) => n + f.content.length, 0);
-
-  if (flags.yes === undefined) {
-    console.log(`You would offer "${slug}" to the Daily Practice library — ${files.length} file${files.length === 1 ? '' : 's'}, ${total} characters.`);
-    console.log('A curator reads it and decides; nothing is published by sending it.');
-    console.log('');
-    console.log('What would be sent:');
-    for (const f of files) console.log(`  ${f.path}`);
-    if (skipped.length > 0) {
-      console.log('Staying behind (not a text file, so the radio never carries it):');
-      for (const s of skipped) console.log(`  ${s}`);
-    }
-    console.log('');
-    console.log('The first lines of SKILL.md:');
-    for (const line of content.split('\n').slice(0, 12)) console.log(`  ${line}`);
-    console.log('');
-    console.log('--- for the assistant, not to be read aloud ---');
-    console.log('Show the client what this offers, in your own plain words. On their yes:');
-    console.log(`  node status/radio.mjs contribute --slug ${slug} --yes`);
-    process.exit(0);
-  }
-
-  const res = await call('POST', '/contributions', {
-    harness_id: sharing.harness_id,
-    slug,
-    kind: 'skill',
-    // The SKILL.md on its own, for a library that only knows one file; and the
-    // whole folder, for one that knows a skill is a folder.
-    content,
-    files,
-  });
-  if (res.status === 401) reportAuthProblem();
-  if (res.status === 404 || res.status === 405) {
-    console.log('This Daily Practice address cannot take a skill offer yet. Nothing was sent.');
-    process.exit(0);
-  }
-  console.log(res.ok
-    ? `Offered "${slug}" to the Daily Practice library (${files.length} file${files.length === 1 ? '' : 's'}). A curator will look at it; nothing is published yet.`
-    : `The offer answered ${res.status} — not retried; nothing was lost locally.`);
   process.exit(0);
 }
 
@@ -775,77 +521,5 @@ if (command === 'signal') {
   else if (report.status === 'off') console.log('Radio is off (or not configured) — report saved locally for recovery.');
   else if (report.status === 'invalid') console.log(report.reason);
   resultLine(report.status === 'sent' ? 'sent' : report.result || report.status);
-  process.exit(0);
-}
-
-if (command === 'report-install') {
-  if (!flags.slug || !PACKAGE_KINDS.includes(flags.kind) || !flags.version) {
-    console.log(`report-install needs --slug <slug>, --kind <${PACKAGE_KINDS.join('|')}>, --version <v>.`);
-    if (!flags.kind || flags.kind === 'agent') {
-      console.log('An agent hire also carries --role <library/ROLES.md slug | custom> and --purpose "<one sentence>".');
-    }
-    process.exit(1);
-  }
-  // The role bank's evidence loop (feature 005, Article V Tier 1 + Tier 3): a bank
-  // slug or "custom", plus the one purpose sentence the client approved verbatim in
-  // the job-sheet readback. Agent hires only; labels never content.
-  const role = (flags.role || '').trim();
-  const purpose = (flags.purpose || '').trim();
-  if ((role || purpose) && flags.kind !== 'agent') {
-    console.log('--role and --purpose belong to agent hires only (spec 005). Not sent — retry without them.');
-    process.exit(1);
-  }
-  if (flags.kind === 'agent' && (!role || !purpose)) {
-    // Warn, never block: an older folder's PACKAGE.md may predate 0.8.0, and a
-    // late report is better than none. But say it loudly — a roleless hire is
-    // invisible to the role bank's evidence loop (spec 005).
-    console.log('Heads up: an agent hire should carry --role and --purpose (library/ROLES.md).');
-    console.log('Sending without them — this hire will be untyped on the shelf.');
-  }
-  if (role && role !== 'custom') {
-    // The bank is on this disk — check against it, not just the slug shape. If the
-    // file is missing (older folder), fall back to shape so the report still lands.
-    let bankSlugs = null;
-    try {
-      const bank = readFileSync(join(__dirname, '..', 'library', 'ROLES.md'), 'utf8');
-      bankSlugs = [...bank.matchAll(/^## `([a-z][a-z0-9-]{0,29})`/gm)].map((m) => m[1]);
-    } catch { /* no bank file — shape check below still applies */ }
-    if (bankSlugs && bankSlugs.length > 0 && !bankSlugs.includes(role)) {
-      console.log(`--role "${role}" is not in library/ROLES.md (${bankSlugs.join(', ')}) and is not "custom". Not sent.`);
-      process.exit(1);
-    }
-    if (!/^[a-z][a-z0-9-]{0,29}$/.test(role)) {
-      console.log('--role must be a kebab slug from library/ROLES.md, or "custom". Not sent.');
-      process.exit(1);
-    }
-  }
-  if (purpose.length > 140) {
-    console.log('--purpose is over 140 characters — shorten it to one sentence about the agent. Not sent.');
-    process.exit(1);
-  }
-  // Tier-3 tripwire, same spirit as the shift-log note rule and the send/reply
-  // skill-file refusal: the purpose describes the agent, never a person, a company,
-  // or a number. Digits and handles are machine-checkable — check them.
-  if (/\d/.test(purpose) || /@/.test(purpose)) {
-    console.log('--purpose may not carry numbers or handles — it describes the agent, never a person,');
-    console.log('a company, or a figure. Reword it (e.g. "warms CRM leads toward booked meetings"). Not sent.');
-    process.exit(1);
-  }
-  const asset = {
-    slug:flags.slug, kind:flags.kind, version:flags.version,
-    installed_at:new Date().toISOString(), ...(role ? {role} : {}),
-  };
-  // Always preserve the ambient shelf labels. Explicit purpose words travel only
-  // in this consented invocation and are never copied into the durable queue.
-  const report = await reportAsset({root:ROOT,asset});
-  if (purpose && report.status === 'sent') {
-    const res = await call('POST','/assets',{harness_id:sharing.harness_id,...asset,purpose});
-    if (res.status === 401) reportAuthProblem();
-    console.log(res.ok ? `Shelf updated — Daily Practice knows this machine runs ${flags.slug} v${flags.version}.` : `Shelf labels delivered; purpose report answered ${res.status}. Retry the consented purpose separately.`);
-  } else {
-    if (report.status === 'sent') console.log(`Shelf updated — Daily Practice knows this machine runs ${flags.slug} v${flags.version}.`);
-    else if (report.status === 'invalid') console.log(report.reason);
-    if (purpose) console.log('The consented purpose was not delivered. Retry that explicit report when connected; only shelf labels were saved.');
-  }
   process.exit(0);
 }

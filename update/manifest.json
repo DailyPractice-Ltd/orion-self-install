@@ -764,6 +764,7 @@
         "fingerprint_key": "plugins/orion/skills/task-planner/references/webinar-follow-up.md"
       }
     ],
+    "_release_only": "Paths that stay in the release and never reach a harness. skills/ is no longer a source (the shipped skills live in plugins/orion/skills/), but it stays listed so an install with --migrate-from never copies an older folder's top-level skills/ into the new harness.",
     "release_only": [
       "skills/",
       "agents/",

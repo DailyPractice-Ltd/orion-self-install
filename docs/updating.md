@@ -56,26 +56,6 @@ check support messages separately with `node status/radio.mjs check`. Report the
 any replaced edited runtime scripts and the backup path. Remove the temporary
 source checkout after the operation.
 
-## Switch AI assistants
-
-To move this folder between Codex and Claude Code, run this from the deployed folder:
-
-```sh
-node switch_ai.mjs
-```
-
-It switches to the other assistant. Name one with `--to claude-code` or `--to codex`.
-It works on this machine only: no release, clone or commit is needed, and the version
-does not matter. It moves every skill between `.agents/skills/` and `.claude/skills/`,
-including skills the client edited or taught, and records the new assistant in
-`status/status.json`. Spec Kit skills are left out. Nothing else in the folder moves.
-
-It refuses to overwrite a file already in the new skills folder, and changes nothing
-if it would. Before it moves anything it copies the old skills and status to the
-`.update-backup/switch-…` folder it reports. To undo a switch, run it again. Review
-your scheduled tasks in the app that owns them before switching, then open the
-folder in the new assistant.
-
 ## Restore
 
 Use the backup path printed by update:

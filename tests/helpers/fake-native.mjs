@@ -23,6 +23,15 @@ const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
 if (args[0] !== 'plugin') { out('unexpected'); finish(9); }
 const [, verb, sub, target] = args;
 
+/** Claude Code's local-scope declarations land in the project's .claude/settings.local.json. */
+function settings(change) {
+  const path = join(realpathSync(process.cwd()), '.claude/settings.local.json');
+  const value = existsSync(path) ? readJson(path) : {};
+  change(value);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
 if (tool === 'claude') {
   const c = (state.claude ||= { marketplaces: {}, installs: {} });
   if (verb === 'validate') {
@@ -38,6 +47,7 @@ if (tool === 'claude') {
     const known = c.marketplaces[name];
     if (known && known.path !== target) { out({ command: 'marketplace-add', outcome: 'failed', message: 'name taken', failureCode: 'name_conflict' }); finish(1); }
     c.marketplaces[name] = { path: target, scopes: [...new Set([...(known?.scopes || []), scope])] };
+    if (scope === 'local') settings((s) => { (s.extraKnownMarketplaces ||= {})[name] = { source: { source: 'directory', path: target } }; });
     out({ command: 'marketplace-add', outcome: 'ok', message: known ? `Marketplace '${name}' already on disk` : `Successfully added marketplace: ${name}`, marketplace: name }); finish(0);
   }
   if (verb === 'marketplace' && sub === 'remove') {
@@ -55,6 +65,7 @@ if (tool === 'claude') {
     const key = `${plugin}|${realpathSync(process.cwd())}`;
     if (c.installs[key]) { out({ command: 'install', outcome: 'ok', message: `Plugin "${plugin}" is already installed (scope: local)` }); finish(0); }
     c.installs[key] = { id: plugin, scope: flag('--scope') || 'user', enabled: !faults.installDisabled, projectPath: realpathSync(process.cwd()) };
+    if (flag('--scope') === 'local') settings((s) => { (s.enabledPlugins ||= {})[plugin] = !faults.installDisabled; });
     out({ command: 'install', outcome: 'ok', pluginId: plugin, scope: flag('--scope') }); finish(0);
   }
   if (verb === 'enable' || verb === 'disable') {

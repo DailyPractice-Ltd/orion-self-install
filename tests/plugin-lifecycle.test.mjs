@@ -404,3 +404,45 @@ test('the previous tool\'s Orion is retired only after the switch is committed',
   assert.ok(has(w.client, CATALOG_PATH['claude-code']));
   assert.equal(get(w.client, '.claude/skills/mine/SKILL.md'), 'my own skill\n');
 });
+
+const SETTINGS = '.claude/settings.local.json';
+const priorSettings = (client) => ({
+  extraKnownMarketplaces: { [CATALOG]: { source: { source: 'directory', path: client }, autoUpdate: false } },
+  enabledPlugins: { [PLUGIN_ID]: true, 'other@elsewhere': true },
+  permissions: { allow: ['Bash(ls)'] },
+});
+
+test('a failed plugin refresh puts back this harness\'s own Claude Code registration entries and keeps the rest', (t) => {
+  const w = world(t, { faults: { listOverride: { errors: ['Source path does not exist'] } } });
+  put(w.client, SETTINGS, json(priorSettings(w.client)));
+  const run = w.update();
+  assert.equal(run.status, 3, out(run));
+  const r = report(run);
+  assert.equal(r.state, 'rolled_back');
+  assert.deepEqual(JSON.parse(get(w.client, SETTINGS)), priorSettings(w.client));
+  assert.ok(has(w.client, `${r.backup}/registration.json`), 'the registration state is in the backup');
+});
+
+test('restoring an update puts back the Claude Code registration entries; later unrelated settings stay', (t) => {
+  const w = world(t);
+  put(w.client, SETTINGS, json(priorSettings(w.client)));
+  const run = w.update();
+  assert.equal(run.status, 0, out(run));
+  const after = JSON.parse(get(w.client, SETTINGS));
+  assert.equal(after.extraKnownMarketplaces[CATALOG].autoUpdate, undefined, 'the refresh re-declared the catalog');
+  after.later = { mine: true };
+  put(w.client, SETTINGS, json(after));
+  const restored = w.restore(report(run).backup);
+  assert.equal(restored.status, 0, out(restored));
+  assert.deepEqual(JSON.parse(get(w.client, SETTINGS)), { ...priorSettings(w.client), later: { mine: true } });
+});
+
+test('a failed plugin refresh puts back this harness\'s own Codex project entries exactly', (t) => {
+  const w = world(t, { tool: 'codex', faults: { codexListFails: true } });
+  const prior = `model = "mine"\n\n[marketplaces."${CATALOG}"]\n# pinned by me\nsource_type = "local"\nsource = ${JSON.stringify(w.client)}\n\n[plugins."${PLUGIN_ID}"]\nenabled = true\n`;
+  put(w.client, '.codex/config.toml', prior);
+  const run = w.update();
+  assert.equal(run.status, 3, out(run));
+  assert.equal(report(run).state, 'rolled_back');
+  assert.equal(get(w.client, '.codex/config.toml'), prior);
+});

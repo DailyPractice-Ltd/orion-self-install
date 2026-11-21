@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { PACKAGE_ROOT, TOOL_LAYOUT, destinationState, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
 import { catalogName, catalogText, ensurePluginRegion } from './plugin-package.mjs';
 import { lowerFirst, retirePlugin } from './plugin-native.mjs';
+import { captureRegistration, restoreRegistration } from './plugin-registration.mjs';
 import { RESUME_COMMAND, VERIFY_COMMAND, nativeStep, runPluginSetup } from './plugin-setup.mjs';
 
 const arg = name => { const i=process.argv.indexOf(name); return i<0 ? undefined : process.argv[i+1]; };
@@ -158,9 +159,11 @@ async function update(root,repo,commit) {
     for (const [oldPath, archive] of archives) archiveLegacy(oldPath, archive);
 
     // The plugin: the whole package, and this harness's catalog for the selected tool.
-    let pkg=null, catalog=null;
+    let pkg=null, catalog=null, registration=null;
     if (withPlugin) {
       const identity=ensurePluginRegion(status,{create:true}).catalog_identity;
+      // This harness's own entries in the tool's settings; the refresh may rewrite them.
+      registration=captureRegistration(root,ai_assistant,catalogName(identity));
       const releasePackage=join(snapshot,PACKAGE_ROOT), harnessPackage=safe(root,PACKAGE_ROOT);
       const prior_hash=treeHash(harnessPackage), installed_hash=treeHash(releasePackage);
       if (prior_hash!==installed_hash) {
@@ -192,7 +195,8 @@ async function update(root,repo,commit) {
       actions:actions.map(a=>({kind:a.kind,destination:a.e.destination,installed_hash:a.kind==='retire'?null:fingerprint(readFileSync(a.src)),prior_hash:a.kind==='add'?null:fingerprint(readFileSync(a.dest))})),
       remove_status_checklist_keys:checklistKeys,
       package:pkg && {path:PACKAGE_ROOT,prior_hash:pkg.prior_hash,installed_hash:pkg.installed_hash},
-      catalog:catalog && {path:catalog.path,prior_hash:catalog.prior_hash,installed_hash:catalog.installed_hash}};
+      catalog:catalog && {path:catalog.path,prior_hash:catalog.prior_hash,installed_hash:catalog.installed_hash},
+      registration:registration ? 'registration.json' : null};
     for(const key of journal.remove_status_checklist_keys) delete status.checklist?.[key];
     status.template_version=manifest.template_version;
     if (withPlugin) {
@@ -217,6 +221,7 @@ async function update(root,repo,commit) {
         writeFileSync(join(backup,'stage',catalog.path),catalog.text);
       }
     }
+    if (registration) writeJson(join(backup,'registration.json'),registration);
     mkdirSync(join(backup,'stage/status'),{recursive:true});
     writeFileSync(join(backup,'stage/status/status.json'),nextStatus);
     writeJson(join(backup,'journal.json'),journal);
@@ -537,6 +542,7 @@ function rollbackUpdate(root,backup,journal) {
     rmSync(safe(root,PACKAGE_ROOT),{recursive:true,force:true});
     if (journal.package.prior_hash) copyTree(join(backup,'package',PACKAGE_ROOT),safe(root,PACKAGE_ROOT));
   }
+  if (journal.registration) restoreRegistration(root,json(join(backup,journal.registration)));
   // Status: only the fields the update owns go back; everything written since stays.
   const status=json(statusPath), old=json(join(backup,'status/status.json'));
   status.template_version=old.template_version;
@@ -645,6 +651,7 @@ function restore(root,backupRel) {
       restored.push(journal.catalog.path);
     }
   }
+  if (journal.registration) { restoreRegistration(root,json(join(backup,journal.registration))); restored.push('registration'); }
   for(const key of journal.remove_status_checklist_keys) if(Object.hasOwn(old.checklist||{},key)) {status.checklist ||= {};status.checklist[key]=old.checklist[key];}
   status.template_version=old.template_version;
   const result={restored,kept,backup:backupRel};

@@ -29,7 +29,6 @@
     "crm/hubspot/apply-hubspot-template.mjs",
     "crm/hubspot/hubspot-template.json",
     "crm/other-crm-manual-setup.md",
-    "docs/intelligence-library-opt-in.md",
     "docs/radio.md",
     "docs/self-serve-learnings.md",
     "docs/simulated-dry-run-example.md",
@@ -43,6 +42,7 @@
     "status/shapes.mjs",
     "status/status-schema.md",
     "status/status.schema-template.json",
+    "switch_ai.mjs",
     "update/manifest.json",
     "update/pristine.json",
     "update/apply.mjs",
@@ -74,7 +74,8 @@
   "remove": [
     "n8n/README.md",
     "n8n/wf-01-prospect-research-outreach.json",
-    "n8n/wf-02-post-call-debrief.json"
+    "n8n/wf-02-post-call-debrief.json",
+    "docs/intelligence-library-opt-in.md"
   ],
   "remove_status_checklist_keys": [
     "n8n_wf01_imported",
@@ -111,7 +112,6 @@
       "crm/hubspot/apply-hubspot-template.mjs",
       "crm/hubspot/hubspot-template.json",
       "crm/other-crm-manual-setup.md",
-      "docs/intelligence-library-opt-in.md",
       "docs/radio.md",
       "docs/scheduled-work.md",
       "docs/self-serve-learnings.md",
@@ -126,6 +126,7 @@
       "status/shapes.mjs",
       "status/status-schema.md",
       "status/status.schema-template.json",
+      "switch_ai.mjs",
       "update/apply.mjs",
       "update/destination-resolver.mjs",
       "update/manifest.json",
@@ -556,6 +557,15 @@
         },
         "ownership": "release",
         "fingerprint_key": "skills/update-harness/SKILL.md"
+      },
+      {
+        "source": "skills/switch-ai/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/switch-ai/SKILL.md",
+          "codex": ".agents/skills/switch-ai/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/switch-ai/SKILL.md"
       },
       {
         "source": "skills/call-planner/SKILL.md",

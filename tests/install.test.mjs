@@ -38,6 +38,7 @@ for (const tool of ['claude-code', 'codex']) {
       assert.ok(existsSync(join(target, skillRoot, name, 'SKILL.md')));
     }
     assert.equal(existsSync(join(target, 'library')), false);
+    assert.equal(existsSync(join(target, 'docs/intelligence-library-opt-in.md')), false);
     assert.equal(existsSync(join(target, tool === 'codex' ? 'agents' : '.claude/agents')), false);
     assert.equal(existsSync(join(target, '.specify')), false);
     assert.equal(existsSync(join(target, 'update/scaffold')), false);

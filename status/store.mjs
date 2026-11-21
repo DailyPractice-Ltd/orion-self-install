@@ -1,8 +1,47 @@
-/** Shared, cross-process status/outbox transaction. Never acquire this recursively. */
+/**
+ * The one owner of status/status.json, status/radio.key and the radio outbox.
+ *
+ * Every Orion command that changes these files goes through here, so no two
+ * commands can overwrite each other's changes: each change reads the file fresh
+ * under the status lock, applies itself, and saves atomically. Nothing else in
+ * the kit writes status.json or radio.key (tests/store-ownership.test.mjs holds
+ * this).
+ *
+ *   changeStatus(root, mutate)   one change to status.json
+ *   createStatus(root)           status.json from the template, when it has none
+ *   readStatus(root)             a read-only look, no lock
+ *   withStatusLock(root, action) several steps that must not be interleaved:
+ *                                status, outbox and key together
+ *
+ * The lock is a directory, status/.radio-lock, because creating one is atomic on
+ * every supported system. It is named for the radio because the radio's outbox
+ * was the first thing it guarded; it now guards all three files, and the name is
+ * kept because the recovery steps in docs/setup.md point at that path.
+ *
+ * Never acquire the lock recursively: a changeStatus or withStatusLock inside
+ * another one, in this process or a child it waits on, blocks until it gives up.
+ */
 import { open, readFile, rename, unlink, mkdir, rmdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
+
+/**
+ * How long a command waits for the lock. The guard holds it through a network
+ * check of up to 10 seconds plus up to 10 seconds per queued report, so this is
+ * generous on purpose. ORION_STATUS_LOCK_WAIT_MS shortens it for tests.
+ */
+export const LOCK_WAIT_MS = Number(process.env.ORION_STATUS_LOCK_WAIT_MS) > 0 ? Number(process.env.ORION_STATUS_LOCK_WAIT_MS) : 60000;
+export const LOCKED_MESSAGE = 'Status is locked. Finish the other Orion command; if it stopped, recover the status lock before retrying.';
+
+/** Thrown when the lock stays busy past the wait; `code` is 'STATUS_LOCKED'. */
+export class StatusLockedError extends Error {
+  constructor() { super(LOCKED_MESSAGE); this.code = 'STATUS_LOCKED'; }
+}
+
+const statusPath = root => join(root, 'status', 'status.json');
+const keyPath = root => join(root, 'status', 'radio.key');
+const templatePath = root => join(root, 'status', 'status.schema-template.json');
 
 async function readJson(path, missing) {
   let text;
@@ -10,12 +49,12 @@ async function readJson(path, missing) {
   catch (error) { if (error.code === 'ENOENT' && missing !== undefined) return missing; throw error; }
   return JSON.parse(text);
 }
-async function atomicJson(path, value) {
+async function atomicText(path, text) {
   const temporary = `${path}.${randomUUID()}.tmp`;
   let file;
   try {
     file = await open(temporary, 'wx', 0o600);
-    await file.writeFile(`${JSON.stringify(value, null, 2)}\n`);
+    await file.writeFile(text);
     await file.sync(); await file.close(); file = null;
     await rename(temporary, path);
     // Directory fsync is unavailable on some supported Windows filesystems.
@@ -28,7 +67,20 @@ async function atomicJson(path, value) {
     await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; });
   }
 }
-export async function withStatusLock(root, action) {
+const atomicJson = (path, value) => atomicText(path, `${JSON.stringify(value, null, 2)}\n`);
+
+function checkStatus(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid status file');
+  return value;
+}
+
+/** status.json as it is now, without the lock: null when there is none, an error when it cannot be read. */
+export async function readStatus(root) {
+  const value = await readJson(statusPath(root), null);
+  return value === null ? null : checkStatus(value);
+}
+
+export async function withStatusLock(root, action, { wait = LOCK_WAIT_MS } = {}) {
   const directory = join(root, 'status');
   const lock = join(directory, '.radio-lock');
   const started = Date.now();
@@ -36,7 +88,7 @@ export async function withStatusLock(root, action) {
     try { await mkdir(lock); break; }
     catch (error) {
       if (error.code !== 'EEXIST') throw error;
-      if (Date.now() - started >= 5000) throw new Error('Status is locked. Finish the other Orion command; if it stopped, recover the status lock before retrying.');
+      if (Date.now() - started >= wait) throw new StatusLockedError();
       await new Promise(resolve => setTimeout(resolve, 25));
     }
   }
@@ -44,12 +96,21 @@ export async function withStatusLock(root, action) {
     await atomicJson(join(lock, 'owner.json'), {pid:process.pid, host:hostname()});
     const store = {
       root,
-      async readStatus() {
-        const value = await readJson(join(directory, 'status.json'));
-        if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid status file');
-        return value;
+      async readStatus() { return checkStatus(await readJson(statusPath(root))); },
+      /** Saves atomically and stamps updated_at. */
+      async writeStatus(value) {
+        checkStatus(value).updated_at = new Date().toISOString();
+        await atomicJson(statusPath(root), value);
       },
-      async writeStatus(value) { await atomicJson(join(directory, 'status.json'), value); },
+      /**
+       * Saves exactly this text, unstamped. Only for a journaled update, rollback
+       * or switch that must put back or predict the file's bytes; any other
+       * change uses writeStatus.
+       */
+      async writeStatusText(text) {
+        checkStatus(JSON.parse(String(text)));
+        await atomicText(statusPath(root), String(text));
+      },
       async readOutbox() {
         const value = await readJson(join(directory, 'radio-outbox.json'), []);
         if (!Array.isArray(value) || value.some(entry => !entry || typeof entry !== 'object' || Array.isArray(entry) || Object.keys(entry).some(key => !['kind','body'].includes(key)) || !['signal','asset'].includes(entry.kind) || !entry.body || typeof entry.body !== 'object' || Array.isArray(entry.body))) throw new Error('Invalid radio outbox');
@@ -59,12 +120,50 @@ export async function withStatusLock(root, action) {
         if (!Array.isArray(value)) throw new Error('Invalid radio outbox');
         await atomicJson(join(directory, 'radio-outbox.json'), value);
       },
+      /** The text of status/radio.key, '' when there is none. Never print it. */
+      async readKey() {
+        try { return await readFile(keyPath(root), 'utf8'); }
+        catch (error) { if (error.code === 'ENOENT') return ''; throw error; }
+      },
+      /** Saves the key with owner-only access, and reads it back before returning. */
+      async writeKey(token) {
+        const value = String(token).trim();
+        await atomicText(keyPath(root), `${value}\n`);
+        if ((await this.readKey()).trim() !== value) throw new Error('the key file did not read back as written');
+      },
+      async removeKey() {
+        await unlink(keyPath(root)).catch(error => { if (error.code !== 'ENOENT') throw error; });
+      },
     };
     return await action(store);
   } finally {
     await unlink(join(lock, 'owner.json')).catch(error => { if (error.code !== 'ENOENT') throw error; });
     await rmdir(lock);
   }
+}
+
+/**
+ * One change to status.json: read fresh under the lock, `mutate(status)` edits
+ * it in place, and it is saved unless mutate throws or changed nothing. Returns
+ * what mutate returns.
+ */
+export async function changeStatus(root, mutate, { wait } = {}) {
+  return withStatusLock(root, async store => {
+    const status = await store.readStatus();
+    const before = JSON.stringify(status);
+    const result = await mutate(status);
+    if (JSON.stringify(status) !== before) await store.writeStatus(status);
+    return result;
+  }, { wait });
+}
+
+/** Creates status.json from the template when there is none. True when it did. */
+export async function createStatus(root) {
+  return withStatusLock(root, async store => {
+    if (await readStatus(root) !== null) return false;
+    await store.writeStatus(JSON.parse(await readFile(templatePath(root), 'utf8')));
+    return true;
+  });
 }
 
 /** Version-2 state upgrade. Historical migration fields are inert. */

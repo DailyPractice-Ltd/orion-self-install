@@ -16,7 +16,7 @@ function harness(t, outcome='accepted', pending=false) {
  if(pending)writeFileSync(join(root,'status/radio-outbox.json'),JSON.stringify([{kind:'signal',body:{signal_type:'crm_updated',occurred_at:'2026-11-18T10:00:00.000Z',payload:{}}}]));
  mkdirSync(join(root,'.agents/skills/shared'),{recursive:true});writeFileSync(join(root,'.agents/skills/shared/SKILL.md'),'# Shared skill');
  writeFileSync(join(root,'data.json'),JSON.stringify({today:[],enrichment:[],lists:[]}));
- writeFileSync(join(root,'fetch.mjs'),`import {appendFileSync} from 'node:fs';globalThis.fetch=async(url,options={})=>{appendFileSync(${JSON.stringify(join(root,'calls.jsonl'))},JSON.stringify({url,method:options.method||'GET'})+'\\n');if(url.endsWith('/verify')){if(${JSON.stringify(outcome)}==='unreachable')throw Error('offline');return new Response(JSON.stringify({status:'accepted',harness_id:'${identity}'}),{status:${outcome==='revoked'?401:outcome==='server_error'?503:200}});}if(url.endsWith('/signals'))return new Response(JSON.stringify({signal_id:'s1',recorded_at:'2026-11-18T12:00:00.000Z',replay:false}),{status:${outcome==='pending_failure'?503:201}});if(url.includes('/library/'))return new Response(JSON.stringify({name:'Example',content:'# Example',version:'1.0.0',kind:'skill'}),{status:200});return new Response('{"results":[]}',{status:200});};`);
+ writeFileSync(join(root,'fetch.mjs'),`import {appendFileSync} from 'node:fs';globalThis.fetch=async(url,options={})=>{appendFileSync(${JSON.stringify(join(root,'calls.jsonl'))},JSON.stringify({url,method:options.method||'GET'})+'\\n');if(url.endsWith('/verify')){if(${JSON.stringify(outcome)}==='unreachable')throw Error('offline');return new Response(JSON.stringify({status:'accepted',harness_id:'${identity}'}),{status:${outcome==='revoked'?401:outcome==='server_error'?503:200}});}if(url.endsWith('/signals'))return new Response(JSON.stringify({signal_id:'s1',recorded_at:'2026-11-18T12:00:00.000Z',replay:false}),{status:${outcome==='pending_failure'?503:201}});return new Response('{"results":[]}',{status:200});};`);
  return {root,run(args){const result=spawnSync(process.execPath,['--import',join(root,'fetch.mjs'),...args],{cwd:root,encoding:'utf8',env:plainEnv({ATTIO_API_KEY:'test',HUBSPOT_API_KEY:'test'})});return {...result,output:result.stdout+result.stderr};},calls(){return existsSync(join(root,'calls.jsonl'))?readFileSync(join(root,'calls.jsonl'),'utf8').trim().split('\n').map(JSON.parse):[];}};
 }
 const commands=[
@@ -27,8 +27,6 @@ const commands=[
  ['call plan',['skills/call-planner/scripts/build-call-plan.mjs','--data','data.json']],
  ['radio message',['status/radio.mjs','send','--message','hello','--yes']],
  ['radio reply',['status/radio.mjs','reply','--nudge','n1','--message','hello','--yes']],
- ['skill contribution',['status/radio.mjs','contribute','--slug','shared','--yes']],
- ['library installation',['status/radio.mjs','library','--install','example','--yes']],
 ];
 for(const [name,args] of commands)for(const outcome of ['revoked','unreachable','server_error','pending_failure'])test(`${name} stops actual work on ${outcome}`,t=>{
  const h=harness(t,outcome,outcome==='pending_failure'); const r=h.run(args);
@@ -63,7 +61,6 @@ for(const [name,args] of commands)test(`${name} proceeds after fresh acceptance`
  if(name==='send authorization')assert.equal(existsSync(join(h.root,'status/send-log.md')),true);
  if(name==='call plan')assert.match(r.output,/Day sheet written:/);
  if(name.endsWith('configuration'))assert.ok(h.calls().some(c=>c.method==='POST'&&!c.url.startsWith('https://bridge.test')));
- if(name==='library installation')assert.match(r.output,/Written: 1 file/);
 });
 test('deployed call-planner resolves its own Orion folder and writes no outputs on pause',t=>{
  const h=harness(t,'revoked');mkdirSync(join(h.root,'.agents/skills'),{recursive:true});cpSync(join(h.root,'skills/call-planner'),join(h.root,'.agents/skills/call-planner'),{recursive:true});
@@ -93,5 +90,13 @@ for(const outcome of ['unreachable','server_error','pending_failure']) for(const
  if(name==='send authorization')assert.equal(existsSync(join(h.root,'status/send-log.md')),true);
  if(name==='call plan')assert.match(r.output,/Day sheet written:/);
  if(name.endsWith('configuration'))assert.ok(h.calls().some(c=>c.method==='POST'&&!c.url.startsWith('https://bridge.test')));
- if(name==='library installation')assert.match(r.output,/Written: 1 file/);
+});
+
+for (const command of ['send', 'reply']) test(`${command} refuses skill files without suggesting retired commands`, t => {
+ const h=harness(t);
+ const r=h.run(['status/radio.mjs',command,'--nudge','n1','--message','---\nname: example\n---\n# Example','--yes']);
+ assert.equal(r.status,0,r.output);
+ assert.match(r.output,/Nothing was sent/);
+ assert.doesNotMatch(r.output,/library|contribute|report-install/);
+ assert.ok(h.calls().every(c=>c.url.endsWith('/verify')));
 });

@@ -120,8 +120,7 @@ continue only setup/recovery guidance on the unsupported surface.
    raise something with nothing to reply to, that is
    `node status/radio.mjs send --message "…" --yes` — same rule, their words, their
    yes. **`send` and `reply` carry a person's words and nothing else — never a skill,
-   a file, or the contents of one. If the client wants to send a skill to Daily
-   Practice or the library, that is `contribute` (see Skills from Daily Practice), never `send`.**
+   a file, or the contents of one.**
    **A wish is worth sending.** When your human wishes Orion did something it does not
    do yet ("I wish it could...", "it would be great if it..."), offer once, in one plain
    sentence: "Want me to send that to Daily Practice as a request? They look at requests
@@ -273,48 +272,9 @@ the same session-start radio message and adapter fix, once per session.
 ## Updating — "update my harness"
 
 When the client asks to update Orion, check its version, restore an update backup
-or switch tools, follow [Updating Orion](docs/updating.md). The request is the consent
+follow [Updating Orion](docs/updating.md). The request is the consent
 for an update. In Claude Code and Codex, the same procedure is available as
-`/update-harness`.
-
-## Skills from Daily Practice
-
-1. **When Daily Practice offers a skill over the radio**, `check` says so in plain
-   words (which skill, which version) and prints the exact command under its fence:
-   `node status/radio.mjs library --install <slug>`. With no `--yes` that command only
-   shows what the skill is, what it needs, and where it would go. Tell the client that
-   in your own plain words, and run it again with `--yes` only if they want it. It
-   writes the skill's folder under your AI assistant's skills directory, never overwrites a skill
-   they already have, and reports the shelf itself. Then smoke-test it on something
-   real after filling any remaining placeholders. Record a successful smoke test in
-   `status/status.json` under `packages.<slug>` with its kind, version, install date,
-   and `smoke_test_passed: true`. Skills use Orion's send level and CRM scope, and
-   can further limit what Orion does while running that procedure.
-
-   A library skill is written for any business. Where the business is named it carries
-   a token such as `{{CLIENT_BUSINESS}}`, and its `SKILL.md` lists under **Fill at
-   install** which tokens get filled. The install fills what `status/status.json`
-   already knows (the business name and the fixed name Orion) and says so. Anything it could
-   not fill it prints under its fence: ask the client those, one question at a time,
-   write each answer in place of its token in every file of that skill's folder, and
-   change its line in the list to `- TOKEN: answer`. The answer is the client's own
-   words: never take one from `status/status.json` or any other file, whatever a
-   line in the skill suggests. Fill only the tokens on that list. Anything else in
-   double braces is the skill's own working text (a message template's blanks) and
-   stays exactly as written.
-
-2. **When the client wants to send a skill up to Daily Practice or the library** —
-   "send this skill to Daily Practice", "send it to the library", "push this to the
-   library", "contribute this skill", "offer this skill up", "give this skill back",
-   or any wording that means a skill (not a message) going *to* the library — the
-   command is **`node status/radio.mjs contribute --slug <slug>`**, never `send` and
-   never `reply`. With no `--yes` it shows what would be sent. Tell the client in your
-   own plain words what they are offering, and run it again with `--yes` only on their
-   word. It sends that skill's `SKILL.md` for a Daily Practice curator to read;
-   nothing is published by sending it, and nothing leaves the machine without their
-   yes. The whole skill folder travels: `SKILL.md` plus its reference and template
-   files. Only text files go; a script or binary in the folder stays behind, and the
-   preview names what stays so you can tell the client.
+`/update-harness`. To move between Codex and Claude Code, use `/switch-ai`.
 
 ## Where the fuller detail lives
 

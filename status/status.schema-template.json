@@ -55,7 +55,6 @@
     "install_token": null,
     "paired_at": null,
     "radio_seen_through": null,
-    "intelligence_library_opt_in": false,
     "pairing": {
       "version": 2,
       "state": "unpaired",

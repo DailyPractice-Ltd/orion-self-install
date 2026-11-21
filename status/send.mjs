@@ -46,6 +46,7 @@ import {
   RISK_MATRIX, riskLabel, riskScore, lowestLevelFor, levelSends, labelProblem, countProblem,
 } from './shapes.mjs';
 import { runtimeLayout } from '../update/destination-resolver.mjs';
+import { changeStatus, readStatus, LOCKED_MESSAGE } from './store.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FOLDER = join(here, '..');
@@ -71,14 +72,18 @@ function stamp(d = new Date()) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-function readStatus() {
+/** A read-only look at status.json; null when there is none or it cannot be read. Changes go through the store. */
+function peekStatus() {
   if (!existsSync(STATUS_PATH)) return null;
   try { return JSON.parse(readFileSync(STATUS_PATH, 'utf8')); } catch { return null; }
 }
 
-function writeStatus(status) {
-  status.updated_at = new Date().toISOString();
-  writeFileSync(STATUS_PATH, `${JSON.stringify(status, null, 2)}\n`);
+/** What a failed status change tells the client: the lock, or a file that needs recovery. Nothing was changed. */
+function statusTrouble(error) {
+  console.log(error?.code === 'STATUS_LOCKED'
+    ? `${LOCKED_MESSAGE} Nothing was changed.`
+    : 'status/status.json could not be read or saved, so nothing was changed. Run  node status/home.mjs check  and recover it before retrying.');
+  return 1;
 }
 
 /** The harness level as recorded: off, low, medium, high, or null when there is none yet. */
@@ -210,7 +215,7 @@ async function score(rest) {
   const permission = await checkWork({root:FOLDER});
   if (!permission.allow) console.log(permission.reason);
   if (!permission.allow) return 2;
-  const status = readStatus();
+  const status = peekStatus();
   if (!status) {
     console.log('No status/status.json yet, so there is no level to score against. Run  node start.mjs  first.');
     return 1;
@@ -353,7 +358,7 @@ function setSheetLine(text, key, value) {
   return `${front[1]}${lines.join(nl)}${front[3]}${text.slice(front[0].length)}`;
 }
 
-function setLevel(rest) {
+async function setLevel(rest) {
   const [what, ...more] = rest;
   const { flags, problems } = parseFlags(more, { values: ['agent', 'cap-email', 'cap-dm', 'cap-sms', 'by'] });
   const word = String(what ?? '').trim().toLowerCase();
@@ -374,7 +379,8 @@ function setLevel(rest) {
     else caps[group] = Number(given);
   }
   if (problems.length > 0) return refuse(problems);
-  const status = readStatus();
+  let status;
+  try { status = await readStatus(FOLDER); } catch (error) { return statusTrouble(error); }
   if (!status) {
     console.log('No status/status.json yet. Run  node start.mjs  first.');
     return 1;
@@ -386,11 +392,6 @@ function setLevel(rest) {
     console.log('Run  node status/send.mjs migrate  first (it backs up, then replaces the kit\'s own old sentences), then set the level again.');
     return 1;
   }
-  status.scopes = status.scopes && typeof status.scopes === 'object' ? status.scopes : { crm_write: true };
-  const by = String(flags.by ?? status.client_name ?? 'the client');
-  const today = stamp().slice(0, 10);
-  const current = harnessLevel(status) ?? 'off';
-
   if (forRole) {
     const role = roleOf(flags.agent);
     if (!role.sheet) {
@@ -409,21 +410,30 @@ function setLevel(rest) {
     return 0;
   }
 
-  let level = word;
-  if (word === 'pause') level = 'off';
-  if (word === 'resume') {
-    level = SEND_LEVELS.includes(status.scopes.send_risk_resume) && status.scopes.send_risk_resume !== 'off' ? status.scopes.send_risk_resume : 'low';
-  }
-  if (level === 'off') {
-    if (current !== 'off') status.scopes.send_risk_resume = current;
-  } else {
-    delete status.scopes.send_risk_resume;
-  }
-  status.scopes.send_risk = level;
-  status.scopes.send_risk_set_by = by;
-  status.scopes.send_risk_set_on = today;
-  if (Object.keys(caps).length > 0) status.scopes.send_caps = { ...(status.scopes.send_caps || {}), ...caps };
-  writeStatus(status);
+  // Read fresh and saved under the status lock, so a guard or an update running
+  // at the same moment can neither lose this level nor have it lost.
+  let level;
+  try {
+    status = await changeStatus(FOLDER, (fresh) => {
+      fresh.scopes = fresh.scopes && typeof fresh.scopes === 'object' ? fresh.scopes : { crm_write: true };
+      const current = harnessLevel(fresh) ?? 'off';
+      level = word;
+      if (word === 'pause') level = 'off';
+      if (word === 'resume') {
+        level = SEND_LEVELS.includes(fresh.scopes.send_risk_resume) && fresh.scopes.send_risk_resume !== 'off' ? fresh.scopes.send_risk_resume : 'low';
+      }
+      if (level === 'off') {
+        if (current !== 'off') fresh.scopes.send_risk_resume = current;
+      } else {
+        delete fresh.scopes.send_risk_resume;
+      }
+      fresh.scopes.send_risk = level;
+      fresh.scopes.send_risk_set_by = String(flags.by ?? fresh.client_name ?? 'the client');
+      fresh.scopes.send_risk_set_on = stamp().slice(0, 10);
+      if (Object.keys(caps).length > 0) fresh.scopes.send_caps = { ...(fresh.scopes.send_caps || {}), ...caps };
+      return fresh;
+    });
+  } catch (error) { return statusTrouble(error); }
 
   if (level === 'off') {
     console.log(`Sending is paused. Everything waits for you.${status.scopes.send_risk_resume ? ` Say 'resume sending' to go back to ${status.scopes.send_risk_resume}.` : ''}`);
@@ -652,13 +662,13 @@ function ownSendLines(files) {
   return found;
 }
 
-function migrate(rest) {
+async function migrate(rest) {
   const { flags, problems } = parseFlags(rest, { values: ['backup'] });
   if (problems.length > 0) return refuse(problems);
   const files = keptFiles();
   // The update's own backup folder is .update-backup/{version}-{date}/ (docs/updating.md step 3)
   // and this runs before step 6 bumps the version, so the two land in one place.
-  const beforeStatus = readStatus();
+  const beforeStatus = peekStatus();
   const backupDir = flags.backup ? join(FOLDER, flags.backup) : join(FOLDER, '.update-backup', `${beforeStatus?.template_version || 'send-risk'}-${stamp().slice(0, 10)}`);
   const replaced = [];
   for (const rel of files) {
@@ -666,7 +676,7 @@ function migrate(rest) {
     const before = readFileSync(path, 'utf8');
     let { text, changed } = migrateText(rel, before);
     if (rel === 'agent/agent-definition.md' && changed > 0) {
-      const agentName = (/^You are ([^,\n]+),/m.exec(before) || [])[1] || readStatus()?.agent_name || 'your-agent';
+      const agentName = (/^You are ([^,\n]+),/m.exec(before) || [])[1] || peekStatus()?.agent_name || 'your-agent';
       text = text.replaceAll('{{AGENT_NAME}}', agentName.trim());
     }
     if (changed === 0 || text === before) continue;
@@ -677,18 +687,25 @@ function migrate(rest) {
     replaced.push(rel);
   }
 
-  const status = readStatus();
+  let status = null;
   let levelWritten = false;
-  if (status) {
-    status.scopes = status.scopes && typeof status.scopes === 'object' ? status.scopes : { crm_write: true };
-    if (typeof status.scopes.crm_write !== 'boolean') status.scopes.crm_write = true;
-    if (harnessLevel(status) === null) {
-      status.scopes.send_risk = 'low';
-      status.scopes.send_risk_set_by = 'update';
-      status.scopes.send_risk_set_on = stamp().slice(0, 10);
-      writeStatus(status);
-      levelWritten = true;
+  try {
+    if (await readStatus(FOLDER) !== null) {
+      status = await changeStatus(FOLDER, (fresh) => {
+        if (harnessLevel(fresh) !== null) return fresh;
+        fresh.scopes = fresh.scopes && typeof fresh.scopes === 'object' ? fresh.scopes : { crm_write: true };
+        if (typeof fresh.scopes.crm_write !== 'boolean') fresh.scopes.crm_write = true;
+        fresh.scopes.send_risk = 'low';
+        fresh.scopes.send_risk_set_by = 'update';
+        fresh.scopes.send_risk_set_on = stamp().slice(0, 10);
+        levelWritten = true;
+        return fresh;
+      });
     }
+  } catch (error) {
+    if (replaced.length > 0) console.log(`Replaced the old rule in ${replaced.length} files: ${replaced.join(', ')}. Backup: ${relative(FOLDER, backupDir)}/`);
+    console.log('The send level was not recorded. Run  node status/send.mjs migrate  again.');
+    return statusTrouble(error);
   }
 
   if (replaced.length > 0) {

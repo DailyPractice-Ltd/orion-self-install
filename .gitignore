@@ -2,7 +2,10 @@ status/status.json
 status/radio.key
 .DS_Store
 .update-backup/
-memory/*
-!memory/README.md
 .scratch/
 .scratch/*
+status/radio-outbox.json
+status/.radio-lock/
+status/status.json.*.tmp
+status/radio-outbox.json.*.tmp
+/.claude

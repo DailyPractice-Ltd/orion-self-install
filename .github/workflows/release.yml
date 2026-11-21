@@ -37,28 +37,42 @@ jobs:
 
       - name: Resolve version and tag
         id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_COMMIT: ${{ inputs.commit }}
         run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            VERSION="${{ inputs.version }}"
-          else
-            VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${INPUT_VERSION:-${GITHUB_REF_NAME#v}}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a release version in X.Y.Z format." >&2
+            exit 1
           fi
           TAG="v${VERSION}"
-          if ! git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
-            # Dispatched for a version with no tag yet: create it here, on the
-            # named commit (or main), so a release never needs a local git push.
-            TARGET="${{ inputs.commit }}"
-            [ -n "$TARGET" ] || TARGET="$(git rev-parse HEAD)"
-            git rev-parse -q --verify "${TARGET}^{commit}" >/dev/null || {
-              echo "Commit ${TARGET} not found on main's history." >&2; exit 1; }
-            DATE="$(grep -m1 -E "^## ${VERSION} — " CHANGELOG.md | sed -E 's/^## [^ ]+ — //')"
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag -a "$TAG" "$TARGET" -m "Orion self-install ${VERSION}${DATE:+ (${DATE})}"
-            git push origin "refs/tags/${TAG}"
+          if git show-ref --verify --quiet "refs/tags/${TAG}"; then
+            CANDIDATE="$(git rev-parse --verify "refs/tags/${TAG}^{commit}")"
+            CREATE_TAG=false
+          else
+            CANDIDATE="$(git rev-parse --verify --end-of-options "${INPUT_COMMIT:-HEAD}^{commit}")"
+            CREATE_TAG=true
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "candidate=${CANDIDATE}" >> "$GITHUB_OUTPUT"
+          echo "create_tag=${CREATE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Validate the release contract on the candidate
+        env:
+          CANDIDATE: ${{ steps.v.outputs.candidate }}
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/orion-release-candidate" "$CANDIDATE"
+          cd "$RUNNER_TEMP/orion-release-candidate"
+          for tool in codex claude-code; do
+            echo "Checking Orion deployment for $tool at $CANDIDATE"
+            node update/release-contract.mjs --tool "$tool" > /dev/null
+          done
 
       - name: Extract release notes from CHANGELOG.md
         id: notes
@@ -78,6 +92,19 @@ jobs:
             echo 'To move an installed harness to this version, open your Orion folder in your agent and say **update my harness**. Your knowledge base, hired agents, taught skills and status are untouched by construction; a full backup is taken first and **restore my harness from the backup** undoes it. Details: `docs/updating.md`.'
           } >> notes.md
           echo "Notes for ${VERSION}:"; cat notes.md
+
+      - name: Push the validated tag
+        if: steps.v.outputs.create_tag == 'true'
+        env:
+          CANDIDATE: ${{ steps.v.outputs.candidate }}
+          TAG: ${{ steps.v.outputs.tag }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          DATE="$(awk -v v="$VERSION" '/^## / && $2 == v { sub(/^## [^ ]+ — /, ""); print; exit }' CHANGELOG.md)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$CANDIDATE" -m "Orion self-install ${VERSION}${DATE:+ (${DATE})}"
+          git push origin "refs/tags/${TAG}"
 
       - name: Create the GitHub release
         env:

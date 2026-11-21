@@ -1,63 +1,24 @@
-# Adapter — ChatGPT (OpenAI)
+# Adapter — ChatGPT website and Custom GPTs
 
-**Thin by design**: mechanics only. Behaviour lives in the
-[agent definition](../agent-definition.md) — fix it there, not here.
+This website-only or paste-only surface cannot execute Orion's pairing and fresh
+pre-work connection checks. It is no longer a supported installation or Orion work
+path. An uploaded knowledge base or pasted agent prompt does not satisfy the gate.
 
-Best fit when `{{CLIENT_AI_TOOL}}` = ChatGPT (Plus/Team+ for custom GPTs; on a free plan,
-use the fallback below).
+## Continue in a supported tool
 
-## Install steps (Custom GPT — preferred) — walk the client through these directly
+1. Explain that Orion needs a local assistant that can run the connection check.
+2. Open the client's existing installed Orion folder in **Codex or Claude Code**.
+   For the Claude desktop app use its Code environment, covered by
+   [the Claude Code adapter](claude-code.md). Keep their saved business files in
+   that folder rather than exporting credentials into chat.
+3. Follow [setup and recovery](../../docs/setup.md): run `node start.mjs`, get the
+   signed-in account's one-time code, exchange and verify it. Resume saved answers.
+4. In the supported tool run `node status/guard.mjs check --quiet` before Orion
+   tasks, outbound messages or CRM writes, and stop on exit 2. Native scheduled
+   work follows [Schedule Orion](../../docs/scheduled-work.md).
 
-1. **Create a GPT**: chatgpt.com → *GPTs → Create*. Name it `{{AGENT_NAME}}`. Set it
-   **private** (only the client) — the knowledge base contains their business detail.
-2. **Instructions**: paste the assembled system prompt from `agent-definition.md`
-   (placeholders filled). If it exceeds the instructions character limit, keep the
-   rules and task list verbatim and move the "Who you work for" details fully into the
-   knowledge files (they're already there — just remove the duplicated lines).
-3. **Knowledge**: upload the seven completed knowledge-base files with numbered filenames
-   intact. Attach both core skill files named in the agent definition's setup notes.
-   Name the attachments `prospect-research-outreach.md` and `post-call-debrief.md`.
-4. **Capabilities**: enable web browsing (prospect research needs it). Connect only the
-   connectors the checklist names (CRM read-and-write, email read, draft and send,
-   calendar read). Verified 4 November 2026: the agent scores by hand from
-   `agent/risk-matrix.md`, says so, and the waiting list is `status/waiting.md`, handed
-   over and read out at the start of each conversation. The approval
-   gate is rule 1 of the agent definition: every message is scored; a custom GPT
-   cannot send on its own, so here every message waits for the client
-   (agent-definition rule 1).
-5. **First-run check, right there in the conversation**: the vocabulary check — one
-   prospect-research task, read the draft back, "does this sound like you?"
-
-## Fallback (no custom-GPT plan)
-
-Use a persistent chat: paste the system prompt as the first message with "these are your
-standing instructions," then paste each knowledge-base file and both core skills, with
-the skill name above each pasted block. Tell the client this is
-slightly weaker — instructions can drift over a long conversation, so re-paste them if the
-agent starts sounding generic again.
-
-## The radio
-
-The radio does not run here, by design: a chat surface can't run scripts, so the
-check-in channel is carried by the client's code-capable sessions (Codex or Claude
-Code: see those adapters), on request or on a schedule.
-Two consequences to say out loud, once, so nobody is surprised later:
-
-- Work done only in this surface is invisible to Daily Practice. It is real and
-  valuable, just unreported. If the client wants their work counted, the tasks they
-  want counted belong in a code-capable session, where a finished task is reported,
-  or from a native scheduled task there.
-- Never simulate a radio check or a signal from here, and never claim one happened.
-  "This surface can't reach the radio" is the honest sentence.
-
-(Actions stay disabled per the install steps above. A signals-only Action that would
-give this surface a voice is a considered future design, not something to improvise —
-it moves a credential into the GPT and needs its own review.)
-
-## Known quirks
-
-- GPT knowledge retrieval is chunk-based; the numbered-section structure keeps references
-  ("knowledge base §5") findable.
-- ChatGPT may offer to "remember" facts about the client across chats — fine as a
-  supplement, but the knowledge-base files stay the source of truth; update files, not
-  memory, when something changes.
+On this unsupported surface, help only with setup and recovery guidance until the
+client moves to a supported tool. Never claim a check or signal happened here.
+Older website instructions described a supported path in earlier releases; their
+recorded radio choices remain historical until explicit pairing. Unpaired work is blocked immediately.
+See [the radio guide](../../docs/radio.md) for the operational-data disclosure.

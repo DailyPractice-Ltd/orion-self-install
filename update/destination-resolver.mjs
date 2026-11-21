@@ -15,6 +15,9 @@ export function safePath(root, path) {
   if (typeof path !== 'string' || !path || path === '.' || isAbsolute(path) || path.split(/[\\/]/).includes('..')) {
     throw new Error(`Invalid deployment path: ${path}`);
   }
+  if (path.split(/[\\/]/).includes('specs')) {
+    throw new Error(`Human-only specs are not an agent or code input: ${path}`);
+  }
   const target = resolve(root, path);
   if (target === resolve(root) || relative(root, target).startsWith(`..${sep}`)) {
     throw new Error(`Deployment path escapes root: ${path}`);

@@ -136,7 +136,6 @@ function install() {
       delete oldStatus.checklist.n8n_wf02_imported;
       oldStatus.sharing={...template.sharing,...oldStatus.sharing,pairing:{...template.sharing.pairing,...oldStatus.sharing?.pairing}};
       oldStatus.scopes={...template.scopes,...oldStatus.scopes};
-      oldStatus.memory={...template.memory,...oldStatus.memory};
       oldStatus.schema_version=template.schema_version;
       oldStatus.ai_assistant = ai_assistant;
       oldStatus.template_version=manifest.template_version;

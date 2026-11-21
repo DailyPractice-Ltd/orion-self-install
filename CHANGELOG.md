@@ -1,5 +1,33 @@
 # Orion self-install — Changelog
 
+## Unreleased — Fixed Orion identity
+
+- Fresh installs record `agent_name: "Orion"` automatically. The installer and
+  agent definition use Orion directly and ask only for business context, tone
+  and working preferences. The status CLI no longer accepts name changes.
+- Existing clients reinstall from scratch. No agent-name migration is added.
+
+## Unreleased — revised required pairing
+
+Removed the learned-memory folder, synchronization, consolidation skill and agent
+habits. Fresh installs retain the knowledge base, setup state, permissions,
+approval queue and operational logs. Reinstall to adopt this version; no memory
+migration or deletion of old installations is provided.
+
+All unpaired folders must pair before normal work, including the first updated
+run. Paired folders work silently through temporary connection or reporting
+failures for 48 elapsed hours after accepted verification and complete acknowledged
+report delivery. Only that cycle renews the clock. Revocation blocks immediately;
+expiry blocks new tasks while admitted work can finish and report. Setup still
+needs current acceptance and acknowledged reporting. Version-2 pairing state keeps
+legacy migration fields readable but inert. No payload expansion.
+
+Switching AI assistants is now local: run `node switch_ai.mjs` in the deployed
+folder. It moves every skill between `.agents/skills/` and `.claude/skills/`,
+records the new assistant and backs up first, with no release clone, commit or
+version check. Run it again to switch back. `update/apply.mjs switch` is retired.
+
+
 Semantic versioning: a real self-serve install's corrections/learnings → minor; a change
 to the install sequence or repo structure → major; wording/clarity fixes → patch.
 
@@ -8,7 +36,7 @@ This changelog tracks **this repo's own** version history — independent of
 the coach-led kit this repo was adapted from. Cross-reference, don't duplicate: a change
 that applies to both gets made in both places, cited both ways.
 
-**Every heading below is a release.** `## X.Y.Z — date` is tagged `vX.Y.Z` on the commit
+**Dated headings are release records unless marked candidate below.** `## X.Y.Z — date` is tagged `vX.Y.Z` on the commit
 that shipped it, and pushing that tag publishes a GitHub Release whose notes are the
 heading's section (`.github/workflows/release.yml`). Clients compare their
 `status.json` `template_version` with the Releases page and say "update my harness".
@@ -507,8 +535,7 @@ from what the notebook actually says.
   other agent.
 - **Private, like everything else.** The notebook's contents never ride the
   radio, and "update my harness" refreshes the notebook's binding — the scripts
-  and guides — never its pages. `docs/memory.md` is the whole contract in plain
-  words.
+  and guides — never its pages. The feature had its own documented contract.
 
 ## 0.6.6 — 2026-09-22
 

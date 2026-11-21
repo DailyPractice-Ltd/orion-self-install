@@ -1,47 +1,17 @@
 #!/usr/bin/env node
-/**
- * Press Start — the Orion setup wizard.
- *
- *   node start.mjs
- *
- * One file, zero dependencies: node: built-ins and global fetch only — no package.json,
- * no npm install, ever (same rule as status/emit-status.mjs). What it does, in order:
- *
- *   1. Looks at this computer (OS, Node, git, which AI tools live here) and writes what
- *      it finds into the bookmark file, status/status.json — so no one is ever asked a
- *      question the machine can answer (spec FR-001).
- *   2. Asks the one question only a human can answer (which AI runs your harness), and
- *      only when two or more are found.
- *   3. Presents the check-in choice — pre-ticked, plain words, one keystroke to decline
- *      (FR-008) — and, given a pairing code, sets the radio up and sends the first
- *      signal. You are never asked for a key: the code is exchanged for one, and the
- *      key is written straight to your own bookmark file (FR-002, FR-B09).
- *   4. Hands off: prints the copy-ready prompt that starts the client's AI on the
- *      AGENTS.md install sequence (FR-003).
- *
- * Driving this from a script or an AI agent? Two supported ways, both order-free:
- *   node start.mjs --code BCDF-GHJK-LMNP [--checkins yes|no] [--surface 1]
- *   printf 'code=BCDF-GHJK-LMNP\ncheckins=y\n' | node start.mjs
- * Bare positional answers still work, but they are fragile: the surface question only
- * appears on a machine with 2+ AI tools, so a caller that guesses wrong shifts every
- * later answer by one. That is exactly what went wrong on the first real install
- * (2026-07-28) — hence the key=value form, and the leftover-answer report at the end.
- *
- * Re-runnable by design: every completed unit is written to the bookmark immediately, a
- * later run greets you with where you left off, and no question answered in the file is
- * ever asked again (constitution Article II). Contracts:
- * specs/002-production-line/contracts/status-additions.schema.json and bridge-radio.md.
- */
+/** Press Start: resumable setup; only fresh, accepted pairing permits handoff. */
 
-import { readFileSync, writeFileSync, existsSync, copyFileSync, statSync, readdirSync, rmSync, chmodSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, delimiter } from 'node:path';
 import os from 'node:os';
+import { reportSignal, validateOutbox } from './status/report.mjs';
+import { checkWork } from './status/guard.mjs';
+import { withStatusLock, changeStatus, createStatus } from './status/store.mjs';
 import {
   bridgeBase,
-  isPairingCode,
   normalizePairingCode,
   pairingCodeProblem,
   radioConfigured,
@@ -49,13 +19,11 @@ import {
   readRadioKeyFile,
   keyHeader,
   homeOn,
-  RADIO_KEY_FILE,
+  INSTALL_TOKEN_RE, RADIO_URL_RE, HARNESS_ID_RE,
 } from './status/shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status', 'status.json');
-const TEMPLATE_PATH = join(__dirname, 'status', 'status.schema-template.json');
-const KEY_PATH = join(__dirname, 'status', RADIO_KEY_FILE);
 
 /**
  * Where the radio key may be besides the bookmark file (status/shapes.mjs,
@@ -64,7 +32,7 @@ const KEY_PATH = join(__dirname, 'status', RADIO_KEY_FILE);
  */
 const keyPlaces = () => ({ keyFile: readRadioKeyFile(join(__dirname, 'status'), { readFileSync }) });
 
-/** How long we'll wait on the radio before giving up and carrying on. */
+/** Bound setup network waits; a timeout leaves setup unfinished. */
 const NETWORK_TIMEOUT_MS = 10000;
 
 /**
@@ -127,7 +95,7 @@ process.on('SIGINT', () => {
   say('');
   say('Stopped — and nothing is lost. Everything finished so far is saved in your');
   say('bookmark file. Run  node start.mjs  again anytime to pick up right here.');
-  process.exit(0);
+  process.exit(2);
 });
 
 function say(line = '') { process.stdout.write(line + '\n'); }
@@ -157,7 +125,7 @@ function ask(id, question, fallback = '') {
   const keyedAt = pendingLines.findIndex((l) => parseKeyedLine(l)?.key === id);
   if (keyedAt !== -1) {
     const { value } = parseKeyedLine(pendingLines.splice(keyedAt, 1)[0]);
-    say(isTTY ? '' : `→ ${value || '(Enter)'}`);
+    say(isTTY ? '' : id === 'code' ? '→ (hidden)' : `→ ${value || '(Enter)'}`);
     return Promise.resolve(value);
   }
 
@@ -166,7 +134,7 @@ function ask(id, question, fallback = '') {
   const posAt = pendingLines.findIndex((l) => parseKeyedLine(l) === null);
   if (posAt !== -1) {
     const v = pendingLines.splice(posAt, 1)[0].trim();
-    say(isTTY ? '' : `→ ${v || '(Enter)'}`);
+    say(isTTY ? '' : id === 'code' ? '→ (hidden)' : `→ ${v || '(Enter)'}`);
     return Promise.resolve(v);
   }
 
@@ -195,7 +163,7 @@ function reportLeftoverAnswers() {
   if (isTTY || pendingLines.length === 0) return;
   say('');
   say(`  • ${pendingLines.length} answer line(s) were never used:`);
-  for (const l of pendingLines) say(`      "${l.trim()}"`);
+  say("    Unused answers are hidden; rerun with the named answers you intended.");
   say('    If you are driving this from a script, answer by name instead — the');
   say(`    order then stops mattering:  ${ANSWER_KEYS.map((k) => `${k}=…`).join('  ')}`);
 }
@@ -204,11 +172,7 @@ function reportLeftoverAnswers() {
 // ── The bookmark file ───────────────────────────────────────────────────────
 
 function loadStatus() {
-  if (!existsSync(STATUS_PATH)) {
-    copyFileSync(TEMPLATE_PATH, STATUS_PATH);
-    return { status: JSON.parse(readFileSync(STATUS_PATH, 'utf8')), firstRun: true };
-  }
-  return { status: JSON.parse(readFileSync(STATUS_PATH, 'utf8')), firstRun: false };
+  return {status:JSON.parse(readFileSync(STATUS_PATH,'utf8'))};
 }
 
 /**
@@ -230,10 +194,6 @@ function migrate(status, { firstRun = false } = {}) {
   // key. A bookmark written before pairing existed simply carries null.
   // 1.4.0 adds sharing.radio_seen_through: the newest message the radio has read
   // out, so nothing is repeated. Null means the radio has not read one out yet.
-  // 1.5.0 adds the memory block (the team notebook's wiring — docs/memory.md).
-  if (!status.memory || typeof status.memory !== 'object') {
-    status.memory = { enabled: true, backend: 'folder', remote: null, path: 'memory' };
-  }
   // 1.6.0 retires the n8n lane: its two checklist keys describe steps that no
   // longer exist. Never resurrect them; drop them from older bookmarks.
   if (status.checklist) {
@@ -273,11 +233,24 @@ function migrate(status, { firstRun = false } = {}) {
 }
 
 /** Write after every completed unit, never batched to the end (Article II). */
-function save(status) {
-  const now = new Date().toISOString();
-  if (!status.started_at) status.started_at = now;
-  status.updated_at = now;
-  writeFileSync(STATUS_PATH, JSON.stringify(status, null, 2) + '\n');
+async function save(status, { chosenSurface = false } = {}) {
+  await changeStatus(__dirname, fresh => {
+    const current = migrate(fresh, {
+      firstRun: status.scopes.send_risk_set_by === 'install',
+    });
+    if (chosenSurface) {
+      current.machine_profile.chosen_surface = status.machine_profile.chosen_surface;
+    } else {
+      current.machine_profile = {
+        ...current.machine_profile,
+        ...status.machine_profile,
+        chosen_surface: current.machine_profile?.chosen_surface ?? null,
+      };
+    }
+    current.started_at ??= new Date().toISOString();
+    // Later setup decisions must use the latest credential and saved answers.
+    Object.assign(status, current);
+  });
 }
 
 // ── Looking at the machine (FR-001) ─────────────────────────────────────────
@@ -375,7 +348,7 @@ async function main() {
     say('');
     say('  --code BCDF-GHJK-LMNP   pair without being asked (also ORION_PAIRING_CODE)');
     say('  --repair-radio          forget the current radio settings and pair again');
-    say('  --checkins yes|no       answer the check-in question up front');
+    say('  Pairing is required; legacy --checkins/skip flags cannot finish setup.');
     say('');
     say('Driving this from a script? Answer by name, in any order:');
     say('  printf \'code=BCDF-GHJK-LMNP\\ncheckins=y\\n\' | node start.mjs');
@@ -387,22 +360,24 @@ async function main() {
   rule();
 
   // Step 0 — the bookmark: read it before saying anything (AGENTS.md rule 1).
-  const { status: statusRaw, firstRun } = loadStatus();
-  const status = migrate(statusRaw, { firstRun });
+  const firstRun = await createStatus(__dirname);
+  // Validate and upgrade pairing state before setup writes.
+  const initial = await checkWork({root:__dirname, replay:false});
+  if (initial.reason.includes('could not safely')) { pauseSetup(initial.reason); return; }
+  const status = migrate(loadStatus().status, { firstRun });
 
-  // --repair-radio: the escape hatch when the settings LOOK fine but aren't —
-  // most often a key that was rotated our side. Shape-checking can't see that,
-  // so nothing else would ever re-open the pairing step.
   if (cliFlags['repair-radio']) {
-    status.sharing.bridge_url = null;
-    status.sharing.harness_id = null;
-    status.sharing.install_token = null;
-    status.sharing.paired_at = null;
-    rmSync(KEY_PATH, { force: true });
-    save(status);
-    say('');
-    say('  ✓ Radio settings cleared. Nothing else about your install was touched —');
-    say('    your knowledge base, your progress and your packages are all intact.');
+    await withStatusLock(__dirname, async store => {
+      const current = await store.readStatus();
+      for (const field of ['bridge_url','harness_id','install_token','paired_at']) current.sharing[field] = null;
+      current.sharing.pairing.state = 'unpaired';
+      current.sharing.pairing.last_check = 'invalid';
+      current.sharing.pairing.last_connected_at = null;
+      await store.removeKey();
+      await store.writeStatus(current);
+      Object.assign(status.sharing,current.sharing);
+    });
+    say('Radio settings cleared. Your saved answers and progress are intact.');
   }
   const resuming = !firstRun && (status.machine_profile || status.ops_stage !== 'booked' ||
     Object.values(status.checklist || {}).some(Boolean));
@@ -414,17 +389,17 @@ async function main() {
     say(`Your bookmark says you're at: ${STAGE_WORDS[status.ops_stage] || status.ops_stage}.`);
     if (doneCount > 0) say(`(${doneCount} install step${doneCount === 1 ? '' : 's'} already done — none will be repeated.)`);
     say("I'll re-check the machine quietly, skip every question you've already answered,");
-    say('and hand you the same starting prompt at the end.');
+    say('and finish setup once the pairing is verified.');
   } else {
     say('');
     say("Hi. I'm the setup wizard — a small program that looks at this computer, works");
     say('out what\'s already here, and gets you to the point where your own AI assistant');
     say('takes over the install. Two promises before I start:');
     say('');
-    say('  • I only LOOK. The one thing I write is your bookmark file');
-    say('    (status/status.json) — it lives in this folder and belongs to you.');
+    say('  • I save your setup progress and pairing securely in this folder. Your bookmark');
+    say('    (status/status.json) belongs to you. A homed folder keeps its key separately.');
     say('  • I never ask you for a password or a key. The only thing you might type is');
-    say('    a short pairing code, if Daily Practice has given you one — and it stops');
+    say('    a short pairing code from your Daily Practice account — and it stops');
     say('    working the moment it\'s used.');
     say('');
     say('This takes a few minutes. Stop anytime (Ctrl+C) — running me again picks up');
@@ -449,9 +424,9 @@ async function main() {
     say('  • AI tools that live on this computer:');
     for (const s of surfaces) say(`      – ${SURFACE_WORDS[s]}`);
   } else {
-    say("  • I didn't find an AI app installed here — no problem at all. The chat");
-    say('    websites (claude.ai, chatgpt.com, Copilot) work for everyone, and the');
-    say('    README\'s Step 4 shows that lane.');
+    say("  • I didn't find an AI app installed here.");
+    say('    Install Codex or Claude Code, then open this folder there.');
+    say('    See docs/setup.md for the supported installation route.');
   }
 
   status.machine_profile = {
@@ -463,7 +438,7 @@ async function main() {
     chosen_surface: status.machine_profile?.chosen_surface ?? null,
     detected_at: new Date().toISOString(),
   };
-  save(status);
+  await save(status);
   say('');
   say('  ✓ Saved to your bookmark — none of this will ever be asked of you.');
 
@@ -473,93 +448,48 @@ async function main() {
   // A new deployed harness has already made the one tool choice at install.
   // Keep the wizard's handoff aligned with the recorded runtime layout.
   const { ai_assistant } = status;
-  if (!mp.chosen_surface && ['claude-code', 'codex'].includes(ai_assistant)) {
+  if (mp.chosen_surface !== ai_assistant && ['claude-code', 'codex'].includes(ai_assistant)) {
     mp.chosen_surface = ai_assistant;
-    save(status);
+    await save(status, { chosenSurface: true });
   }
-  if (!mp.chosen_surface) {
-    if (surfaces.length === 0) {
-      mp.chosen_surface = 'website-chat';
-      say(`  ✓ Your lane: ${SURFACE_WORDS['website-chat']}.`);
-    } else if (surfaces.length === 1) {
-      mp.chosen_surface = surfaces[0];
-      say(`  ✓ Your lane: ${SURFACE_WORDS[surfaces[0]]} — the only AI tool found, so no need to ask.`);
+  if (!['claude-code', 'codex'].includes(mp.chosen_surface)) {
+    const supported = surfaces.filter(surface => ['claude-code', 'codex'].includes(surface));
+    const choices = supported.length ? supported : ['codex', 'claude-code'];
+    if (mp.chosen_surface) say('Your previous surface cannot run the required checks. Choose Codex or Claude Code to continue in this folder.');
+    if (choices.length === 1) {
+      mp.chosen_surface = choices[0];
+      say(`  ✓ Your lane: ${SURFACE_WORDS[choices[0]]} — the supported AI tool found.`);
     } else {
       say('');
       say('One question — the only one this machine can\'t answer for you:');
       say('');
       say('  Which of these should run Orion day to day?');
-      surfaces.forEach((s, i) => say(`    ${i + 1}) ${SURFACE_WORDS[s]}`));
+      choices.forEach((s, i) => say(`    ${i + 1}) ${SURFACE_WORDS[s]}`));
       say('');
       const answer = await ask('surface', '  Type a number and press Enter (or just Enter for 1): ', '1');
-      const idx = Math.min(Math.max(parseInt(answer || '1', 10) || 1, 1), surfaces.length) - 1;
-      mp.chosen_surface = surfaces[idx];
+      const idx = Math.min(Math.max(parseInt(answer || '1', 10) || 1, 1), choices.length) - 1;
+      mp.chosen_surface = choices[idx];
       say(`  ✓ Noted: ${SURFACE_WORDS[mp.chosen_surface]}.`);
     }
-    save(status);
+    await save(status, { chosenSurface: true });
   } else {
     say(`  ✓ Your chosen lane (from last time): ${SURFACE_WORDS[mp.chosen_surface] || mp.chosen_surface}.`);
   }
 
-  // Step 2 — the check-in choice (FR-008). Pre-ticked, plain words, one keystroke to
-  // decline, never re-asked once answered. Full disclosure: docs/radio.md.
-  say('');
-  rule();
-  say('  Step 2 of 3 — the check-in choice');
-  rule();
-  if (status.sharing.radio_choice === null) {
-    say('');
-    // These sentences are the consent itself. AGENTS.md presents the same choice in
-    // the same words, and tests/finished-work.test.mjs fails if the two ever differ.
-    say('Your harness checks in with Daily Practice so we can support you and');
-    say('count your system as running. It shares which step you\'re on, what kind');
-    say('of task finished (a general tag such as "prospecting", a count, and which');
-    say('skill or agent ran), and which packages you\'ve installed. Never the');
-    say('content of your messages, your knowledge base, or your prospects. You can');
-    say('switch this off.');
-    say('');
-    say('(We call this the radio. You can switch it off now or with one edit later,');
-    say('and everything else works exactly the same. Full detail: docs/radio.md.)');
-    say('');
-    const keep = (typeof cliFlags.checkins === 'string'
-      ? (say(`  Keep check-ins on? [Y/n] (from --checkins): ${cliFlags.checkins}`), cliFlags.checkins)
-      : await ask('checkins', '  Keep check-ins on? [Y/n] ', 'y')).toLowerCase();
-    if (keep === 'n' || keep === 'no') {
-      status.sharing.radio_choice = 'declined';
-      status.sharing.status_signal_enabled = false;
-      save(status);
-      say('');
-      say('  ✓ Done — check-ins are OFF and nothing will ever be sent. Everything');
-      say('    else about your install works identically.');
-    } else {
-      status.sharing.radio_choice = 'accepted';
-      status.sharing.status_signal_enabled = true;
-      save(status);
-      say('');
-      say('  ✓ Check-ins stay on. Thank you — it\'s how we spot a problem before');
-      say('    you have to report it.');
-      await pairingStep(status);
-    }
-  } else {
-    say('');
-    say(status.sharing.radio_choice === 'declined'
-      ? '  ✓ You chose to keep check-ins off — unchanged, and not asking again.'
-      : '  ✓ Check-ins are on (chosen earlier — not asking again).');
-    if (status.sharing.radio_choice === 'accepted') {
-      if (!radioConfigured(status, keyPlaces())) {
-        await pairingStep(status);
-      } else if (radioKey(status, keyPlaces()).source !== 'attached' && !(await radioStillWorks(status))) {
-        // (A cloud run holds no key to check: its environment attaches one, and
-        // pairing on a machine that is about to be thrown away helps nobody.)
-        // A revoked key still looks well-formed, so only the radio itself can
-        // tell us. Rotations become self-healing instead of a support ticket.
-        say('');
-        say('  • Your key has been cancelled by Daily Practice — usually because it');
-        say('    was rotated for safety. Nothing is wrong with your install.');
-        await pairingStep(status);
-      }
-    }
+  say(''); rule(); say('  Step 2 of 3 — pair Orion'); rule();
+  say('Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.');
+  say('https://www.dailypractice.world/home/pair');
+  const explicitCode = typeof cliFlags.code === 'string' || !!process.env.ORION_PAIRING_CODE || pendingLines.some(line => parseKeyedLine(line)?.key === 'code');
+  if (explicitCode || !radioConfigured(status,keyPlaces()) || status.sharing.radio_choice === 'declined') {
+    if (!(await pairingStep(status))) { pauseSetup('Get or renew your code at https://www.dailypractice.world/home/pair, then run node start.mjs --code <code>.'); return; }
   }
+  const verified = await checkWork({root:__dirname,scope:false});
+  const checked = loadStatus().status;
+  if (!verified.allow || verified.allowance || checked.sharing.pairing.state !== 'verified' || checked.sharing.pairing.last_check !== 'accepted') {
+    pauseSetup(verified.reason + ' Run node start.mjs again to resume your saved setup.'); return;
+  }
+  Object.assign(status.sharing, checked.sharing);
+  if (!(await sendFirstSignal())) return;
 
   // Step 3 — hand off to the client's own AI (FR-003).
   say('');
@@ -575,182 +505,97 @@ async function main() {
   rl.close();
 }
 
-/**
- * The pairing step — where the radio gets switched on (FR-B09).
- *
- * You are never asked for a key. If Daily Practice has given you a short code, typing
- * it in sends it to Daily Practice, which hands back the key and writes it straight
- * into your own bookmark file. Nothing secret is ever typed into a chat by whoever
- * gave you the code, which is the whole reason this replaced the old four-value
- * welcome pack. Going solo with no code at all is the default path, not a fallback.
- *
- * No code is never a blocker: the radio stays quietly off and the next run
- * re-opens this step (US4 edge case).
- */
-async function pairingStep(status) {
-  say('');
-  say('If Daily Practice has given you a pairing code, type it in now and I\'ll set');
-  say('the radio up for you — you\'ll never be asked for a key or an address. If you');
-  say('don\'t have one, that\'s completely fine — press Enter to skip, and you can add');
-  say('it anytime later by running  node start.mjs  again.');
-  say('');
-  say('(A code is twelve letters in three groups, like BCDF-GHJK-LMNP — all letters,');
-  say('no vowels, no numbers, and it works once, for 15 minutes only.)');
-  say('');
-
-  const fromFlag = typeof cliFlags.code === 'string' ? cliFlags.code : process.env.ORION_PAIRING_CODE;
-  const entered = fromFlag
-    ? (say(`  Pairing code (from --code): ${fromFlag}`), fromFlag)
-    : await ask('code', '  Pairing code (or press Enter to skip for now): ', '');
-
-  if (!entered || !entered.trim()) {
-    say('');
-    say('  ✓ No problem — the radio stays quiet until you have a code. Nothing else');
-    say('    is affected. When you get one, run  node start.mjs  again.');
-    say('    Expecting a code and it never came? Ask support@dailypractice.world.');
-    return;
-  }
-
-  const problem = pairingCodeProblem(entered);
-  if (problem) {
-    say('');
-    say(`  • ${problem}`);
-    say('    Nothing is saved and nothing was sent. Ask Daily Practice for it again,');
-    say('    then run  node start.mjs  once more.');
-    return;
-  }
-
-  const base = bridgeBase();
-  say('');
-  say('  Checking that code with Daily Practice…');
-
-  let res;
-  try {
-    res = await fetch(`${base}/pair`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: normalizePairingCode(entered) }),
-      signal: AbortSignal.timeout(NETWORK_TIMEOUT_MS),
-    });
-  } catch (err) {
-    say(`  • Daily Practice didn't answer (${err?.cause?.code || err.code || err.message}) — not retrying.`);
-    say('    Nothing is saved. Check your internet and run  node start.mjs  again.');
-    return;
-  }
-
-  if (res.status === 404) {
-    say('  • That code isn\'t valid, has expired (they only last 15 minutes), or has');
-    say('    already been used. Ask Daily Practice for a fresh one — it takes two seconds.');
-    return;
-  }
-  if (res.status === 429) {
-    say('  • Too many tries from this network. Wait five minutes, then run');
-    say('    node start.mjs  again with a fresh code.');
-    return;
-  }
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    say(`  • Daily Practice answered ${res.status}${body?.error ? ` — ${body.error}` : ''}.`);
-    say('    Nothing is saved. Ask support@dailypractice.world if it keeps happening.');
-    return;
-  }
-
-  const pack = await res.json().catch(() => null);
-  if (!pack?.install_token || !pack?.harness_id) {
-    say('  • Daily Practice answered, but the reply was incomplete — nothing saved.');
-    say('    Ask support@dailypractice.world.');
-    return;
-  }
-
-  status.sharing.bridge_url = String(pack.bridge_url || base).replace(/\/+$/, '');
-  status.sharing.harness_id = pack.harness_id;
-  // A folder with a home saves its bookmark file there, so the key must not be
-  // in it: it goes to status/radio.key, which never leaves this machine.
-  const keyApart = homeOn(status);
-  if (keyApart) {
-    writeFileSync(KEY_PATH, String(pack.install_token) + '\n', { mode: 0o600 });
-    // The mode above only counts for a new file. Tighten one that was already there.
-    try { chmodSync(KEY_PATH, 0o600); } catch { /* a disk with no modes */ }
-    status.sharing.install_token = null;
-  } else {
-    status.sharing.install_token = pack.install_token;
-  }
-  status.sharing.paired_at = new Date().toISOString();
-  save(status);
-
-  say(keyApart
-    ? `  ✓ Paired. Your key is saved on this machine only, in status/${RADIO_KEY_FILE} (ends ····${String(pack.install_token).slice(-4)}).`
-    : `  ✓ Paired — your key is saved in your own bookmark file (ends ····${String(pack.install_token).slice(-4)}).`);
-  say('    That code is now used up; it can never be used again, by anyone.');
-  say('    Sending the first check-in…');
-
-  await sendFirstSignal(status);
+function pauseSetup(reason) {
+  say('Setup is saved but unfinished.'); say(reason);
+  process.exitCode = 2; rl.close();
 }
 
-/**
- * First signal, during the install session itself (FR-008). One try, honest
- * report, never a blocker — the same posture every outbound path here has.
- */
-async function sendFirstSignal(status) {
+async function pairingStep(status) {
+  const fromFlag = typeof cliFlags.code === 'string' ? cliFlags.code : process.env.ORION_PAIRING_CODE;
+  const entered = fromFlag !== undefined ? fromFlag : await ask('code','  Pairing code: ','');
+  const problem = pairingCodeProblem(entered);
+  if (problem) { say(problem); return false; }
+  const base = bridgeBase();
+  if (!RADIO_URL_RE.test(base)) { say('The radio address needs recovery. Check ORION_BRIDGE_URL.'); return false; }
+  let response;
   try {
-    const res = await fetch(status.sharing.bridge_url + '/signals', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...keyHeader(radioKey(status, keyPlaces())),
-      },
-      body: JSON.stringify({
-        harness_id: status.sharing.harness_id,
-        signal_type: 'install_checkpoint',
+    response = await fetch(`${base}/pair`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:normalizePairingCode(entered)}),signal:AbortSignal.timeout(NETWORK_TIMEOUT_MS)});
+  } catch {
+    say('Daily Practice could not be reached. Check your connection. If the code was used before the reply arrived, renew it on the pairing page.'); return false;
+  }
+  if (response.status !== 200) {
+    say(response.status === 404 ? 'That code is expired, used, or unavailable. Renew it on the pairing page.' : response.status === 429 ? 'Too many attempts. Wait five minutes and renew your code.' : response.status === 400 ? 'That code was not accepted. Copy a fresh code from the pairing page.' : 'Daily Practice could not exchange the code. Try again shortly; renew the code if needed.'); return false;
+  }
+  const pack = await response.json().catch(() => null);
+  const address = typeof pack?.bridge_url === 'string' ? pack.bridge_url.replace(/\/+$/,'') : '';
+  if (!INSTALL_TOKEN_RE.test(pack?.install_token || '') || !HARNESS_ID_RE.test(pack?.harness_id || '') || !RADIO_URL_RE.test(address)) {
+    say('The pairing reply was incomplete. Renew your code on the pairing page.'); return false;
+  }
+  await withStatusLock(__dirname, async store => {
+    const current = await store.readStatus();
+    const sharing = current.sharing;
+    if (homeOn(current)) {
+      await store.writeKey(pack.install_token);
+      sharing.install_token = null;
+    } else sharing.install_token = pack.install_token;
+    sharing.bridge_url = address; sharing.harness_id = pack.harness_id;
+    sharing.radio_choice = 'accepted'; sharing.status_signal_enabled = true;
+    sharing.paired_at = new Date().toISOString();
+    sharing.pairing.state = 'exchanged'; sharing.pairing.last_check = null; sharing.pairing.last_connected_at = null;
+    await store.writeStatus(current); Object.assign(status.sharing,sharing);
+  });
+  say('Pairing saved securely. Checking the connection before finishing setup…');
+  return true;
+}
+
+/** The setup checkpoint has one durable identity, including across lost ACKs. */
+async function sendFirstSignal() {
+  try {
+    const checkpoint = await withStatusLock(__dirname, async store => {
+      const current = await store.readStatus();
+      current.setup_checkpoint ??= {
+        harness_id: current.sharing.harness_id,
         occurred_at: new Date().toISOString(),
         payload: {
-          ops_stage: status.ops_stage,
-          harness_status: status.harness_status,
-          template_version: status.template_version,
+          ops_stage: current.ops_stage,
+          harness_status: current.harness_status,
+          template_version: current.template_version,
         },
-      }),
-      signal: AbortSignal.timeout(NETWORK_TIMEOUT_MS),
+        delivered: false,
+      };
+      const saved = current.setup_checkpoint;
+      if (!saved || saved.harness_id !== current.sharing.harness_id || typeof saved.delivered !== 'boolean') throw new Error('Invalid setup checkpoint');
+      validateOutbox([{kind:'signal',body:{harness_id:saved.harness_id,signal_type:'install_checkpoint',occurred_at:saved.occurred_at,payload:saved.payload}}]);
+      await store.writeStatus(current);
+      return saved;
     });
-    if (res.ok) {
-      say('  ✓ The first check-in just landed with Daily Practice. That\'s the radio');
-      say('    working. Your system counts as running once it reports its first');
-      say('    finished task.');
-    } else if (res.status === 401) {
-      say('  • The radio says that key isn\'t valid (401) — unusual right after');
-      say('    pairing. Ask support@dailypractice.world. Nothing else is affected.');
-    } else {
-      say(`  • The radio answered with status ${res.status} — not retrying.`);
-      say('    Your settings are saved; your AI will try again at its next check-in.');
+    if (checkpoint.delivered) return true;
+    const report = await reportSignal({root:__dirname,signalType:'install_checkpoint',occurredAt:checkpoint.occurred_at,payload:checkpoint.payload});
+    if (report.status !== 'sent' || report.pending !== 0) {
+      pauseSetup((report.reason || 'The first check-in is waiting for recovery.') + ' Run node start.mjs again to resume your saved setup.');
+      return false;
     }
-  } catch (err) {
-    say(`  • The radio didn't answer (${err?.cause?.code || err.code || err.message}) — not retrying.`);
-    say('    Your settings are saved; your AI will try again at its next check-in.');
-  }
-}
-
-/**
- * A key can be cancelled from our side (a leak, a rotation). Shape-checking
- * cannot detect that — a revoked key still looks perfectly well-formed — so an
- * already-paired install asks the radio once, quietly, whether it still works.
- * Only a definite 401 does anything; a timeout or any other answer stays silent,
- * because being offline must never cost you your pairing.
- */
-async function radioStillWorks(status) {
-  try {
-    const res = await fetch(status.sharing.bridge_url + '/nudges', {
-      headers: keyHeader(radioKey(status, keyPlaces())),
-      signal: AbortSignal.timeout(4000),
+    // Preserve the fresh guard decision, but check for any concurrent reporter
+    // before completing setup. An unresolved report must suppress the handoff.
+    await withStatusLock(__dirname, async store => {
+      const current = await store.readStatus();
+      const pending = validateOutbox(await store.readOutbox());
+      if (pending.length || current.sharing.pairing.last_check !== 'accepted' || current.sharing.harness_id !== checkpoint.harness_id || current.sharing.status_signal_enabled !== true) throw new Error('Report recovery needed');
+      current.setup_checkpoint.delivered = true;
+      await store.writeStatus(current);
     });
-    return res.status !== 401;
-  } catch {
+    say('  ✓ The first check-in just landed with Daily Practice. Your system counts');
+    say('    as running once it reports its first finished task.');
     return true;
+  } catch {
+    pauseSetup('The setup check-in needs recovery. Run node start.mjs again after recovering the saved status files or connection.');
+    return false;
   }
 }
 
 /** The copy-ready prompt that starts the client's AI on the AGENTS.md sequence. */
 function printHandoff(surface) {
   const prompt = 'Read AGENTS.md and let\'s get started. Press Start has already run — my machine profile is saved in status/status.json, so don\'t re-ask anything it already answers.';
-  const promptChat = 'Read AGENTS.md and let\'s get started. Press Start has already run on my computer — I\'ll paste status/status.json whenever you need to check where we are.';
 
   say('');
   switch (surface) {
@@ -764,36 +609,8 @@ function printHandoff(surface) {
       say('by typing  codex  and pressing Enter, then paste this prompt:');
       box(prompt);
       break;
-    case 'cursor':
-      say('Open Cursor, use File → Open Folder… to open THIS folder, open its AI chat');
-      say('panel, and paste this prompt:');
-      box(prompt);
-      break;
-    case 'copilot-vscode':
-      say('Open VS Code, use File → Open Folder… to open THIS folder, open Copilot');
-      say('Chat, and paste this prompt:');
-      box(prompt);
-      break;
-    case 'claude-desktop':
-      say('Open the Claude app and click Code (near the top of the sidebar), then open');
-      say('THIS folder with its folder picker — the one you gave Orion as its home in');
-      say('README Step 2. Then paste this prompt:');
-      box(prompt);
-      say('');
-      say('(No Code tab in your Claude app? Create a Project instead — a chat space');
-      say('with its own memory — add the file AGENTS.md from this folder to it, and');
-      say('paste the same prompt. Both roads lead to the same place.)');
-      break;
-    case 'chatgpt-app':
-      say('Open ChatGPT and attach the file AGENTS.md from this folder to a new chat');
-      say('(or add it to a Project/GPT if your plan has those), then paste this');
-      say('prompt:');
-      box(promptChat);
-      break;
     default:
-      say('Go to your AI\'s website (claude.ai, chatgpt.com, or Copilot), follow');
-      say('README.md Step 4 to hand it the file AGENTS.md, then paste this prompt:');
-      box(promptChat);
+      say('Open this installed folder in Codex or Claude Code. See docs/setup.md.');
   }
   say('');
   say('(That prompt also lives in README.md, so you can copy it later without');
@@ -821,4 +638,4 @@ function box(text) {
   say('  └' + '─'.repeat(60));
 }
 
-await main();
+try { await main(); } catch { pauseSetup('Orion could not safely save setup. Recover the status files or lock, then run node start.mjs again.'); }

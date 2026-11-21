@@ -34,6 +34,9 @@ to the AI assistant recorded in the deployed status file.
 node "$scratch/source/update/apply.mjs" update --root "$harness" --commit "$commit"
 ```
 
+The helper excludes human-only implementation records from its source snapshot
+and rejects deployment paths into them. Agents use `docs/` for update guidance.
+
 The helper uses the deployment allowlist for your AI assistant. A file the client has changed is kept
 and reported. The runtime scripts under `status/` are refreshed together, and
 `update/pristine.json` is refreshed with the source fingerprints. The helper backs up
@@ -43,39 +46,19 @@ On the same version it reports an up-to-date result when there is no work.
 
 When upgrading a harness that predates the 1.5.0 sending rule, run
 `node status/send.mjs migrate` as described in [AGENTS.md](../AGENTS.md).
-If the radio is on, check it with
-`node status/radio.mjs check`. Report the version, changed files, preserved edits,
+Updates never start or renew a connection allowance. All unpaired folders must
+pair before normal work. Older pairing markers upgrade to version 2 without
+inferring last_connected_at from verification or migration dates. A successful
+verification and complete report delivery establish the silent 48-hour allowance.
+Before resuming Orion work, run `node status/guard.mjs check --quiet`; exit 2
+keeps work paused while diagnosis, updating and re-pairing remain available. Then
+check support messages separately with `node status/radio.mjs check`. Report the version, changed files, preserved edits,
 any replaced edited runtime scripts and the backup path. Remove the temporary
 source checkout after the operation.
 
-## Switch AI assistants
-
-Use the pinned source with `switch` as the operation:
-
-```sh
-(
-  set -eu
-  cd /path/to/my-orion
-  release_tmp=$(mktemp -d)
-  trap 'rm -rf "$release_tmp"' EXIT
-  git clone --quiet --depth 1 --branch main https://github.com/DailyPractice-Ltd/orion-self-install.git "$release_tmp/release"
-  release_commit=$(git -C "$release_tmp/release" rev-parse HEAD)
-  node "$release_tmp/release/update/apply.mjs" switch --root "$PWD" --release-repo "$release_tmp/release" --commit "$release_commit" --to codex
-)
-```
-
-Use `--to claude-code` to move the other way. For an older Claude harness with no recorded
-AI assistant, add `--legacy-tool claude-code` to migrate it explicitly. The switch
-requires the harness version, manifest, and common runtime scripts to match the pinned
-release. Run the pinned update command above first if it reports an older version.
-The switch backs up, stages and validates the new skill layout, then records the new
-selection. Review your scheduled tasks in the app that owns them before switching. The switch reports
-its backup. If interrupted, run the pinned release script with `recover --root "$PWD"`
-before trying again. The temporary checkout is removed automatically.
-
 ## Restore
 
-Use the backup path printed by update or switch:
+Use the backup path printed by update:
 
 ```sh
 node update/apply.mjs restore --root . --backup .update-backup/VERSION-TIMESTAMP
@@ -84,8 +67,7 @@ node update/apply.mjs restore --root . --backup .update-backup/VERSION-TIMESTAMP
 For an update, restore puts prior released files back and removes newly installed
 files. A file changed after update is kept and reported. It restores the prior
 version and retired checklist keys without replacing the client's live status
-wholesale. A completed switch can also be restored from its reported backup; any
-new-layout edits that conflict must be handled first. Keep the backup for audit.
+wholesale. Keep the backup for audit.
 
 ## Older same-path folders
 
@@ -99,7 +81,7 @@ node install.mjs --tool claude-code --target /path/to/new-client-folder \
 ```
 
 Use `--tool codex` only when the legacy status already records Codex. The migration
-copies the client's status and logs, knowledge, memory, skills, roster and job sheets,
+copies the client's status and logs, knowledge, skills, roster and job sheets,
 as well as other client-created files such as notes and playbooks, then overlays edited
 deployed files. Release-only source trees, maintainer files, and retired workflows stay
 behind. Computer schedules refer to the original folder. Review them there before

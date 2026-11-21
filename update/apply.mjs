@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { destinationState, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
+import { withStatusLock } from '../status/store.mjs';
 
 const arg = name => { const i=process.argv.indexOf(name); return i<0 ? undefined : process.argv[i+1]; };
 const json = path => JSON.parse(readFileSync(path,'utf8'));
@@ -16,14 +17,18 @@ function sourceSnapshot(repo, commit) {
   if (!/^[0-9a-f]{40,64}$/.test(commit||'')) throw new Error('A full pinned commit hash is required');
   const head=execFileSync('git',['rev-parse',`${commit}^{commit}`],{cwd:repo,encoding:'utf8'}).trim();
   if (head!==commit) throw new Error('Commit must resolve exactly');
+  // Select top-level paths by name so the snapshot never loads human-only records.
+  const paths = execFileSync('git', ['ls-tree', '--name-only', '-z', commit], {cwd:repo,encoding:'utf8'})
+    .split('\0').filter(path => path && path !== 'specs' && path !== '.specify');
+  if (!paths.length) throw new Error('Release has no permitted source paths');
+  const archive=execFileSync('git',['archive',commit,'--',...paths],{cwd:repo,maxBuffer:1<<28});
   const dir=mkdtempSync(join(tmpdir(),'orion-pinned-release-'));
-  const archive=execFileSync('git',['archive',commit],{cwd:repo,maxBuffer:1<<28});
   execFileSync('tar',['-xf','-','-C',dir],{input:archive});
   return dir;
 }
 
-function update(root,repo,commit) {
-  recoverPendingUpdates(root);
+async function update(store,root,repo,commit) {
+  await recoverPendingUpdates(store,root);
   const snapshot=sourceSnapshot(repo,commit);
   try {
     const manifest=json(join(snapshot,'update/manifest.json'));
@@ -119,10 +124,11 @@ function update(root,repo,commit) {
           parent = dirname(parent);
         }
       }
-      renameSync(join(backup,'stage/status/status.json'),statusPath);
+      await store.writeStatusText(readFileSync(join(backup,'stage/status/status.json'),'utf8'));
+      rmSync(join(backup,'stage/status/status.json'));
       journal.state='complete';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
     } catch(error) {
-      rollbackUpdate(root,backup,journal);
+      await rollbackUpdate(store,root,backup,journal);
       journal.state='recovered';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
       throw error;
     }
@@ -130,152 +136,7 @@ function update(root,repo,commit) {
   } finally {rmSync(snapshot,{recursive:true,force:true});}
 }
 
-// A switch moves the active skill layout. Historical job files stay in place.
-function switchTool(root,repo,commit,ai_assistant,legacyTool) {
-  recoverPendingSwitches(root);
-  recoverPendingUpdates(root);
-  const snapshot=sourceSnapshot(repo,commit);
-  try {
-    const manifest=json(join(snapshot,'update/manifest.json'));
-    const pristine=json(join(snapshot,'update/pristine.json'));
-    const deployment=manifest.deployment;
-    const statusPath=safe(root,'status/status.json'), status=json(statusPath);
-    const from=resolveAiAssistant(status,deployment,{legacyTool});
-    if (status.template_version !== manifest.template_version ||
-        !existsSync(safe(root,'update/manifest.json')) ||
-        fingerprint(readFileSync(safe(root,'update/manifest.json'))) !== fingerprint(readFileSync(safe(snapshot,'update/manifest.json')))) {
-      throw new Error(`Update this harness to pinned release ${manifest.template_version} before switching tools`);
-    }
-    for(const path of deployment.common_sources.filter(p=>/^status\/[^/]+\.mjs$/.test(p) || /^update\/(manifest\.json|apply\.mjs|destination-resolver\.mjs|release-contract\.mjs)$/.test(p))) {
-      const installed=safe(root,path), released=safe(snapshot,path);
-      if(!existsSync(installed) || fingerprint(readFileSync(installed))!==fingerprint(readFileSync(released))) {
-        throw new Error(`Update this harness to the pinned release before switching: ${path}`);
-      }
-    }
-    if (!deployment.tools.includes(ai_assistant) || ai_assistant===from) throw new Error(`Choose the other supported tool (current: ${from})`);
-    const sourcePlan=planForTool(deployment,from,{releaseRoot:snapshot,root});
-    const targetPlan=planForTool(deployment,ai_assistant,{releaseRoot:snapshot,root});
-    const actions=[], retire=[];
-    const targetPaths=new Set();
-    const add=(destination,source,kind='copy') => {
-      safe(root,destination);
-      if (targetPaths.has(destination)) throw new Error(`Duplicate switch destination: ${destination}`);
-      targetPaths.add(destination);
-      if (existsSync(safe(root,destination))) throw new Error(`Target collision: ${destination}`);
-      if (!lstatSync(source).isFile()) throw new Error(`Not a regular source file: ${source}`);
-      actions.push({kind,destination,source});
-    };
-    for (const entry of deployment.entries) {
-      const old=sourcePlan.find(e=>e.destination===entry.destinations[from]), next=targetPlan.find(e=>e.destination===entry.destinations[ai_assistant]);
-      const oldPath=safe(root,old.destination);
-      const state=destinationState(root,old,pristine);
-      if (old.destination===next.destination) {
-        if (old.source!==next.source && entry.ownership==='release') {
-          if (state==='absent') add(next.destination,safe(snapshot,next.source));
-          else if (state==='owned') {
-            targetPaths.add(next.destination);
-            actions.push({kind:'replace',destination:next.destination,source:safe(snapshot,next.source)});
-          }
-        }
-        continue;
-      }
-      if (state==='preserve' && existsSync(oldPath) && lstatSync(oldPath).isSymbolicLink()) throw new Error(`Source symlink collision: ${old.destination}`);
-      if (state==='absent') {
-        if (entry.ownership==='release') add(next.destination,safe(snapshot,entry.source));
-        continue;
-      }
-      if (state==='owned') add(next.destination,safe(snapshot,entry.source));
-      else if (lstatSync(oldPath).isFile()) add(next.destination,oldPath);
-      else throw new Error(`Source collision: ${old.destination}`);
-      retire.push(old.destination);
-    }
-    const portable=(oldRoot,newRoot) => {
-      const base=safe(root,oldRoot);
-      if (!existsSync(base)) return;
-      const walk=(dir,prefix='') => {
-        for(const item of readdirSync(dir,{withFileTypes:true})) {
-          const rel=prefix?`${prefix}/${item.name}`:item.name, path=join(dir,item.name);
-          if(oldRoot===oldSkill && rel.split('/')[0].startsWith('speckit-')) {
-            if(item.isDirectory()) walk(path,rel);
-            else if(item.isFile()) retire.push(`${oldRoot}/${rel}`);
-            else throw new Error(`Source symlink or special file: ${oldRoot}/${rel}`);
-            continue;
-          }
-          if(item.isDirectory()) walk(path,rel);
-          else if(item.isFile()) {
-            const destination=`${newRoot}/${rel}`;
-            if(!targetPaths.has(destination)) add(destination,path);
-            retire.push(`${oldRoot}/${rel}`);
-          } else throw new Error(`Source symlink or special file: ${oldRoot}/${rel}`);
-        }
-      };
-      walk(base);
-    };
-    const oldSkill=from==='codex'?'.agents/skills':'.claude/skills';
-    const newSkill=ai_assistant==='codex'?'.agents/skills':'.claude/skills';
-    portable(oldSkill,newSkill);
-    // Stage expected bytes and all backups before touching the deployed tree.
-    const stamp=new Date().toISOString().replace(/[:.]/g,'-');
-    const backupRel=`.update-backup/switch-${from}-to-${ai_assistant}-${stamp}`;
-    const backup=safe(root,backupRel);if(existsSync(backup)) throw new Error('Backup already exists');
-    mkdirSync(backup,{recursive:true});copyTo(statusPath,join(backup,'status/status.json'));
-    for(const a of actions) {
-      if(a.kind==='replace') copyTo(safe(root,a.destination),join(backup,'files',a.destination));
-      copyTo(a.source,join(backup,'stage',a.destination));
-    }
-    const retired=[...new Set(retire)];
-    for(const destination of retired) copyTo(safe(root,destination),join(backup,'files',destination));
-    const journal={kind:'switch',state:'pending',from,to:ai_assistant,actions:actions.map(a=>({destination:a.destination,kind:a.kind||'copy',hash:fingerprint(readFileSync(join(backup,'stage',a.destination))),prior_hash:a.kind==='replace'?fingerprint(readFileSync(join(backup,'files',a.destination))):null})),retire:retired};
-    writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
-    try {
-      let count=0;
-      for(const a of journal.actions) {
-        const staged=join(backup,'stage',a.destination), dest=safe(root,a.destination);
-        copyTo(staged,dest);
-        if(fingerprint(readFileSync(dest))!==a.hash) throw new Error(`Validation failed: ${a.destination}`);
-        if(process.env.ORION_SWITCH_FAIL_AFTER && ++count===Number(process.env.ORION_SWITCH_FAIL_AFTER)) throw new Error('Injected switch interruption');
-      }
-      for(const destination of retired) rmSync(safe(root,destination));
-      pruneEmpty(safe(root,oldSkill));
-      pruneEmpty(safe(root,from==='codex'?'.agents':'.claude'));
-      status.ai_assistant = ai_assistant;
-      status.notes=[status.notes||'',`switched from ${from} to ${ai_assistant}; backup in ${backupRel}`].filter(Boolean).join('\n');
-      writeFileSync(statusPath,JSON.stringify(status,null,2)+'\n');
-      journal.state='complete';
-      writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
-      return {from,to:ai_assistant,backup:backupRel,installed:journal.actions.map(a=>a.destination),retired};
-    } catch(error) {
-      rollbackSwitch(root,backup,journal);
-      journal.state='recovered';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
-      throw error;
-    }
-  } finally {rmSync(snapshot,{recursive:true,force:true});}
-}
-
-function pruneEmpty(path) {
-  if(!existsSync(path) || !lstatSync(path).isDirectory()) return;
-  for(const item of readdirSync(path)) pruneEmpty(join(path,item));
-  if(readdirSync(path).length===0) rmdirSync(path);
-}
-
-function recoverPendingSwitches(root) {
-  const backups=safe(root,'.update-backup');
-  if(!existsSync(backups)) return [];
-  const recovered=[];
-  for(const name of readdirSync(backups).filter(n=>n.startsWith('switch-'))) {
-    const backup=safe(root,`.update-backup/${name}`), path=join(backup,'journal.json');
-    if(!existsSync(path)) continue;
-    const journal=json(path);
-    if(journal.kind==='switch' && journal.state==='pending') {
-      rollbackSwitch(root,backup,journal);
-      journal.state='recovered';writeFileSync(path,JSON.stringify(journal,null,2));
-      recovered.push(name);
-    }
-  }
-  return recovered;
-}
-
-function rollbackUpdate(root,backup,journal) {
+async function rollbackUpdate(store,root,backup,journal) {
   const statusPath=safe(root,'status/status.json');
   const statusHash=fingerprint(readFileSync(statusPath));
   const oldStatusHash=fingerprint(readFileSync(join(backup,'status/status.json')));
@@ -293,11 +154,11 @@ function rollbackUpdate(root,backup,journal) {
     if(a.kind==='add') {if(existsSync(dest)) rmSync(dest);}
     else copyTo(join(backup,'files',a.destination),dest);
   }
-  copyTo(join(backup,'status/status.json'),safe(root,'status/status.json'));
+  await store.writeStatusText(readFileSync(join(backup,'status/status.json'),'utf8'));
   const stage=join(backup,'stage');if(existsSync(stage)) rmSync(stage,{recursive:true,force:true});
 }
 
-function recoverPendingUpdates(root) {
+async function recoverPendingUpdates(store,root) {
   const backups=safe(root,'.update-backup');if(!existsSync(backups)) return [];
   const recovered=[];
   for(const name of readdirSync(backups)) {
@@ -305,43 +166,16 @@ function recoverPendingUpdates(root) {
     if(!existsSync(path)) continue;
     const journal=json(path);
     if(journal.kind==='update' && journal.state==='pending') {
-      rollbackUpdate(root,backup,journal);
+      await rollbackUpdate(store,root,backup,journal);
       journal.state='recovered';writeFileSync(path,JSON.stringify(journal,null,2));recovered.push(name);
     }
   }
   return recovered;
 }
 
-function rollbackSwitch(root,backup,journal) {
-  const conflicts=journal.actions.filter(a=>{
-    const path=safe(root,a.destination);
-    return existsSync(path) && (!lstatSync(path).isFile() || ![a.hash,a.prior_hash].includes(fingerprint(readFileSync(path))));
-  }).map(a=>a.destination);
-  if(conflicts.length) throw new Error(`Switch recovery collisions: ${conflicts.join(', ')}`);
-  for(const action of [...journal.actions].reverse()) {
-    const path=safe(root,action.destination);
-    if(action.kind==='replace') copyTo(join(backup,'files',action.destination),path);
-    else if(existsSync(path)) rmSync(path);
-  }
-  for(const destination of journal.retire) {
-    const old=join(backup,'files',destination);
-    if(existsSync(old)) copyTo(old,safe(root,destination));
-  }
-  copyTo(join(backup,'status/status.json'),safe(root,'status/status.json'));
-}
-function restore(root,backupRel) {
+async function restore(store,root,backupRel) {
   const backup=safe(root,backupRel); const journal=json(join(backup,'journal.json'));
-  if(journal.kind==='switch') {
-    if(journal.state!=='complete') throw new Error(`Switch backup is ${journal.state}; only completed switches can be restored`);
-    const conflicts=journal.actions.filter(a=>{
-      const dest=safe(root,a.destination);
-      return existsSync(dest) && fingerprint(readFileSync(dest))!==a.hash;
-    }).map(a=>a.destination);
-    if(conflicts.length) throw new Error(`Restore collisions: ${conflicts.join(', ')}`);
-    rollbackSwitch(root,backup,journal);
-    journal.state='restored';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
-    return {restored:journal.retire,removed:journal.actions.map(a=>a.destination),backup:backupRel};
-  }
+  if(journal.kind==='switch') throw new Error('This backup is from a tool switch. To switch back, run: node switch_ai.mjs');
   if(journal.state!=='complete') throw new Error(`Update backup is ${journal.state}; only completed updates can be restored`);
   const statusPath=safe(root,'status/status.json'), status=json(statusPath), old=json(join(backup,'status/status.json'));
   const restored=[],kept=[];
@@ -359,12 +193,17 @@ function restore(root,backupRel) {
   for(const key of journal.remove_status_checklist_keys) if(Object.hasOwn(old.checklist||{},key)) {status.checklist ||= {};status.checklist[key]=old.checklist[key];}
   status.template_version=old.template_version;
   status.notes=[status.notes||'',`restored from ${backupRel}`].filter(Boolean).join('\n');
-  writeFileSync(statusPath,JSON.stringify(status,null,2)+'\n');
+  await store.writeStatus(status);
   return {restored,kept,backup:backupRel};
 }
 try {
   const command=process.argv[2], root=arg('--root'); if(!root) throw new Error('--root is required');
   const repo=arg('--release-repo')||dirname(dirname(fileURLToPath(import.meta.url)));
-  const result=command==='update' ? update(root,repo,arg('--commit')) : command==='switch' ? switchTool(root,repo,arg('--commit'),arg('--to'),arg('--legacy-tool')) : command==='restore' ? restore(root,arg('--backup')) : command==='recover' ? {recovered:[...recoverPendingUpdates(root),...recoverPendingSwitches(root)]} : (()=>{throw new Error('Use update, switch, restore or recover');})();
+  if (command==='switch') throw new Error('To switch AI assistants, run: node switch_ai.mjs');
+  if (!['update','restore','recover'].includes(command)) throw new Error('Use update, restore or recover');
+  // The whole run holds the status lock, from the first read of status.json to
+  // the journal's last word, so no other Orion command's change is lost to it.
+  const result=await withStatusLock(root, store =>
+    command==='update' ? update(store,root,repo,arg('--commit')) : command==='restore' ? restore(store,root,arg('--backup')) : recoverPendingUpdates(store,root).then(recovered=>({recovered})));
   console.log(JSON.stringify(result,null,2));
 } catch(error) {console.error(error.message);process.exitCode=2;}

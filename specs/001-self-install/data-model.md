@@ -3,8 +3,8 @@
 **Phase 1 output** | **Date**: 2026-07-12 | **Plan**: [plan.md](plan.md)
 
 No database. Every entity below lives as a plain file inside the client's own copy of this
-repository, or (for the emitted signal only) as a transient outbound payload. Nothing here
-requires a schema migration or a shared store — this is the entire persistence model.
+repository. Failed operational reports persist in a labels-only local outbox; all
+pairing/report/replay mutations share a cross-process atomic store lock (007).
 
 ---
 
@@ -27,9 +27,9 @@ unit of work thereafter.
 | `updated_at` | `ISO 8601 \| null` | Set on every write |
 | `checklist` | `object` | Boolean per install unit — see below |
 | `stage_history` | `array` | `{ stage, at }` entries, append-only, never edited in place |
-| `sharing.status_signal_enabled` | `bool` | Default `true` — constitution Article V channel 1 |
-| `sharing.status_signal_endpoint` | `string \| null` | Filled if/when a webhook target exists |
-| `sharing.intelligence_library_opt_in` | `bool` | Default `false` — constitution Article V channel 2, separate and explicit |
+| `sharing.status_signal_enabled` | `bool` | Required enabled connection for normal work — constitution Article V channel 1 |
+| `sharing.pairing` | `object` | Feature marker, exchanged/verified history and version-2 connection timestamp; [007 contract](../007-required-pairing/contracts/status-and-guard.md) |
+| `setup_checkpoint` | `object`, optional | Original setup report identity and delivery progress; never authorization |
 | `notes` | `string` | Free text; the installing agent's own scratch notes across sessions |
 
 **`checklist` keys** (all boolean, default `false`):
@@ -52,8 +52,10 @@ earlier in the sequence than the current one. `ops_stage` likewise only moves fo
 A minimal, deliberately narrow subset of `status.json`, defined formally in
 [`contracts/status-signal.schema.json`](contracts/status-signal.schema.json). Never
 includes KB content, prospect data, or message content — identity + stage + timestamp
-only. Emitted via an n8n webhook node (preferred) or `status/emit-status.mjs` (code-capable
-agent path), and only when `sharing.status_signal_enabled` is `true`.
+only. `status/emit-status.mjs` runs the shared guard before advancing a stage.
+The authenticated bridge report persists its original identity before sending;
+failed reports replay before new work when the shared guard blocks.
+No business-name/client-id content is part of that operational payload.
 
 ---
 
@@ -79,7 +81,7 @@ live (VT-01..VT-04 exercise it directly), per constitution Article VIII.
 ## Connector credentials
 
 **Never stored in this repository, never transmitted to Daily Practice.** CRM, Gmail, and
-Calendar credentials live exclusively in the client's own n8n instance (their own account).
+Calendar credentials live in the client's own connector/tool credential store.
 `status.json`'s `connector_*_live` booleans record only that a live test passed at a point
 in time — not the credential itself, not even a reference to it.
 

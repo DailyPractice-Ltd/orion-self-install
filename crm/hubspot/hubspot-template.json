@@ -35,7 +35,6 @@
         "options": ["HubSpot", "Attio", "Other", "None"] },
       { "name": "harness_team_size", "label": "Team size", "type": "number", "fieldType": "number" },
       { "name": "harness_ai_sales_maturity", "label": "AI-sales maturity (1-5)", "type": "number", "fieldType": "number" },
-      { "name": "harness_agent_name", "label": "Agent name", "type": "string", "fieldType": "text" },
       { "name": "harness_template_version", "label": "Template version", "type": "string", "fieldType": "text" },
       { "name": "harness_installed_on", "label": "Installed on", "type": "date", "fieldType": "date" }
     ]

@@ -1,0 +1,258 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Labels-only operational outbox",
+  "description": "Structural schema; contract additionally requires public tag menu, semantic field dependencies, size and timestamp validation. No client words or credentials.",
+  "type": "array",
+  "items": {
+    "oneOf": [
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "body"
+        ],
+        "properties": {
+          "kind": {
+            "const": "signal"
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "signal_type",
+              "occurred_at",
+              "payload"
+            ],
+            "properties": {
+              "harness_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "signal_type": {
+                "enum": [
+                  "install_checkpoint",
+                  "workflow_execution_completed",
+                  "outreach_approved",
+                  "outreach_rejected",
+                  "debrief_completed",
+                  "crm_updated",
+                  "routine_completed",
+                  "task_completed"
+                ]
+              },
+              "occurred_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "payload": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "ops_stage": {
+                    "enum": [
+                      "booked",
+                      "day1_encode",
+                      "day2_wire_and_run",
+                      "validated",
+                      "seven_day_checkin",
+                      "formalised"
+                    ]
+                  },
+                  "harness_status": {
+                    "enum": [
+                      "draft",
+                      "configured",
+                      "connected",
+                      "validated",
+                      "installed",
+                      "running"
+                    ]
+                  },
+                  "template_version": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,49}$"
+                  },
+                  "tag": {
+                    "enum": [
+                      "prospecting",
+                      "outreach",
+                      "content",
+                      "crm",
+                      "calls",
+                      "deals",
+                      "accounts",
+                      "hiring",
+                      "finance",
+                      "admin",
+                      "onboarding",
+                      "research",
+                      "reporting",
+                      "ops",
+                      "other"
+                    ]
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "routine": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{1,59}$"
+                  },
+                  "asset": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{1,59}$"
+                  },
+                  "asset_kind": {
+                    "enum": [
+                      "agent",
+                      "skill",
+                      "workflow",
+                      "program"
+                    ]
+                  },
+                  "asset_version": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,49}$"
+                  },
+                  "outcome": {
+                    "enum": [
+                      "run_completed",
+                      "rep_logged",
+                      "skipped"
+                    ]
+                  },
+                  "surface": {
+                    "enum": [
+                      "agent",
+                      "routine"
+                    ]
+                  }
+                },
+                "maxProperties": 20,
+                "dependencies": {
+                  "asset": [
+                    "outcome",
+                    "surface"
+                  ],
+                  "outcome": [
+                    "asset"
+                  ],
+                  "surface": [
+                    "asset"
+                  ],
+                  "asset_kind": [
+                    "asset"
+                  ],
+                  "asset_version": [
+                    "asset"
+                  ]
+                }
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "signal_type": {
+                      "const": "task_completed"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "payload": {
+                      "required": [
+                        "tag",
+                        "count"
+                      ],
+                      "properties": {
+                        "count": {
+                          "minimum": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "signal_type": {
+                      "const": "routine_completed"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "payload": {
+                      "required": [
+                        "routine",
+                        "count"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "body"
+        ],
+        "properties": {
+          "kind": {
+            "const": "asset"
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "slug",
+              "kind",
+              "version",
+              "installed_at"
+            ],
+            "properties": {
+              "harness_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "slug": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{1,59}$"
+              },
+              "kind": {
+                "enum": [
+                  "agent",
+                  "skill",
+                  "workflow",
+                  "crm_template",
+                  "program"
+                ]
+              },
+              "version": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,49}$"
+              },
+              "installed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "role": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{1,59}$"
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

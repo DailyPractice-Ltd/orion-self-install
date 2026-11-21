@@ -53,7 +53,7 @@ actually does:
 1. **Ensures `lifecyclestage` has the right option set** (1. Prospect … 9. Subscriber) —
    adds missing options, leaves existing ones alone.
 2. **Creates the assessment-profile properties** (industry, product, ICP, motion, AI
-   tools, CRM, team size, maturity, agent name, template version, installed on) as a
+   tools, CRM, team size, maturity, template version, installed on) as a
    custom property group on Contacts (and Companies, for a B2B motion) — mirrors
    `status/status.json` so the same information is visible inside your own CRM.
 3. **Creates (or flags for manual rename) a Deal pipeline** — see the plan-tier note
@@ -87,7 +87,7 @@ HubSpot's settings — it takes about 10 minutes:
 2. Still in **Settings → Properties**, create a new group called **Orion Harness
    Install**, and add these fields to it: Industry / vertical, Product / service, ICP
    description, Sales motion, AI tools in use, CRM in use, Team size, AI-sales maturity
-   (1–5), Agent name, Template version, Installed on.
+   (1–5), Template version, Installed on.
 3. Go to **Settings → Objects → Deals → Pipelines**. If you're allowed to add a new one,
    create **Orion Pipeline** with stages: Prospect, Lead, MQL, SQL, Deal, Closed Won,
    Closed Lost. **If HubSpot won't let you add a new pipeline** (this is normal on

@@ -143,3 +143,75 @@ test('deployed documentation uses permitted sources without directing agents int
     assert.match(text, /ask (the human|\{\{CLIENT_NAME\}\})/);
   }
 });
+
+/** A synthetic release candidate: exactly the files the release contract reads. */
+function candidate(t) {
+  const release = mkdtempSync(join(tmpdir(), 'orion-release-candidate-'));
+  t.after(() => rmSync(release, { recursive: true, force: true }));
+  const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
+  for (const path of ['update/manifest.json', 'update/release-contract.mjs',
+    ...manifest.deployment.common_sources,
+    ...manifest.deployment.entries.flatMap((entry) => [entry.source, ...Object.values(entry.sources || {})])]) {
+    mkdirSync(dirname(join(release, path)), { recursive: true });
+    copyFileSync(join(repo, path), join(release, path));
+  }
+  return { release, version: manifest.template_version };
+}
+const contract = (release, ...args) => spawnSync(process.execPath, [join(release, 'update/release-contract.mjs'), ...args], { encoding: 'utf8' });
+
+test('release contract passes both tools at the candidate version and refuses any other version', (t) => {
+  const { release, version } = candidate(t);
+  for (const tool of ['codex', 'claude-code']) {
+    const run = contract(release, '--tool', tool, '--version', version);
+    assert.equal(run.status, 0, run.stderr);
+    const wrong = contract(release, '--tool', tool, '--version', '0.0.1');
+    assert.notEqual(wrong.status, 0);
+    assert.match(wrong.stderr, new RegExp(`${tool}.*0\\.0\\.1.*${version.replaceAll('.', '\\.')}`, 's'));
+  }
+  assert.notEqual(contract(release, '--tool', 'codex', '--version', 'v1').status, 0, 'a malformed version is refused');
+});
+
+test('release preparation fails when one tool’s packaging is broken in the candidate', (t) => {
+  const { release, version } = candidate(t);
+  const claudeManifest = join(release, 'plugins/orion/.claude-plugin/plugin.json');
+  writeFileSync(claudeManifest, JSON.stringify({ name: 'claude-orion', version, description: 'x' }));
+  const broken = contract(release, '--tool', 'claude-code', '--version', version);
+  assert.notEqual(broken.status, 0);
+  assert.match(broken.stderr, /claude-code/);
+  assert.match(broken.stderr, /\.claude-plugin\/plugin\.json/);
+  copyFileSync(join(repo, 'plugins/orion/.claude-plugin/plugin.json'), claudeManifest);
+  assert.equal(contract(release, '--tool', 'claude-code', '--version', version).status, 0);
+
+  // Manifests generated from a different version than the candidate's are stale.
+  const manifest = JSON.parse(readFileSync(join(release, 'update/manifest.json'), 'utf8'));
+  manifest.template_version = '99.0.0';
+  writeFileSync(join(release, 'update/manifest.json'), JSON.stringify(manifest));
+  const stale = contract(release, '--tool', 'codex');
+  assert.notEqual(stale.status, 0);
+  assert.match(stale.stderr, /codex/);
+  assert.match(stale.stderr, /stale|99\.0\.0/i);
+});
+
+test('release contract refuses a package carrying client credentials or business state', (t) => {
+  const { release, version } = candidate(t);
+  for (const path of ['plugins/orion/status/status.json', 'plugins/orion/skills/prospecting/radio.key', 'plugins/orion/.env']) {
+    mkdirSync(dirname(join(release, path)), { recursive: true });
+    writeFileSync(join(release, path), '{}');
+    const run = contract(release, '--tool', 'codex', '--version', version);
+    assert.notEqual(run.status, 0, `${path} must block the release`);
+    assert.match(run.stderr, new RegExp(path.replaceAll('.', '\\.')));
+    rmSync(join(release, path));
+  }
+  assert.equal(contract(release, '--tool', 'codex', '--version', version).status, 0);
+});
+
+test('the release workflow runs the full contract for both tools at the tag version before tagging', () => {
+  const workflow = readFileSync(join(repo, '.github/workflows/release.yml'), 'utf8');
+  const validate = workflow.indexOf('node update/release-contract.mjs --tool "$tool" --version "$VERSION"');
+  assert.ok(validate > 0, 'the contract checks the tag version');
+  assert.match(workflow, /for tool in codex claude-code/);
+  const tests = workflow.indexOf('node --test');
+  assert.ok(tests > 0, 'the candidate’s own tests run');
+  const tag = workflow.indexOf('git tag -a');
+  assert.ok(validate < tag && tests < tag, 'validation happens before the tag is pushed');
+});

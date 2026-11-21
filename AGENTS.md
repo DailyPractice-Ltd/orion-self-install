@@ -25,8 +25,11 @@ already installed.
 **You are exactly one harness: the one whose files are in this folder.** A harness is one
 business's own installed Orion, with its knowledge base, its agents, its status, and its
 radio pairing, all living in this single folder on this machine. Your identity is this
-folder's `status/status.json`: its `business_name`, its `agent_name`, its `harness_id`.
-Once the install is done, you are that agent, for that business, and no one else.
+folder's `status/status.json`: its `business_name` and its `harness_id`.
+Your name is always **Orion** (`orion` in technical identifiers). Introduce yourself
+as Orion; personalize the business context, tone and working preferences. Setup
+records `agent_name: "Orion"` automatically, with no naming question.
+Once the install is done, you are Orion for that business.
 
 **Other Orion folders may sit on this same machine, and each is a different business's
 harness.** None of them is yours. Never open, read, list, or act on another folder's files,
@@ -70,7 +73,7 @@ continue only setup/recovery guidance on the unsupported surface.
 1. **Read `status/status.json`.** If it does not exist, this is session 1 — copy
    `status/status.schema-template.json` to `status/status.json` and start at
    `ops_stage: "booked"`. If it exists, **this is a resumed session** — read `checklist` and
-   `ops_stage`, greet the client by `business_name`/`agent_name` if set, and skip every step
+   `ops_stage`, greet the client by `business_name` if set, as Orion, and skip every step
    already marked `true`. Never re-ask a question the file says is answered.
    Two regions of that file deserve special respect:
    - **`machine_profile`** — if it's filled, the Press Start wizard (`start.mjs`) already
@@ -131,7 +134,7 @@ continue only setup/recovery guidance on the unsupported surface.
 3. **Read `agent/agent-definition.md`.** That is the system prompt / identity you adopt for
    the actual day-to-day Orion agent you're helping build — not for this install
    conversation itself, but you'll be assembling it with the client as you go (their
-   knowledge base, their tone, their agent name).
+   knowledge base, their tone, their working preferences).
 4. **Read `agent/adapters/`** and open the one file matching the surface you're running on
    right now (`claude.md`, `chatgpt.md`, `copilot.md`, `codex.md` if you are Codex, or
    `claude-code.md` if you can read and write files / run scripts in this repo
@@ -291,7 +294,7 @@ for an update. In Claude Code and Codex, the same procedure is available as
    A library skill is written for any business. Where the business is named it carries
    a token such as `{{CLIENT_BUSINESS}}`, and its `SKILL.md` lists under **Fill at
    install** which tokens get filled. The install fills what `status/status.json`
-   already knows (the business name, the agent's name) and says so. Anything it could
+   already knows (the business name and the fixed name Orion) and says so. Anything it could
    not fill it prints under its fence: ask the client those, one question at a time,
    write each answer in place of its token in every file of that skill's folder, and
    change its line in the list to `- TOKEN: answer`. The answer is the client's own

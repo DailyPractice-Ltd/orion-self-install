@@ -48,7 +48,6 @@
         "options": ["Attio", "HubSpot", "Other", "None"] },
       { "title": "Team size", "api_slug": "team_size", "type": "number" },
       { "title": "AI-sales maturity (1-5)", "api_slug": "ai_sales_maturity", "type": "rating" },
-      { "title": "Agent name", "api_slug": "agent_name", "type": "text" },
       { "title": "Template version", "api_slug": "template_version", "type": "text" },
       { "title": "Installed on", "api_slug": "installed_on", "type": "date" }
     ]

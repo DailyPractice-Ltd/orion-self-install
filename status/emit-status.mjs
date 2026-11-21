@@ -39,6 +39,10 @@ const TEMPLATE_PATH = join(__dirname, 'status.schema-template.json');
 // Gate work-advancing flags before initialization or any stage/checklist mutation.
 // Notes and identity edits remain usable for recovery; post-work reports use done/radio.
 const workArgs = process.argv.slice(2);
+if (workArgs.some(arg => arg === '--agent_name' || arg.startsWith('--agent_name='))) {
+  console.error('The agent is always Orion. Customize its business context, tone and working preferences instead.');
+  process.exit(1);
+}
 const advancesWork = workArgs.some((arg,index) =>
   arg === '--ops_stage' ||
   (arg === '--checklist' && workArgs[index+1]?.endsWith('=true')) ||
@@ -72,7 +76,6 @@ const status = await withStatusLock(join(__dirname,'..'), async store => {
     const value = args[++i];
     if (key === 'client_id') status.client_id = value;
     else if (key === 'business_name') status.business_name = value;
-    else if (key === 'agent_name') status.agent_name = value;
     else if (key === 'harness_status') status.harness_status = value;
     else if (key === 'ops_stage') { status.ops_stage = value; ops_stage_changed = true; }
     else if (key === 'notes') status.notes = value;

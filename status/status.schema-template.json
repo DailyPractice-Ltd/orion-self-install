@@ -4,7 +4,7 @@
   "ai_assistant": null,
   "client_id": null,
   "business_name": null,
-  "agent_name": null,
+  "agent_name": "Orion",
   "harness_status": "draft",
   "ops_stage": "booked",
   "started_at": null,

@@ -65,7 +65,7 @@ for(const [name,args] of commands)test(`${name} proceeds after fresh acceptance`
  if(name.endsWith('configuration'))assert.ok(h.calls().some(c=>c.method==='POST'&&!c.url.startsWith('https://bridge.test')));
  if(name==='library installation')assert.match(r.output,/Written: 1 file/);
 });
-test('deployed call-planner resolves its own Orion folder and writes no outputs on pause',t=>{
+test('a call-planner copy elsewhere uses the Orion folder it runs in and writes no outputs on pause',t=>{
  const h=harness(t,'revoked');mkdirSync(join(h.root,'.agents/skills'),{recursive:true});cpSync(join(h.root,'plugins/orion/skills/call-planner'),join(h.root,'.agents/skills/call-planner'),{recursive:true});
  const r=h.run(['.agents/skills/call-planner/scripts/build-call-plan.mjs','--data','data.json']);
  assert.equal(r.status,2,r.output);assert.equal(h.calls().length,1);

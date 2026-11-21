@@ -2,12 +2,14 @@
 /**
  * Call-Planner Control Tower — day-sheet generator.
  *
- *   node scripts/build-call-plan.mjs [--data <path>] [--out <dir>] [--timezone <IANA-zone>]
+ *   node <skill folder>/scripts/build-call-plan.mjs [--root <Orion folder>] [--data <path>] [--out <dir>] [--timezone <IANA-zone>]
  *
- * Reads call-data.json (by default the one next to this script) and writes three files
- * into the data file's folder (or --out): a readable markdown day-sheet plus two CSVs
- * you can open in any spreadsheet tool. Re-run it as often as you like — it only ever
- * reads the data file and rewrites its own three outputs.
+ * Works for one Orion folder: --root, else the current folder, which must be the root
+ * of an Orion folder (see harness-root.mjs). Reads call-data.json (by default the one at
+ * that folder's root; relative paths resolve against it) and writes three files into the
+ * data file's folder (or --out), never outside the Orion folder: a readable markdown
+ * day-sheet plus two CSVs you can open in any spreadsheet tool. Re-run it as often as
+ * you like — it only ever reads the data file and rewrites its own three outputs.
  *
  * The data shape is the contract in SKILL.md (today / history / enrichment / lists) —
  * extracted, with its triage rules, from a live operating harness's daily calling
@@ -18,14 +20,13 @@
  *     and a safe next step — an honest "not yet" beats a bad call.
  *   • Dials, connects and connect-rate are counted from the sheet itself.
  *
- * Dependency-free: node:fs only. No package.json, no npm install.
+ * Dependency-free: node:fs and node:path only. No package.json, no npm install.
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { HarnessRootError, insideHarness, resolveHarnessRoot, rootFlags } from './harness-root.mjs';
 
 const flags = {};
 const argv = process.argv.slice(2);
@@ -34,27 +35,29 @@ for (let i = 0; i < argv.length; i++) {
 }
 
 if (Object.hasOwn(flags, 'help')) {
-  console.log('Usage: node scripts/build-call-plan.mjs --data <path> [--out <directory>] [--timezone <IANA-zone>]');
+  console.log('Usage: node <skill folder>/scripts/build-call-plan.mjs [--root <Orion folder>] [--data <path>] [--out <directory>] [--timezone <IANA-zone>]');
+  console.log('Run it from the root of the active Orion folder, or name that folder with --root.');
+  console.log('--data defaults to call-data.json at that root; outputs stay inside that Orion folder.');
   process.exit(0);
 }
 
-// Source and deployed skill folders have different depths; resolve only ancestors
-// of this script, never sibling harnesses or the caller's current directory.
-let root = __dirname;
-while (!existsSync(join(root,'status/guard.mjs')) || !existsSync(join(root,'status/status.json'))) {
-  const parent = dirname(root);
-  if (parent === root) {
-    console.log('Run this skill inside its Orion folder after node start.mjs.');
-    process.exit(2);
-  }
-  root = parent;
+// The harness is the explicitly active project (--root, else the current folder),
+// never this script's own location: the package may run from a cached copy.
+let root, DATA_PATH, OUT_DIR;
+try {
+  root = resolveHarnessRoot({ roots: rootFlags(argv) });
+  DATA_PATH = insideHarness(root, flags.data || 'call-data.json', 'The call data');
+  OUT_DIR = insideHarness(root, flags.out || dirname(DATA_PATH), 'The output folder');
+} catch (error) {
+  if (!(error instanceof HarnessRootError)) throw error;
+  console.log(error.message);
+  process.exit(2);
 }
 const {checkWork} = await import(pathToFileURL(join(root,'status/guard.mjs')).href);
 const permission = await checkWork({root});
 if (!permission.allow) console.log(permission.reason);
 if (!permission.allow) process.exit(2);
 
-const DATA_PATH = flags.data || join(__dirname, 'call-data.json');
 let raw;
 try {
   raw = readFileSync(DATA_PATH, 'utf8');
@@ -72,7 +75,6 @@ for (const key of ['today', 'enrichment', 'lists']) {
   }
 }
 
-const OUT_DIR = flags.out || dirname(DATA_PATH);
 const now = new Date();
 const formatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: flags.timezone || data.timezone || undefined,
@@ -163,7 +165,7 @@ md.push(`- **Priorities**: ${(data.lists.priorities || []).join(' · ') || '—'
 md.push(`- **Stages**: ${(data.lists.stages || []).join(' · ') || '—'}`);
 md.push(`- **Outcomes**: ${(data.lists.outcomes || []).join(' · ') || '—'}`);
 md.push('');
-md.push(`_Generated ${now.toISOString()} from ${DATA_PATH.split('/').pop()}. Rebuild anytime: node scripts/build-call-plan.mjs_`);
+md.push(`_Generated ${now.toISOString()} from ${DATA_PATH.split('/').pop()}. Rebuild anytime: node <skill folder>/scripts/build-call-plan.mjs_`);
 
 // ── CSVs (open in any spreadsheet tool) ─────────────────────────────────────
 

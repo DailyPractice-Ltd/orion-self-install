@@ -626,6 +626,12 @@
    "63e91a31b8651f47a7046eeb13a1642ac7604ca7084db38348674772cf800932",
    "b076979b103c4f0b77ba6635fed2f95e78823d8a7cb85e5b808a689479596b59"
   ],
+  "plugins/orion/.claude-plugin/plugin.json": [
+   "42e749b31034effecea451489d1537502d82878b2d82202800ad3d297655d44c"
+  ],
+  "plugins/orion/plugin.json": [
+   "0dd744db8917976888f4b3d5fee547e11eacc5614f759cd03b93f1e427a0b197"
+  ],
   "plugins/orion/skills/apollo-enrich-phone/SKILL.md": [
    "0332cffc34bc04d08d0122358d0ccc4dbaa694ad44901784c50242030a451690"
   ],
@@ -660,13 +666,18 @@
    "b324eba3246da8867b38a45a97126907c3baaa9006e63b85ed3552b632e04df4"
   ],
   "plugins/orion/skills/call-planner/SKILL.md": [
-   "0b0859a81f0315704bbebc54320bf8d59d871ee30b8e3f498b15afc53412ca84"
+   "0b0859a81f0315704bbebc54320bf8d59d871ee30b8e3f498b15afc53412ca84",
+   "286fa55ecf05059b24a9499183f95c6b8f03238d0b291998be0f3de105d46aa8"
   ],
   "plugins/orion/skills/call-planner/assets/call-data.template.json": [
    "29421fd24f35cf8d7318557d8032f800a75df80dbc1171dc0d1dd07a5f7e7111"
   ],
   "plugins/orion/skills/call-planner/scripts/build-call-plan.mjs": [
+   "5c611a810660bf340fbe3e348f715da50d1ed0054d8a717214f85853314107cc",
    "a84715fd40bd6f7e66b4bf3d05da6edd8a50d24f334f115571d3021811516d56"
+  ],
+  "plugins/orion/skills/call-planner/scripts/harness-root.mjs": [
+   "3a38f3b09d48d21542fe1d1f9d243c562dfd07dc4c841ce5b88eac4b3db69382"
   ],
   "plugins/orion/skills/closeout-spreadsheet/SKILL.md": [
    "38805ce211b7cee8ecc2c0bcca9f501552f91aa5084ec16f90a61be80ccbfed4"
@@ -675,7 +686,8 @@
    "ef880af90e57916dbf7746981e52d757b6cf545950b54181fd63438c4e9a69cb"
   ],
   "plugins/orion/skills/create-skill/SKILL.md": [
-   "512db52c0995ba0e3a99fbf1770008c566fc32a5a47c18bc1e0fba7ef846bd7c"
+   "512db52c0995ba0e3a99fbf1770008c566fc32a5a47c18bc1e0fba7ef846bd7c",
+   "ab8fa6f599e210e88cc0636ba887ee8ff343b72cecb0aeb8e376af33f5cc128d"
   ],
   "plugins/orion/skills/friday-report/SKILL.md": [
    "2aaf9e579c627caa7ad172c16d61f6caa694c9b0854599db380f93dcb66ac0b2"
@@ -696,7 +708,8 @@
    "322590a01a7154ae6a7688af76057822524a9b0d697472f61cddfb15696c81af"
   ],
   "plugins/orion/skills/post-call-debrief/SKILL.md": [
-   "0c01bff073713a03bc77db89eac85f89f484855cc8f0a6bd79cc9e7ff7421f3b"
+   "0c01bff073713a03bc77db89eac85f89f484855cc8f0a6bd79cc9e7ff7421f3b",
+   "9f823ce569f2ef72a0b9d59d7ff1cddf947b2632f8f19fab5aaa73c2804c5876"
   ],
   "plugins/orion/skills/prospect-call-list/SKILL.md": [
    "f4aed3e008633632695ff5b59a0345e038c872ceccc4d6014b9cbde2921fc624"
@@ -717,7 +730,8 @@
    "ebdef0542e15bc5f33a434e62ef34f72a2aaa20232b64c8ccb0492007c130511"
   ],
   "plugins/orion/skills/prospect-research-outreach/SKILL.md": [
-   "46935f7f4e68166adf2595b543a3fcb747b9eaff3b98941834008738c1e51207"
+   "46935f7f4e68166adf2595b543a3fcb747b9eaff3b98941834008738c1e51207",
+   "fa1e601d7f113edcb58890a519c16fdcf0c398298ef7307499e6568525e88253"
   ],
   "plugins/orion/skills/prospecting/SKILL.md": [
    "de90bdcb15ec162b17f710339f60a917d3a3b77bb5c4f0f0a7d252a8ce8830df"
@@ -729,6 +743,7 @@
    "9985cd6a74a6d9c52149e48c6e06a7af4354491983b1f8b78e516232c5c63cfd"
   ],
   "plugins/orion/skills/report-bug/references/report-guide.md": [
+   "783f8770c1f671a4d932ef6ba53900287ba7e6c68b2fe17afa3628c9c6de6c40",
    "97fab64c4faf9e723df5d2aa0683f0cefbfce737b95c6bb457c5298861bdedd0"
   ],
   "plugins/orion/skills/task-planner/SKILL.md": [
@@ -747,6 +762,7 @@
    "163eb1d9bf6f673d0a7ae2c3bdf73bc1e37c232b9f0ead3179f45e7251c39b33"
   ],
   "plugins/orion/skills/update-harness/SKILL.md": [
+   "1ff0df0f7f35b4db6864895ca5a7e9ec1b2ea96874e5f91d9878564a5ea5b247",
    "c054233152f13d203ffe3772d9d3bf93e088cd3811f517ae11bf85aea4769aca"
   ],
   "skills/hire-agent/SKILL.md": [
@@ -804,6 +820,7 @@
    "625f603c63b7e344daccd9f171ac66e16f818c4b5c0be581d1db63bd76971685",
    "70f587ae97356f972164805c67272f2d7c90b1dfaf9ea7211762ce53dc29fd8f",
    "740300365fcea4a63d66a43c38c1b152010163e3ccca66de4c0051ceb6893eb9",
+   "85b5b892e7a02506d1190d83ec87726b934b76100ac7c165f9e8b425d7d7af53",
    "8841ca853b78da3e5ccc7cf65e216cd157f9bfa0d2f3302422ec3267dbf86b69",
    "9f451c4360b22d4689b0668a94587e262424b6f5b13e603d973e23160e30eab6",
    "adc2de89ad5a29b67d071a607832f4f8f15840577d11bf817a8e096d7db6072f",
@@ -946,6 +963,7 @@
    "8a5e67c119a29e9a9439d84e9c2a64538497ff93183deb1623a43357915e8da3",
    "8dfc4d219e5507a223103cd1bbc600a28907b07bc7fc0fa8ab5b77781e0e3d22",
    "8e21db781b805fe29cc95399e95c0180224f551cdb8dc63b4f296a1f741bc31a",
+   "8e61d15aa66159d1de6630683f0a4d4913aa6ea0aa7e7971f5578d9654800e60",
    "93f2011e3b6349b8b3c43038b11213fd2e3b4110d2d380c79ceb288e8e66a804",
    "a40851301a39614410b1fdb9340a36fee02f979f62dff5f51b351ff469cda692",
    "ab55f8c337987b904dd67965adbf183a1badba95fc00f31bcb15e5826c334f47",
@@ -993,6 +1011,7 @@
    "a38c6eff7250ce07885300fca3a2615be4972aadd20a97152e3c7f763f822e7d",
    "a8a50ad5473bce0d0a88e1f5971dd94a5099003f2ce79d22a216e0c6aa129d36",
    "c0ea5e7934443e7ca9ee959f14428f0f258c77c95cbe21116b58c566e6410928",
+   "c1b17689ac4b87f6f4f4f07642a1941bcdaddf7d9faa27776726337889925b78",
    "c41467839d149743e0520fc3d8472a182caa28985716eacd7d660cda701211bb",
    "cc164c629c19c560d652010852e4edc1f0cd14823e5e5f69f4299f052f2f50ce",
    "d7a4fc4f3aabb12e4364a2575c266e3081dd2e376bf7ea3c0ce1ddd6cfac3939",
@@ -1060,6 +1079,7 @@
    "5b7ea48379b88afe6deea98bb885aaf562b88a5532067be03a8d93d6722c920d",
    "5e09b9baf976c874c729337cfe1667156f1d0864b62827a5aa8a728046e8b938",
    "6a39ad6972d0217436f03fb1f6680382c11cb5831439d3e08b51644c72225185",
+   "7541eb8363a5a2406fb7f26a99138a4fba0c024a62eac5a4cbca81fdbd5c5df4",
    "7f0ed74770f896f5f784ebfdeff2172bbc3ac7d20aa4ee1f61e88178e67494f8",
    "8716f92d657cb127e089760179903f222c20d5c9a08d4a8003593f174d7045a7",
    "8885c98e4f55c3ee0a98c7e03db3ed0fa9589dc17b7948fb8f730cd4a4f90146",
@@ -1092,6 +1112,9 @@
   ],
   "update/plugin-native.mjs": [
    "9f1bcedab1a4e4dbaecbe3f6b3edc1dbd79f7db75564d5ad5ac7fde17a5bbb94"
+  ],
+  "update/plugin-package.mjs": [
+   "bbc64dfdd263a3efe63e11cd29724cdafd0d9e527ab2d655c4532d179247d305"
   ],
   "update/release-contract.mjs": [
    "14b6d87a242fe87c3fd8cf7b9ac8d03fbb3d207e72b3a9e05e43a8d38452747c",

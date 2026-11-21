@@ -131,6 +131,7 @@
       "update/manifest.json",
       "update/plugin-native.mjs",
       "update/pristine.json",
+      "update/plugin-package.mjs",
       "update/release-contract.mjs",
       "validation/validation-tasks.md",
       "status/guard.mjs",
@@ -541,6 +542,16 @@
     ],
     "entries": [
       {
+        "source": "plugins/orion/plugin.json",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/plugin.json"
+      },
+      {
+        "source": "plugins/orion/.claude-plugin/plugin.json",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/.claude-plugin/plugin.json"
+      },
+      {
         "source": "plugins/orion/skills/create-skill/SKILL.md",
         "ownership": "release",
         "fingerprint_key": "plugins/orion/skills/create-skill/SKILL.md"
@@ -564,6 +575,11 @@
         "source": "plugins/orion/skills/call-planner/scripts/build-call-plan.mjs",
         "ownership": "release",
         "fingerprint_key": "plugins/orion/skills/call-planner/scripts/build-call-plan.mjs"
+      },
+      {
+        "source": "plugins/orion/skills/call-planner/scripts/harness-root.mjs",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/call-planner/scripts/harness-root.mjs"
       },
       {
         "source": "plugins/orion/skills/friday-report/SKILL.md",

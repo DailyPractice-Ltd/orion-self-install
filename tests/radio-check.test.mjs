@@ -73,10 +73,12 @@ test('parses the directive exactly as the server formats it', () => {
  * Run the real radio in a scratch harness folder. Returns what it printed, the
  * status.json it left behind, and every call the bridge received.
  */
-function checkRadio({ thread, sharing = {} }) {
+function checkRadio({ thread, sharing = {}, locked = false }) {
   const dir = mkdtempSync(join(tmpdir(), 'orion-radio-'));
   try {
     mkdirSync(join(dir, 'status'));
+    // Another Orion command holding the status lock for the whole check.
+    if (locked) mkdirSync(join(dir, 'status', '.radio-lock'));
     for (const f of ['radio.mjs', 'shapes.mjs', 'report.mjs', 'store.mjs']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
     mkdirSync(join(dir, 'update'));
     for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(statusDir, '..', 'update', f), join(dir, 'update', f));
@@ -154,6 +156,16 @@ test('check tells the client about an offer in words and prints the exact instal
   assert.ok(out.indexOf('library --install') > fence);
   assert.equal(status.sharing.radio_seen_through, at, 'the message read out is remembered');
   assert.equal(status.sharing.install_token, FAKE_KEY, 'the rest of the file survives');
+});
+
+test('a busy status lock never stops the message being read out; it is only remembered next time', () => {
+  const at = now();
+  const started = Date.now();
+  const { code, out, err, status } = checkRadio({ thread: { version: 1, messages: [fromUs({ at })] }, locked: true });
+  assert.equal(code, 0, err);
+  assert.match(out, /From Oliver Carter, just now:/);
+  assert.equal(status.sharing.radio_seen_through, undefined, 'the mark is skipped, never written around the lock');
+  assert.ok(Date.now() - started < 10000, 'the radio waits only briefly for the lock');
 });
 
 test('a plain message is still read as written, with no install command', () => {

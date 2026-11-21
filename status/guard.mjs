@@ -1,7 +1,6 @@
 /** Point-in-time pre-work authorization; verification never consumes radio messages. */
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFile } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
 import { withStatusLock, pairingState } from './store.mjs';
 import { radioKey, keyHeader, RADIO_URL_RE, HARNESS_ID_RE, wantsEnvProxy, envProxyEnv } from './shapes.mjs';
@@ -107,10 +106,7 @@ export async function checkWork({root, now = () => new Date(), fetchImpl = globa
           return {allow:false,reason:reasons.invalid,allowance:false,deadlineAt:null};
         }
       }
-      let keyFile = '';
-      try { keyFile = await readFile(join(root,'status/radio.key'),'utf8'); }
-      catch (error) { if (error.code !== 'ENOENT') throw error; }
-      const credential = radioKey(status, {keyFile});
+      const credential = radioKey(status, {keyFile: await store.readKey()});
       let outcome = 'invalid';
       if (RADIO_URL_RE.test(sharing.bridge_url || '') && HARNESS_ID_RE.test(sharing.harness_id || '') && credential.source) {
         try {

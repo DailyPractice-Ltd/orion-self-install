@@ -11,9 +11,10 @@
  * It refuses to overwrite anything, and keeps a copy of the old skills and status in
  * .update-backup/ first. To undo a switch, run it again.
  */
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withStatusLock } from './status/store.mjs';
 
 const SKILLS = { codex: '.agents/skills', 'claude-code': '.claude/skills' };
 const TOP = { codex: '.agents', 'claude-code': '.claude' };
@@ -54,10 +55,18 @@ function currentTool(root, status) {
   return present[0];
 }
 
-export function switchAi(root, to) {
+/**
+ * The whole switch holds the status lock, from reading status.json to the last
+ * restore on failure, so no other Orion command's change is lost to it.
+ */
+export async function switchAi(root, to) {
   const statusPath = join(root, 'status/status.json');
   if (!existsSync(statusPath)) throw new Error('No status/status.json here. Run this from inside your Orion folder.');
-  const status = JSON.parse(readFileSync(statusPath, 'utf8'));
+  return withStatusLock(root, (store) => switchLocked(store, root, statusPath, to));
+}
+
+async function switchLocked(store, root, statusPath, to) {
+  const status = await store.readStatus();
   const from = currentTool(root, status);
   to ??= TOOLS.find((tool) => tool !== from);
   if (!TOOLS.includes(to)) throw new Error(`Choose --to claude-code or --to codex (not ${to}).`);
@@ -95,7 +104,7 @@ export function switchAi(root, to) {
     status.ai_assistant = to;
     if (status.machine_profile && typeof status.machine_profile === 'object') status.machine_profile.chosen_surface = to;
     status.notes = [status.notes || '', `switched from ${from} to ${to}; backup in ${backupRel}`].filter(Boolean).join('\n');
-    writeFileSync(statusPath, JSON.stringify(status, null, 2) + '\n');
+    await store.writeStatus(status);
   } catch (error) {
     // Put the folder back as it was: remove what was added, restore from the backup.
     for (const target of created) rmSync(target, { force: true });
@@ -105,7 +114,7 @@ export function switchAi(root, to) {
       const source = join(root, SKILLS[from], rel);
       if (!existsSync(source)) copy(join(backup, SKILLS[from], rel), source);
     }
-    copy(join(backup, 'status/status.json'), statusPath);
+    await store.writeStatusText(readFileSync(join(backup, 'status/status.json'), 'utf8'));
     throw error;
   }
   return { from, to, moved: moving.map((rel) => `${SKILLS[to]}/${rel}`), dropped: dropped.map((rel) => `${SKILLS[from]}/${rel}`), backup: backupRel };
@@ -114,7 +123,7 @@ export function switchAi(root, to) {
 if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   try {
     const root = arg('--root') || dirname(fileURLToPath(import.meta.url));
-    const result = switchAi(root, arg('--to'));
+    const result = await switchAi(root, arg('--to'));
     if (process.argv.includes('--json')) console.log(JSON.stringify(result, null, 2));
     else {
       console.log(`Switched this Orion folder from ${NAME[result.from]} to ${NAME[result.to]}.`);

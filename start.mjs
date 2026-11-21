@@ -1,17 +1,15 @@
 #!/usr/bin/env node
 /** Press Start: resumable setup; only fresh, accepted pairing permits handoff. */
 
-import { readFileSync, existsSync, statSync, readdirSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, delimiter } from 'node:path';
 import os from 'node:os';
-import { open, rename, unlink } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
 import { reportSignal, validateOutbox } from './status/report.mjs';
 import { checkWork } from './status/guard.mjs';
-import { withStatusLock } from './status/store.mjs';
+import { withStatusLock, changeStatus, createStatus } from './status/store.mjs';
 import {
   bridgeBase,
   normalizePairingCode,
@@ -22,13 +20,10 @@ import {
   keyHeader,
   homeOn,
   INSTALL_TOKEN_RE, RADIO_URL_RE, HARNESS_ID_RE,
-  RADIO_KEY_FILE,
 } from './status/shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status', 'status.json');
-const TEMPLATE_PATH = join(__dirname, 'status', 'status.schema-template.json');
-const KEY_PATH = join(__dirname, 'status', RADIO_KEY_FILE);
 
 /**
  * Where the radio key may be besides the bookmark file (status/shapes.mjs,
@@ -239,8 +234,8 @@ function migrate(status, { firstRun = false } = {}) {
 
 /** Write after every completed unit, never batched to the end (Article II). */
 async function save(status, { chosenSurface = false } = {}) {
-  await withStatusLock(__dirname, async store => {
-    const current = migrate(await store.readStatus(), {
+  await changeStatus(__dirname, fresh => {
+    const current = migrate(fresh, {
       firstRun: status.scopes.send_risk_set_by === 'install',
     });
     if (chosenSurface) {
@@ -252,10 +247,7 @@ async function save(status, { chosenSurface = false } = {}) {
         chosen_surface: current.machine_profile?.chosen_surface ?? null,
       };
     }
-    const now = new Date().toISOString();
-    current.started_at ??= now;
-    current.updated_at = now;
-    await store.writeStatus(current);
+    current.started_at ??= new Date().toISOString();
     // Later setup decisions must use the latest credential and saved answers.
     Object.assign(status, current);
   });
@@ -368,11 +360,7 @@ async function main() {
   rule();
 
   // Step 0 — the bookmark: read it before saying anything (AGENTS.md rule 1).
-  const firstRun = await withStatusLock(__dirname, async store => {
-    if (existsSync(STATUS_PATH)) return false;
-    await store.writeStatus(JSON.parse(readFileSync(TEMPLATE_PATH,'utf8')));
-    return true;
-  });
+  const firstRun = await createStatus(__dirname);
   // Validate and upgrade pairing state before setup writes.
   const initial = await checkWork({root:__dirname, replay:false});
   if (initial.reason.includes('could not safely')) { pauseSetup(initial.reason); return; }
@@ -385,7 +373,7 @@ async function main() {
       current.sharing.pairing.state = 'unpaired';
       current.sharing.pairing.last_check = 'invalid';
       current.sharing.pairing.last_connected_at = null;
-      rmSync(KEY_PATH, {force:true});
+      await store.removeKey();
       await store.writeStatus(current);
       Object.assign(status.sharing,current.sharing);
     });
@@ -547,17 +535,7 @@ async function pairingStep(status) {
     const current = await store.readStatus();
     const sharing = current.sharing;
     if (homeOn(current)) {
-      const temporary = `${KEY_PATH}.${randomUUID()}.tmp`;
-      let file;
-      try {
-        file = await open(temporary,'wx',0o600);
-        await file.writeFile(pack.install_token+'\n'); await file.sync(); await file.close(); file = null;
-        await rename(temporary,KEY_PATH);
-        let directory;
-        try { directory = await open(join(__dirname,'status'),'r'); await directory.sync(); }
-        catch (error) { if (!['EINVAL','ENOTSUP','EISDIR'].includes(error.code) && !(process.platform === 'win32' && ['EPERM','EACCES'].includes(error.code))) throw error; }
-        finally { await directory?.close(); }
-      } finally { await file?.close(); await unlink(temporary).catch(error=>{if(error.code!=='ENOENT')throw error;}); }
+      await store.writeKey(pack.install_token);
       sharing.install_token = null;
     } else sharing.install_token = pack.install_token;
     sharing.bridge_url = address; sharing.harness_id = pack.harness_id;

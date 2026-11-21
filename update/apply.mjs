@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { destinationState, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
+import { withStatusLock } from '../status/store.mjs';
 
 const arg = name => { const i=process.argv.indexOf(name); return i<0 ? undefined : process.argv[i+1]; };
 const json = path => JSON.parse(readFileSync(path,'utf8'));
@@ -26,8 +27,8 @@ function sourceSnapshot(repo, commit) {
   return dir;
 }
 
-function update(root,repo,commit) {
-  recoverPendingUpdates(root);
+async function update(store,root,repo,commit) {
+  await recoverPendingUpdates(store,root);
   const snapshot=sourceSnapshot(repo,commit);
   try {
     const manifest=json(join(snapshot,'update/manifest.json'));
@@ -123,10 +124,11 @@ function update(root,repo,commit) {
           parent = dirname(parent);
         }
       }
-      renameSync(join(backup,'stage/status/status.json'),statusPath);
+      await store.writeStatusText(readFileSync(join(backup,'stage/status/status.json'),'utf8'));
+      rmSync(join(backup,'stage/status/status.json'));
       journal.state='complete';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
     } catch(error) {
-      rollbackUpdate(root,backup,journal);
+      await rollbackUpdate(store,root,backup,journal);
       journal.state='recovered';writeFileSync(join(backup,'journal.json'),JSON.stringify(journal,null,2));
       throw error;
     }
@@ -134,7 +136,7 @@ function update(root,repo,commit) {
   } finally {rmSync(snapshot,{recursive:true,force:true});}
 }
 
-function rollbackUpdate(root,backup,journal) {
+async function rollbackUpdate(store,root,backup,journal) {
   const statusPath=safe(root,'status/status.json');
   const statusHash=fingerprint(readFileSync(statusPath));
   const oldStatusHash=fingerprint(readFileSync(join(backup,'status/status.json')));
@@ -152,11 +154,11 @@ function rollbackUpdate(root,backup,journal) {
     if(a.kind==='add') {if(existsSync(dest)) rmSync(dest);}
     else copyTo(join(backup,'files',a.destination),dest);
   }
-  copyTo(join(backup,'status/status.json'),safe(root,'status/status.json'));
+  await store.writeStatusText(readFileSync(join(backup,'status/status.json'),'utf8'));
   const stage=join(backup,'stage');if(existsSync(stage)) rmSync(stage,{recursive:true,force:true});
 }
 
-function recoverPendingUpdates(root) {
+async function recoverPendingUpdates(store,root) {
   const backups=safe(root,'.update-backup');if(!existsSync(backups)) return [];
   const recovered=[];
   for(const name of readdirSync(backups)) {
@@ -164,14 +166,14 @@ function recoverPendingUpdates(root) {
     if(!existsSync(path)) continue;
     const journal=json(path);
     if(journal.kind==='update' && journal.state==='pending') {
-      rollbackUpdate(root,backup,journal);
+      await rollbackUpdate(store,root,backup,journal);
       journal.state='recovered';writeFileSync(path,JSON.stringify(journal,null,2));recovered.push(name);
     }
   }
   return recovered;
 }
 
-function restore(root,backupRel) {
+async function restore(store,root,backupRel) {
   const backup=safe(root,backupRel); const journal=json(join(backup,'journal.json'));
   if(journal.kind==='switch') throw new Error('This backup is from a tool switch. To switch back, run: node switch_ai.mjs');
   if(journal.state!=='complete') throw new Error(`Update backup is ${journal.state}; only completed updates can be restored`);
@@ -191,12 +193,17 @@ function restore(root,backupRel) {
   for(const key of journal.remove_status_checklist_keys) if(Object.hasOwn(old.checklist||{},key)) {status.checklist ||= {};status.checklist[key]=old.checklist[key];}
   status.template_version=old.template_version;
   status.notes=[status.notes||'',`restored from ${backupRel}`].filter(Boolean).join('\n');
-  writeFileSync(statusPath,JSON.stringify(status,null,2)+'\n');
+  await store.writeStatus(status);
   return {restored,kept,backup:backupRel};
 }
 try {
   const command=process.argv[2], root=arg('--root'); if(!root) throw new Error('--root is required');
   const repo=arg('--release-repo')||dirname(dirname(fileURLToPath(import.meta.url)));
-  const result=command==='update' ? update(root,repo,arg('--commit')) : command==='switch' ? (()=>{throw new Error('To switch AI assistants, run: node switch_ai.mjs');})() : command==='restore' ? restore(root,arg('--backup')) : command==='recover' ? {recovered:recoverPendingUpdates(root)} : (()=>{throw new Error('Use update, restore or recover');})();
+  if (command==='switch') throw new Error('To switch AI assistants, run: node switch_ai.mjs');
+  if (!['update','restore','recover'].includes(command)) throw new Error('Use update, restore or recover');
+  // The whole run holds the status lock, from the first read of status.json to
+  // the journal's last word, so no other Orion command's change is lost to it.
+  const result=await withStatusLock(root, store =>
+    command==='update' ? update(store,root,repo,arg('--commit')) : command==='restore' ? restore(store,root,arg('--backup')) : recoverPendingUpdates(store,root).then(recovered=>({recovered})));
   console.log(JSON.stringify(result,null,2));
 } catch(error) {console.error(error.message);process.exitCode=2;}

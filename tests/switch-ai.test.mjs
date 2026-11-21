@@ -101,6 +101,8 @@ test('a folder with no recorded assistant is read from its layout', (t) => {
 test('with no --root it switches the folder it sits in', (t) => {
   const root = folder(t, 'codex');
   copyFileSync(script, join(root, 'switch_ai.mjs'));
+  // A deployed folder carries the status store the script imports.
+  copyFileSync(new URL('../status/store.mjs', import.meta.url), join(root, 'status/store.mjs'));
   const result = spawnSync(process.execPath, [join(root, 'switch_ai.mjs')], { encoding: 'utf8', cwd: tmpdir() });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(status(root).ai_assistant, 'claude-code');

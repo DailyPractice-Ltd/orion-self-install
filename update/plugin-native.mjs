@@ -85,7 +85,7 @@ function run(ctx, args) {
   const result = shim
     ? spawnSync(quote(ctx.bin), args.map(quote), { cwd: ctx.real, env: ctx.env, encoding: 'utf8', shell: true, timeout: 120000, windowsHide: true })
     : spawnSync(ctx.bin, args, { cwd: ctx.real, env: ctx.env, encoding: 'utf8', timeout: 120000, windowsHide: true });
-  const call = { command: `${ctx.command} ${args.join(' ')}`, status: result.status, json: parseJson(result.stdout) };
+  const call = { command: `${ctx.command} ${args.join(' ')}`, status: result.status, json: parseJson(result.stdout), stdout: result.stdout };
   ctx.calls.push({ command: call.command, status: call.status });
   if (result.error) call.error = result.error.message;
   else if (call.status !== 0 && !call.json) call.error = (result.stderr || result.stdout || '').trim().split(/\r?\n/).slice(-3).join(' ');
@@ -170,7 +170,37 @@ function claudeInspect(ctx) {
   const found = row.folderVersion || row.version;
   if (found !== ctx.version) return { result: failed(ctx.tool, 'version_mismatch', ctx.details({ expected: ctx.version, found })), row };
   if (row.enabled !== true) return { result: pending(ctx.tool, `Enable Orion for this folder: from this folder run "claude plugin enable ${ctx.pluginId} --scope local".`, 'disabled', ctx.details()), row, disabled: true };
-  return { result: { state: 'complete', details: ctx.details({ version: found, scope: 'local', source: row.readFromFolder, verified_by: 'claude plugin list --json', next: fresh }) }, row };
+  // The install record is not discovery: Claude Code's own inventory must show every shipped skill.
+  const inventory = claudeSkills(ctx);
+  const expected = packageSkills(ctx);
+  // Names are compared when the inventory line lists them; otherwise the count must match.
+  const missing = inventory.names ? expected.filter((name) => !inventory.names.includes(name)) : [];
+  if (!expected.length || inventory.count !== expected.length || missing.length) {
+    return { result: pending(ctx.tool, `Claude Code has Orion installed here but does not yet show its ${expected.length} skills. ${fresh} Then run Orion's plugin setup check again (node update/plugin-setup.mjs verify).`, 'skills_not_discovered', ctx.details({ expected: expected.length, found: inventory.count ?? null, missing, message: inventory.error })), row };
+  }
+  return { result: { state: 'complete', details: ctx.details({ version: found, scope: 'local', source: row.readFromFolder, skills: inventory.names, verified_by: `claude plugin list --json; claude plugin details ${ctx.pluginId}`, next: fresh }) }, row };
+}
+
+/** The shipped skill names: every folder under the package's skills/ holding a SKILL.md. */
+function skillNames(dir) {
+  try { return readdirSync(dir).filter((name) => isFile(join(dir, name, 'SKILL.md'))).sort(); }
+  catch { return null; }
+}
+const packageSkills = (ctx) => skillNames(join(ctx.packageDir, 'skills')) || [];
+
+/**
+ * `claude plugin details` has no JSON mode; its component inventory reads
+ * "Skills (N)  a, b, c". Names are taken only when the line lists exactly N of them.
+ */
+function claudeSkills(ctx) {
+  const shown = run(ctx, ['plugin', 'details', ctx.pluginId]);
+  if (shown.status !== 0) return { error: shown.error || 'plugin details failed' };
+  const text = `${shown.stdout || ''}`;
+  const line = text.split(/\r?\n/).map((l) => l.match(/^\s*Skills\s*\((\d+)\)\s*(.*)$/)).find(Boolean);
+  if (!line) return { error: 'no skill inventory in plugin details' };
+  const count = Number(line[1]);
+  const names = line[2].split(/[,\s]+/).map((n) => n.replace(/^orion:/, '')).filter(Boolean);
+  return { count, names: names.length === count ? names.sort() : undefined };
 }
 
 function claudeSetup(ctx) {

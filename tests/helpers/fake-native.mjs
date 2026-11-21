@@ -5,7 +5,7 @@
  * State lives in the JSON file named by FAKE_NATIVE_STATE; every call is logged there.
  * It never reaches a real tool, a real home folder or the network.
  */
-import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const statePath = process.env.FAKE_NATIVE_STATE;
@@ -67,6 +67,14 @@ if (tool === 'claude') {
   if (verb === 'uninstall') {
     delete c.installs[`${plugin}|${realpathSync(process.cwd())}`];
     out({ command: 'uninstall', outcome: 'ok' }); finish(0);
+  }
+  if (verb === 'details') {
+    // Text only, as the real CLI: a header, then a component inventory.
+    const record = c.installs[`${sub}|${realpathSync(process.cwd())}`];
+    if (!record || faults.detailsFails) { process.stderr.write(`Plugin "${sub}" is not loaded\n`); finish(1); }
+    const skillsDir = join(c.marketplaces[sub.split('@')[1]]?.path || '/nowhere', 'plugins/orion/skills');
+    const skills = faults.detailsSkills || (existsSync(skillsDir) ? readdirSync(skillsDir).filter((n) => existsSync(join(skillsDir, n, 'SKILL.md'))).sort() : []);
+    out(`${sub}\nComponent inventory\n  Skills (${skills.length})  ${skills.join(', ')}\n  Token cost  ~1.2k`); finish(0);
   }
   if (verb === 'list') {
     const cwd = realpathSync(process.cwd());

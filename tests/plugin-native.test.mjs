@@ -11,6 +11,7 @@ import { findNativeClient, retirePlugin, setupPlugin, verifyPlugin } from '../up
 const FAKE = join(dirname(fileURLToPath(import.meta.url)), 'helpers/fake-native.mjs');
 const VERSION = '9.8.7';
 const CATALOG = 'orion-3f9c2a7e1b';
+const SKILLS = ['hello', 'prospecting'];
 
 function world(t, { tools = ['claude', 'codex'], faults = {}, state = {} } = {}) {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'orion-native-')));
@@ -30,6 +31,7 @@ function world(t, { tools = ['claude', 'codex'], faults = {}, state = {} } = {})
   const put = (path, value) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), JSON.stringify(value)); };
   put('plugins/orion/plugin.json', { name: 'orion', version: VERSION });
   put('plugins/orion/.claude-plugin/plugin.json', { name: 'orion', version: VERSION });
+  for (const skill of SKILLS) put(`plugins/orion/skills/${skill}/SKILL.md`, `${skill}\n`);
   put('.claude-plugin/marketplace.json', { name: CATALOG, owner: { name: 'Daily Practice' }, plugins: [{ name: 'orion', source: './plugins/orion' }] });
   put('.agents/plugins/marketplace.json', { name: CATALOG, plugins: [{ name: 'orion', source: { source: 'local', path: './plugins/orion' } }] });
   const env = { PATH: bin, HOME: home, USERPROFILE: home, FAKE_NATIVE_STATE: statePath, SystemRoot: process.env.SystemRoot, ComSpec: process.env.ComSpec, PATHEXT: process.env.PATHEXT };
@@ -55,7 +57,8 @@ test('Claude Code: validate, register and install with local scope, then confirm
   assert.equal(result.state, 'complete', JSON.stringify(result));
   assert.equal(result.details.plugin_id, `orion@${CATALOG}`);
   assert.equal(result.details.version, VERSION);
-  assert.equal(result.details.verified_by, 'claude plugin list --json');
+  assert.equal(result.details.verified_by, `claude plugin list --json; claude plugin details orion@${CATALOG}`);
+  assert.deepEqual(result.details.skills, SKILLS);
   const calls = w.read().calls.map((c) => c.args.join(' '));
   assert.deepEqual(calls, [
     `plugin validate ${join(w.root, 'plugins/orion')} --json`,
@@ -64,6 +67,7 @@ test('Claude Code: validate, register and install with local scope, then confirm
     `plugin marketplace add ${w.root} --scope local --json`,
     `plugin install orion@${CATALOG} --scope local --json`,
     'plugin list --json',
+    `plugin details orion@${CATALOG}`,
   ]);
   assert.ok(w.read().calls.every((c) => c.cwd === w.root), 'every native call runs from the harness');
 });
@@ -108,6 +112,20 @@ test('Claude Code: inspection that does not prove this harness package fails exp
     assert.equal(result.state, 'failed', reason);
     assert.equal(result.details.reason, reason);
   }
+});
+
+test('Claude Code: complete needs the native skill inventory to match the package', (t) => {
+  const short = world(t, { faults: { detailsSkills: ['hello'] } });
+  const partial = setupPlugin(short.opts('claude-code'));
+  assert.equal(partial.state, 'pending', JSON.stringify(partial));
+  assert.equal(partial.details.reason, 'skills_not_discovered');
+  assert.deepEqual(partial.details.missing, ['prospecting']);
+  assert.match(partial.remaining_action, /fresh Claude Code session/);
+
+  const unloaded = world(t, { faults: { detailsFails: true } });
+  const result = setupPlugin(unloaded.opts('claude-code'));
+  assert.equal(result.state, 'pending', JSON.stringify(result));
+  assert.equal(result.details.reason, 'skills_not_discovered');
 });
 
 test('Claude Code: an installed-but-disabled plugin is enabled in local scope only', (t) => {

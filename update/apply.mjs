@@ -112,7 +112,7 @@ async function update(root,repo,commit) {
     const statusPath=safe(root,'status/status.json'), status=json(statusPath);
     const ai_assistant=resolveAiAssistant(status,manifest.deployment);
     if (newer(status.template_version,manifest.template_version)) throw new Error('Refusing to roll back the harness version');
-    if (status.plugin?.pending_switch) throw new Error(`A switch to ${status.plugin.pending_switch.to} is waiting. Finish it (run the same switch command again) or cancel it with "node update/apply.mjs restore --root . --backup ${status.plugin.pending_switch.backup}", then update`);
+    if (status.plugin?.pending_switch) throw new Error(`A switch to ${product(status.plugin.pending_switch.to)} has started but is not finished, and an update now could leave the two tools on different releases. Finish the switch first (run the same switch command again) or cancel it with "node update/apply.mjs restore --root . --backup ${status.plugin.pending_switch.backup}", then update`);
     const withPlugin=hasPackage(manifest.deployment);
     const plan=planForTool(manifest.deployment,ai_assistant,{releaseRoot:snapshot,root});
     const retired=(manifest.deployment.retired||[]).map(e=>({source:e.source,destination:e.destinations?.[ai_assistant]||e.destination,ownership:'release',fingerprint_key:e.sources?.[ai_assistant]||e.fingerprint_key||e.source}));
@@ -310,7 +310,7 @@ async function switchTool(root,repo,commit,ai_assistant,legacyTool) {
     if (!deployment.tools.includes(ai_assistant) || ai_assistant===from) throw new Error(`Choose the other supported tool (current: ${from})`);
     const withPlugin=hasPackage(deployment);
     const waiting=status.plugin?.pending_switch;
-    if (waiting && waiting.to!==ai_assistant) throw new Error(`A switch to ${waiting.to} is waiting. Finish it with --to ${waiting.to}, or cancel it with "node update/apply.mjs restore --root . --backup ${waiting.backup}"`);
+    if (waiting && waiting.to!==ai_assistant) throw new Error(`A switch to ${product(waiting.to)} has started but is not finished, and only one switch can run at a time. Finish it with --to ${waiting.to}, or cancel it with "node update/apply.mjs restore --root . --backup ${waiting.backup}"`);
 
     let backupRel, backup, journal, count=0;
     const step=()=>{ if(process.env.ORION_SWITCH_FAIL_AFTER && ++count===Number(process.env.ORION_SWITCH_FAIL_AFTER)) throw new Error('Injected switch interruption'); };
@@ -519,7 +519,7 @@ async function recoverPendingSwitches(root) {
   return recovered;
 }
 
-const RECOVERY_ACTION = (backup,command) => `Nothing was overwritten. Move your changes to those paths somewhere outside this folder (keep them: edits to Orion's own skills belong in a client skill under .claude/skills or .agents/skills), put the paths back as the backup in ${backup} has them or delete them, then run "${command}" again.`;
+const RECOVERY_ACTION = (backup,command,kind='update') => `These files changed after the ${kind}, and putting the backup back would overwrite those changes, so Orion stopped. Nothing was overwritten. Move your changes to those paths somewhere outside this folder (keep them: edits to Orion's own skills belong in a client skill under .claude/skills or .agents/skills), put the paths back as the backup in ${backup} has them or delete them, then run "${command}" again.`;
 
 /**
  * Undo an update's own changes under the status lock; `adjust` may change more owned status
@@ -593,7 +593,7 @@ async function rollbackSwitchLocked(root,backup,journal,store) {
     return existsSync(path) && (!lstatSync(path).isFile() || ![a.hash,a.prior_hash].includes(fingerprint(readFileSync(path))));
   }).map(a=>a.destination);
   const backupRel=`.update-backup/${backup.split(/[\\/]/).pop()}`;
-  if(conflicts.length) throw new Error(`Switch recovery collisions: ${conflicts.join(', ')}. ${RECOVERY_ACTION(backupRel,'node update/apply.mjs recover --root .')}`);
+  if(conflicts.length) throw new Error(`Switch recovery collisions: ${conflicts.join(', ')}. ${RECOVERY_ACTION(backupRel,'node update/apply.mjs recover --root .','switch')}`);
   const removed=[];
   for(const action of [...journal.actions].reverse()) {
     const path=safe(root,action.destination);
@@ -621,7 +621,7 @@ async function restoreLocked(root,backupRel,store) {
       const dest=safe(root,a.destination);
       return existsSync(dest) && fingerprint(readFileSync(dest))!==a.hash;
     }).map(a=>a.destination);
-    if(conflicts.length) throw new Error(`Restore collisions: ${conflicts.join(', ')}. ${RECOVERY_ACTION(backupRel,`node update/apply.mjs restore --root . --backup ${backupRel}`)}`);
+    if(conflicts.length) throw new Error(`Restore collisions: ${conflicts.join(', ')}. ${RECOVERY_ACTION(backupRel,`node update/apply.mjs restore --root . --backup ${backupRel}`,'switch')}`);
     const waiting=journal.state==='awaiting_target';
     await rollbackSwitchLocked(root,backup,journal,store);
     const result={restored:journal.retire,removed:journal.actions.map(a=>a.destination),backup:backupRel};
@@ -643,7 +643,7 @@ async function restoreLocked(root,backupRel,store) {
   if(journal.state!=='complete') throw new Error(`Update backup is ${journal.state}; only completed updates can be restored`);
   // The package is restored as a unit, so a later edit inside it stops the whole restore first.
   if (journal.package && treeHash(safe(root,PACKAGE_ROOT))!==journal.package.installed_hash) {
-    throw new Error(`Restore collision: ${PACKAGE_ROOT} changed after the update. Nothing was restored. Move your changes out of ${PACKAGE_ROOT} (keep them as a client skill under ${TOOL_LAYOUT[journal.ai_assistant]?.skillRoot || '.claude/skills or .agents/skills'}), put back the release's files or delete ${PACKAGE_ROOT}, then run "node update/apply.mjs restore --root . --backup ${backupRel}" again.`);
+    throw new Error(`Restore collision: ${PACKAGE_ROOT} changed after the update, and putting the backup back would overwrite those changes, so Orion stopped. Nothing was restored. Move your changes out of ${PACKAGE_ROOT} (keep them as a client skill under ${TOOL_LAYOUT[journal.ai_assistant]?.skillRoot || '.claude/skills or .agents/skills'}), put back the release's files or delete ${PACKAGE_ROOT}, then run "node update/apply.mjs restore --root . --backup ${backupRel}" again.`);
   }
   const status=await store.readStatus(), old=json(join(backup,'status/status.json'));
   const restored=[],kept=[];

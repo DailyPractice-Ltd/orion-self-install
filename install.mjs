@@ -188,7 +188,7 @@ async function install() {
   // Only now, at its final path, is the harness registered with the selected tool.
   let plugin;
   try { plugin = await runPluginSetup(target, { mode: 'setup' }); }
-  catch (error) { plugin = { setup_state: 'failed', tool: ai_assistant, reason: error.message, errors: [], remaining_action: `Run "${RESUME_COMMAND}" from the new folder.` }; }
+  catch (error) { plugin = { setup_state: 'failed', tool: ai_assistant, reason: error.message, errors: [], remaining_action: `Plugin setup stopped before it could finish (${error.message}). Your new folder is installed and keeps its progress: from that folder run "${RESUME_COMMAND}" to try again.` }; }
   console.log(describe(plugin));
   console.log(`Next: cd ${JSON.stringify(target)} and run node start.mjs`);
   if (plugin.setup_state === 'failed') process.exitCode = 3;

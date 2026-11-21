@@ -49,6 +49,8 @@ test('a missing native client leaves setup pending with an install instruction',
     assert.equal(result.state, 'pending', tool);
     assert.match(result.remaining_action, tool === 'codex' ? /Codex/ : /Claude Code/);
     assert.match(result.remaining_action, tool === 'codex' ? /ORION_CODEX_BIN/ : /ORION_CLAUDE_BIN/);
+    // Non-technical first: the reason in plain words before any program name or setting.
+    assert.match(result.remaining_action, /^Orion's skills reach (Codex|Claude Code) through its plugin system, and (Codex|Claude Code) was not found on this computer\./);
   }
 });
 

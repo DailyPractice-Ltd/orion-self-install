@@ -72,7 +72,7 @@ function missingClient(tool) {
   const { product } = TOOL_LAYOUT[tool];
   return {
     state: 'pending',
-    remaining_action: `Install ${product} on this computer (or set ${envVar} to its program file), then run Orion's plugin setup again from this folder.`,
+    remaining_action: `Orion's skills reach ${product} through its plugin system, and ${product} was not found on this computer. Install ${product} (if it is already installed somewhere unusual, set ${envVar} to its program file instead), then run Orion's plugin setup again from this folder (node update/plugin-setup.mjs resume).`,
     details: { tool, reason: 'native_client_not_found' },
   };
 }

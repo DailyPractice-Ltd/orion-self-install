@@ -521,7 +521,7 @@ async function main() {
   // Plugin readiness is separate from pairing: surface its one owed step, never block on it.
   const pluginStep = loadStatus().status.plugin;
   if (pluginStep?.setup_state !== 'complete') {
-    say(`Pairing is done. The Orion plugin (your shipped skills) still needs one step: ${pluginStep?.remaining_action || 'run node update/plugin-setup.mjs resume in this folder.'}`);
+    say(`Pairing is done. The Orion plugin (your shipped skills) still needs one step: ${pluginStep?.remaining_action || 'connect the Orion skills to your AI tool by running node update/plugin-setup.mjs resume in this folder.'}`);
     say('');
   } else {
     say('You\'ll know this whole setup worked when: your AI introduces itself and asks');

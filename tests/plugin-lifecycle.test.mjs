@@ -236,6 +236,7 @@ test('a crashed update journal is recovered from its backup, but never over a co
   assert.match(blocked.stderr, /plugins\/orion/);
   assert.match(blocked.stderr, /Nothing was overwritten/);
   assert.match(blocked.stderr, /recover/);
+  assert.match(blocked.stderr, /changed after the update, and putting the backup back would overwrite those changes/, 'the reason comes before the steps');
   assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'edited after the crash\n');
   assert.equal(w.status().template_version, '2.0.0');
 
@@ -259,6 +260,7 @@ test('restore puts the package and catalog back and says a fresh check is needed
   assert.equal(blocked.status, 2);
   assert.match(blocked.stderr, /plugins\/orion/);
   assert.match(blocked.stderr, /client skill|\.claude\/skills/);
+  assert.match(blocked.stderr, /putting the backup back would overwrite those changes/);
   assert.equal(get(w.client, 'plugins/orion/skills/fresh/SKILL.md'), 'edited after the update\n');
   assert.equal(get(w.client, 'AGENTS.md'), 'agents v2\n', 'nothing restored before the conflict was found');
   assert.equal(w.status().template_version, '2.0.0');

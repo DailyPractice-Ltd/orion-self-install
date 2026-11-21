@@ -18,6 +18,8 @@
  *   registered   the tool's own inspection shows Orion installed for this folder at this version, but
  *                no fresh session has confirmed it discovers the skills yet: remaining_action
  *   complete     registered, and an assistant in a fresh session here confirmed the skills (--discovered)
+ * `verified_version` is the last release confirmed active; `pending_version` an installed release
+ * awaiting that confirmation (an update's target). See update/apply.mjs for updates and switches.
  *
  * Native inspection alone, including any stubbed CLI, never earns `complete`: every report names the
  * program that answered. The catalog identity is created once and reused; registration is idempotent.
@@ -67,19 +69,30 @@ export function checkFolder(root, { tool, identity, version, write = false }) {
  * Run plugin setup (`mode: 'setup'`) or inspection (`mode: 'verify'`) for the harness at `root`
  * and record the outcome in its status.json. Returns the recorded plugin region plus `checked_with`.
  */
-export async function runPluginSetup(root, { mode = 'setup', discovered = false, env = process.env, home, now = () => new Date() } = {}) {
-  const { tool, identity, version } = await harness(root);
+/**
+ * Check the folder, then run one tool's native setup or inspection for it. Also used by
+ * update/apply.mjs for a tool switch's target, before that tool is the selected one.
+ */
+export function nativeStep(root, { tool, identity, version, mode = 'setup', env = process.env, home }) {
   const errors = checkFolder(root, { tool, identity, version, write: mode === 'setup' });
-  const native = errors.length
+  return errors.length
     ? { state: 'failed', details: { reason: 'package_or_catalog_invalid', errors } }
     : (mode === 'setup' ? setupPlugin : verifyPlugin)({ root, tool, catalogName: catalogName(identity), version, env, home });
+}
+
+/**
+ * `verified_version` is the last release confirmed active (discovered in a fresh session);
+ * it changes only on that confirmation. `pending_version` is an installed release still
+ * awaiting it, such as an update's target; it clears on confirmation.
+ */
+export async function runPluginSetup(root, { mode = 'setup', discovered = false, env = process.env, home, now = () => new Date() } = {}) {
+  const { tool, identity, version } = await harness(root);
+  const native = nativeStep(root, { tool, identity, version, mode, env, home });
   const checked_with = native.details?.binary || null;
   return update(root, (status) => {
     const plugin = ensurePluginRegion(status);
     const stillConfirmed = plugin.setup_state === 'complete' && plugin.verified_version === version;
-    const confirmedAt = plugin.verified_at;
-    plugin.verified_version = null;
-    plugin.verified_at = null;
+    plugin.pending_version = plugin.verified_version === version && stillConfirmed ? null : version;
     if (native.state === 'pending') {
       plugin.setup_state = 'pending';
       plugin.remaining_action = native.remaining_action;
@@ -89,8 +102,11 @@ export async function runPluginSetup(root, { mode = 'setup', discovered = false,
     } else if (discovered || stillConfirmed) {
       plugin.setup_state = 'complete';
       plugin.remaining_action = null;
-      plugin.verified_version = native.details.version;
-      plugin.verified_at = discovered ? now().toISOString() : confirmedAt;
+      plugin.pending_version = null;
+      if (discovered) {
+        plugin.verified_version = native.details.version;
+        plugin.verified_at = now().toISOString();
+      }
     } else {
       plugin.setup_state = 'registered';
       plugin.remaining_action = `${native.details.next} Then ask your assistant to confirm it sees the Orion skills (it runs "${VERIFY_COMMAND}").`;

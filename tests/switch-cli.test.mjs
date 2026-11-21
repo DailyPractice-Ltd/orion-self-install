@@ -5,12 +5,13 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { plainEnv } from './helpers/env.mjs';
 
 const script = new URL('../update/apply.mjs', import.meta.url).pathname;
 const put = (root, path, body) => { mkdirSync(dirname(join(root,path)), { recursive:true }); writeFileSync(join(root,path),body); };
 const get = (root, path) => readFileSync(join(root,path),'utf8');
 const hash = body => createHash('sha256').update(body).digest('hex');
-const run = (env,...args) => spawnSync(process.execPath,[script,...args],{encoding:'utf8',env:{...process.env,...env}});
+const run = (env,...args) => spawnSync(process.execPath,[script,...args],{encoding:'utf8',env:plainEnv(env)});
 
 function fixture(t, from='claude-code') {
   const base=mkdtempSync(join(tmpdir(),'orion-switch-')); t.after(()=>rmSync(base,{recursive:true,force:true}));

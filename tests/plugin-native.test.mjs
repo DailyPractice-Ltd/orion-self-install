@@ -174,7 +174,9 @@ test('Codex: verify is complete only when the plugin list shows this harness ins
   setupPlugin(w.opts('codex'));
   assert.equal(verifyPlugin(w.opts('codex')).state, 'pending', 'registration alone is not an install');
   w.write((s) => { s.codex.installed = [installed({ version: '0.0.1' })]; });
-  assert.equal(verifyPlugin(w.opts('codex')).details.reason, 'version_mismatch');
+  const stale = verifyPlugin(w.opts('codex'));
+  assert.equal(stale.state, 'pending', 'an outdated cached copy is a reinstall step, not a failure');
+  assert.equal(stale.details.reason, 'cached_copy_outdated');
   w.write((s) => { s.codex.installed = [installed({ enabled: false })]; });
   assert.equal(verifyPlugin(w.opts('codex')).state, 'pending');
   w.write((s) => { s.codex.installed = [installed({ marketplace: 'orion-other', id: 'orion@orion-other' })]; });

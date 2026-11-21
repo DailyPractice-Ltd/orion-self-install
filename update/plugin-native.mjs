@@ -198,7 +198,10 @@ function codexInspect(ctx) {
   if (!row.version || row.version === 'local') {
     return pending(ctx.tool, `In Codex's Plugins Directory, check that Orion from "${ctx.catalogName}" shows version ${ctx.version}; then start a fresh chat in this folder.`, 'version_unconfirmed', ctx.details({ found: row.version ?? null }));
   }
-  if (row.version !== ctx.version) return failed(ctx.tool, 'version_mismatch', ctx.details({ expected: ctx.version, found: row.version }));
+  // Codex loads its cached copy; after an update it holds the previous release until reinstalled.
+  if (row.version !== ctx.version) {
+    return pending(ctx.tool, `In Codex, from this folder, open the Plugins Directory (desktop app) or type /plugins (CLI) and reinstall Orion from the "${ctx.catalogName}" catalog so its cached copy moves from ${row.version} to ${ctx.version}; then start a fresh chat in this folder.`, 'cached_copy_outdated', ctx.details({ expected: ctx.version, found: row.version }));
+  }
   return { state: 'complete', details: ctx.details({ version: row.version, verified_by: 'codex plugin list --json', next: 'Start a fresh chat in this folder so Codex loads the Orion skills.' }) };
 }
 

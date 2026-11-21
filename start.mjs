@@ -237,7 +237,7 @@ function migrate(status, { firstRun = false } = {}) {
   // progress. Missing fields gain their defaults; an identity is never made
   // here — only update/plugin-package.mjs creates it, once.
   if (!status.plugin || typeof status.plugin !== 'object' || Array.isArray(status.plugin)) status.plugin = {};
-  for (const [key, value] of Object.entries({ catalog_identity: null, setup_state: 'not_started', remaining_action: null, verified_version: null, verified_at: null })) {
+  for (const [key, value] of Object.entries({ catalog_identity: null, setup_state: 'not_started', remaining_action: null, verified_version: null, verified_at: null, pending_version: null, pending_switch: null })) {
     if (!(key in status.plugin)) status.plugin[key] = value;
   }
   status.schema_version = '2.0.0';

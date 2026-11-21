@@ -1,13 +1,14 @@
 /** A client journey using a complete release checkout and only deployed commands. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { plainEnv } from './helpers/env.mjs';
 import { planForTool } from '../update/destination-resolver.mjs';
+import { catalogName } from '../update/plugin-package.mjs';
 
 const checkout = join(dirname(fileURLToPath(import.meta.url)), '..');
 const other = tool => tool === 'codex' ? 'claude-code' : 'codex';
@@ -24,6 +25,21 @@ const git = (root, ...args) => execFileSync('git', args, { cwd: root, encoding: 
 const run = (root, script, ...args) => spawnSync(process.execPath, [join(root, script), ...args], {
   cwd: root, encoding: 'utf8', env: plainEnv(),
 });
+/** Stand-in claude and codex CLIs (tests/helpers/fake-native.mjs) and a temp HOME. */
+function fakeNative(base) {
+  const bin = join(base, 'bin'), statePath = join(base, 'native.json'), home = join(base, 'home');
+  mkdirSync(bin); mkdirSync(home);
+  writeFileSync(statePath, '{}');
+  const env = { FAKE_NATIVE_STATE: statePath, HOME: home };
+  for (const [name, envVar] of [['claude', 'ORION_CLAUDE_BIN'], ['codex', 'ORION_CODEX_BIN']]) {
+    const file = join(bin, name);
+    writeFileSync(file, `#!/bin/sh\nexec "${process.execPath}" "${join(checkout, 'tests/helpers/fake-native.mjs')}" ${name} "$@"\n`);
+    chmodSync(file, 0o755);
+    env[envVar] = file;
+  }
+  const edit = (change) => { const state = JSON.parse(readFileSync(statePath, 'utf8')); change(state); writeFileSync(statePath, JSON.stringify(state)); };
+  return { env: plainEnv(env), edit };
+}
 const ok = result => assert.equal(result.status, 0, result.stdout + result.stderr);
 const status = root => JSON.parse(read(root, 'status/status.json'));
 
@@ -100,10 +116,14 @@ for (const tool of ['claude-code', 'codex']) {
     const report = JSON.parse(result.stdout);
     assert.match(read(client, 'AGENTS.md'), /Release update\./);
     assert.doesNotMatch(read(client, 'AGENTS.md'), /Uncommitted poison/);
-    assert.equal(read(client, `${pkg}/prospecting/SKILL.md`), edited);
+    // The package is replaced as a unit; the in-place edit is in the backup, not kept in place.
+    assert.equal(read(client, `${pkg}/prospecting/SKILL.md`), read(release, `${pkg}/prospecting/SKILL.md`));
+    assert.equal(read(client, `${report.backup}/package/${pkg}/prospecting/SKILL.md`), edited);
+    assert.ok(report.package.edits_backed_up.includes(`${pkg}/prospecting/SKILL.md`));
+    assert.equal(report.active, false, 'the target is not announced as active before discovery');
+    assert.equal(status(client).plugin.pending_version, manifest.template_version);
     assert.equal(read(client, `${skill(tool)}/personal/SKILL.md`), '# Personal skill\n');
     assert.equal(read(client, `${pkg}/new-release/SKILL.md`), '# New release skill\n');
-    assert.ok(report.kept.includes(`${pkg}/prospecting/SKILL.md`));
     assert.ok(report.retired.includes(retiredPage));
     assert.equal(read(client, shiftRecord), shiftHistory);
     assert.ok(report.retired.includes(retiredMeetingPackage));
@@ -115,7 +135,7 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(read(client, `${report.backup}/files/${retiredPage}`), oldPage);
     assert.deepEqual(status(client).packages, packageHistory);
     for (const slug of ['prospect-research-outreach', 'post-call-debrief']) {
-      assert.ok(report.added.includes(`${pkg}/${slug}/SKILL.md`));
+      assert.ok(existsSync(join(client, pkg, slug, 'SKILL.md')), slug);
     }
     assert.equal(read(client, 'legacy/hire-agent/SKILL.md'), 'Custom legacy instructions\n');
     assert.equal(existsSync(join(client, `${skill(tool)}/hire-agent/SKILL.md`)), false);
@@ -130,6 +150,8 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(read(client, `${skill(tool)}/hire-agent/SKILL.md`), 'Custom legacy instructions\n');
     assert.equal(existsSync(join(client, `${pkg}/new-release/SKILL.md`)), false);
     assert.equal(read(client, `${pkg}/prospecting/SKILL.md`), edited);
+    assert.equal(existsSync(join(client, pkg, 'post-call-debrief', 'SKILL.md')), false, 'the prior package comes back exactly');
+    assert.equal(status(client).plugin.setup_state, 'pending', 'recovery waits for a fresh check');
   });
 
   test(`${tool} deployed journey: library install and interrupted tool switch`, t => {
@@ -161,17 +183,21 @@ for (const tool of ['claude-code', 'codex']) {
 
     put(client, `${jobs(tool)}/follow-up.md`, '---\nname: follow-up\ntools: Read\n---\n# Follow-up\n');
     const commit = git(release, 'rev-parse', 'HEAD');
+    const native = fakeNative(dirname(client));
     const interrupted = spawnSync(process.execPath, [join(client, 'update/apply.mjs'),
       'switch', '--root', client, '--release-repo', release, '--commit', commit, '--to', other(tool),
-    ], { cwd: client, encoding: 'utf8', env: plainEnv({ ORION_SWITCH_FAIL_AFTER: '1' }) });
+    ], { cwd: client, encoding: 'utf8', env: { ...native.env, ORION_SWITCH_FAIL_AFTER: '1' } });
     assert.notEqual(interrupted.status, 0);
     assert.match(interrupted.stderr, /Injected switch interruption/);
     assert.equal(status(client).ai_assistant, tool);
     assert.equal(read(client, `${skill(tool)}/meeting-sizing/SKILL.md`).includes('Size the meeting'), true);
     assert.equal(existsSync(join(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`)), false);
 
-    const switched = run(client, 'update/apply.mjs', 'switch', '--root', client,
-      '--release-repo', release, '--commit', commit, '--to', other(tool));
+    // Codex shows Orion installed for this folder only after the human's native install.
+    const name = catalogName(status(client).plugin.catalog_identity);
+    native.edit((state) => { state.codex = { marketplaces: {}, adds: 0, installed: [{ id: `orion@${name}`, name: 'orion', marketplace: name, version: status(client).template_version, installed: true, enabled: true }] }; });
+    const switched = spawnSync(process.execPath, [join(client, 'update/apply.mjs'), 'switch', '--root', client,
+      '--release-repo', release, '--commit', commit, '--to', other(tool)], { cwd: client, encoding: 'utf8', env: native.env });
     ok(switched);
     const report = JSON.parse(switched.stdout);
     assert.equal(status(client).ai_assistant, other(tool));

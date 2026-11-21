@@ -41,7 +41,9 @@
     "setup_state": "not_started",
     "remaining_action": null,
     "verified_version": null,
-    "verified_at": null
+    "verified_at": null,
+    "pending_version": null,
+    "pending_switch": null
   },
   "home": {
     "enabled": false,

@@ -5,12 +5,13 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { plainEnv } from './helpers/env.mjs';
 
 const script = new URL('../update/apply.mjs', import.meta.url).pathname;
 const put = (root, path, body) => { mkdirSync(dirname(join(root,path)), {recursive:true}); writeFileSync(join(root,path),body); };
 const get = (root, path) => readFileSync(join(root,path),'utf8');
 const git = (cwd,...args) => execFileSync('git',args,{cwd,encoding:'utf8'}).trim();
-const run = (...args) => spawnSync(process.execPath,[script,...args],{encoding:'utf8'});
+const run = (...args) => spawnSync(process.execPath,[script,...args],{encoding:'utf8',env:plainEnv()});
 
 test('pinned selected update preserves collisions and restores additions and retirements', t => {
   const base=mkdtempSync(join(tmpdir(),'orion-update-cli-')); t.after(()=>rmSync(base,{recursive:true,force:true}));
@@ -66,7 +67,7 @@ test('failed update rolls back writes from the predeclared transaction',t=>{
   git(source,'init','-q');git(source,'add','.');git(source,'-c','user.email=test@example.com','-c','user.name=Test','commit','-qm','release');
   put(client,'status/status.json',JSON.stringify({template_version:'1.0.0',ai_assistant:'codex'}));
   put(client,'AGENTS.md','old agents\n');put(client,'README.md','old readme\n');
-  const result=spawnSync(process.execPath,[script,'update','--root',client,'--release-repo',source,'--commit',git(source,'rev-parse','HEAD')],{encoding:'utf8',env:{...process.env,ORION_UPDATE_FAIL_AFTER:'1'}});
+  const result=spawnSync(process.execPath,[script,'update','--root',client,'--release-repo',source,'--commit',git(source,'rev-parse','HEAD')],{encoding:'utf8',env:plainEnv({ORION_UPDATE_FAIL_AFTER:'1'})});
   assert.equal(result.status,2);assert.match(result.stderr,/Injected update interruption/);
   assert.equal(get(client,'AGENTS.md'),'old agents\n');assert.equal(get(client,'README.md'),'old readme\n');
   assert.equal(JSON.parse(get(client,'status/status.json')).template_version,'1.0.0');

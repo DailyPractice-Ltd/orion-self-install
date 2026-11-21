@@ -117,7 +117,7 @@ const IDENTITY = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 
 /** The status.json `plugin` region a harness starts with (documented in status/status-schema.md). */
 export function defaultPluginRegion() {
-  return { catalog_identity: null, setup_state: 'not_started', remaining_action: null, verified_version: null, verified_at: null };
+  return { catalog_identity: null, setup_state: 'not_started', remaining_action: null, verified_version: null, verified_at: null, pending_version: null, pending_switch: null };
 }
 
 /**
@@ -217,13 +217,18 @@ export function buildCatalog(ai_assistant, identity) {
   };
 }
 
+/** The exact bytes of the selected tool's catalog for this identity. */
+export function catalogText(ai_assistant, identity) {
+  return json(buildCatalog(ai_assistant, identity));
+}
+
 /** Write only the selected tool's catalog into the harness; returns its harness path. */
 export function writeCatalog(root, ai_assistant, identity) {
   supported(ai_assistant);
   const path = TOOL_LAYOUT[ai_assistant].catalogPath;
   const target = safePath(root, path);
   mkdirSync(dirname(target), { recursive: true });
-  writeFileSync(target, json(buildCatalog(ai_assistant, identity)));
+  writeFileSync(target, catalogText(ai_assistant, identity));
   return path;
 }
 

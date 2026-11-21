@@ -117,7 +117,7 @@ const IDENTITY = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 
 /** The status.json `plugin` region a harness starts with (documented in status/status-schema.md). */
 export function defaultPluginRegion() {
-  return { catalog_identity: null, setup_state: 'not_started', remaining_action: null, verified_version: null, verified_at: null, pending_version: null, pending_switch: null };
+  return { catalog_identity: null, setup_state: 'not_started', remaining_action: null, verified_version: null, verified_at: null, pending_version: null, pending_switch: null, update_backup: null };
 }
 
 /**

@@ -43,7 +43,8 @@
     "verified_version": null,
     "verified_at": null,
     "pending_version": null,
-    "pending_switch": null
+    "pending_switch": null,
+    "update_backup": null
   },
   "home": {
     "enabled": false,

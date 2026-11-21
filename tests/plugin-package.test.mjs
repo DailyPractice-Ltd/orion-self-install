@@ -142,7 +142,7 @@ test('only the selected tool gets a catalog, and its source resolves to the pack
 
 test('the status template and the setup wizard carry the plugin region, keeping an existing identity', (t) => {
   const template = JSON.parse(readFileSync(join(repo, 'status/status.schema-template.json'), 'utf8'));
-  assert.deepEqual(template.plugin, { catalog_identity: null, setup_state: 'not_started', remaining_action: null, verified_version: null, verified_at: null, pending_version: null, pending_switch: null });
+  assert.deepEqual(template.plugin, { catalog_identity: null, setup_state: 'not_started', remaining_action: null, verified_version: null, verified_at: null, pending_version: null, pending_switch: null, update_backup: null });
   assert.deepEqual(defaultPluginRegion(), template.plugin);
   assert.match(readFileSync(join(repo, 'status/status-schema.md'), 'utf8'), /\| `plugin` \|.*catalog_identity/);
 

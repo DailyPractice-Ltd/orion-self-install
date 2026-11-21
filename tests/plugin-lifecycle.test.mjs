@@ -405,6 +405,28 @@ test('the previous tool\'s Orion is retired only after the switch is committed',
   assert.equal(get(w.client, '.claude/skills/mine/SKILL.md'), 'my own skill\n');
 });
 
+test('a pending update whose later check fails confirmedly names the restore that puts the previous release back', async (t) => {
+  const w = world(t);
+  const run = w.update();
+  assert.equal(run.status, 0, out(run));
+  const { backup } = report(run);
+  assert.equal(w.status().plugin.update_backup, backup);
+
+  w.setNative((s) => { s.faults = { listOverride: { errors: ['Source path does not exist'] } }; });
+  const checked = await runPluginSetup(w.client, { mode: 'verify', env: w.env, home: w.home });
+  assert.equal(checked.setup_state, 'failed');
+  const { plugin } = w.status();
+  assert.equal(plugin.setup_state, 'failed');
+  assert.match(plugin.remaining_action, /^Orion 2\.0\.0 could not be confirmed/, 'the reason comes first, in plain words');
+  assert.ok(plugin.remaining_action.includes(`node update/apply.mjs restore --root . --backup ${backup}`), plugin.remaining_action);
+  assert.match(plugin.remaining_action, /1\.0\.0/);
+
+  w.setNative((s) => { s.faults = {}; });
+  const confirmed = await runPluginSetup(w.client, { mode: 'verify', discovered: true, env: w.env, home: w.home });
+  assert.equal(confirmed.setup_state, 'complete');
+  assert.equal(w.status().plugin.update_backup, null, 'a confirmed release needs no way back');
+});
+
 const SETTINGS = '.claude/settings.local.json';
 const priorSettings = (client) => ({
   extraKnownMarketplaces: { [CATALOG]: { source: { source: 'directory', path: client }, autoUpdate: false } },

@@ -65,10 +65,6 @@ export function checkFolder(root, { tool, identity, version, write = false }) {
 }
 
 /**
- * Run plugin setup (`mode: 'setup'`) or inspection (`mode: 'verify'`) for the harness at `root`
- * and record the outcome in its status.json. Returns the recorded plugin region plus `checked_with`.
- */
-/**
  * Check the folder, then run one tool's native setup or inspection for it. Also used by
  * update/apply.mjs for a tool switch's target, before that tool is the selected one.
  */
@@ -79,7 +75,15 @@ export function nativeStep(root, { tool, identity, version, mode = 'setup', env 
     : (mode === 'setup' ? setupPlugin : verifyPlugin)({ root, tool, catalogName: catalogName(identity), version, env, home });
 }
 
+/** The release an update started from, read from its backup's journal. */
+function updateOrigin(root, backup) {
+  try { return JSON.parse(readFileSync(safePath(root, `${backup}/journal.json`), 'utf8')).from || 'the previous release'; }
+  catch { return 'the previous release'; }
+}
+
 /**
+ * Run plugin setup (`mode: 'setup'`) or inspection (`mode: 'verify'`) for the harness at `root`
+ * and record the outcome in its status.json. Returns the recorded plugin region plus `checked_with`.
  * `verified_version` is the last release confirmed active (discovered in a fresh session);
  * it changes only on that confirmation. `pending_version` is an installed release still
  * awaiting it, such as an update's target; it clears on confirmation.
@@ -91,17 +95,23 @@ export async function runPluginSetup(root, { mode = 'setup', discovered = false,
   return update(root, (status) => {
     const plugin = ensurePluginRegion(status);
     const stillConfirmed = plugin.setup_state === 'complete' && plugin.verified_version === version;
-    plugin.pending_version = plugin.verified_version === version && stillConfirmed ? null : version;
+    plugin.pending_version = stillConfirmed ? null : version;
     if (native.state === 'pending') {
       plugin.setup_state = 'pending';
       plugin.remaining_action = native.remaining_action;
     } else if (native.state !== 'complete') {
       plugin.setup_state = 'failed';
-      plugin.remaining_action = `Plugin setup failed (${native.details?.reason || 'unknown reason'}); fix that, then run "${RESUME_COMMAND}" from this folder.`;
+      const reason = native.details?.reason || 'unknown reason';
+      const from = plugin.pending_version && plugin.update_backup ? updateOrigin(root, plugin.update_backup) : null;
+      plugin.remaining_action = from
+        // An update's later check failed: the way back is that update's own backup.
+        ? `Orion ${version} could not be confirmed in ${TOOL_LAYOUT[tool].product} (${reason}). To put back Orion ${from} as it was before the update, run "node update/apply.mjs restore --root . --backup ${plugin.update_backup}" from this folder; or fix the problem and run "${RESUME_COMMAND}" to try again.`
+        : `Plugin setup failed (${reason}); fix that, then run "${RESUME_COMMAND}" from this folder.`;
     } else if (discovered || stillConfirmed) {
       plugin.setup_state = 'complete';
       plugin.remaining_action = null;
       plugin.pending_version = null;
+      plugin.update_backup = null;
       if (discovered) {
         plugin.verified_version = native.details.version;
         plugin.verified_at = now().toISOString();

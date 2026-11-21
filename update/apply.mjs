@@ -202,6 +202,7 @@ async function update(root,repo,commit) {
     if (withPlugin) {
       const plugin=ensurePluginRegion(status);
       plugin.pending_version=manifest.template_version;
+      plugin.update_backup=backupRel;
       plugin.setup_state='pending';
       plugin.remaining_action=`Finish refreshing the Orion plugin: from this folder run "${RESUME_COMMAND}", then ${lowerFirst(freshCheck(ai_assistant))}`;
     }
@@ -661,6 +662,7 @@ function restore(root,backupRel) {
     const tool=status.ai_assistant;
     plugin.setup_state='pending';
     plugin.pending_version=old.template_version;
+    plugin.update_backup=null;
     plugin.remaining_action=`Orion ${old.template_version} was restored. ${freshCheck(tool)}${tool==='codex'?` If Codex still shows a different Orion version, reinstall Orion from its Plugins Directory first.`:''}`;
     Object.assign(result,{reload_required:true,remaining_action:plugin.remaining_action});
   }

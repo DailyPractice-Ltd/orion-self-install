@@ -9,7 +9,7 @@ const source = new URL('../', import.meta.url);
 const identity = '11111111-1111-1111-1111-111111111111';
 function harness(t, outcome='accepted', pending=false) {
  const root=mkdtempSync(join(tmpdir(),'orion-work-gate-')); t.after(()=>rmSync(root,{recursive:true,force:true}));
- for(const path of ['status','update','crm','skills/call-planner']) cpSync(new URL(path,source),join(root,path),{recursive:true});
+ for(const path of ['status','update','crm','plugins/orion/skills/call-planner']) cpSync(new URL(path,source),join(root,path),{recursive:true});
  const status=JSON.parse(readFileSync(new URL('status/status.schema-template.json',source),'utf8'));
  status.ai_assistant='codex'; status.scopes.send_risk='low'; status.sharing={...status.sharing,status_signal_enabled:true,bridge_url:'https://bridge.test/api/bridge',harness_id:identity,install_token:'orion_'+'test'.repeat(6)};
  writeFileSync(join(root,'status/status.json'),JSON.stringify(status));
@@ -24,7 +24,7 @@ const commands=[
  ['stage advancement',['status/emit-status.mjs','--ops_stage','day1_encode']],
  ['Attio configuration',['crm/attio/apply-attio-template.mjs']],
  ['HubSpot configuration',['crm/hubspot/apply-hubspot-template.mjs']],
- ['call plan',['skills/call-planner/scripts/build-call-plan.mjs','--data','data.json']],
+ ['call plan',['plugins/orion/skills/call-planner/scripts/build-call-plan.mjs','--data','data.json']],
  ['radio message',['status/radio.mjs','send','--message','hello','--yes']],
  ['radio reply',['status/radio.mjs','reply','--nudge','n1','--message','hello','--yes']],
  ['skill contribution',['status/radio.mjs','contribute','--slug','shared','--yes']],
@@ -48,7 +48,7 @@ test('direct outbound invocation freshly verifies and replays pending reports be
  assert.deepEqual(JSON.parse(readFileSync(join(h.root,'status/radio-outbox.json'))),[]);
 });
 for(const outcome of ['accepted','revoked','unreachable','server_error','pending_failure'])test(`scheduled task command applies ${outcome} before its actual output`,t=>{
- const h=harness(t,outcome,true); const r=spawnSync('/bin/sh',['-c','node --import ./fetch.mjs status/guard.mjs check --quiet && node --import ./fetch.mjs skills/call-planner/scripts/build-call-plan.mjs --data data.json'],{cwd:h.root,encoding:'utf8',env:plainEnv()});
+ const h=harness(t,outcome,true); const r=spawnSync('/bin/sh',['-c','node --import ./fetch.mjs status/guard.mjs check --quiet && node --import ./fetch.mjs plugins/orion/skills/call-planner/scripts/build-call-plan.mjs --data data.json'],{cwd:h.root,encoding:'utf8',env:plainEnv()});
  assert.equal(r.status,outcome==='accepted'?0:2,r.stdout+r.stderr);
  const outputs=readdirSync(h.root).filter(name=>name.startsWith('call-plan-'));
  assert.equal(outputs.length,outcome==='accepted'?3:0);
@@ -66,7 +66,7 @@ for(const [name,args] of commands)test(`${name} proceeds after fresh acceptance`
  if(name==='library installation')assert.match(r.output,/Written: 1 file/);
 });
 test('deployed call-planner resolves its own Orion folder and writes no outputs on pause',t=>{
- const h=harness(t,'revoked');mkdirSync(join(h.root,'.agents/skills'),{recursive:true});cpSync(join(h.root,'skills/call-planner'),join(h.root,'.agents/skills/call-planner'),{recursive:true});
+ const h=harness(t,'revoked');mkdirSync(join(h.root,'.agents/skills'),{recursive:true});cpSync(join(h.root,'plugins/orion/skills/call-planner'),join(h.root,'.agents/skills/call-planner'),{recursive:true});
  const r=h.run(['.agents/skills/call-planner/scripts/build-call-plan.mjs','--data','data.json']);
  assert.equal(r.status,2,r.output);assert.equal(h.calls().length,1);
 });

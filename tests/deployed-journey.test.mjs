@@ -12,6 +12,7 @@ import { planForTool } from '../update/destination-resolver.mjs';
 const checkout = join(dirname(fileURLToPath(import.meta.url)), '..');
 const other = tool => tool === 'codex' ? 'claude-code' : 'codex';
 const skill = tool => tool === 'codex' ? '.agents/skills' : '.claude/skills';
+const pkg = 'plugins/orion/skills';
 const jobs = tool => tool === 'codex' ? 'agents' : '.claude/agents';
 const read = (root, path) => readFileSync(join(root, path), 'utf8');
 const put = (root, path, text) => {
@@ -64,8 +65,8 @@ for (const tool of ['claude-code', 'codex']) {
     put(client, shiftRecord, shiftHistory);
 
     const original = read(client, 'AGENTS.md');
-    const edited = read(client, `${skill(tool)}/prospecting/SKILL.md`) + '\nClient note.\n';
-    put(client, `${skill(tool)}/prospecting/SKILL.md`, edited);
+    const edited = read(client, `${pkg}/prospecting/SKILL.md`) + '\nClient note.\n';
+    put(client, `${pkg}/prospecting/SKILL.md`, edited);
     put(client, `${skill(tool)}/hire-agent/SKILL.md`, 'Custom legacy instructions\n');
     put(client, `${skill(tool)}/personal/SKILL.md`, '# Personal skill\n');
     const retiredPage = 'library/workflows/prospect-research-outreach/PACKAGE.md';
@@ -80,17 +81,15 @@ for (const tool of ['claude-code', 'codex']) {
     const packageHistory = { 'post-call-debrief': { kind: 'workflow', version: '2.0.0', smoke_test_passed: true } };
     put(client, 'status/status.json', JSON.stringify({ ...prior, packages: packageHistory }));
     for (const slug of ['prospect-research-outreach', 'post-call-debrief']) {
-      rmSync(join(client, skill(tool), slug, 'SKILL.md'));
+      rmSync(join(client, pkg, slug, 'SKILL.md'));
     }
     const manifest = JSON.parse(read(release, 'update/manifest.json'));
     assert.equal(existsSync(join(client, '.specify')), false);
     manifest.deployment.entries.push({
-      source: 'skills/new-release/SKILL.md',
-      destinations: { 'claude-code': '.claude/skills/new-release/SKILL.md', codex: '.agents/skills/new-release/SKILL.md' },
-      ownership: 'release', fingerprint_key: 'skills/new-release/SKILL.md',
+      source: `${pkg}/new-release/SKILL.md`, ownership: 'release', fingerprint_key: `${pkg}/new-release/SKILL.md`,
     });
     put(release, 'update/manifest.json', JSON.stringify(manifest, null, 2));
-    put(release, 'skills/new-release/SKILL.md', '# New release skill\n');
+    put(release, `${pkg}/new-release/SKILL.md`, '# New release skill\n');
     put(release, 'AGENTS.md', original + '\nRelease update.\n');
     git(release, 'add', '.');
     git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'next release');
@@ -101,10 +100,10 @@ for (const tool of ['claude-code', 'codex']) {
     const report = JSON.parse(result.stdout);
     assert.match(read(client, 'AGENTS.md'), /Release update\./);
     assert.doesNotMatch(read(client, 'AGENTS.md'), /Uncommitted poison/);
-    assert.equal(read(client, `${skill(tool)}/prospecting/SKILL.md`), edited);
+    assert.equal(read(client, `${pkg}/prospecting/SKILL.md`), edited);
     assert.equal(read(client, `${skill(tool)}/personal/SKILL.md`), '# Personal skill\n');
-    assert.equal(read(client, `${skill(tool)}/new-release/SKILL.md`), '# New release skill\n');
-    assert.ok(report.kept.includes(`${skill(tool)}/prospecting/SKILL.md`));
+    assert.equal(read(client, `${pkg}/new-release/SKILL.md`), '# New release skill\n');
+    assert.ok(report.kept.includes(`${pkg}/prospecting/SKILL.md`));
     assert.ok(report.retired.includes(retiredPage));
     assert.equal(read(client, shiftRecord), shiftHistory);
     assert.ok(report.retired.includes(retiredMeetingPackage));
@@ -116,7 +115,7 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(read(client, `${report.backup}/files/${retiredPage}`), oldPage);
     assert.deepEqual(status(client).packages, packageHistory);
     for (const slug of ['prospect-research-outreach', 'post-call-debrief']) {
-      assert.ok(report.added.includes(`${skill(tool)}/${slug}/SKILL.md`));
+      assert.ok(report.added.includes(`${pkg}/${slug}/SKILL.md`));
     }
     assert.equal(read(client, 'legacy/hire-agent/SKILL.md'), 'Custom legacy instructions\n');
     assert.equal(existsSync(join(client, `${skill(tool)}/hire-agent/SKILL.md`)), false);
@@ -129,8 +128,8 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(read(client, retiredMeetingPackage), oldMeetingPackage);
     assert.equal(read(client, 'AGENTS.md'), original);
     assert.equal(read(client, `${skill(tool)}/hire-agent/SKILL.md`), 'Custom legacy instructions\n');
-    assert.equal(existsSync(join(client, `${skill(tool)}/new-release/SKILL.md`)), false);
-    assert.equal(read(client, `${skill(tool)}/prospecting/SKILL.md`), edited);
+    assert.equal(existsSync(join(client, `${pkg}/new-release/SKILL.md`)), false);
+    assert.equal(read(client, `${pkg}/prospecting/SKILL.md`), edited);
   });
 
   test(`${tool} deployed journey: library install and interrupted tool switch`, t => {

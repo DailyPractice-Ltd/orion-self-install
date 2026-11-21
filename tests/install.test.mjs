@@ -28,8 +28,9 @@ for (const tool of ['claude-code', 'codex']) {
       assert.doesNotMatch(read(path), /memory\/|memory\.mjs|memory-consolidation/);
     }
     for (const name of ['prospecting', 'call-planner', 'friday-report', 'prospect-research-outreach', 'post-call-debrief']) {
-      assert.ok(existsSync(join(target, skillRoot, name, 'SKILL.md')));
+      assert.ok(existsSync(join(target, 'plugins/orion/skills', name, 'SKILL.md')));
     }
+    assert.equal(existsSync(join(target, skillRoot)), false, 'client-owned skills start empty; shipped skills live in the package');
     assert.equal(existsSync(join(target, 'library')), false);
     assert.equal(existsSync(join(target, tool === 'codex' ? 'agents' : '.claude/agents')), false);
     assert.equal(existsSync(join(target, '.specify')), false);

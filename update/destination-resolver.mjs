@@ -6,6 +6,15 @@ import { fileURLToPath } from 'node:url';
 
 const RELEASE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+/** The shipped Orion plugin package: same path in the release and in every harness. */
+export const PACKAGE_ROOT = 'plugins/orion';
+
+/** Per-tool harness paths that do not come from shipped files. */
+export const TOOL_LAYOUT = Object.freeze({
+  'claude-code': Object.freeze({ skillRoot: '.claude/skills', catalogPath: '.claude-plugin/marketplace.json', rosterPath: '.claude/agents/README.md' }),
+  codex: Object.freeze({ skillRoot: '.agents/skills', catalogPath: '.agents/plugins/marketplace.json', rosterPath: 'agents/README.md' }),
+});
+
 function readJson(path, name) {
   try { return JSON.parse(readFileSync(path, 'utf8')); }
   catch (error) { throw new Error(`Cannot read ${name} at ${path}: ${error.message}`); }
@@ -68,22 +77,20 @@ export function destinationState(root, entry, pristine) {
 /** The sole source-to-destination mapper for release and deployed harnesses. */
 export function planForTool(deployment, ai_assistant, { releaseRoot = RELEASE_ROOT, root } = {}) {
   if (!deployment.tools.includes(ai_assistant)) throw new Error(`Unsupported AI assistant: ${ai_assistant || '(missing)'}`);
-  const skillRoot = join(releaseRoot, 'skills');
-  const actualSkills = (existsSync(skillRoot) ? readdirSync(skillRoot, { recursive: true, withFileTypes: true }) : [])
+  const packageDir = join(releaseRoot, PACKAGE_ROOT);
+  const packageFiles = (existsSync(packageDir) ? readdirSync(packageDir, { recursive: true, withFileTypes: true }) : [])
     .filter(item => item.isFile())
     .map(item => relative(releaseRoot, join(item.parentPath, item.name)).split(sep).join('/')).sort();
-  const mappedSkills = deployment.entries.filter(entry => entry.source.startsWith('skills/'));
-  const skillSources = mappedSkills.map(entry => entry.source).sort();
-  if (JSON.stringify(actualSkills) !== JSON.stringify(skillSources)) {
-    throw new Error('Deployment skill mappings must cover every file under skills/ exactly once');
+  const packageEntries = deployment.entries.filter(entry => entry.source.startsWith(`${PACKAGE_ROOT}/`));
+  if (JSON.stringify(packageFiles) !== JSON.stringify(packageEntries.map(entry => entry.source).sort())) {
+    throw new Error(`Deployment entries must cover every file under ${PACKAGE_ROOT}/ exactly once`);
   }
-  for (const entry of mappedSkills) for (const selected of deployment.tools) {
-    const expected = `${selected === 'codex' ? '.agents' : '.claude'}/skills/${entry.source.slice('skills/'.length)}`;
-    if (entry.destinations?.[selected] !== expected) throw new Error(`Invalid skill mapping for ${entry.source} (${selected})`);
+  for (const entry of packageEntries) {
+    if (entry.destinations || entry.sources) throw new Error(`Package file ships at its own path for every tool: ${entry.source}`);
   }
   const entries = [
     ...deployment.common_sources.map((source) => ({ source, destination: source, ownership: 'release', fingerprint_key: source })),
-    ...deployment.entries.map((entry) => ({ source: entry.sources?.[ai_assistant] || entry.source, destination: entry.destinations[ai_assistant], ownership: entry.ownership, fingerprint_key: entry.sources?.[ai_assistant] || entry.fingerprint_key })),
+    ...deployment.entries.map((entry) => ({ source: entry.sources?.[ai_assistant] || entry.source, destination: entry.destinations ? entry.destinations[ai_assistant] : entry.source, ownership: entry.ownership, fingerprint_key: entry.sources?.[ai_assistant] || entry.fingerprint_key })),
   ];
   const destinations = new Set();
   for (const entry of entries) {
@@ -106,18 +113,15 @@ export function resolveDestinations({ root, releaseRoot = RELEASE_ROOT, legacyTo
   return { ai_assistant, legacy_migration: status.ai_assistant == null, entries: entries.map((entry) => ({ ...entry, state: destinationState(root, entry, pristine) })) };
 }
 
-/** Paths used by a running client harness, from its recorded tool and release map. */
+/** Paths used by a running client harness, from its recorded tool alone. */
 export function runtimeLayout(root, { legacyTool } = {}) {
   const manifest = readJson(join(root, 'update/manifest.json'), 'deployment manifest');
   const status = readJson(join(root, 'status/status.json'), 'harness status');
   const ai_assistant = resolveAiAssistant(status, manifest.deployment, { legacyTool });
-  const skill = manifest.deployment.entries.find((entry) => entry.source === 'skills/create-skill/SKILL.md');
-  if (!skill?.destinations?.[ai_assistant]) throw new Error(`Missing runtime destinations for ${ai_assistant}`);
-  const skillRoot = dirname(dirname(skill.destinations[ai_assistant]));
-  const rosterPath = ai_assistant === 'codex' ? 'agents/README.md' : '.claude/agents/README.md';
-  safePath(root, skillRoot);
-  safePath(root, rosterPath);
-  return { ai_assistant, skillRoot, rosterPath, jobRoot: dirname(rosterPath) };
+  const tool = TOOL_LAYOUT[ai_assistant];
+  if (!tool) throw new Error(`Missing runtime layout for ${ai_assistant}`);
+  for (const path of [PACKAGE_ROOT, ...Object.values(tool)]) safePath(root, path);
+  return { ai_assistant, packageRoot: PACKAGE_ROOT, ...tool, jobRoot: dirname(tool.rosterPath) };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

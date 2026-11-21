@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, copyFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,32 +31,32 @@ test('release contract plans one selected runtime from portable sources', (t) =>
     }
     assert.ok(!destinations.some(path => path.startsWith('.specify/')), 'maintainer governance stays in the release');
     assert.ok(!plan.entries.some(entry => [entry.source, entry.destination].some(path => path.split('/').includes('specs'))), 'human-only records stay out of every deployment');
-    const skillRoot = tool === 'codex' ? '.agents/skills' : '.claude/skills';
+    const skills = 'plugins/orion/skills';
     for (const name of ['prospecting', 'call-planner', 'friday-report']) {
-      assert.ok(destinations.includes(`${skillRoot}/${name}/SKILL.md`));
+      assert.ok(destinations.includes(`${skills}/${name}/SKILL.md`));
     }
-    assert.ok(destinations.includes(`${skillRoot}/call-planner/scripts/build-call-plan.mjs`));
-    assert.ok(destinations.includes(`${skillRoot}/call-planner/assets/call-data.template.json`));
-    assert.ok(!destinations.includes(`${skillRoot}/hire-agent/SKILL.md`));
-    assert.ok(!destinations.some(path => path.startsWith('agents/') || path.startsWith('.claude/agents/')));
-    assert.ok(destinations.every((path) => tool === 'codex' ? !path.startsWith('.claude/') : !path.startsWith('.agents/')));
+    assert.ok(destinations.includes(`${skills}/call-planner/scripts/build-call-plan.mjs`));
+    assert.ok(destinations.includes(`${skills}/call-planner/assets/call-data.template.json`));
+    assert.ok(!destinations.includes(`${skills}/hire-agent/SKILL.md`));
+    assert.ok(!destinations.some(path => path.startsWith('agents/') || path.startsWith('.claude/') || path.startsWith('.agents/')));
   }
-  rmSync(join(release, 'skills/prospecting/SKILL.md'));
+  const prospecting = 'plugins/orion/skills/prospecting/SKILL.md';
+  rmSync(join(release, prospecting));
   const missing = spawnSync(process.execPath, [join(release, 'update/release-contract.mjs'), '--tool', 'codex'], { encoding: 'utf8' });
   assert.notEqual(missing.status, 0);
-  assert.match(missing.stderr, /skill mappings|missing release source/i);
-  copyFileSync(join(repo, 'skills/prospecting/SKILL.md'), join(release, 'skills/prospecting/SKILL.md'));
-  mkdirSync(join(release, 'skills/unmapped'), { recursive: true });
-  copyFileSync(join(repo, 'skills/prospecting/SKILL.md'), join(release, 'skills/unmapped/SKILL.md'));
+  assert.match(missing.stderr, /plugins\/orion\/ exactly once|missing release source/i);
+  copyFileSync(join(repo, prospecting), join(release, prospecting));
+  mkdirSync(join(release, 'plugins/orion/skills/unmapped'), { recursive: true });
+  copyFileSync(join(repo, prospecting), join(release, 'plugins/orion/skills/unmapped/SKILL.md'));
   const unmapped = spawnSync(process.execPath, [join(release, 'update/release-contract.mjs'), '--tool', 'codex'], { encoding: 'utf8' });
   assert.notEqual(unmapped.status, 0);
-  assert.match(unmapped.stderr, /skill mappings/i);
-  rmSync(join(release, 'skills/unmapped'), { recursive: true });
-  manifest.deployment.entries.push(manifest.deployment.entries.find(entry => entry.source === 'skills/prospecting/SKILL.md'));
+  assert.match(unmapped.stderr, /plugins\/orion\/ exactly once/i);
+  rmSync(join(release, 'plugins/orion/skills/unmapped'), { recursive: true });
+  manifest.deployment.entries.push(manifest.deployment.entries.find(entry => entry.source === prospecting));
   writeFileSync(join(release, 'update/manifest.json'), JSON.stringify(manifest));
   const duplicate = spawnSync(process.execPath, [join(release, 'update/release-contract.mjs'), '--tool', 'claude-code'], { encoding: 'utf8' });
   assert.notEqual(duplicate.status, 0);
-  assert.match(duplicate.stderr, /skill mappings/i);
+  assert.match(duplicate.stderr, /plugins\/orion\/ exactly once/i);
 });
 
 test('release contract rejects an unsupported tool and keeps historical ownership hashes', () => {
@@ -70,17 +70,39 @@ test('release contract rejects an unsupported tool and keeps historical ownershi
   assert.ok(pristine.files['agents/README.md'].length > 0);
 });
 
-test('release contract ships every skill file to the selected runtime', () => {
-  const sources = readdirSync(join(repo, 'skills'), { recursive: true, withFileTypes: true })
+test('release contract ships every package file exactly once, at its own path, for both tools', () => {
+  assert.equal(existsSync(join(repo, 'skills')), false, 'the package is the one maintained skill source');
+  const sources = readdirSync(join(repo, 'plugins/orion'), { recursive: true, withFileTypes: true })
     .filter(entry => entry.isFile())
     .map(entry => relative(repo, join(entry.parentPath, entry.name)).split(sep).join('/'));
+  for (const name of ['create-skill', 'update-harness', 'call-planner', 'report-bug']) {
+    assert.ok(sources.includes(`plugins/orion/skills/${name}/SKILL.md`), `${name} moved into the package`);
+  }
+  assert.ok(sources.includes('plugins/orion/skills/call-planner/scripts/build-call-plan.mjs'));
+  assert.ok(sources.includes('plugins/orion/skills/report-bug/agents/openai.yaml'));
   for (const tool of ['codex', 'claude-code']) {
     const run = spawnSync(process.execPath, [join(repo, 'update/release-contract.mjs'), '--tool', tool], { encoding: 'utf8' });
     assert.equal(run.status, 0, run.stderr);
     const plan = JSON.parse(run.stdout);
     for (const source of sources) {
-      const destination = `${tool === 'codex' ? '.agents' : '.claude'}/${source}`;
-      assert.ok(plan.entries.some(entry => entry.source === source && entry.destination === destination), `missing skill file: ${source}`);
+      assert.deepEqual(plan.entries.filter(entry => entry.source === source).map(entry => entry.destination), [source], `package file: ${source}`);
+    }
+    assert.ok(!plan.entries.some(entry => /^\.(claude|agents)\/skills\//.test(entry.destination)), 'client skill folders hold no shipped files');
+  }
+});
+
+test('relative links in the package resolve to package files, never escape to the harness', () => {
+  const packageRoot = join(repo, 'plugins/orion');
+  const docs = readdirSync(packageRoot, { recursive: true, withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.endsWith('.md'))
+    .map(entry => join(entry.parentPath, entry.name));
+  for (const doc of docs) {
+    for (const [, target] of readFileSync(doc, 'utf8').matchAll(/\]\(([^)\s#]+)(?:#[^)]*)?\)/g)) {
+      if (/^[a-z]+:/i.test(target)) continue;
+      const resolved = join(dirname(doc), target);
+      const where = `${relative(repo, doc)} -> ${target}`;
+      assert.ok(!relative(packageRoot, resolved).startsWith('..'), `${where} escapes the package`);
+      assert.ok(existsSync(resolved), `${where} is missing`);
     }
   }
 });

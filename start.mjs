@@ -342,7 +342,7 @@ const STAGE_WORDS = {
 // ── The wizard, step by step ────────────────────────────────────────────────
 
 async function main() {
-  if (existsSync(join(__dirname, 'skills')) && existsSync(join(__dirname, 'install.mjs'))) {
+  if (existsSync(join(__dirname, 'install.mjs'))) {
     say('This is the Orion release folder. Create a separate client repository first:');
     say('  node install.mjs --tool codex --target <your-client-folder>');
     say('  node install.mjs --tool claude-code --target <your-client-folder>');

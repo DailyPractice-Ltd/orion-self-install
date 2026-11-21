@@ -170,7 +170,9 @@ function switchTool(root,repo,commit,ai_assistant,legacyTool) {
       actions.push({kind,destination,source});
     };
     for (const entry of deployment.entries) {
-      const old=sourcePlan.find(e=>e.destination===entry.destinations[from]), next=targetPlan.find(e=>e.destination===entry.destinations[ai_assistant]);
+      // Package entries have no per-tool destinations: they stay at their own path.
+      const at=tool=>entry.destinations?entry.destinations[tool]:entry.source;
+      const old=sourcePlan.find(e=>e.destination===at(from)), next=targetPlan.find(e=>e.destination===at(ai_assistant));
       const oldPath=safe(root,old.destination);
       const state=destinationState(root,old,pristine);
       if (old.destination===next.destination) {

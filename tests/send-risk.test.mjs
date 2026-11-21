@@ -408,7 +408,7 @@ test('tripwire: every template carries the words migrate writes into a kept file
   const definition = read('agent/agent-definition.md');
   for (const slug of ['prospect-research-outreach', 'post-call-debrief']) {
     assert.ok(definition.includes(`${slug}/SKILL.md`));
-    assert.match(read(`skills/${slug}/SKILL.md`), /rule 1/);
+    assert.match(read(`plugins/orion/skills/${slug}/SKILL.md`), /rule 1/);
   }
 });
 

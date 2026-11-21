@@ -43,6 +43,7 @@
     "status/shapes.mjs",
     "status/status-schema.md",
     "status/status.schema-template.json",
+    "switch_ai.mjs",
     "update/manifest.json",
     "update/pristine.json",
     "update/apply.mjs",
@@ -126,6 +127,7 @@
       "status/shapes.mjs",
       "status/status-schema.md",
       "status/status.schema-template.json",
+      "switch_ai.mjs",
       "update/apply.mjs",
       "update/destination-resolver.mjs",
       "update/manifest.json",
@@ -556,6 +558,15 @@
         },
         "ownership": "release",
         "fingerprint_key": "skills/update-harness/SKILL.md"
+      },
+      {
+        "source": "skills/switch-ai/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/switch-ai/SKILL.md",
+          "codex": ".agents/skills/switch-ai/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/switch-ai/SKILL.md"
       },
       {
         "source": "skills/call-planner/SKILL.md",

@@ -15,6 +15,11 @@ expiry blocks new tasks while admitted work can finish and report. Setup still
 needs current acceptance and acknowledged reporting. Version-2 pairing state keeps
 legacy migration fields readable but inert. No payload expansion.
 
+Switching AI assistants is now local: run `node switch_ai.mjs` in the deployed
+folder. It moves every skill between `.agents/skills/` and `.claude/skills/`,
+records the new assistant and backs up first, with no release clone, commit or
+version check. Run it again to switch back. `update/apply.mjs switch` is retired.
+
 
 Semantic versioning: a real self-serve install's corrections/learnings → minor; a change
 to the install sequence or repo structure → major; wording/clarity fixes → patch.

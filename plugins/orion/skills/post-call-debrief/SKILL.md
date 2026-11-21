@@ -20,4 +20,5 @@ three sections in the same response.
    is live, or show it in the conversation and say where it is.
 
 Use the core connector setup for email and CRM. Verify the three sections and the
-CRM entry with VT-04 in `validation/validation-tasks.md` on a recent real call.
+CRM entry with VT-04 in `validation/validation-tasks.md` at the root of the active Orion folder on a recent
+real call.

@@ -18,6 +18,13 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(run.status, 0, run.stderr);
     const read = (path) => readFileSync(join(target, path), 'utf8');
     assert.equal(JSON.parse(read('status/status.json')).ai_assistant, tool);
+    assert.equal(JSON.parse(read('status/status.json')).agent_name, 'Orion');
+    assert.match(read('agent/agent-definition.md'), /^You are Orion,/m);
+    assert.doesNotMatch(read('agent/agent-definition.md'), /\{\{AGENT_NAME\}\}/);
+    const rename = spawnSync(process.execPath, [join(target, 'status/emit-status.mjs'), '--agent_name', 'Neo'], { encoding: 'utf8', cwd: target });
+    assert.equal(rename.status, 1);
+    assert.match(rename.stderr, /always Orion/);
+    assert.equal(JSON.parse(read('status/status.json')).agent_name, 'Orion');
     assert.ok(existsSync(join(target, 'AGENTS.md')));
     const skillRoot = tool === 'codex' ? '.agents/skills' : '.claude/skills';
     for (const path of ['memory', 'status/memory.mjs', 'docs/memory.md', `${skillRoot}/memory-consolidation`]) {

@@ -1,5 +1,8 @@
 # Orion — turn your own AI assistant into your sales agent
 
+Every harness and its assistant are named **Orion**. Setup personalizes your business
+context, tone and working preferences; there is no naming step.
+
 Orion is a personal sales agent that learns your business, your customers, and how you
 actually sell — then takes on the parts of selling that aren't talking to people. You
 tell it about a prospect; it researches them and drafts a message for you to look over.

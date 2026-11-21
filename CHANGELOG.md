@@ -1,5 +1,12 @@
 # Orion self-install — Changelog
 
+## Unreleased — Fixed Orion identity
+
+- Fresh installs record `agent_name: "Orion"` automatically. The installer and
+  agent definition use Orion directly and ask only for business context, tone
+  and working preferences. The status CLI no longer accepts name changes.
+- Existing clients reinstall from scratch. No agent-name migration is added.
+
 ## Unreleased — revised required pairing
 
 Removed the learned-memory folder, synchronization, consolidation skill and agent

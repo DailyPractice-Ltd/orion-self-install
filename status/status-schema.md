@@ -14,7 +14,7 @@ anything. Its contents ARE the answer to "where did we leave off."
 |---|---|---|
 | `client_id` | slugified business name | as soon as `business_name` is known |
 | `business_name` | the client's business, human-readable | first thing captured (knowledge base §1) |
-| `agent_name` | the name the client chose for their agent | during agent identity setup |
+| `agent_name` | fixed identity: `Orion` | set automatically on fresh install |
 | `harness_status` | forward-only: `draft → configured → connected → validated → installed/running` | on each real lifecycle transition — never skip a step, never move backward |
 | `ops_stage` | forward-only: `booked → day1_encode → day2_wire_and_run → validated → seven_day_checkin → formalised` | tracks alongside `harness_status`, one notch coarser |
 | `machine_profile` | what the Press Start wizard learned about this computer (OS, Node, git, AI tools found, which one the client chose) | written by `start.mjs` only; `null` means the wizard never ran here — ask conversationally instead, never assume. If it's filled, **don't re-ask any of it** |

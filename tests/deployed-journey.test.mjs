@@ -81,7 +81,7 @@ for (const tool of ['claude-code', 'codex']) {
     put(client, retiredDisclosure, oldDisclosure);
     const prior = status(client);
     const packageHistory = { 'post-call-debrief': { kind: 'workflow', version: '2.0.0', smoke_test_passed: true } };
-    put(client, 'status/status.json', JSON.stringify({ ...prior, packages: packageHistory, sharing: { ...prior.sharing, intelligence_library_opt_in: true } }));
+    put(client, 'status/status.json', JSON.stringify({ ...prior, packages: packageHistory, sharing: { ...prior.sharing} }));
     for (const slug of ['prospect-research-outreach', 'post-call-debrief']) {
       rmSync(join(client, skill(tool), slug, 'SKILL.md'));
     }
@@ -118,7 +118,6 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(read(client, editedPage), '# Client debrief instructions\n');
     assert.equal(read(client, `${report.backup}/files/${retiredPage}`), oldPage);
     assert.deepEqual(status(client).packages, packageHistory);
-    assert.equal(status(client).sharing.intelligence_library_opt_in, true, 'preserve inert client history');
     assert.ok(report.retired.includes(retiredDisclosure));
     assert.equal(existsSync(join(client, retiredDisclosure)), false);
     assert.equal(read(client, `${report.backup}/files/${retiredDisclosure}`), oldDisclosure);

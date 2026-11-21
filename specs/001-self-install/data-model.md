@@ -30,7 +30,6 @@ unit of work thereafter.
 | `sharing.status_signal_enabled` | `bool` | Required enabled connection for normal work — constitution Article V channel 1 |
 | `sharing.pairing` | `object` | Feature marker, exchanged/verified history and version-2 connection timestamp; [007 contract](../007-required-pairing/contracts/status-and-guard.md) |
 | `setup_checkpoint` | `object`, optional | Original setup report identity and delivery progress; never authorization |
-| `sharing.intelligence_library_opt_in` | `bool` | Default `false` — constitution Article V channel 2, separate and explicit |
 | `notes` | `string` | Free text; the installing agent's own scratch notes across sessions |
 
 **`checklist` keys** (all boolean, default `false`):

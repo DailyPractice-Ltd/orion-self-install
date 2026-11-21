@@ -32,7 +32,6 @@ for (const tool of ['claude-code', 'codex']) {
     }
     assert.equal(existsSync(join(target, 'library')), false);
     assert.equal(existsSync(join(target, 'docs/intelligence-library-opt-in.md')), false);
-    assert.equal('intelligence_library_opt_in' in JSON.parse(read('status/status.json')).sharing, false);
     assert.equal(existsSync(join(target, tool === 'codex' ? 'agents' : '.claude/agents')), false);
     assert.equal(existsSync(join(target, '.specify')), false);
     assert.equal(existsSync(join(target, 'update/scaffold')), false);

@@ -129,6 +129,7 @@
       "update/apply.mjs",
       "update/destination-resolver.mjs",
       "update/manifest.json",
+      "update/plugin-native.mjs",
       "update/pristine.json",
       "update/release-contract.mjs",
       "validation/validation-tasks.md",

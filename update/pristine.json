@@ -12,20 +12,9 @@
    "a07a629bdc292d20498662d6189d7a53aba0496415a56ca947c9c2010ba4eebd",
    "e39b3779f587a8fef08db4e76bfbeb25afe9f51e9bbdabc7b0a4c6c981678163"
   ],
-  ".claude/skills/create-skill/SKILL.md": [
-   "3b6d2bd65e00b422aace6a57beb432e4befa9e2eb9b16c44a11aaf09976540ae",
-   "a7d53bfebfb856e35d7469b91cc6da1806be1d13bdac224b9918facf37c5a010",
-   "d50714304118add05075dba9613835c61213759594b3d8c3defad2f14f9f1302"
-  ],
   ".claude/skills/hire-agent/SKILL.md": [
    "75c479d9dc00e53579a29972c02262635e0239ceb59075f53d3bf2092ee72f5f",
    "7d11accf71237ac769011cd47ec604c2f7e6eb427ad23f04f6240507e9af3d56"
-  ],
-  ".claude/skills/update-harness/SKILL.md": [
-   "5a01e7840dd33711606563442dfe7869bda088640faa1f9ccc4df1a2466d032e",
-   "b7b732d37bc1db7f4e76f2496186d61e4390447614fe6f557e478daac926b795",
-   "d1a9dd93101f087b1f69f140f9fbc3f5defa44955dc5d1f53cbb3bb3d998867a",
-   "fe5de8c5339206ff9050735af4cbc55afe5c45289029f5543d4f7577ce62a6e6"
   ],
   ".gitignore": [
    "037dde8b8dc8661c896c8eb4972799a6b84f348eef93e252fd05d883a1ec4f1d",
@@ -637,124 +626,134 @@
    "63e91a31b8651f47a7046eeb13a1642ac7604ca7084db38348674772cf800932",
    "b076979b103c4f0b77ba6635fed2f95e78823d8a7cb85e5b808a689479596b59"
   ],
-  "skills/apollo-enrich-phone/SKILL.md": [
+  "plugins/orion/skills/apollo-enrich-phone/SKILL.md": [
    "0332cffc34bc04d08d0122358d0ccc4dbaa694ad44901784c50242030a451690"
   ],
-  "skills/apollo-enrich-phone/agents/openai.yaml": [
+  "plugins/orion/skills/apollo-enrich-phone/agents/openai.yaml": [
    "5b44541c15c760064b2c4ab8470ea3fb3243c1b9e39b6a514968e80ea76475cc"
   ],
-  "skills/apollo-enrich-phone/references/hubspot-mapping.md": [
+  "plugins/orion/skills/apollo-enrich-phone/references/hubspot-mapping.md": [
    "2dafb78eaa62125acdd6a5bb24097e9f818d6c3dd607bf5f96c8a4a5863893d1"
   ],
-  "skills/apollo-enrich-phone/references/za-phone-types.md": [
+  "plugins/orion/skills/apollo-enrich-phone/references/za-phone-types.md": [
    "0136c0aa5828e0ce70066052b3573e41d4bf6c6a3e90554dd855120c8047ac39"
   ],
-  "skills/call-planner-control-tower/SKILL.md": [
+  "plugins/orion/skills/call-planner-control-tower/SKILL.md": [
    "7d5cb732ca75aa5b659b2c4e820ee42ed5a6d6bbaf5a13e09339ca55f4fdba8e"
   ],
-  "skills/call-planner-control-tower/agents/openai.yaml": [
+  "plugins/orion/skills/call-planner-control-tower/agents/openai.yaml": [
    "967ebd6df7387b9d215a2b8d68ce6f070b1cbb7688d8f5d10580db5b38351e99"
   ],
-  "skills/call-planner-control-tower/references/blue-collar-assessment.md": [
+  "plugins/orion/skills/call-planner-control-tower/references/blue-collar-assessment.md": [
    "2b9d1bc25ebe9c2eac776a73f774712628258eaa7611a55b5a169023449013d9"
   ],
-  "skills/call-planner-control-tower/references/contact-history-and-reentry.md": [
+  "plugins/orion/skills/call-planner-control-tower/references/contact-history-and-reentry.md": [
    "7c5091b65703496f46dc6a55c6ce0e277e1fb204aeba16d0d037a32e22d951d0"
   ],
-  "skills/call-planner-control-tower/references/outcome-routing.md": [
+  "plugins/orion/skills/call-planner-control-tower/references/outcome-routing.md": [
    "675570758511ebb1492bb99f44fcb98478d3d19411e052993913970f4599bd3e"
   ],
-  "skills/call-planner-control-tower/references/queue-schema-and-call-ask.md": [
+  "plugins/orion/skills/call-planner-control-tower/references/queue-schema-and-call-ask.md": [
    "1aee71a1fa5b1b72093509a72db2cc56f4d978a132a0cba72aaf702390eba950"
   ],
-  "skills/call-planner-control-tower/references/today-only-queue.md": [
+  "plugins/orion/skills/call-planner-control-tower/references/today-only-queue.md": [
    "b324eba3246da8867b38a45a97126907c3baaa9006e63b85ed3552b632e04df4"
   ],
-  "skills/call-planner/SKILL.md": [
+  "plugins/orion/skills/call-planner/SKILL.md": [
    "0b0859a81f0315704bbebc54320bf8d59d871ee30b8e3f498b15afc53412ca84"
   ],
-  "skills/call-planner/assets/call-data.template.json": [
+  "plugins/orion/skills/call-planner/assets/call-data.template.json": [
    "29421fd24f35cf8d7318557d8032f800a75df80dbc1171dc0d1dd07a5f7e7111"
   ],
-  "skills/call-planner/scripts/build-call-plan.mjs": [
-   "0329031a800975988a6e4bf6a2818b1d130a843e143caaa5257b8a386e60f5b8",
-   "a84715fd40bd6f7e66b4bf3d05da6edd8a50d24f334f115571d3021811516d56",
-   "d3cd880a5f14057383e3ef03adac8a13bd71711f806996c7d33cfc1431452fb2"
+  "plugins/orion/skills/call-planner/scripts/build-call-plan.mjs": [
+   "a84715fd40bd6f7e66b4bf3d05da6edd8a50d24f334f115571d3021811516d56"
   ],
-  "skills/closeout-spreadsheet/SKILL.md": [
+  "plugins/orion/skills/closeout-spreadsheet/SKILL.md": [
    "38805ce211b7cee8ecc2c0bcca9f501552f91aa5084ec16f90a61be80ccbfed4"
   ],
-  "skills/closeout-spreadsheet/references/sheet-stage-evidence.md": [
+  "plugins/orion/skills/closeout-spreadsheet/references/sheet-stage-evidence.md": [
    "ef880af90e57916dbf7746981e52d757b6cf545950b54181fd63438c4e9a69cb"
   ],
-  "skills/create-skill/SKILL.md": [
-   "3b6d2bd65e00b422aace6a57beb432e4befa9e2eb9b16c44a11aaf09976540ae",
-   "512db52c0995ba0e3a99fbf1770008c566fc32a5a47c18bc1e0fba7ef846bd7c",
-   "8704d24f87a5887126b9d6817c2b4bd11cb0cfb4cdc6214c4e0a3b181378aa2a",
-   "a7d53bfebfb856e35d7469b91cc6da1806be1d13bdac224b9918facf37c5a010",
-   "d50714304118add05075dba9613835c61213759594b3d8c3defad2f14f9f1302",
-   "eadd09b143a41704c88c20c94ca9e723e1376a96fa71ea731562894b4847e411"
+  "plugins/orion/skills/create-skill/SKILL.md": [
+   "512db52c0995ba0e3a99fbf1770008c566fc32a5a47c18bc1e0fba7ef846bd7c"
   ],
-  "skills/friday-report/SKILL.md": [
+  "plugins/orion/skills/friday-report/SKILL.md": [
    "2aaf9e579c627caa7ad172c16d61f6caa694c9b0854599db380f93dcb66ac0b2"
+  ],
+  "plugins/orion/skills/lifecycle-governance/SKILL.md": [
+   "26dabaee5fce5cd8bf9a30e600bcf9c61f63a9fcb819d4efa3ac488fa049e69d"
+  ],
+  "plugins/orion/skills/lifecycle-governance/agents/openai.yaml": [
+   "27ea8d10f12a3277e3563d428f4e661e2f73f4697b22168148a7b6c2b798900e"
+  ],
+  "plugins/orion/skills/lifecycle-governance/references/hubspot-model.md": [
+   "d2164820619e8ef566da1591967a6e01473778594d75bd851c6e4fcfbf937f48"
+  ],
+  "plugins/orion/skills/lifecycle-governance/references/hubspot-schema.json": [
+   "698617de0e17d2e764f7c902fa6a9585787e99ad5b2e510bcc2401cc9e5a163d"
+  ],
+  "plugins/orion/skills/lifecycle-governance/references/lifecycle-stage-policy.md": [
+   "322590a01a7154ae6a7688af76057822524a9b0d697472f61cddfb15696c81af"
+  ],
+  "plugins/orion/skills/post-call-debrief/SKILL.md": [
+   "0c01bff073713a03bc77db89eac85f89f484855cc8f0a6bd79cc9e7ff7421f3b"
+  ],
+  "plugins/orion/skills/prospect-call-list/SKILL.md": [
+   "f4aed3e008633632695ff5b59a0345e038c872ceccc4d6014b9cbde2921fc624"
+  ],
+  "plugins/orion/skills/prospect-call-list/agents/openai.yaml": [
+   "4d850adfed776a491cc16244c54e092f74db6e882147b08e0b6a52999f7ca6fe"
+  ],
+  "plugins/orion/skills/prospect-call-list/references/crm-review.md": [
+   "cc57ab9af3c9eb22ba74b8011dd8bebffaad45b754acae357d8415e508fb75b3"
+  ],
+  "plugins/orion/skills/prospect-call-list/references/run-guide.md": [
+   "797e0f2bc0d8bf268611abdcbc5342c44592508e695e9000f9483ce1ac52a668"
+  ],
+  "plugins/orion/skills/prospect-call-list/references/target-brief.md": [
+   "dc18f39d625f222fce009f4065cea9b0263c40fb94bda3b53d35cecee8973130"
+  ],
+  "plugins/orion/skills/prospect-enrichment/SKILL.md": [
+   "ebdef0542e15bc5f33a434e62ef34f72a2aaa20232b64c8ccb0492007c130511"
+  ],
+  "plugins/orion/skills/prospect-research-outreach/SKILL.md": [
+   "46935f7f4e68166adf2595b543a3fcb747b9eaff3b98941834008738c1e51207"
+  ],
+  "plugins/orion/skills/prospecting/SKILL.md": [
+   "de90bdcb15ec162b17f710339f60a917d3a3b77bb5c4f0f0a7d252a8ce8830df"
+  ],
+  "plugins/orion/skills/report-bug/SKILL.md": [
+   "2377d5e23014ae48c7cb2b474f50b1b085aee389e3e068f8b7b0cbf51fb90be7"
+  ],
+  "plugins/orion/skills/report-bug/agents/openai.yaml": [
+   "9985cd6a74a6d9c52149e48c6e06a7af4354491983b1f8b78e516232c5c63cfd"
+  ],
+  "plugins/orion/skills/report-bug/references/report-guide.md": [
+   "97fab64c4faf9e723df5d2aa0683f0cefbfce737b95c6bb457c5298861bdedd0"
+  ],
+  "plugins/orion/skills/task-planner/SKILL.md": [
+   "d9374993827602cfea2aeb02c59ee1000448d5b4d9526f6e13946d323d1ede0b"
+  ],
+  "plugins/orion/skills/task-planner/agents/openai.yaml": [
+   "aefab17e0136b3150e9c2690bd9fcbbb306f00380bcddd447830a322b9ca33df"
+  ],
+  "plugins/orion/skills/task-planner/references/call-ranking.md": [
+   "d8e367ad308ba4eeaf6869ae5fba08d733b85c6d3a23f5e66422f5a6618850ed"
+  ],
+  "plugins/orion/skills/task-planner/references/slack-opportunity-intake.md": [
+   "c374047f7fc13ee2fbbcb318fcf8504a2bffaff9fe232a9579f2bfc4bb9c1992"
+  ],
+  "plugins/orion/skills/task-planner/references/webinar-follow-up.md": [
+   "163eb1d9bf6f673d0a7ae2c3bdf73bc1e37c232b9f0ead3179f45e7251c39b33"
+  ],
+  "plugins/orion/skills/update-harness/SKILL.md": [
+   "c054233152f13d203ffe3772d9d3bf93e088cd3811f517ae11bf85aea4769aca"
   ],
   "skills/hire-agent/SKILL.md": [
    "54b156d787c009a5c1c35151eb099ed95d613f6ee199afe5a131107c5ea2d3cc",
    "75c479d9dc00e53579a29972c02262635e0239ceb59075f53d3bf2092ee72f5f",
    "7d11accf71237ac769011cd47ec604c2f7e6eb427ad23f04f6240507e9af3d56",
    "819773ceb514c196c89861a4585f690f5c25f8bd81e137dbac0ebb4f878a338b"
-  ],
-  "skills/lifecycle-governance/SKILL.md": [
-   "26dabaee5fce5cd8bf9a30e600bcf9c61f63a9fcb819d4efa3ac488fa049e69d"
-  ],
-  "skills/lifecycle-governance/agents/openai.yaml": [
-   "27ea8d10f12a3277e3563d428f4e661e2f73f4697b22168148a7b6c2b798900e"
-  ],
-  "skills/lifecycle-governance/references/hubspot-model.md": [
-   "d2164820619e8ef566da1591967a6e01473778594d75bd851c6e4fcfbf937f48"
-  ],
-  "skills/lifecycle-governance/references/hubspot-schema.json": [
-   "698617de0e17d2e764f7c902fa6a9585787e99ad5b2e510bcc2401cc9e5a163d"
-  ],
-  "skills/lifecycle-governance/references/lifecycle-stage-policy.md": [
-   "322590a01a7154ae6a7688af76057822524a9b0d697472f61cddfb15696c81af"
-  ],
-  "skills/post-call-debrief/SKILL.md": [
-   "0c01bff073713a03bc77db89eac85f89f484855cc8f0a6bd79cc9e7ff7421f3b"
-  ],
-  "skills/prospect-call-list/SKILL.md": [
-   "f4aed3e008633632695ff5b59a0345e038c872ceccc4d6014b9cbde2921fc624"
-  ],
-  "skills/prospect-call-list/agents/openai.yaml": [
-   "4d850adfed776a491cc16244c54e092f74db6e882147b08e0b6a52999f7ca6fe"
-  ],
-  "skills/prospect-call-list/references/crm-review.md": [
-   "cc57ab9af3c9eb22ba74b8011dd8bebffaad45b754acae357d8415e508fb75b3"
-  ],
-  "skills/prospect-call-list/references/run-guide.md": [
-   "797e0f2bc0d8bf268611abdcbc5342c44592508e695e9000f9483ce1ac52a668"
-  ],
-  "skills/prospect-call-list/references/target-brief.md": [
-   "dc18f39d625f222fce009f4065cea9b0263c40fb94bda3b53d35cecee8973130"
-  ],
-  "skills/prospect-enrichment/SKILL.md": [
-   "ebdef0542e15bc5f33a434e62ef34f72a2aaa20232b64c8ccb0492007c130511"
-  ],
-  "skills/prospect-research-outreach/SKILL.md": [
-   "46935f7f4e68166adf2595b543a3fcb747b9eaff3b98941834008738c1e51207"
-  ],
-  "skills/prospecting/SKILL.md": [
-   "0fbec3f8380b833d9ff0dd57b62f37c7b4bc8b09aecc0e35ed2cb78ebe96daac",
-   "de90bdcb15ec162b17f710339f60a917d3a3b77bb5c4f0f0a7d252a8ce8830df"
-  ],
-  "skills/report-bug/SKILL.md": [
-   "2377d5e23014ae48c7cb2b474f50b1b085aee389e3e068f8b7b0cbf51fb90be7"
-  ],
-  "skills/report-bug/agents/openai.yaml": [
-   "9985cd6a74a6d9c52149e48c6e06a7af4354491983b1f8b78e516232c5c63cfd"
-  ],
-  "skills/report-bug/references/report-guide.md": [
-   "97fab64c4faf9e723df5d2aa0683f0cefbfce737b95c6bb457c5298861bdedd0"
   ],
   "skills/speckit-agent-context-update/SKILL.md": [
    "4bebe9b02a5aa3f65b27d54fee7e4e112cc3bb89cc554866d370c9082c8f0fe8"
@@ -789,29 +788,6 @@
   "skills/speckit-taskstoissues/SKILL.md": [
    "dfe23aaca349cd76e98505dafa9aae1ef4616a0c35a5c79122b9bd881e16b62f"
   ],
-  "skills/task-planner/SKILL.md": [
-   "d9374993827602cfea2aeb02c59ee1000448d5b4d9526f6e13946d323d1ede0b"
-  ],
-  "skills/task-planner/agents/openai.yaml": [
-   "aefab17e0136b3150e9c2690bd9fcbbb306f00380bcddd447830a322b9ca33df"
-  ],
-  "skills/task-planner/references/call-ranking.md": [
-   "d8e367ad308ba4eeaf6869ae5fba08d733b85c6d3a23f5e66422f5a6618850ed"
-  ],
-  "skills/task-planner/references/slack-opportunity-intake.md": [
-   "c374047f7fc13ee2fbbcb318fcf8504a2bffaff9fe232a9579f2bfc4bb9c1992"
-  ],
-  "skills/task-planner/references/webinar-follow-up.md": [
-   "163eb1d9bf6f673d0a7ae2c3bdf73bc1e37c232b9f0ead3179f45e7251c39b33"
-  ],
-  "skills/update-harness/SKILL.md": [
-   "588bb20dc314084765d3d5ab45b067bc6f9f27a637d215e7ef058ee489bbd2d4",
-   "5a01e7840dd33711606563442dfe7869bda088640faa1f9ccc4df1a2466d032e",
-   "99d9b18736a582ce0f83ffa796a11e280f14d867ab878a6be5d376efe39cd0c2",
-   "b7b732d37bc1db7f4e76f2496186d61e4390447614fe6f557e478daac926b795",
-   "d1a9dd93101f087b1f69f140f9fbc3f5defa44955dc5d1f53cbb3bb3d998867a",
-   "fe5de8c5339206ff9050735af4cbc55afe5c45289029f5543d4f7577ce62a6e6"
-  ],
   "start.mjs": [
    "0f0811915296725f3f46670297423839344ce4ee539eea4e5df0d8b4594f15b7",
    "118cf3981cac5881f20f6d098c044798d606d974f2dd21044600909f0c2030bf",
@@ -832,6 +808,7 @@
    "9f451c4360b22d4689b0668a94587e262424b6f5b13e603d973e23160e30eab6",
    "adc2de89ad5a29b67d071a607832f4f8f15840577d11bf817a8e096d7db6072f",
    "b6f607fa0c2c0d18b52e8171cba607362de6af6a82ca8ae9d83d778966cf1da7",
+   "be5e7537118e8924b49a6d20819eb237c9038d3717a1b5458d762798f6c0c205",
    "bf874d2b31d6a7db63100a5145ebf7fb32597831573312407dff97a654336cdf",
    "d8d35e931bc9db7890440a7656f91d233db0a6bc8fc13b5cc9527c7290114a16",
    "d9acef317bf1fc439e3146e18c5e41e53d3f1f3452be39d41ff96fff26a123da",
@@ -870,6 +847,7 @@
   "status/home.mjs": [
    "112de500572a9f1c677760290735805fc82699c947a88bbbaba44edbadf7cad8",
    "2960aca5f2e1eeeebacadbafd7aee1f6e088b629c12eb50309bbf3dd9371e7c8",
+   "57c884355dd0c95505a18cdb8051671973664a6e483ab405c18f7708a5d2344b",
    "7b3f49dffbba73fdb4c10b1ffd00e08cc7f37a3fd36e7e62b9f1758090cb296f",
    "82a32fe9f5d2c15e4f587b869a591ac0f840f07b642e25b5c948723bf5592998",
    "9d0e59b6e21ea07e2fa1ec59337699d3b32b95fefe359db7c61c46ecea6bb797",
@@ -1033,6 +1011,7 @@
   ],
   "update/apply.mjs": [
    "07a45cb15e53425534928655006f030e5a59740fd7e7b0674147b20cd4406620",
+   "23f5694da4897849f1c5aaafa39e359326668a44497b7c77b87f496de21e40b7",
    "50e84ff447030754aaea51a85f4771313aa9740a7646fdd0d18bc32395f62da8",
    "6e450c0c07d44103ef606cd95f20f11d7b3f4a99b2531c92e6da4fdaebe35eeb",
    "748641a8afae305f3e03157ce3d296a2b4d327e33893290594cf0957d2b48508",
@@ -1046,6 +1025,7 @@
    "f49f708d2d56f1eff0a634886334db8164f386cecf69cd1cec6685e69dcf8139"
   ],
   "update/destination-resolver.mjs": [
+   "1a7b4afeb418274378a16ac7bc8e65961864601d9aad210ce8cbc195f74bd72b",
    "56f956f389976a7c74fa33ae3b51b456c8a02856eb0221fc7ebff126bc9d6de3",
    "739e8f5346137b36056224c778d7be528969df26edbcceb3e5a384578d8b5ac9",
    "9f36c5926a3a9ad57ec6839b9c57ef88e00579f41ce20c9be6a79942c0916255",
@@ -1106,6 +1086,7 @@
    "d998260b7546b73067e02f6ec0c8ec4b152231b84fc63988ef3b0144826f3122",
    "dfc60a60de1b0454f9a2396e735e7be8934fde38463502f03316bab71c264d11",
    "e6b371b1713ae4aeddd21076fb99aa255b58f680f27aa47dad6f08e7f332011d",
+   "e6d6e7b9312170174de75c485235b30f60b7805606c2ea43eb428c8650bff1e5",
    "faf502d8a7ca4211eeb2c0b93d33fb032c9046aef8515ac9bf15319617575a8f"
   ],
   "update/release-contract.mjs": [

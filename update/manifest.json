@@ -132,6 +132,7 @@
       "update/plugin-native.mjs",
       "update/pristine.json",
       "update/plugin-package.mjs",
+      "update/plugin-setup.mjs",
       "update/release-contract.mjs",
       "validation/validation-tasks.md",
       "status/guard.mjs",

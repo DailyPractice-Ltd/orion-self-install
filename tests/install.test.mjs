@@ -6,15 +6,19 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { NO_NATIVE } from './helpers/env.mjs';
 
 const release = join(dirname(fileURLToPath(import.meta.url)), '..');
+// No real `claude` or `codex` is ever reached: point both at a program that does not exist,
+// so plugin setup records the missing client as a pending step.
+const noNative = { ...process.env, ...NO_NATIVE };
 
 for (const tool of ['claude-code', 'codex']) {
   test(`install CLI creates an isolated ${tool} harness`, (t) => {
     const base = mkdtempSync(join(tmpdir(), 'orion-install-'));
     t.after(() => rmSync(base, { recursive: true, force: true }));
     const target = join(base, 'client');
-    const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', target], { encoding: 'utf8' });
+    const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', target], { encoding: 'utf8', env: noNative });
     assert.equal(run.status, 0, run.stderr);
     const read = (path) => readFileSync(join(target, path), 'utf8');
     assert.equal(JSON.parse(read('status/status.json')).ai_assistant, tool);
@@ -57,6 +61,11 @@ for (const tool of ['claude-code', 'codex']) {
     const paired = spawnSync(process.execPath, ['--import', pathToFileURL(mock).href, join(target, 'start.mjs'), '--code', 'BCDF-GHJK-LMNP'], { encoding: 'utf8', input: '', cwd: target });
     assert.equal(paired.status, 0, paired.stdout + paired.stderr);
     assert.match(paired.stdout, /Step 3 of 3/);
+    // Plugin readiness is separate from pairing: surfaced, never blocking, never called done.
+    const pluginStep = JSON.parse(read('status/status.json')).plugin;
+    assert.equal(pluginStep.setup_state, 'pending');
+    assert.ok(paired.stdout.includes(pluginStep.remaining_action), paired.stdout);
+    assert.doesNotMatch(paired.stdout, /whole setup worked|plugin setup complete/i);
     const saved = JSON.parse(read('status/status.json'));
     assert.equal(saved.sharing.pairing.state, 'verified');
     assert.equal(saved.setup_checkpoint.delivered, true);
@@ -64,7 +73,7 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal('memory' in saved, false, 'wizard must not recreate retired configuration');
     assert.equal(existsSync(join(target, 'memory')), false);
 
-    const second = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', target, '--local-only'], { encoding: 'utf8' });
+    const second = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', target, '--local-only'], { encoding: 'utf8', env: noNative });
     assert.notEqual(second.status, 0);
     assert.equal(JSON.parse(read('status/status.json')).ai_assistant, tool);
   });
@@ -76,7 +85,7 @@ test('install CLI rejects collisions before creating status', (t) => {
   const target = join(base, 'client');
   mkdirSync(target);
   writeFileSync(join(target, 'AGENTS.md'), 'my own instructions\n');
-  const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', 'codex', '--target', target, '--local-only'], { encoding: 'utf8' });
+  const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', 'codex', '--target', target, '--local-only'], { encoding: 'utf8', env: noNative });
   assert.notEqual(run.status, 0);
   assert.equal(readFileSync(join(target, 'AGENTS.md'), 'utf8'), 'my own instructions\n');
   assert.equal(existsSync(join(target, 'status/status.json')), false);
@@ -119,7 +128,7 @@ test('legacy migration carries personal work into a separate deployed repository
     if (process.platform !== 'win32' || error.code !== 'EPERM') throw error;
     put('specs/unreadable.md', 'human-only fixture\n');
   }
-  const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','claude-code','--target',target,'--migrate-from',legacy,'--local-only'],{encoding:'utf8'});
+  const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','claude-code','--target',target,'--migrate-from',legacy,'--local-only'],{encoding:'utf8',env:noNative});
   assert.equal(result.status,0,result.stderr);
   const read=path=>readFileSync(join(target,path),'utf8');
   assert.equal(JSON.parse(read('status/status.json')).ai_assistant,'claude-code');
@@ -148,7 +157,7 @@ test('Codex migration preserves legacy team jobs in place', t => {
   const put=(path,body)=>{const full=join(legacy,path);mkdirSync(dirname(full),{recursive:true});writeFileSync(full,body);};
   put('status/status.json',JSON.stringify({template_version:'2.0.0',ai_assistant:'codex'}));
   put('team/README.md','my roster\n');put('team/writer.md','my job\n');
-  const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','codex','--target',target,'--migrate-from',legacy,'--local-only'],{encoding:'utf8'});
+  const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','codex','--target',target,'--migrate-from',legacy,'--local-only'],{encoding:'utf8',env:noNative});
   assert.equal(result.status,0,result.stderr);
   const migrated = JSON.parse(readFileSync(join(target, 'status/status.json'), 'utf8'));
   assert.equal(migrated.ai_assistant, 'codex');
@@ -163,7 +172,7 @@ test('remote setup rejects a repository that is not verified private',t=>{
   writeFileSync(join(bin,'gh'),'#!/bin/sh\nprintf "false\\n"\n');
   chmodSync(join(bin,'gh'),0o755);
   const target=join(base,'client');
-  const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','codex','--target',target,'--remote','https://github.com/owner/private.git'],{encoding:'utf8',env:{...process.env,PATH:`${bin}:${process.env.PATH}`}});
+  const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','codex','--target',target,'--remote','https://github.com/owner/private.git'],{encoding:'utf8',env:{...noNative,PATH:`${bin}:${process.env.PATH}`}});
   assert.equal(result.status,2);assert.match(result.stderr,/must exist and be private/);
   assert.equal(existsSync(target),false);
 });

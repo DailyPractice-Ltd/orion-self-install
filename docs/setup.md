@@ -21,6 +21,32 @@ required checks: open this same folder in one of those supported tools to contin
    Run `node start.mjs` again to resume saved answers. If an exchange succeeded but
    its response was lost before saving, request a fresh code.
 
+## Finish the Orion plugin
+
+Orion's shipped skills arrive as the `orion` plugin in `plugins/orion/`. Its setup is
+separate from pairing: pairing does not depend on it, and it does not pair anything.
+The installer registers it with the selected tool, scoped to this folder, and records
+progress in `status/status.json` under `plugin`:
+
+- `pending`: one step is owed first (install the tool, install Orion from Codex's
+  `/plugins` or Plugins Directory, or enable it). `remaining_action` says exactly what.
+- `failed`: a check or native command failed; `remaining_action` says how to retry.
+- `registered`: the tool's own listing shows Orion for this folder at this version,
+  but no fresh session has confirmed it discovers the skills yet.
+- `complete`: an assistant in a fresh session in this folder saw the Orion skills
+  and confirmed it with `node update/plugin-setup.mjs verify --discovered`.
+
+To resume unfinished plugin setup, run from this folder (safe to repeat; it reuses the
+folder's catalog identity and never registers twice):
+
+```text
+node update/plugin-setup.mjs resume
+```
+
+`node update/plugin-setup.mjs verify` inspects without changing anything, and
+`node update/plugin-setup.mjs status` prints where setup stands. Only report
+"plugin setup complete" when the command says so.
+
 Pairing links your account and folder; it does not check payment or subscription.
 The [radio guide](radio.md) explains exactly which operational labels are shared.
 

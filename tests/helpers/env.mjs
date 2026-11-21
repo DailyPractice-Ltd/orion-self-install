@@ -7,10 +7,23 @@
  * proxy). The tests themselves may be run on a cloud machine, and there every
  * "no key means the radio is off" case would otherwise read as "on".
  */
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 const CLOUD_NAMES = ['CLAUDE_CODE_REMOTE', 'ORION_CLOUD', 'ORION_INSTALL_TOKEN', 'NODE_USE_ENV_PROXY'];
+
+/**
+ * The native plugin CLIs point at programs that do not exist, so a script under test
+ * never registers anything with this machine's real `claude` or `codex`. A test that
+ * wants a native CLI passes a fake one in `extra`.
+ */
+export const NO_NATIVE = Object.freeze({
+  ORION_CLAUDE_BIN: join(tmpdir(), 'orion-no-native', 'claude'),
+  ORION_CODEX_BIN: join(tmpdir(), 'orion-no-native', 'codex'),
+});
 
 export function plainEnv(extra = {}) {
   const env = { ...process.env };
   for (const name of CLOUD_NAMES) delete env[name];
-  return { ...env, ...extra };
+  return { ...env, ...NO_NATIVE, ...extra };
 }

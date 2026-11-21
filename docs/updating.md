@@ -52,11 +52,15 @@ backup (`<backup>/package/plugins/orion/`) and lists edited files under
 `package.edits_backed_up`. Customizations belong in client skills under `.claude/skills/`
 or `.agents/skills/`, which the update never touches. It also backs up the selected
 tool's catalog (`.claude-plugin/marketplace.json` or `.agents/plugins/marketplace.json`),
-which keeps the same catalog identity. It then refreshes the selected tool with
+which keeps the same catalog identity, and this folder's own registration entries for
+that tool (`<backup>/registration.json`): Orion's two keys in
+`.claude/settings.local.json`, or Orion's two tables in `.codex/config.toml`. Nothing
+else in those files is recorded or put back. It then refreshes the selected tool with
 `node update/plugin-setup.mjs resume` logic:
 
-- **Failed** (a check or native command failed): the previous package, catalog, files
-  and version are put back, the report says `"state": "rolled_back"` and the helper
+- **Failed** (a check or native command failed): the previous package, catalog,
+  registration entries, files and version are put back, the report says
+  `"state": "rolled_back"` and the helper
   exits 3. Recovery is not claimed until a fresh session confirms it: follow the
   report's `remaining_action`.
 - **Pending or registered**: the files are at the new release, but the update is not
@@ -66,7 +70,9 @@ which keeps the same catalog identity. It then refreshes the selected tool with
   loads the package in place, so a fresh session (or `/reload-plugins`) picks it up.
   Codex loads a cached copy, so reinstall Orion from its Plugins Directory or `/plugins`,
   then start a fresh chat. Then run `node update/plugin-setup.mjs verify --discovered`;
-  that clears `pending_version`.
+  that clears `pending_version`. Until then `plugin.update_backup` names the update's
+  backup: if a later `resume` or `verify` fails, `remaining_action` gives the exact
+  restore command that puts the previous release back.
 
 Marketplace auto-updates never replace the pinned release: the Claude Code catalog is a
 local folder read in place, and Orion never runs `codex plugin marketplace upgrade`.
@@ -109,9 +115,13 @@ requires the harness version, manifest, and common runtime scripts to match the 
 release. Run the pinned update command above first if it reports an older version.
 The switch reuses the same package, version and catalog identity. It writes the target
 tool's catalog and sets Orion up with that tool first. Only when the target tool's own
-CLI lists Orion for this folder does it move client skills to the new skill folder,
-remove Orion (and only Orion's catalog) from the previous tool, and record the new
-selection. Other plugins, caches and settings of either tool are left alone.
+inspection shows the same discovery evidence as plugin setup (see
+[Finish the Orion plugin](setup.md#finish-the-orion-plugin): every shipped skill at this
+version, enabled for this folder only) does it move client skills to the new skill
+folder and record the new selection. After that commit it removes Orion from the
+previous tool, and then that tool's catalog, so a failure before the commit leaves the
+previous tool exactly as it was. For Codex, removing Orion means `codex plugin remove`
+and deleting Orion's two tables from `.codex/config.toml`. Other plugins, caches and settings of either tool are left alone.
 If the target still needs a step (Codex's native install, a missing app), the switch is
 pending: `ai_assistant` keeps the current tool, `plugin.pending_switch` records the target,
 its backup and the remaining step. Do that step, then run the same switch command again
@@ -131,7 +141,8 @@ node update/apply.mjs restore --root . --backup .update-backup/VERSION-TIMESTAMP
 For an update, restore puts prior released files back and removes newly installed
 files. A file changed after update is kept and reported. It restores the prior
 version and retired checklist keys without replacing the client's live status
-wholesale. It also puts back the previous plugin package and catalog. If the package
+wholesale. It also puts back the previous plugin package, catalog and this folder's
+own registration entries, leaving other settings as they are now. If the package
 changed after the update, restore stops before changing anything and says how to keep
 those edits. After a restore, the report says `reload_required`: start a fresh session,
 and confirm discovery with `node update/plugin-setup.mjs verify --discovered` before

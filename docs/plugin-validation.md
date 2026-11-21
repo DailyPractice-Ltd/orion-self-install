@@ -61,12 +61,21 @@ plus 12 hex digits, also found in `.claude-plugin/marketplace.json`.
 - Open the folder in Claude Code and accept the workspace trust prompt.
 - Start a fresh session in the folder, or run `/reload-plugins`.
 
-**Codex.** The installer runs `codex plugin marketplace add <folder>`. Codex has no
-established unattended install, so the report stays `pending` with this step:
+**Codex.** The installer does not run `codex plugin marketplace add` (it writes the
+user-wide config). It writes this folder's own `.codex/config.toml` with
+`[marketplaces."orion-<12 hex>"]` (this folder) and `[plugins."orion@orion-<12 hex>"]`
+`enabled = true`, then checks with `codex plugin marketplace list --json` from the folder.
+Codex has no established unattended install, so the report stays `pending`:
 
+- If it says the folder must be trusted, open the folder in Codex and accept the trust
+  prompt, then run `node update/plugin-setup.mjs resume`. Record whether Codex asked.
 - From the folder, open the Plugins Directory (desktop) or type `/plugins` (CLI).
 - Choose the `orion-<12 hex>` catalog and install Orion.
 - Start a fresh chat in the folder. Restart the desktop app if the catalog does not appear.
+- Record whether Codex's install wrote `[plugins."orion@orion-<12 hex>"]` into
+  `~/.codex/config.toml`. If it did, Orion reports `enabled_user_wide` and stays pending
+  until that entry is removed: record this, since it decides whether project-only
+  enablement works on this surface.
 
 Then, from the folder, run:
 
@@ -84,11 +93,16 @@ release version. Record the output.
 - **Claude Code:** run `claude plugin list --json`. Expect id `orion@orion-<12 hex>`,
   `scope: "local"`, `enabled: true`, no `errors`, a `projectPath` of this folder, and a
   `readFromFolder` of this folder's `plugins/orion`. The version must equal
-  `template_version`. Also run `claude plugin details orion` and record the skill count.
+  `template_version`. Also run `claude plugin details orion@orion-<12 hex>` and record
+  the full `Component inventory`: Orion reads its `Skills (N)  a, b, ...` line and
+  requires N, and the names when listed, to match `plugins/orion/skills/`. Record the
+  exact layout of that line, since Orion's parsing of it is unverified.
 - **Codex:** run `codex plugin list --json` and `codex plugin marketplace list --json`.
-  Expect `orion` from `orion-<12 hex>`, enabled, at the release version (not `local`). The
-  marketplace root must be this folder. Also note where the cached copy sits, normally
-  under `~/.codex/plugins/cache/orion-<12 hex>/orion/`.
+  Expect `orion` from `orion-<12 hex>`, enabled. Its version may read `local`: Orion then
+  reads the version from the cached copy's manifest, under
+  `~/.codex/plugins/cache/orion-<12 hex>/orion/local/` (`plugin.json`), and checks that its
+  `skills/` folder holds every shipped skill. Record the listed version and the cache
+  path you actually find. The marketplace root must be this folder.
 
 ## 4. Discovery and a harmless invocation
 
@@ -115,7 +129,8 @@ In a fresh session in the harness folder:
 - Open a different folder, one that is not an Orion harness, in the same tool. Record
   whether the Orion skills appear there.
   - Claude Code should not show them, because Orion is installed at local scope.
-  - Codex registers its catalog in user config, and its install state there is
+  - Codex should not show them: the catalog and enablement live in this folder's
+    `.codex/config.toml`. Whether Codex's own install also enables Orion user-wide is
     unverified. Record exactly what you see.
 - Check that `~/.claude/settings.json` or `~/.codex/config.toml` gained no global
   Orion enablement you did not expect. Copy only the Orion lines.
@@ -127,11 +142,13 @@ Run these only in disposable harness folders.
 - **Update:** use `node update/apply.mjs update` from a newer release checkout, per
   `docs/updating.md`. Confirm the report says `active: false` until the fresh-session
   step and `verify --discovered` are done. For Codex, confirm the reinstall step moves
-  the cached version.
+  the cached copy's manifest version. If a later `verify` fails, confirm its next step
+  names `node update/apply.mjs restore --root . --backup <the update's backup>`.
 - **Restore:** use `node update/apply.mjs restore` with the reported backup.
-- **Tool switch:** use `apply.mjs switch --to <other tool>`. Confirm the target lists
-  Orion before the previous tool's Orion catalog and enablement are removed, and that
-  other plugins are untouched.
+- **Tool switch:** use `apply.mjs switch --to <other tool>`. Confirm the target shows
+  Orion's full skill inventory before the switch commits, that the previous tool's Orion
+  (and then its catalog) is removed only after the commit, and that other plugins are
+  untouched.
 
 ## Reporting
 

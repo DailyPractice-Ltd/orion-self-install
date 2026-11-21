@@ -15,11 +15,13 @@
  *   not_started  nothing tried yet
  *   pending      a step is owed first (install the tool, a native install, enable): remaining_action
  *   failed       a check or native command failed: remaining_action says how to retry
- *   registered   the tool's own inspection shows Orion installed for this folder at this version, but
- *                no fresh session has confirmed it discovers the skills yet: remaining_action
+ *   registered   the tool's own inspection shows Orion enabled for this folder only, at this version,
+ *                with every shipped skill (update/plugin-native.mjs), but no fresh session has
+ *                confirmed it discovers the skills yet: remaining_action
  *   complete     registered, and an assistant in a fresh session here confirmed the skills (--discovered)
  * `verified_version` is the last release confirmed active; `pending_version` an installed release
- * awaiting that confirmation (an update's target). See update/apply.mjs for updates and switches.
+ * awaiting that confirmation (an update's target), and `update_backup` that update's backup, named
+ * in remaining_action if a later check fails. See update/apply.mjs for updates and switches.
  *
  * Native inspection alone, including any stubbed CLI, never earns `complete`: every report names the
  * program that answered. The catalog identity is created once and reused; registration is idempotent.

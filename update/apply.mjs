@@ -7,15 +7,18 @@
  *   node update/apply.mjs recover --root <harness>
  *
  * The Orion plugin package (plugins/orion) is release-managed and replaced as a unit; the
- * complete prior package, in-place edits included, goes into the backup first. Only the
- * selected tool's catalog file is backed up as registration state. After the files, the
+ * complete prior package, in-place edits included, goes into the backup first. The
+ * selected tool's catalog file and this harness's own entries in that tool's settings
+ * (update/plugin-registration.mjs) are backed up as registration state. After the files, the
  * selected tool is refreshed through its own CLI (update/plugin-native.mjs):
  *   failed             a confirmed failure: the previous coordinated state is restored (exit 3)
  *   pending/registered the update stays pending in status.json `plugin.pending_version`
  *                      until a fresh session confirms discovery; it is never announced as active
  * A switch writes the target tool's catalog and sets that tool up first. The selected tool
- * (`ai_assistant`) changes only once the target's own CLI lists Orion for this folder;
- * until then the switch is pending (`plugin.pending_switch`) and the same command resumes it.
+ * (`ai_assistant`) changes only once the target's own inspection shows the same discovery
+ * evidence as plugin setup; until then the switch is pending (`plugin.pending_switch`) and
+ * the same command resumes it. The previous tool's Orion is retired after the commit.
+ * Every status.json write holds the shared status lock (status/store.mjs).
  * Neither tool's marketplace auto-update is used: the harness supplies the pinned package.
  */
 import { execFileSync, spawnSync } from 'node:child_process';

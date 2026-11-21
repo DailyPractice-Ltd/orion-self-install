@@ -269,9 +269,9 @@ the same session-start radio message and adapter fix, once per session.
 ## Updating — "update my harness"
 
 When the client asks to update Orion, check its version, restore an update backup
-or switch tools, follow [Updating Orion](docs/updating.md). The request is the consent
+follow [Updating Orion](docs/updating.md). The request is the consent
 for an update. In Claude Code and Codex, the same procedure is available as
-`/update-harness`.
+`/update-harness`. To move between Codex and Claude Code, use `/switch-ai`.
 
 ## Where the fuller detail lives
 

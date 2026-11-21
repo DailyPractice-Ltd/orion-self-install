@@ -56,34 +56,9 @@ check support messages separately with `node status/radio.mjs check`. Report the
 any replaced edited runtime scripts and the backup path. Remove the temporary
 source checkout after the operation.
 
-## Switch AI assistants
-
-Use the pinned source with `switch` as the operation:
-
-```sh
-(
-  set -eu
-  cd /path/to/my-orion
-  release_tmp=$(mktemp -d)
-  trap 'rm -rf "$release_tmp"' EXIT
-  git clone --quiet --depth 1 --branch main https://github.com/DailyPractice-Ltd/orion-self-install.git "$release_tmp/release"
-  release_commit=$(git -C "$release_tmp/release" rev-parse HEAD)
-  node "$release_tmp/release/update/apply.mjs" switch --root "$PWD" --release-repo "$release_tmp/release" --commit "$release_commit" --to codex
-)
-```
-
-Use `--to claude-code` to move the other way. For an older Claude harness with no recorded
-AI assistant, add `--legacy-tool claude-code` to migrate it explicitly. The switch
-requires the harness version, manifest, and common runtime scripts to match the pinned
-release. Run the pinned update command above first if it reports an older version.
-The switch backs up, stages and validates the new skill layout, then records the new
-selection. Review your scheduled tasks in the app that owns them before switching. The switch reports
-its backup. If interrupted, run the pinned release script with `recover --root "$PWD"`
-before trying again. The temporary checkout is removed automatically.
-
 ## Restore
 
-Use the backup path printed by update or switch:
+Use the backup path printed by update:
 
 ```sh
 node update/apply.mjs restore --root . --backup .update-backup/VERSION-TIMESTAMP
@@ -92,8 +67,7 @@ node update/apply.mjs restore --root . --backup .update-backup/VERSION-TIMESTAMP
 For an update, restore puts prior released files back and removes newly installed
 files. A file changed after update is kept and reported. It restores the prior
 version and retired checklist keys without replacing the client's live status
-wholesale. A completed switch can also be restored from its reported backup; any
-new-layout edits that conflict must be handled first. Keep the backup for audit.
+wholesale. Keep the backup for audit.
 
 ## Older same-path folders
 

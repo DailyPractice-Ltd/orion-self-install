@@ -67,11 +67,11 @@ import {
   homeBlock, homeOn, isHomeBranch, isCloudRun, looksLikeKey, looksLikeCredential,
   INSTALL_TOKEN_RE, RADIO_KEY_FILE,
 } from './shapes.mjs';
+import { changeStatus, withStatusLock, LOCKED_MESSAGE } from './store.mjs';
 
 const STATUS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(STATUS_DIR, '..');
 const STATUS_PATH = path.join(STATUS_DIR, 'status.json');
-const KEY_PATH = path.join(STATUS_DIR, RADIO_KEY_FILE);
 const KEY_REL = `status/${RADIO_KEY_FILE}`;
 
 // A release checkout is not a client's home, even if it is itself a git repository.
@@ -159,16 +159,13 @@ function repoState() {
   return { state: 'inside', where: git(['rev-parse', '--show-toplevel']).out.trim() };
 }
 
+/** A read-only look at status.json; null when it cannot be read. Every change goes through status/store.mjs. */
 function readStatus() {
   try {
     return JSON.parse(fs.readFileSync(STATUS_PATH, 'utf8'));
   } catch {
     return null;
   }
-}
-
-function writeStatus(status) {
-  fs.writeFileSync(STATUS_PATH, JSON.stringify(status, null, 2) + '\n');
 }
 
 // ── The key leaves status.json ──────────────────────────────────────────────
@@ -179,31 +176,25 @@ function keyInStatus(status) {
 }
 
 /**
- * Move the key from status.json to status/radio.key. The key file is written
- * and read back before the field is cleared, so a failure half-way leaves the
- * key where it was. Never prints the key.
+ * Take the key out of status.json, as one change under the status lock, read
+ * fresh. Normally it moves to status/radio.key: the key file is written (owner
+ * access only) and read back before the field is cleared, so a failure half-way
+ * leaves the key where it was. With keepFileKey, a different well-shaped key
+ * already in the file stays and the one in status.json is dropped. Returns
+ * 'none' (no key in status.json), 'moved' or 'second'. Never prints the key.
  */
-function moveKeyOut(status) {
-  const token = String(status.sharing.install_token).trim();
-  fs.writeFileSync(KEY_PATH, token + '\n', { mode: 0o600 });
-  // The mode above only counts when the file is new. One that was already there
-  // keeps whatever it had, so say it again.
-  try { fs.chmodSync(KEY_PATH, 0o600); } catch { /* a disk with no modes: nothing to tighten */ }
-  if (fs.readFileSync(KEY_PATH, 'utf8').trim() !== token) {
-    throw new Error('the key file did not read back as written');
-  }
-  status.sharing.install_token = null;
-  writeStatus(status);
-}
-
-/** The key already in status/radio.key, or '' when there is none or it is not shaped like one. */
-function keyInFile() {
-  try {
-    const text = fs.readFileSync(KEY_PATH, 'utf8').trim();
-    return INSTALL_TOKEN_RE.test(text) ? text : '';
-  } catch {
-    return '';
-  }
+async function moveKeyOut({ keepFileKey = false } = {}) {
+  return withStatusLock(ROOT, async (store) => {
+    const fresh = await store.readStatus();
+    if (!keyInStatus(fresh)) return 'none';
+    const token = String(fresh.sharing.install_token).trim();
+    const text = (await store.readKey()).trim();
+    const second = keepFileKey && INSTALL_TOKEN_RE.test(text) && text !== token;
+    if (!second) await store.writeKey(token);
+    fresh.sharing.install_token = null;
+    await store.writeStatus(fresh);
+    return second ? 'second' : 'moved';
+  });
 }
 
 // ── The ignore rules and the append-only logs ───────────────────────────────
@@ -453,7 +444,7 @@ if (command === 'prepare') {
   if (keyInStatus(status)) {
     steps.push({
       what: `Move the radio key out of status/status.json and into ${KEY_REL}, which is never saved to the home.`,
-      run: () => moveKeyOut(status),
+      run: () => moveKeyOut(),
     });
   }
   const ignore = wantedIgnore();
@@ -484,11 +475,11 @@ if (command === 'prepare') {
   if (!homeOn(status)) {
     steps.push({
       what: 'Switch the home on in status/status.json (home.enabled).',
-      run() {
+      async run() {
         const here = repoState().state === 'own' ? git(['symbolic-ref', '--short', '-q', 'HEAD']).out.trim() : '';
-        const fresh = readStatus() || status;
-        fresh.home = { ...homeBlock(fresh), enabled: true, branch: isHomeBranch(here) ? here : 'main' };
-        writeStatus(fresh);
+        await changeStatus(ROOT, (fresh) => {
+          fresh.home = { ...homeBlock(fresh), enabled: true, branch: isHomeBranch(here) ? here : 'main' };
+        });
       },
     });
   }
@@ -503,10 +494,11 @@ if (command === 'prepare') {
   } else {
     for (const step of steps) {
       try {
-        step.run();
+        await step.run();
         say(`Done: ${step.what}`);
       } catch (err) {
-        say(`Could not: ${step.what} (${err?.code || err?.message || 'unknown'}). Stopped there. Nothing was sent.`);
+        if (err?.code === 'STATUS_LOCKED') say(`Could not: ${step.what} ${LOCKED_MESSAGE} Stopped there. Nothing was sent.`);
+        else say(`Could not: ${step.what} (${err?.code || err?.message || 'unknown'}). Stopped there. Nothing was sent.`);
         process.exit(0);
       }
     }
@@ -638,19 +630,17 @@ if (command === 'sync') {
 
   // A key that found its way back into status.json (a fresh pairing, say) is
   // moved out before anything is saved.
-  const already = keyInFile();
-  if (keyInStatus(status) && already && already !== String(status.sharing.install_token).trim()) {
-    // Two different keys, and no way to tell here which is the live one. The
-    // key file is where a folder with a home keeps its key, so that one stays.
-    status.sharing.install_token = null;
-    writeStatus(status);
-    say(`status/status.json held a second radio key. It was taken out, and the key in ${KEY_REL} was kept. If the radio answers "that key isn't valid", pair again: node start.mjs`);
-  } else if (keyInStatus(status)) {
+  // Two different keys means no way to tell here which is the live one. The
+  // key file is where a folder with a home keeps its key, so that one stays.
+  if (keyInStatus(status)) {
     try {
-      moveKeyOut(status);
-      say(`The radio key was inside status/status.json. It is now in ${KEY_REL}, which is never saved.`);
-    } catch {
-      say('The radio key is inside status/status.json and could not be moved out, so nothing was saved. Run: node status/home.mjs check');
+      const moved = await moveKeyOut({ keepFileKey: true });
+      if (moved === 'second') say(`status/status.json held a second radio key. It was taken out, and the key in ${KEY_REL} was kept. If the radio answers "that key isn't valid", pair again: node start.mjs`);
+      if (moved === 'moved') say(`The radio key was inside status/status.json. It is now in ${KEY_REL}, which is never saved.`);
+    } catch (err) {
+      say(err?.code === 'STATUS_LOCKED'
+        ? `The radio key is inside status/status.json and could not be moved out: ${LOCKED_MESSAGE} Nothing was saved.`
+        : 'The radio key is inside status/status.json and could not be moved out, so nothing was saved. Run: node status/home.mjs check');
       process.exit(0);
     }
   }

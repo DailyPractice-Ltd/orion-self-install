@@ -14,13 +14,12 @@
  * surface, edit status/status.json directly instead — it's plain JSON, no script needed.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { wantsEnvProxy, envProxyEnv } from './shapes.mjs';
 
-import { withStatusLock } from './store.mjs';
+import { changeStatus, createStatus } from './store.mjs';
 import { checkWork } from './guard.mjs';
 import { reportSignal } from './report.mjs';
 
@@ -33,8 +32,6 @@ if (wantsEnvProxy()) {
   process.exit(again.status ?? 0);
 }
 
-const STATUS_PATH = join(__dirname, 'status.json');
-const TEMPLATE_PATH = join(__dirname, 'status.schema-template.json');
 
 // Gate work-advancing flags before initialization or any stage/checklist mutation.
 // Notes and identity edits remain usable for recovery; post-work reports use done/radio.
@@ -50,12 +47,10 @@ if (advancesWork) {
 }
 
 const now = new Date().toISOString();
-const status = await withStatusLock(join(__dirname,'..'), async store => {
-  if (!existsSync(STATUS_PATH)) {
-    await store.writeStatus(JSON.parse(readFileSync(TEMPLATE_PATH, 'utf8')));
-    console.log('status/status.json did not exist — initialized from status.schema-template.json.');
-  }
-  const status = await store.readStatus();
+if (await createStatus(join(__dirname,'..'))) {
+  console.log('status/status.json did not exist — initialized from status.schema-template.json.');
+}
+const status = await changeStatus(join(__dirname,'..'), status => {
 
   // Parse --key value and --checklist key=value pairs from argv.
   const args = process.argv.slice(2);
@@ -79,12 +74,9 @@ const status = await withStatusLock(join(__dirname,'..'), async store => {
   }
 
   if (!status.started_at) status.started_at = now;
-  status.updated_at = now;
   if (ops_stage_changed) {
     status.stage_history.push({ stage: status.ops_stage, at: now });
   }
-
-  await store.writeStatus(status);
   return status;
 });
 console.log(`status/status.json updated — harness_status: ${status.harness_status}, ops_stage: ${status.ops_stage}`);

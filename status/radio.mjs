@@ -64,7 +64,9 @@ import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { reportSignal } from './report.mjs';
+import { reportSignal, reportAsset } from './report.mjs';
+import { changeStatus } from './store.mjs';
+import { runtimeLayout } from '../update/destination-resolver.mjs';
 import {
   radioOn as radioIsOn, radioKey, readRadioKeyFile, keyHeader, wantsEnvProxy, envProxyEnv, isCloudRun,
   isWorkTag, workTagMenu, labelProblem, countProblem,
@@ -271,16 +273,20 @@ function unheard(fromUs, seenThrough) {
   return fromUs.filter((m) => m.state !== 'delivered' || typeof m.state_at !== 'string' || m.state_at === newest);
 }
 
-/** Remember the newest message read out, so it is never repeated. Never fatal. */
-function rememberHeard(at) {
+/**
+ * Remember the newest message read out, so it is never repeated. Never fatal,
+ * and it waits only briefly for the status lock: a busy lock or a failed write
+ * only means the message is read again next time (at-least-once).
+ */
+async function rememberHeard(at) {
   if (typeof at !== 'string' || Number.isNaN(Date.parse(at))) return;
   try {
-    const fresh = JSON.parse(readFileSync(STATUS_PATH, 'utf8'));
-    fresh.sharing = fresh.sharing || {};
-    fresh.sharing.radio_seen_through = at;
-    writeFileSync(STATUS_PATH, JSON.stringify(fresh, null, 2) + '\n');
+    await changeStatus(ROOT, (fresh) => {
+      fresh.sharing = fresh.sharing || {};
+      fresh.sharing.radio_seen_through = at;
+    }, { wait: 1000 });
   } catch {
-    // At-least-once: a failed write only means the message is read again next time.
+    // Read again next time.
   }
 }
 
@@ -327,7 +333,12 @@ if (command === 'check') {
   console.log('Read the message above to the client in full. If they want to answer,');
   console.log('take their words and run this, replacing only the message:');
   console.log(`  node status/radio.mjs reply --nudge ${newest.key} --message "their words" --yes`);
-  rememberHeard(newest.at);
+  for (const offer of offers) {
+    console.log(`A skill is on offer: ${offer.slug}. To show the client what it is, with nothing written yet:`);
+    console.log(`  node status/radio.mjs library --install ${offer.slug}`);
+    console.log('Run it again with --yes only when they say yes. Never before.');
+  }
+  await rememberHeard(newest.at);
   process.exit(0);
 }
 

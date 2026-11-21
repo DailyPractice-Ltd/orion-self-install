@@ -144,29 +144,18 @@ for (const tool of ['claude-code', 'codex']) {
     const { release, client } = journey(t, tool);
     put(client, `${skill(tool)}/meeting-sizing/SKILL.md`, '# Meeting sizing\nSize the meeting.\n');
     put(client, `${jobs(tool)}/follow-up.md`, '---\nname: follow-up\ntools: Read\n---\n# Follow-up\n');
-    const commit = git(release, 'rev-parse', 'HEAD');
-    const interrupted = spawnSync(process.execPath, [join(client, 'update/apply.mjs'),
-      'switch', '--root', client, '--release-repo', release, '--commit', commit, '--to', other(tool),
-    ], { cwd: client, encoding: 'utf8', env: plainEnv({ ORION_SWITCH_FAIL_AFTER: '1' }) });
-    assert.notEqual(interrupted.status, 0);
-    assert.match(interrupted.stderr, /Injected switch interruption/);
-    assert.equal(status(client).ai_assistant, tool);
-    assert.equal(read(client, `${skill(tool)}/meeting-sizing/SKILL.md`).includes('Size the meeting'), true);
-    assert.equal(existsSync(join(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`)), false);
-
-    const switched = run(client, 'update/apply.mjs', 'switch', '--root', client,
-      '--release-repo', release, '--commit', commit, '--to', other(tool));
+    const switched = run(client, 'switch_ai.mjs', '--json');
     ok(switched);
     const report = JSON.parse(switched.stdout);
+    assert.equal(report.to, other(tool));
     assert.equal(status(client).ai_assistant, other(tool));
     assert.equal(existsSync(join(client, '.specify')), false);
     assert.match(read(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`), /Size the meeting/);
     assert.equal(existsSync(join(client, `${skill(tool)}/meeting-sizing/SKILL.md`)), false);
     assert.equal(existsSync(join(client, `${jobs(tool)}/follow-up.md`)), true);
     assert.equal(existsSync(join(client, `${jobs(other(tool))}/follow-up.md`)), false);
-    ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
+    ok(run(client, 'switch_ai.mjs'));
     assert.equal(status(client).ai_assistant, tool);
-    assert.equal(existsSync(join(client, '.specify')), false);
     assert.match(read(client, `${skill(tool)}/meeting-sizing/SKILL.md`), /Size the meeting/);
     assert.equal(existsSync(join(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`)), false);
   });

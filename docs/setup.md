@@ -59,6 +59,13 @@ accepted verification and acknowledged setup reporting.
 - **Server error:** retry the guard once service is restored. Keep the saved state.
 - **Pending reports:** rerun the guard after recovery. It replays their original
   event identities before allowing new work, so retries do not add duplicate counts.
+- **"Status is locked":** another Orion command is changing `status/status.json`.
+  Every change to that file, to `status/radio.key` and to the report queue goes
+  through `status/store.mjs` under one lock, so no command loses another's change.
+  A command waits up to a minute for it (a guard check holds it while it reaches
+  the service), then stops and changes nothing. The radio does not wait: a message
+  is still read out, and only remembered on the next check. Let the other command
+  finish and run yours again.
 - **Local state or lock error:** preserve status and outbox files. For a stale lock,
   inspect `status/.radio-lock/owner.json` and establish that its PID on its named
   host has stopped before removing that lock directory. An old timestamp alone

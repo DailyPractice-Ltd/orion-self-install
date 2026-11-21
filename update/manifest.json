@@ -560,6 +560,15 @@
         "fingerprint_key": "skills/update-harness/SKILL.md"
       },
       {
+        "source": "skills/switch-ai/SKILL.md",
+        "destinations": {
+          "claude-code": ".claude/skills/switch-ai/SKILL.md",
+          "codex": ".agents/skills/switch-ai/SKILL.md"
+        },
+        "ownership": "release",
+        "fingerprint_key": "skills/switch-ai/SKILL.md"
+      },
+      {
         "source": "skills/call-planner/SKILL.md",
         "destinations": {
           "claude-code": ".claude/skills/call-planner/SKILL.md",

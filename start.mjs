@@ -233,6 +233,13 @@ function migrate(status, { firstRun = false } = {}) {
     levelWrittenThisRun = true;
   }
   if (status.checklist && !('vt09_send_gate' in status.checklist)) status.checklist.vt09_send_gate = false;
+  // The plugin region (spec 008): the Orion plugin's catalog identity and setup
+  // progress. Missing fields gain their defaults; an identity is never made
+  // here — only update/plugin-package.mjs creates it, once.
+  if (!status.plugin || typeof status.plugin !== 'object' || Array.isArray(status.plugin)) status.plugin = {};
+  for (const [key, value] of Object.entries({ catalog_identity: null, setup_state: 'not_started', remaining_action: null, verified_version: null, verified_at: null })) {
+    if (!(key in status.plugin)) status.plugin[key] = value;
+  }
   status.schema_version = '2.0.0';
   return status;
 }

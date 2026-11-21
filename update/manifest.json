@@ -130,6 +130,7 @@
       "update/destination-resolver.mjs",
       "update/manifest.json",
       "update/pristine.json",
+      "update/plugin-package.mjs",
       "update/release-contract.mjs",
       "validation/validation-tasks.md",
       "status/guard.mjs",
@@ -539,6 +540,16 @@
       }
     ],
     "entries": [
+      {
+        "source": "plugins/orion/plugin.json",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/plugin.json"
+      },
+      {
+        "source": "plugins/orion/.claude-plugin/plugin.json",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/.claude-plugin/plugin.json"
+      },
       {
         "source": "plugins/orion/skills/create-skill/SKILL.md",
         "ownership": "release",

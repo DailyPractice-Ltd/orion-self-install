@@ -565,6 +565,11 @@
         "fingerprint_key": "plugins/orion/skills/call-planner/scripts/build-call-plan.mjs"
       },
       {
+        "source": "plugins/orion/skills/call-planner/scripts/harness-root.mjs",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/call-planner/scripts/harness-root.mjs"
+      },
+      {
         "source": "plugins/orion/skills/friday-report/SKILL.md",
         "ownership": "release",
         "fingerprint_key": "plugins/orion/skills/friday-report/SKILL.md"

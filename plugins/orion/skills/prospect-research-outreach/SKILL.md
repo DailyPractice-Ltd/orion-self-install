@@ -18,4 +18,4 @@ description: Research a named prospect, draft tailored outreach, and record the 
    Prospect stage for a new prospect. Report a completed write in one line.
 
 Use the core connector setup for email and CRM. Verify the full run with VT-01 in
-`validation/validation-tasks.md` on a real prospect. Check the CRM round-trip in VT-03.
+`validation/validation-tasks.md` at the root of the active Orion folder on a real prospect. Check the CRM round-trip in VT-03.

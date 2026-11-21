@@ -30,7 +30,7 @@ if (tool === 'claude') {
     out({ success: true, target: sub }); finish(0);
   }
   if (verb === 'marketplace' && sub === 'list') {
-    out(Object.entries(c.marketplaces).map(([name, m]) => ({ name, source: 'directory', path: m.path, installLocation: m.path }))); finish(0);
+    out(Object.entries(c.marketplaces).map(([name, m]) => (faults.listNoPath ? { name, source: 'directory' } : { name, source: 'directory', path: m.path, installLocation: m.path }))); finish(0);
   }
   if (verb === 'marketplace' && sub === 'add') {
     const name = readJson(join(target, '.claude-plugin/marketplace.json')).name;
@@ -83,7 +83,7 @@ if (tool === 'claude') {
 if (tool === 'codex') {
   const c = (state.codex ||= { marketplaces: {}, installed: [], adds: 0 });
   if (verb === 'marketplace' && sub === 'list') {
-    out({ marketplaces: Object.entries(c.marketplaces).map(([name, root]) => ({ name, root })) }); finish(0);
+    out({ marketplaces: Object.entries(c.marketplaces).map(([name, root]) => (faults.listNoPath ? { name } : { name, root })) }); finish(0);
   }
   if (verb === 'marketplace' && sub === 'add') {
     if (faults.codexAdd) { out({ error: 'cannot add' }); finish(1); }
@@ -94,7 +94,10 @@ if (tool === 'codex') {
   if (verb === 'marketplace' && sub === 'remove') {
     delete c.marketplaces[target]; out({ removed: target }); finish(0);
   }
-  if (verb === 'list') { out(c.installed); finish(0); }
+  if (verb === 'list') {
+    if (faults.codexListFails) { process.stderr.write('cannot read plugins\n'); finish(1); }
+    out(c.installed); finish(0);
+  }
   if (verb === 'remove') {
     c.installed = c.installed.filter((p) => p.id !== sub); out({ removed: sub }); finish(0);
   }

@@ -10,12 +10,13 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { delimiter, join, sep } from 'node:path';
+import { delimiter, isAbsolute, join, sep } from 'node:path';
 import { PACKAGE_ROOT, TOOL_LAYOUT } from './destination-resolver.mjs';
+import { catalogNameErrors } from './plugin-package.mjs';
 
 const CLIENTS = Object.freeze({
-  'claude-code': Object.freeze({ command: 'claude', envVar: 'ORION_CLAUDE_BIN', product: 'Claude Code' }),
-  codex: Object.freeze({ command: 'codex', envVar: 'ORION_CODEX_BIN', product: 'Codex' }),
+  'claude-code': Object.freeze({ command: 'claude', envVar: 'ORION_CLAUDE_BIN' }),
+  codex: Object.freeze({ command: 'codex', envVar: 'ORION_CODEX_BIN' }),
 });
 
 function client(tool) {
@@ -56,7 +57,8 @@ export function findNativeClient(tool, { env = process.env, home } = {}) {
 }
 
 function missingClient(tool) {
-  const { product, envVar } = client(tool);
+  const { envVar } = client(tool);
+  const { product } = TOOL_LAYOUT[tool];
   return {
     state: 'pending',
     remaining_action: `Install ${product} on this computer (or set ${envVar} to its program file), then run Orion's plugin setup again from this folder.`,
@@ -90,13 +92,11 @@ function run(ctx, args) {
   return call;
 }
 
-const CATALOG_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
-
 /** Shared checks before any native call: a real harness folder holding this catalog and package. */
 function prepare({ root, tool, catalogName, version, env = process.env, home, requireCatalog = true } = {}) {
   const { command } = client(tool);
   if (!root) throw new Error('A harness root is required');
-  if (typeof catalogName !== 'string' || !CATALOG_NAME.test(catalogName) || catalogName.includes('..')) throw new Error(`Invalid catalog name: ${catalogName}`);
+  if (catalogNameErrors(catalogName).length) throw new Error(`Invalid catalog name: ${catalogName}`);
   if (requireCatalog && !version) throw new Error('The expected Orion version is required');
   const real = realpathSync(root);
   const layout = TOOL_LAYOUT[tool];
@@ -122,18 +122,37 @@ function listedMarketplace(json, name) {
   const rows = Array.isArray(json) ? json : (json?.marketplaces || []);
   const row = rows.find((r) => r?.name === name);
   if (!row) return null;
-  return { row, path: row.path || row.root || row.installLocation || row.source?.path || (typeof row.source === 'string' ? row.source : undefined) };
+  // Claude Code's `source` is a type word ("directory"); only an absolute path names a folder.
+  const sourcePath = typeof row.source === 'string' && isAbsolute(row.source) ? row.source : undefined;
+  return { row, path: row.path || row.root || row.installLocation || row.source?.path || sourcePath };
 }
 
-/** Refuse to touch a marketplace name that already points somewhere else. */
+/**
+ * Refuse to touch a marketplace name that already points somewhere else. A listing
+ * that names the catalog but gives no path proves nothing either way: unverified, pending.
+ */
 function marketplaceConflict(ctx) {
   const listed = run(ctx, ['plugin', 'marketplace', 'list', '--json']);
   if (listed.status !== 0 || listed.json === undefined) return { error: failed(ctx.tool, 'marketplace_list_failed', ctx.details({ message: listed.error })) };
   const found = listedMarketplace(listed.json, ctx.catalogName);
-  if (found && !(found.path && samePath(found.path, ctx.real))) {
+  if (found && !found.path) {
+    return { error: pending(ctx.tool, `${PRODUCT_OF(ctx)} lists this folder's catalog "${ctx.catalogName}" without saying which folder it reads, so Orion cannot confirm it belongs here and changed nothing. Run Orion's plugin setup again from this folder (node update/plugin-setup.mjs resume); if this keeps happening, send the output to Daily Practice.`, 'catalog_path_unverified', ctx.details()) };
+  }
+  if (found && !samePath(found.path, ctx.real)) {
     return { error: failed(ctx.tool, 'catalog_name_points_elsewhere', ctx.details({ remaining: 'Another folder already uses this catalog name. Nothing was changed.' })) };
   }
   return { registered: Boolean(found) };
+}
+
+const PRODUCT_OF = (ctx) => TOOL_LAYOUT[ctx.tool].product;
+/** A sentence continued after a comma. */
+export const lowerFirst = (text) => text.charAt(0).toLowerCase() + text.slice(1);
+
+/** This harness's Orion row in a Codex `plugin list`, in any of its listing shapes. */
+function codexRow(ctx, json) {
+  const rows = Array.isArray(json) ? json : (json?.plugins || json?.installed || []);
+  return rows.find((r) => r?.id === ctx.pluginId
+    || (r?.name === 'orion' && [r.marketplace, r.marketplaceName, r.marketplace_name].includes(ctx.catalogName)));
 }
 
 const okOutcome = (call) => call.json?.outcome === 'ok' || call.json?.failureCode === 'already_in_goal_state' || call.json?.alreadyInGoalState === true;
@@ -144,7 +163,7 @@ function claudeInspect(ctx) {
   const rows = listed.json.filter((row) => row?.id === ctx.pluginId);
   const row = rows.find((r) => r.scope === 'local' && r.projectPath && samePath(r.projectPath, ctx.real));
   const fresh = 'Start a fresh Claude Code session in this folder (or run /reload-plugins) to load the Orion skills.';
-  if (!row) return { result: pending(ctx.tool, `Install Orion for this folder: from this folder run "claude plugin install ${ctx.pluginId} --scope local", then ${fresh.charAt(0).toLowerCase()}${fresh.slice(1)}`, 'not_installed_here', ctx.details({ other_scopes: rows.map((r) => r.scope) })) };
+  if (!row) return { result: pending(ctx.tool, `Install Orion for this folder: from this folder run "claude plugin install ${ctx.pluginId} --scope local", then ${lowerFirst(fresh)}`, 'not_installed_here', ctx.details({ other_scopes: rows.map((r) => r.scope) })) };
   const errors = [...(row.errors || []), ...(row.errorDetails ? [].concat(row.errorDetails) : [])];
   if (errors.length) return { result: failed(ctx.tool, 'plugin_reports_errors', ctx.details({ errors })), row };
   if (!row.readFromFolder || !within(row.readFromFolder, ctx.packageDir)) return { result: failed(ctx.tool, 'source_outside_harness_package', ctx.details({ source: row.readFromFolder || row.installPath || null })), row };
@@ -181,7 +200,12 @@ export function setupPlugin(options = {}) {
 export function verifyPlugin(options = {}) {
   const { ctx, early } = prepare(options);
   if (early) return early;
-  return ctx.tool === 'claude-code' ? claudeInspect(ctx).result : codexVerify(ctx);
+  return ctx.tool === 'claude-code' ? claudeVerify(ctx) : codexVerify(ctx);
+}
+
+function claudeVerify(ctx) {
+  const conflict = marketplaceConflict(ctx);
+  return conflict.error || claudeInspect(ctx).result;
 }
 
 const codexInstallAction = (ctx) => `In Codex, from this folder, open the Plugins Directory (desktop app) or type /plugins (CLI), choose the "${ctx.catalogName}" catalog and install Orion; then start a fresh chat in this folder.`;
@@ -190,9 +214,7 @@ const codexInstallAction = (ctx) => `In Codex, from this folder, open the Plugin
 function codexInspect(ctx) {
   const listed = run(ctx, ['plugin', 'list', '--json']);
   if (listed.status !== 0 || listed.json === undefined) return failed(ctx.tool, 'plugin_list_failed', ctx.details({ message: listed.error }));
-  const rows = Array.isArray(listed.json) ? listed.json : (listed.json.plugins || listed.json.installed || []);
-  const row = rows.find((r) => r?.id === ctx.pluginId
-    || (r?.name === 'orion' && [r.marketplace, r.marketplaceName, r.marketplace_name].includes(ctx.catalogName)));
+  const row = codexRow(ctx, listed.json);
   if (!row || row.installed === false) return pending(ctx.tool, codexInstallAction(ctx), 'not_installed', ctx.details());
   if (row.enabled === false) return pending(ctx.tool, `In Codex, type /plugins from this folder and switch Orion (${ctx.pluginId}) on; then start a fresh chat in this folder.`, 'disabled', ctx.details());
   if (!row.version || row.version === 'local') {
@@ -239,8 +261,9 @@ function claudeRetire(ctx, registered) {
 function codexRetire(ctx, registered) {
   if (!registered) return { state: 'complete', details: ctx.details({ retired: 'nothing registered' }) };
   const listed = run(ctx, ['plugin', 'list', '--json']);
-  const rows = Array.isArray(listed.json) ? listed.json : (listed.json?.plugins || listed.json?.installed || []);
-  if (rows.some((r) => r?.id === ctx.pluginId || (r?.name === 'orion' && [r.marketplace, r.marketplaceName, r.marketplace_name].includes(ctx.catalogName)))) {
+  // An unreadable list proves nothing is installed no more than that something is: stop.
+  if (listed.status !== 0 || listed.json === undefined) return failed(ctx.tool, 'plugin_list_failed', ctx.details({ message: listed.error }));
+  if (codexRow(ctx, listed.json)) {
     const removed = run(ctx, ['plugin', 'remove', ctx.pluginId, '--json']);
     if (removed.status !== 0) return failed(ctx.tool, 'uninstall_failed', ctx.details({ report: removed.json ?? removed.error }));
   }

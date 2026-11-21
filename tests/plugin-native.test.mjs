@@ -237,6 +237,27 @@ test('retire refuses a catalog name registered from another folder', (t) => {
   }
 });
 
+test('a catalog listed without a readable path is unverified, never a conflict', (t) => {
+  for (const tool of ['claude-code', 'codex']) {
+    const w = world(t, { faults: { listNoPath: true } });
+    if (tool === 'codex') w.write((s) => { s.codex = { marketplaces: { [CATALOG]: w.root }, installed: [], adds: 0 }; });
+    else w.write((s) => { s.claude = { marketplaces: { [CATALOG]: { path: w.root, scopes: ['local'] } }, installs: {} }; });
+    const result = verifyPlugin(w.opts(tool));
+    assert.equal(result.state, 'pending', `${tool}: ${JSON.stringify(result)}`);
+    assert.equal(result.details.reason, 'catalog_path_unverified');
+    assert.ok(result.remaining_action);
+  }
+});
+
+test('Codex: retire fails, and removes nothing, when the plugin list cannot be read', (t) => {
+  const w = world(t);
+  w.write((s) => { s.codex = { marketplaces: { [CATALOG]: w.root }, installed: [{ id: `orion@${CATALOG}`, version: VERSION }], adds: 0 }; s.faults = { codexListFails: true }; });
+  const result = retirePlugin(w.opts('codex'));
+  assert.equal(result.state, 'failed', JSON.stringify(result));
+  assert.equal(result.details.reason, 'plugin_list_failed');
+  assert.ok(!w.read().calls.some((c) => c.args.includes('remove')), 'nothing removed');
+});
+
 test('Claude Code bundled inside the desktop app is found when it is not on PATH', { skip: process.platform === 'win32' }, (t) => {
   const w = world(t, { tools: [] });
   const appBin = (v, b) => join(w.home, 'Library/Application Support/Claude/claude-code', v, b, 'claude.app/Contents/MacOS');

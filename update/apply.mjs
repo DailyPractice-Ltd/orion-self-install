@@ -25,7 +25,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PACKAGE_ROOT, TOOL_LAYOUT, destinationState, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
 import { catalogName, catalogText, ensurePluginRegion } from './plugin-package.mjs';
-import { retirePlugin } from './plugin-native.mjs';
+import { lowerFirst, retirePlugin } from './plugin-native.mjs';
 import { RESUME_COMMAND, VERIFY_COMMAND, nativeStep, runPluginSetup } from './plugin-setup.mjs';
 
 const arg = name => { const i=process.argv.indexOf(name); return i<0 ? undefined : process.argv[i+1]; };
@@ -37,7 +37,7 @@ const newer = (a,b) => { const x=versionParts(a),y=versionParts(b); for(let i=0;
 const writeJson = (path,value) => writeFileSync(path,JSON.stringify(value,null,2));
 const writeStatus = (root,status) => writeFileSync(safe(root,'status/status.json'),JSON.stringify(status,null,2)+'\n');
 const note = (status,line) => { status.notes=[status.notes||'',line].filter(Boolean).join('\n'); };
-const PRODUCT = { 'claude-code': 'Claude Code', codex: 'Codex' };
+const product = tool => TOOL_LAYOUT[tool].product;
 const fileHash = path => existsSync(path) && lstatSync(path).isFile() ? fingerprint(readFileSync(path)) : null;
 const isPackagePath = path => path===PACKAGE_ROOT || path.startsWith(`${PACKAGE_ROOT}/`);
 
@@ -94,7 +94,7 @@ function pruneParents(root, paths) {
   }
 }
 
-const freshCheck = tool => `Start a fresh ${PRODUCT[tool]} session in this folder${tool==='claude-code'?' (or run /reload-plugins)':''}, then ask your assistant to confirm it sees the Orion skills (it runs "${VERIFY_COMMAND}").`;
+const freshCheck = tool => `Start a fresh ${product(tool)} session in this folder${tool==='claude-code'?' (or run /reload-plugins)':''}, then ask your assistant to confirm it sees the Orion skills (it runs "${VERIFY_COMMAND}").`;
 
 async function update(root,repo,commit) {
   await recoverPendingUpdates(root);
@@ -199,7 +199,7 @@ async function update(root,repo,commit) {
       const plugin=ensurePluginRegion(status);
       plugin.pending_version=manifest.template_version;
       plugin.setup_state='pending';
-      plugin.remaining_action=`Finish refreshing the Orion plugin: from this folder run "${RESUME_COMMAND}", then ${freshCheck(ai_assistant).charAt(0).toLowerCase()}${freshCheck(ai_assistant).slice(1)}`;
+      plugin.remaining_action=`Finish refreshing the Orion plugin: from this folder run "${RESUME_COMMAND}", then ${lowerFirst(freshCheck(ai_assistant))}`;
     }
     note(status,`updated to ${manifest.template_version}; backup in ${backupRel}`);
     const nextStatus=JSON.stringify(status,null,2)+'\n';
@@ -463,7 +463,7 @@ function commitSwitch({root,snapshot,deployment,pristine,from,to,backup,backupRe
     if (withPlugin) {
       result.active=false;
       result.remaining_action=status.plugin.remaining_action;
-      if (oldRetired?.state!=='complete') result.previous_tool_action=`Remove Orion from ${PRODUCT[from]} for this folder by hand (${oldRetired?.details?.reason || 'its CLI was not reachable'}); nothing else there was changed.`;
+      if (oldRetired?.state!=='complete') result.previous_tool_action=`Remove Orion from ${product(from)} for this folder by hand (${oldRetired?.details?.reason || 'its CLI was not reachable'}); nothing else there was changed.`;
     }
     return result;
   } catch(error) {
@@ -594,10 +594,10 @@ function restore(root,backupRel) {
       const plugin=ensurePluginRegion(status);
       plugin.setup_state='pending';
       plugin.pending_version=status.template_version;
-      plugin.remaining_action=`Re-register Orion with ${PRODUCT[journal.from]}: from this folder run "${RESUME_COMMAND}". ${freshCheck(journal.from)} Orion may still be listed in ${PRODUCT[journal.to]}; remove it there if you no longer use it.`;
+      plugin.remaining_action=`Re-register Orion with ${product(journal.from)}: from this folder run "${RESUME_COMMAND}". ${freshCheck(journal.from)} Orion may still be listed in ${product(journal.to)}; remove it there if you no longer use it.`;
       Object.assign(result,{reload_required:true,remaining_action:plugin.remaining_action});
     } else if (waiting) {
-      result.remaining_action=`The waiting switch was cancelled. Orion may be listed in ${PRODUCT[journal.to]}; remove it there if you no longer use it.`;
+      result.remaining_action=`The waiting switch was cancelled. Orion may be listed in ${product(journal.to)}; remove it there if you no longer use it.`;
     }
     note(status,`${waiting?'cancelled switch':'restored'} from ${backupRel}`);
     writeStatus(root,status);

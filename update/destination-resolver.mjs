@@ -11,8 +11,8 @@ export const PACKAGE_ROOT = 'plugins/orion';
 
 /** Per-tool harness paths that do not come from shipped files. */
 export const TOOL_LAYOUT = Object.freeze({
-  'claude-code': Object.freeze({ skillRoot: '.claude/skills', catalogPath: '.claude-plugin/marketplace.json', rosterPath: '.claude/agents/README.md' }),
-  codex: Object.freeze({ skillRoot: '.agents/skills', catalogPath: '.agents/plugins/marketplace.json', rosterPath: 'agents/README.md' }),
+  'claude-code': Object.freeze({ product: 'Claude Code', skillRoot: '.claude/skills', catalogPath: '.claude-plugin/marketplace.json', rosterPath: '.claude/agents/README.md' }),
+  codex: Object.freeze({ product: 'Codex', skillRoot: '.agents/skills', catalogPath: '.agents/plugins/marketplace.json', rosterPath: 'agents/README.md' }),
 });
 
 function readJson(path, name) {
@@ -120,8 +120,9 @@ export function runtimeLayout(root, { legacyTool } = {}) {
   const ai_assistant = resolveAiAssistant(status, manifest.deployment, { legacyTool });
   const tool = TOOL_LAYOUT[ai_assistant];
   if (!tool) throw new Error(`Missing runtime layout for ${ai_assistant}`);
-  for (const path of [PACKAGE_ROOT, ...Object.values(tool)]) safePath(root, path);
-  return { ai_assistant, packageRoot: PACKAGE_ROOT, ...tool, jobRoot: dirname(tool.rosterPath) };
+  const { product, ...paths } = tool;
+  for (const path of [PACKAGE_ROOT, ...Object.values(paths)]) safePath(root, path);
+  return { ai_assistant, packageRoot: PACKAGE_ROOT, ...paths, jobRoot: dirname(tool.rosterPath) };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

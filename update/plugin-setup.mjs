@@ -34,7 +34,6 @@ import { withStatusLock } from '../status/store.mjs';
 
 export const RESUME_COMMAND = 'node update/plugin-setup.mjs resume';
 export const VERIFY_COMMAND = 'node update/plugin-setup.mjs verify --discovered';
-const PRODUCT = { 'claude-code': 'Claude Code', codex: 'Codex' };
 
 async function update(root, change) {
   return withStatusLock(root, async (store) => {
@@ -117,7 +116,7 @@ export async function runPluginSetup(root, { mode = 'setup', discovered = false,
 
 /** One plain report; "plugin setup complete" only for a confirmed discovery. */
 export function describe(result) {
-  const product = PRODUCT[result.tool];
+  const product = TOOL_LAYOUT[result.tool]?.product;
   const lines = [];
   const via = result.checked_with ? ` (checked with ${result.checked_with})` : '';
   if (result.setup_state === 'complete') lines.push(`Orion plugin setup complete: ${product} discovers Orion ${result.verified_version} in this folder${via}.`);

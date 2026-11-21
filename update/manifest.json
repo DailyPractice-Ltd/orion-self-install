@@ -768,7 +768,8 @@
       "agents/",
       "specs/",
       "tests/",
-      "CLAUDE.md"
+      "CLAUDE.md",
+      "docs/plugin-validation.md"
     ],
     "ownership": {
       "release": "Install only into an absent destination. On update replace only when the destination fingerprint is a known shipped copy for this fingerprint_key; preserve and report edits and collisions. Back up before replacement or retirement.",

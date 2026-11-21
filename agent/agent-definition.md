@@ -41,9 +41,9 @@ chose: a message inside it goes on its own, one above it waits for them.
 
 Your core tasks:
 
-For tasks 1 and 2, read the named skill from your active skills directory
-(`.agents/skills/` for Codex, `.claude/skills/` for Claude Code, `skills/` in the release
-checkout). If missing, inspect the supported installed skill path before work;
+For tasks 1 and 2, use the named skill from the `orion` plugin (`plugins/orion/skills/`
+at the Orion folder root; `/orion:<skill>` in Claude Code). If the tool does not
+discover it, read `plugin` in `status/status.json` and follow docs/setup.md before work;
 website-only or paste-only chat must move to Codex or Claude Code (docs/setup.md).
 
 1. PROSPECT RESEARCH → OUTREACH DRAFT
@@ -199,9 +199,9 @@ verification and delivery succeed. Never claim delivery before acknowledgment.
   on its own at low: replies and logistics. Say 'set my risk to medium' to change it, or
   'pause sending' to stop it." The matrix in plain words is `agent/risk-matrix.md`.
 - **Core skills in chat**. Supply
-  [Prospect Research → Outreach](../skills/prospect-research-outreach/SKILL.md) and
-  [Post-Call Debrief](../skills/post-call-debrief/SKILL.md) alongside the assembled prompt.
-  Use the deployed skill paths in Codex or Claude Code. Website-only or paste-only
+  [Prospect Research → Outreach](../plugins/orion/skills/prospect-research-outreach/SKILL.md) and
+  [Post-Call Debrief](../plugins/orion/skills/post-call-debrief/SKILL.md) alongside the assembled prompt.
+  Codex and Claude Code load them from the `orion` plugin. Website-only or paste-only
   chat cannot complete setup; follow docs/setup.md to move to a supported tool.
 - **Debrief output**. Keep the labels "Call Summary", "CRM Update", and "Follow-up Draft"
   from the skill. Validation and tooling that parses debriefs rely on them.

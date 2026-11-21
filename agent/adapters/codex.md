@@ -12,7 +12,14 @@ Best fit when the client works in Codex — the CLI in a terminal, the IDE exten
 the desktop app. The wizard detects it (`codex` on PATH or `~/.codex` present) and hands
 off to exactly the same prompt as Claude Code.
 
-In a deployed Codex folder, installed skills live in `.agents/skills/`. `AGENTS.md` is the shared instruction file.
+In a deployed Codex folder, `AGENTS.md` is the shared instruction file. Orion's shipped
+skills come from the `orion` plugin in `plugins/orion/`, offered through this folder's
+own catalog (`.agents/plugins/marketplace.json`). Codex installs a cached copy, so the
+client installs Orion once from the Plugins Directory (desktop app) or `/plugins` (CLI),
+then starts a fresh chat; after each update they reinstall it the same way. Skills the
+client creates or adds live in `.agents/skills/`; updates never touch them. If the Orion
+skills are missing, read `plugin` in `status/status.json` and follow
+[Finish the Orion plugin](../../docs/setup.md#finish-the-orion-plugin).
 
 ## Pairing and network access
 

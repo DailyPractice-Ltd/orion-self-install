@@ -41,8 +41,12 @@ node install.mjs --tool claude-code --target /path/to/my-orion
 ```
 
 The target must be a new or empty folder outside this release. The installer creates
-a separate local Git repository, copies the shipped skills into your chosen
-tool's layout, and records that choice in `status/status.json`.
+a separate local Git repository, copies Orion's skills in as the `orion` plugin
+(`plugins/orion/`), registers that plugin with your chosen tool for this folder only,
+and records that choice in `status/status.json`. If the tool still needs a step from
+you (installing Orion from Codex's plugin list, or a fresh session), the installer
+prints it; [setup and recovery](docs/setup.md#finish-the-orion-plugin) explains how
+to resume.
 It leaves the release sources, tests, and project specifications behind. Then enter your new folder and
 press Start:
 
@@ -77,17 +81,21 @@ only `@AGENTS.md`. Keep the shared instructions in one place.
 
 ## Built-in skills
 
-The installer includes
-[Prospecting](skills/prospecting/SKILL.md), [Call Planner](skills/call-planner/SKILL.md), and
-[Friday Report](skills/friday-report/SKILL.md), and these two skills:
+The installer includes these skills in the `orion` plugin, among others:
+[Prospecting](plugins/orion/skills/prospecting/SKILL.md),
+[Call Planner](plugins/orion/skills/call-planner/SKILL.md),
+[Friday Report](plugins/orion/skills/friday-report/SKILL.md), and
 
-- **[Prospect Research → Outreach](skills/prospect-research-outreach/SKILL.md)** — give Orion
+- **[Prospect Research → Outreach](plugins/orion/skills/prospect-research-outreach/SKILL.md)** — give Orion
   a prospect to research, prepare outreach, and record the next step in your CRM.
-- **[Post-Call Debrief](skills/post-call-debrief/SKILL.md)** — give Orion call notes for a
+- **[Post-Call Debrief](plugins/orion/skills/post-call-debrief/SKILL.md)** — give Orion call notes for a
   summary, CRM update, and follow-up draft.
 
-In an installed harness, find these files in `.agents/skills/` for Codex or
-`.claude/skills/` for Claude Code. Tell Orion which task to do or teach it a new procedure.
+In an installed harness they live in `plugins/orion/skills/`, and "update my harness"
+replaces that package as a whole. In Claude Code you can call one directly as
+`/orion:<skill>`, such as `/orion:friday-report`. Skills you create or add yourself are
+yours: they go in `.agents/skills/` for Codex or `.claude/skills/` for Claude Code, and
+updates leave them alone. Tell Orion which task to do or teach it a new procedure.
 Use [Codex scheduled tasks or Claude Routines](docs/scheduled-work.md) for recurring work.
 Daily Practice can offer additional skills [over the radio](docs/radio.md).
 

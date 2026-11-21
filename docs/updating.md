@@ -167,8 +167,8 @@ lists the three `.claude/skills/` source files removed from the release. An olde
 same-path updater can still refresh the other listed files; it will leave those
 three installed skills as they are. To receive current skill definitions, migrate
 the harness into a separate client folder with `install.mjs --migrate-from` above,
-or follow the pinned update procedure in an already deployed folder. It maps the
-`skills/` sources to the chosen runtime paths and recognizes historical Claude
-copies by fingerprint. `deployment` is the contract for separate client folders.
+or follow the pinned update procedure in an already deployed folder. It installs
+the `orion` plugin package at `plugins/orion/` for either tool and recognizes
+historical Claude copies by fingerprint. `deployment` is the contract for separate client folders.
 Maintainers run
 `node tests/helpers/pristine.mjs --write` after release edits and before tagging.

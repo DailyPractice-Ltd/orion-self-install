@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { plainEnv } from './helpers/env.mjs';
 import { planForTool } from '../update/destination-resolver.mjs';
@@ -76,9 +76,12 @@ for (const tool of ['claude-code', 'codex']) {
     const retiredMeetingPackage = 'library/skills/meeting-sizing/PACKAGE.md';
     const oldMeetingPackage = git(release, 'show', `c933b9ff05ce5825f09a2ec2adc2d6d8e38b1e7a:${retiredMeetingPackage}`) + '\n';
     put(client, retiredMeetingPackage, oldMeetingPackage);
+    const retiredDisclosure = 'docs/intelligence-library-opt-in.md';
+    const oldDisclosure = git(release, 'show', `5eb0eaa23679caede3a1f7bbae722df8b7ce433e:${retiredDisclosure}`) + '\n';
+    put(client, retiredDisclosure, oldDisclosure);
     const prior = status(client);
     const packageHistory = { 'post-call-debrief': { kind: 'workflow', version: '2.0.0', smoke_test_passed: true } };
-    put(client, 'status/status.json', JSON.stringify({ ...prior, packages: packageHistory }));
+    put(client, 'status/status.json', JSON.stringify({ ...prior, packages: packageHistory, sharing: { ...prior.sharing} }));
     for (const slug of ['prospect-research-outreach', 'post-call-debrief']) {
       rmSync(join(client, skill(tool), slug, 'SKILL.md'));
     }
@@ -115,6 +118,9 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(read(client, editedPage), '# Client debrief instructions\n');
     assert.equal(read(client, `${report.backup}/files/${retiredPage}`), oldPage);
     assert.deepEqual(status(client).packages, packageHistory);
+    assert.ok(report.retired.includes(retiredDisclosure));
+    assert.equal(existsSync(join(client, retiredDisclosure)), false);
+    assert.equal(read(client, `${report.backup}/files/${retiredDisclosure}`), oldDisclosure);
     for (const slug of ['prospect-research-outreach', 'post-call-debrief']) {
       assert.ok(report.added.includes(`${skill(tool)}/${slug}/SKILL.md`));
     }
@@ -127,39 +133,16 @@ for (const tool of ['claude-code', 'codex']) {
     }
     ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
     assert.equal(read(client, retiredMeetingPackage), oldMeetingPackage);
+    assert.equal(read(client, retiredDisclosure), oldDisclosure);
     assert.equal(read(client, 'AGENTS.md'), original);
     assert.equal(read(client, `${skill(tool)}/hire-agent/SKILL.md`), 'Custom legacy instructions\n');
     assert.equal(existsSync(join(client, `${skill(tool)}/new-release/SKILL.md`)), false);
     assert.equal(read(client, `${skill(tool)}/prospecting/SKILL.md`), edited);
   });
 
-  test(`${tool} deployed journey: library install and local tool switch`, t => {
+  test(`${tool} deployed journey: local skill and interrupted tool switch`, t => {
     const { release, client } = journey(t, tool);
-    const current = status(client);
-    current.sharing = {
-      status_signal_enabled: true,
-      bridge_url: 'https://radio.test/api/bridge',
-      harness_id: '9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62',
-      install_token: 'orion_' + 'test'.repeat(6),
-    };
-    put(client, 'status/status.json', JSON.stringify(current));
-    const mock = join(dirname(client), 'fetch.mjs');
-    writeFileSync(mock, `globalThis.fetch = async (url) => {
-      if (String(url).endsWith('/verify')) return Response.json({status: 'accepted', harness_id: '9e6d1cbf-9d5c-4213-8c3f-b8ad95d34f62'});
-      if (String(url).endsWith('/assets')) return Response.json({asset_id: 'asset-1', reported_at: '2026-11-18T12:00:00.000Z', replay: false}, {status: 201});
-      return new Response(JSON.stringify({
-      slug: 'meeting-sizing', kind: 'skill', name: 'Meeting sizing',
-      one_liner: 'Size meetings', family: 'value_building', tools_required: [],
-      version: '1.0.0', content: '---\\nname: meeting-sizing\\n---\\nSize the meeting.\\n'
-    }), {status: 200, headers: {'content-type': 'application/json'}}); };\n`);
-    const installed = spawnSync(process.execPath, [
-      '--import', pathToFileURL(mock).href, join(client, 'status/radio.mjs'),
-      'library', '--install', 'meeting-sizing', '--yes',
-    ], { cwd: client, encoding: 'utf8', env: plainEnv() });
-    ok(installed);
-    assert.match(read(client, `${skill(tool)}/meeting-sizing/SKILL.md`), /Size the meeting/);
-    assert.equal(existsSync(join(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`)), false);
-
+    put(client, `${skill(tool)}/meeting-sizing/SKILL.md`, '# Meeting sizing\nSize the meeting.\n');
     put(client, `${jobs(tool)}/follow-up.md`, '---\nname: follow-up\ntools: Read\n---\n# Follow-up\n');
     const switched = run(client, 'switch_ai.mjs', '--json');
     ok(switched);

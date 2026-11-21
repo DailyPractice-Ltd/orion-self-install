@@ -30,7 +30,7 @@ appear the moment the files exist. No other change needed.
 ### `docs/img/02-unzipped-folder-contents.png` — ✅ landed 2026-07-26
 
 - **Screen**: the unzipped folder open in Finder — `README.md`, `AGENTS.md`,
-  `start.mjs`, and the `agent`, `crm`, `library` folders visible.
+  `start.mjs`, and the `agent`, `crm`, `skills` folders visible.
 - **Re-capture note (optional polish)**: current shot is a French-localised Finder
   ("Nom", "Dossier"); an English-UI capture would suit the global audience better. Not
   blocking — the shape of the window is the point.

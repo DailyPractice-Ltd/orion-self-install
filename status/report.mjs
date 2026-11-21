@@ -84,6 +84,7 @@ export function validateOutbox(entries) {
       requireThat(
         typeof b.harness_id === 'string' && HARNESS_ID_RE.test(b.harness_id),
       );
+    // Replay-only compatibility for installed-package reports queued by older releases.
     if (entry.kind === 'asset') {
       requireThat(
         slug(b.slug) &&
@@ -321,25 +322,6 @@ export async function reportSignal({
           ),
           ...payload,
         },
-      },
-    }),
-    fetchImpl,
-  );
-}
-export async function reportAsset({
-  root,
-  asset,
-  fetchImpl = globalThis.fetch,
-}) {
-  return report(
-    root,
-    (status) => ({
-      kind: 'asset',
-      body: {
-        ...(status.sharing?.harness_id
-          ? { harness_id: status.sharing.harness_id }
-          : {}),
-        ...asset,
       },
     }),
     fetchImpl,

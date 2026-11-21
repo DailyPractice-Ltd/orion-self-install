@@ -21,7 +21,9 @@ function world(t, { tools = ['claude', 'codex'], faults = {} } = {}) {
   const bin = join(base, 'bin'); mkdirSync(bin);
   const statePath = join(base, 'native-state.json');
   writeFileSync(statePath, JSON.stringify({ faults }));
-  const env = { ...process.env, FAKE_NATIVE_STATE: statePath };
+  const home = join(base, 'home'); mkdirSync(home);
+  // A temp home: no real ~/.codex or ~/.claude is ever read.
+  const env = { ...process.env, FAKE_NATIVE_STATE: statePath, HOME: home, USERPROFILE: home, CODEX_HOME: join(home, '.codex') };
   for (const [tool, envVar] of [['claude', 'ORION_CLAUDE_BIN'], ['codex', 'ORION_CODEX_BIN']]) {
     const file = join(bin, process.platform === 'win32' ? `${tool}.cmd` : tool);
     env[envVar] = file; // absent file = client not installed on this computer
@@ -39,7 +41,7 @@ function world(t, { tools = ['claude', 'codex'], faults = {} } = {}) {
     if (process.platform === 'win32') writeFileSync(file, `@"${process.execPath}" "${FAKE}" ${tool} %*\r\n`);
     else { writeFileSync(file, `#!/bin/sh\nexec "${process.execPath}" "${FAKE}" ${tool} "$@"\n`); chmodSync(file, 0o755); }
   };
-  return { base, bin, env, target, native, install, setup, status, addTool };
+  return { base, bin, home, env, target, native, install, setup, status, addTool };
 }
 
 const out = (run) => `${run.stdout}${run.stderr}`;
@@ -140,12 +142,17 @@ test('Codex install prepares its own catalog and leaves the native install as th
   assert.match(plugin.remaining_action, /\/plugins/);
   assert.ok(plugin.remaining_action.includes(name));
   assert.ok(run.stdout.includes(plugin.remaining_action));
-  assert.equal(w.native().codex.marketplaces[name], realpathSync(w.target));
+  // Registered in this folder's own Codex config only; nothing user-wide.
+  const config = readFileSync(join(w.target, '.codex/config.toml'), 'utf8');
+  assert.ok(config.includes(`[marketplaces."${name}"]\nsource_type = "local"\nsource = ${JSON.stringify(realpathSync(w.target))}`), config);
+  assert.ok(config.includes(`[plugins."orion@${name}"]\nenabled = true`), config);
+  assert.equal(existsSync(join(w.home, '.codex')), false, 'the user-wide Codex home is never written');
+  assert.equal(w.native().codex.adds, 0, 'no user-wide marketplace add');
   assert.equal(w.native().codex.forbiddenAdd, undefined, 'never an unattended plugin install');
 
   const again = w.setup('resume');
   assert.equal(again.status, 0, out(again));
-  assert.equal(w.native().codex.adds, 1, 'the catalog is registered once');
+  assert.equal(readFileSync(join(w.target, '.codex/config.toml'), 'utf8'), config, 'the entries are written once');
   assert.equal(w.status().plugin.catalog_identity, plugin.catalog_identity);
 
   // Asserting discovery cannot skip a native install that has not happened.

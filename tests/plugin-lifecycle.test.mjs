@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { buildCatalog, catalogName, pluginManifests } from '../update/plugin-package.mjs';
+import { codexOwnedText } from '../update/plugin-registration.mjs';
 import { runPluginSetup } from '../update/plugin-setup.mjs';
 import { plainEnv } from './helpers/env.mjs';
 
@@ -86,12 +87,17 @@ function world(t, { tool = 'claude-code', at = '1.0.0', faults = {}, codexInstal
     native.claude.marketplaces[CATALOG] = { path: client, scopes: ['local'] };
     native.claude.installs[`${PLUGIN_ID}|${client}`] = { id: PLUGIN_ID, scope: 'local', enabled: true, projectPath: client };
   } else {
-    native.codex.marketplaces[CATALOG] = client;
-    if (codexInstalled) native.codex.installed = [{ id: PLUGIN_ID, name: 'orion', marketplace: CATALOG, version: codexInstalled, installed: true, enabled: true }];
+    // Codex: this folder's own project config, and the copy Codex loads from its cache.
+    put(client, '.codex/config.toml', `model = "mine"\n\n${codexOwnedText(CATALOG, client)}\n`);
+    if (codexInstalled) {
+      const cached = join(home, '.codex/plugins/cache', CATALOG, 'orion/local');
+      for (const [path, body] of Object.entries(codexInstalled === '2.0.0' ? V2 : V1)) put(cached, path.slice('plugins/orion/'.length), body);
+      native.codex.installed = [{ id: PLUGIN_ID, name: 'orion', marketplace: CATALOG, version: 'local', installed: true, enabled: true }];
+    }
   }
   writeFileSync(statePath, JSON.stringify(native));
   const bin = join(base, 'bin'); mkdirSync(bin);
-  const extra = { FAKE_NATIVE_STATE: statePath, HOME: home };
+  const extra = { FAKE_NATIVE_STATE: statePath, HOME: home, CODEX_HOME: join(home, '.codex') };
   for (const [name, envVar] of [['claude', 'ORION_CLAUDE_BIN'], ['codex', 'ORION_CODEX_BIN']]) {
     const file = join(bin, name);
     writeFileSync(file, `#!/bin/sh\nexec "${process.execPath}" "${FAKE}" ${name} "$@"\n`); chmodSync(file, 0o755);
@@ -103,6 +109,7 @@ function world(t, { tool = 'claude-code', at = '1.0.0', faults = {}, codexInstal
     base, release, client, commit, env, home,
     status: () => JSON.parse(get(client, 'status/status.json')),
     native: () => JSON.parse(readFileSync(statePath, 'utf8')),
+    humanInstall: () => spawnSync(process.execPath, [FAKE, 'codex', 'plugin', '__human-install', CATALOG], { cwd: client, env, encoding: 'utf8' }),
     setNative: (change) => { const s = JSON.parse(readFileSync(statePath, 'utf8')); change(s); writeFileSync(statePath, JSON.stringify(s)); },
     update: (more) => apply(['update', '--root', client, '--release-repo', release, '--commit', commit], more),
     switchTo: (to, more) => apply(['switch', '--root', client, '--release-repo', release, '--commit', commit, '--to', to], more),
@@ -288,10 +295,10 @@ test('switch to Codex waits for the native install as a pending switch, then com
   assert.ok(has(w.client, CATALOG_PATH['claude-code']));
   assert.equal(get(w.client, '.claude/skills/mine/SKILL.md'), 'my own skill\n');
   assert.ok(!nativeCalls(w).some((c) => c.startsWith('claude plugin uninstall')));
-  assert.equal(w.native().codex.marketplaces[CATALOG], w.client);
 
   // The human installs Orion in Codex; running the same switch again finishes it.
-  w.setNative((s) => { s.codex.installed = [{ id: PLUGIN_ID, name: 'orion', marketplace: CATALOG, version: '2.0.0', installed: true, enabled: true }]; });
+  assert.ok(get(w.client, '.codex/config.toml').includes(`[plugins."${PLUGIN_ID}"]\nenabled = true`), 'Codex is registered in this folder only');
+  assert.equal(w.humanInstall().status, 0);
   const done = w.switchTo('codex');
   assert.equal(done.status, 0, out(done));
   assert.equal(report(done).state, 'switched');
@@ -325,7 +332,8 @@ test('switch to Claude Code commits once its own CLI lists Orion for this folder
   assert.equal(get(w.client, '.claude/skills/mine/SKILL.md'), 'my own skill\n');
   assert.equal(has(w.client, CATALOG_PATH.codex), false);
   assert.equal(get(w.client, '.agents/other/notes.md'), 'unrelated\n', 'only Orion-owned items leave .agents');
-  assert.ok(nativeCalls(w).includes(`codex plugin marketplace remove ${CATALOG} --json`));
+  assert.ok(nativeCalls(w).includes(`codex plugin remove ${PLUGIN_ID} --json`));
+  assert.equal(get(w.client, '.codex/config.toml'), 'model = "mine"\n', 'only Orion\'s own Codex entries leave');
   assert.deepEqual(w.native().codex.installed, []);
 });
 

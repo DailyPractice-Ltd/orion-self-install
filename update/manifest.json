@@ -130,6 +130,7 @@
       "update/destination-resolver.mjs",
       "update/manifest.json",
       "update/plugin-native.mjs",
+      "update/plugin-registration.mjs",
       "update/pristine.json",
       "update/plugin-package.mjs",
       "update/plugin-setup.mjs",

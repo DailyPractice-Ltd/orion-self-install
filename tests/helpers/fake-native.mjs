@@ -5,8 +5,8 @@
  * State lives in the JSON file named by FAKE_NATIVE_STATE; every call is logged there.
  * It never reaches a real tool, a real home folder or the network.
  */
-import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 const statePath = process.env.FAKE_NATIVE_STATE;
 const state = JSON.parse(readFileSync(statePath, 'utf8'));
@@ -90,8 +90,20 @@ if (tool === 'claude') {
 
 if (tool === 'codex') {
   const c = (state.codex ||= { marketplaces: {}, installed: [], adds: 0 });
+  const cwd = realpathSync(process.cwd());
+  const codexHome = process.env.CODEX_HOME || join(process.env.HOME, '.codex');
+  // Marketplaces: user-wide ones, plus a trusted project's own .codex/config.toml.
+  const projectMarketplaces = () => {
+    const path = join(cwd, '.codex/config.toml');
+    if (faults.untrusted || !existsSync(path)) return {};
+    const found = {};
+    const re = /^\[marketplaces\.(?:"([^"]+)"|([A-Za-z0-9_-]+))\]\s*\n(?:[^[]*?\n)?source = "([^"]*)"/gm;
+    for (const m of readFileSync(path, 'utf8').matchAll(re)) found[m[1] || m[2]] = JSON.parse(`"${m[3]}"`);
+    return found;
+  };
   if (verb === 'marketplace' && sub === 'list') {
-    out({ marketplaces: Object.entries(c.marketplaces).map(([name, root]) => (faults.listNoPath ? { name } : { name, root })) }); finish(0);
+    const all = { ...c.marketplaces, ...projectMarketplaces() };
+    out({ marketplaces: Object.entries(all).map(([name, root]) => (faults.listNoPath ? { name } : { name, root })) }); finish(0);
   }
   if (verb === 'marketplace' && sub === 'add') {
     if (faults.codexAdd) { out({ error: 'cannot add' }); finish(1); }
@@ -110,6 +122,21 @@ if (tool === 'codex') {
     c.installed = c.installed.filter((p) => p.id !== sub); out({ removed: sub }); finish(0);
   }
   if (verb === 'add') { c.forbiddenAdd = true; out({ error: 'not used by Orion' }); finish(1); }
+  // Test-only: what a person's install from the Plugins Directory or /plugins leaves behind.
+  if (verb === '__human-install') {
+    const catalog = sub;
+    const cache = join(codexHome, 'plugins/cache', catalog, 'orion/local');
+    rmSync(cache, { recursive: true, force: true });
+    mkdirSync(dirname(cache), { recursive: true });
+    cpSync(join(cwd, 'plugins/orion'), cache, { recursive: true });
+    c.installed = c.installed.filter((p) => p.id !== `orion@${catalog}`);
+    c.installed.push({ id: `orion@${catalog}`, name: 'orion', marketplace: catalog, version: 'local', installed: true, enabled: true });
+    if (faults.userEnable) {
+      mkdirSync(codexHome, { recursive: true });
+      writeFileSync(join(codexHome, 'config.toml'), `[plugins."orion@${catalog}"]\nenabled = true\n`);
+    }
+    out({ installed: `orion@${catalog}` }); finish(0);
+  }
 }
 
 out('unhandled'); finish(9);

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -152,30 +153,55 @@ test('a catalog file naming a different catalog is refused before any native cal
   assert.equal(w.read().calls, undefined);
 });
 
-test('Codex: registration prepares the catalog and leaves install + fresh chat as the remaining action', (t) => {
+const PROJECT_CONFIG = '.codex/config.toml';
+const userConfig = (w) => join(w.home, '.codex/config.toml');
+const project = (w) => readFileSync(join(w.root, PROJECT_CONFIG), 'utf8');
+const count = (text, needle) => text.split(needle).length - 1;
+/** What a person does in Codex's Plugins Directory or /plugins: the fake copies the package into its cache. */
+const humanInstall = (w) => spawnSync(process.execPath, [FAKE, 'codex', 'plugin', '__human-install', CATALOG], { cwd: w.root, env: w.env, encoding: 'utf8' });
+
+test('Codex: setup registers the catalog in this folder\'s own Codex config, never user-wide, and leaves the install as the remaining action', (t) => {
   const w = world(t);
+  mkdirSync(join(w.root, '.codex'));
+  writeFileSync(join(w.root, PROJECT_CONFIG), '# mine\nmodel = "gpt-x"\n\n[mcp_servers.crm]\ncommand = "crm"\n');
   const result = setupPlugin(w.opts('codex'));
   assert.equal(result.state, 'pending', JSON.stringify(result));
+  assert.equal(result.details.reason, 'not_installed');
   assert.match(result.remaining_action, /Plugins Directory/);
   assert.match(result.remaining_action, /\/plugins/);
   assert.match(result.remaining_action, /fresh chat/);
   assert.match(result.remaining_action, new RegExp(CATALOG));
+  const text = project(w);
+  assert.match(text, /^# mine\nmodel = "gpt-x"\n\n\[mcp_servers\.crm\]\ncommand = "crm"\n/, 'unrelated settings stay as written');
+  assert.ok(text.includes(`[marketplaces."${CATALOG}"]\nsource_type = "local"\nsource = ${JSON.stringify(w.root)}`));
+  assert.ok(text.includes(`[plugins."orion@${CATALOG}"]\nenabled = true`));
+  assert.equal(existsSync(userConfig(w)), false, 'the user-wide Codex config is never written');
   const { codex, calls } = w.read();
-  assert.equal(codex.marketplaces[CATALOG], w.root);
+  assert.equal(codex.adds, 0, 'no global marketplace add');
   assert.ok(!codex.forbiddenAdd, 'never installs the plugin unattended');
   assert.deepEqual(calls.map((c) => c.args.join(' ')), [
     'plugin marketplace list --json',
-    `plugin marketplace add ${w.root} --json`,
     'plugin marketplace list --json',
     'plugin list --json',
   ]);
 });
 
-test('Codex: a re-run does not register the catalog twice', (t) => {
+test('Codex: a re-run keeps one set of Orion entries', (t) => {
   const w = world(t);
   setupPlugin(w.opts('codex'));
+  const first = project(w);
   assert.equal(setupPlugin(w.opts('codex')).state, 'pending');
-  assert.equal(w.read().codex.adds, 1);
+  assert.equal(project(w), first);
+  assert.equal(count(project(w), `[marketplaces."${CATALOG}"]`), 1);
+  assert.equal(count(project(w), `[plugins."orion@${CATALOG}"]`), 1);
+});
+
+test('Codex: an untrusted folder is pending with the trust step, not complete', (t) => {
+  const w = world(t, { faults: { untrusted: true } });
+  const result = setupPlugin(w.opts('codex'));
+  assert.equal(result.state, 'pending', JSON.stringify(result));
+  assert.equal(result.details.reason, 'project_not_trusted');
+  assert.match(result.remaining_action, /trust/);
 });
 
 test('Codex: a catalog name already pointing at another folder is left alone', (t) => {
@@ -183,31 +209,71 @@ test('Codex: a catalog name already pointing at another folder is left alone', (
   const result = setupPlugin(w.opts('codex'));
   assert.equal(result.state, 'failed');
   assert.equal(result.details.reason, 'catalog_name_points_elsewhere');
+  assert.equal(existsSync(join(w.root, PROJECT_CONFIG)), false);
   assert.equal(w.read().codex.adds, 0);
 });
 
-test('Codex: verify is complete only when the plugin list shows this harness install at the expected version', (t) => {
-  const installed = (extra = {}) => ({ id: `orion@${CATALOG}`, name: 'orion', marketplace: CATALOG, version: VERSION, installed: true, enabled: true, ...extra });
+test('Codex: verify is complete only for a project-scoped install whose cached copy holds this release and every skill', (t) => {
   const w = world(t);
+  assert.equal(verifyPlugin(w.opts('codex')).details.reason, 'project_config_missing', 'verify changes nothing; resume writes the config');
   setupPlugin(w.opts('codex'));
   assert.equal(verifyPlugin(w.opts('codex')).state, 'pending', 'registration alone is not an install');
-  w.write((s) => { s.codex.installed = [installed({ version: '0.0.1' })]; });
+
+  assert.equal(humanInstall(w).status, 0);
+  const done = verifyPlugin(w.opts('codex'));
+  assert.equal(done.state, 'complete', JSON.stringify(done));
+  assert.equal(done.details.version, VERSION);
+  assert.equal(done.details.scope, 'project');
+  assert.deepEqual(done.details.skills, SKILLS);
+  assert.match(done.details.verified_by, /codex plugin list --json/);
+  assert.match(done.details.verified_by, /cached copy/);
+  assert.match(done.details.next, /fresh chat/);
+
+  const cache = join(w.home, '.codex/plugins/cache', CATALOG, 'orion/local');
+  writeFileSync(join(cache, 'plugin.json'), JSON.stringify({ name: 'orion', version: '0.0.1' }));
   const stale = verifyPlugin(w.opts('codex'));
   assert.equal(stale.state, 'pending', 'an outdated cached copy is a reinstall step, not a failure');
   assert.equal(stale.details.reason, 'cached_copy_outdated');
-  w.write((s) => { s.codex.installed = [installed({ enabled: false })]; });
-  assert.equal(verifyPlugin(w.opts('codex')).state, 'pending');
-  w.write((s) => { s.codex.installed = [installed({ marketplace: 'orion-other', id: 'orion@orion-other' })]; });
-  assert.equal(verifyPlugin(w.opts('codex')).state, 'pending');
-  w.write((s) => { s.codex.installed = [installed()]; });
-  const done = verifyPlugin(w.opts('codex'));
-  assert.equal(done.state, 'complete', JSON.stringify(done));
-  assert.equal(done.details.verified_by, 'codex plugin list --json');
-  assert.match(done.details.next, /fresh chat/);
+  assert.match(stale.remaining_action, /reinstall/);
+
+  writeFileSync(join(cache, 'plugin.json'), JSON.stringify({ name: 'orion', version: VERSION }));
+  rmSync(join(cache, 'skills/prospecting'), { recursive: true });
+  const partial = verifyPlugin(w.opts('codex'));
+  assert.equal(partial.details.reason, 'cached_copy_outdated');
+  assert.deepEqual(partial.details.missing, ['prospecting']);
+
+  rmSync(cache, { recursive: true });
+  assert.equal(verifyPlugin(w.opts('codex')).details.reason, 'version_unconfirmed');
+});
+
+test('Codex: a release version in the plugin list must match too', (t) => {
+  const w = world(t);
+  setupPlugin(w.opts('codex'));
+  humanInstall(w);
+  w.write((s) => { s.codex.installed[0].version = '0.0.1'; });
+  assert.equal(verifyPlugin(w.opts('codex')).details.reason, 'cached_copy_outdated');
+  w.write((s) => { s.codex.installed[0].version = 'local'; s.codex.installed[0].enabled = false; });
+  assert.equal(verifyPlugin(w.opts('codex')).details.reason, 'disabled');
+  w.write((s) => { s.codex.installed = [{ ...s.codex.installed[0], enabled: true, id: 'orion@orion-other', marketplace: 'orion-other' }]; });
+  assert.equal(verifyPlugin(w.opts('codex')).details.reason, 'not_installed');
+});
+
+test('Codex: Orion switched on in the user-wide Codex config is reported as a limitation, never complete', (t) => {
+  const w = world(t, { faults: { userEnable: true } });
+  setupPlugin(w.opts('codex'));
+  humanInstall(w);
+  const result = verifyPlugin(w.opts('codex'));
+  assert.equal(result.state, 'pending', JSON.stringify(result));
+  assert.equal(result.details.reason, 'enabled_user_wide');
+  assert.match(result.remaining_action, /every folder/);
+  assert.match(result.remaining_action, new RegExp(`orion@${CATALOG}`));
+  assert.match(readFileSync(userConfig(w), 'utf8'), /enabled = true/, 'Orion never edits the user-wide config');
 });
 
 test('Codex: verify fails when the catalog name is registered from another folder', (t) => {
-  const w = world(t, { state: { codex: { marketplaces: { [CATALOG]: '/elsewhere/other' }, installed: [{ id: `orion@${CATALOG}`, version: VERSION, installed: true, enabled: true }], adds: 0 } } });
+  const w = world(t);
+  setupPlugin(w.opts('codex'));
+  w.write((s) => { s.codex.marketplaces[CATALOG] = '/elsewhere/other'; s.faults = { untrusted: true }; });
   assert.equal(verifyPlugin(w.opts('codex')).details.reason, 'catalog_name_points_elsewhere');
 });
 
@@ -229,17 +295,33 @@ test('Claude Code: retire removes only this harness enablement and catalog, in l
   assert.equal(retirePlugin(w.opts('claude-code')).state, 'complete', 'retiring twice is harmless');
 });
 
-test('Codex: retire removes only this harness plugin and catalog', (t) => {
+test('Codex: retire removes only this harness plugin and its own config entries', (t) => {
   const w = world(t);
+  mkdirSync(join(w.root, '.codex'));
+  writeFileSync(join(w.root, PROJECT_CONFIG), 'model = "gpt-x"\n');
   setupPlugin(w.opts('codex'));
+  humanInstall(w);
   w.write((s) => {
-    s.codex.installed = [{ id: `orion@${CATALOG}`, version: VERSION, installed: true }, { id: 'other@elsewhere', version: '1', installed: true }];
+    s.codex.installed.push({ id: 'other@elsewhere', version: '1', installed: true });
     s.codex.marketplaces.elsewhere = '/somewhere/else';
+    s.calls = [];
   });
   assert.equal(retirePlugin(w.opts('codex')).state, 'complete');
-  const { codex } = w.read();
+  const { codex, calls } = w.read();
   assert.deepEqual(codex.installed.map((p) => p.id), ['other@elsewhere']);
   assert.deepEqual(Object.keys(codex.marketplaces), ['elsewhere']);
+  assert.equal(project(w), 'model = "gpt-x"\n');
+  assert.ok(!calls.some((c) => c.args.join(' ').startsWith('plugin marketplace remove')), 'nothing user-wide to remove');
+  assert.equal(retirePlugin(w.opts('codex')).state, 'complete', 'retiring twice is harmless');
+});
+
+test('Codex: retire also drops a user-wide registration of this catalog made from this folder', (t) => {
+  const w = world(t);
+  mkdirSync(join(w.home, '.codex'), { recursive: true });
+  writeFileSync(userConfig(w), `[marketplaces."${CATALOG}"]\nsource_type = "local"\nsource = ${JSON.stringify(w.root)}\n`);
+  w.write((s) => { s.codex = { marketplaces: { [CATALOG]: w.root }, installed: [], adds: 1 }; });
+  assert.equal(retirePlugin(w.opts('codex')).state, 'complete');
+  assert.ok(w.read().calls.some((c) => c.args.join(' ') === `plugin marketplace remove ${CATALOG} --json`));
 });
 
 test('retire refuses a catalog name registered from another folder', (t) => {
@@ -260,7 +342,7 @@ test('a catalog listed without a readable path is unverified, never a conflict',
     const w = world(t, { faults: { listNoPath: true } });
     if (tool === 'codex') w.write((s) => { s.codex = { marketplaces: { [CATALOG]: w.root }, installed: [], adds: 0 }; });
     else w.write((s) => { s.claude = { marketplaces: { [CATALOG]: { path: w.root, scopes: ['local'] } }, installs: {} }; });
-    const result = verifyPlugin(w.opts(tool));
+    const result = setupPlugin(w.opts(tool));
     assert.equal(result.state, 'pending', `${tool}: ${JSON.stringify(result)}`);
     assert.equal(result.details.reason, 'catalog_path_unverified');
     assert.ok(result.remaining_action);

@@ -5,7 +5,17 @@
  * Every function takes the harness root, the tool, this harness's catalog name and the
  * expected Orion version, and returns { state: 'complete' | 'pending' | 'failed',
  * remaining_action?, details }. `complete` means a real native inspection confirmed the
- * plugin, its version and its source in this harness; nothing else earns it.
+ * plugin, its version, its source and every shipped skill in this harness, with the
+ * enablement scoped to this folder; nothing else earns it.
+ *
+ *   Claude Code  validate, marketplace add and install with --scope local; then `plugin list`
+ *                (local scope, this folder, read in place from the package, this version) and
+ *                `plugin details` (its skill inventory matches the package)
+ *   Codex        this folder's own .codex/config.toml names the catalog and switches Orion on
+ *                (update/plugin-registration.mjs); nothing user-wide is written. Then
+ *                `marketplace list` (the catalog is seen here: the folder is trusted),
+ *                `plugin list` (installed, on), no user-wide switch, and the cached copy
+ *                Codex loads holds this version and every skill
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
@@ -13,6 +23,7 @@ import { homedir } from 'node:os';
 import { delimiter, isAbsolute, join, sep } from 'node:path';
 import { PACKAGE_ROOT, TOOL_LAYOUT } from './destination-resolver.mjs';
 import { catalogNameErrors } from './plugin-package.mjs';
+import { CODEX_PROJECT_CONFIG, codexHome, codexProjectEntries, codexUserEntries, removeCodexProjectConfig, writeCodexProjectConfig } from './plugin-registration.mjs';
 
 const CLIENTS = Object.freeze({
   'claude-code': Object.freeze({ command: 'claude', envVar: 'ORION_CLAUDE_BIN' }),
@@ -100,7 +111,7 @@ function prepare({ root, tool, catalogName, version, env = process.env, home, re
   if (requireCatalog && !version) throw new Error('The expected Orion version is required');
   const real = realpathSync(root);
   const layout = TOOL_LAYOUT[tool];
-  const ctx = { tool, command, real, catalogName, version, env, calls: [], pluginId: `orion@${catalogName}`, packageDir: join(real, PACKAGE_ROOT) };
+  const ctx = { tool, command, real, catalogName, version, env, home, calls: [], pluginId: `orion@${catalogName}`, packageDir: join(real, PACKAGE_ROOT) };
   if (requireCatalog) {
     let catalog;
     try { catalog = JSON.parse(readFileSync(join(real, layout.catalogPath), 'utf8')); }
@@ -239,41 +250,73 @@ function claudeVerify(ctx) {
 }
 
 const codexInstallAction = (ctx) => `In Codex, from this folder, open the Plugins Directory (desktop app) or type /plugins (CLI), choose the "${ctx.catalogName}" catalog and install Orion; then start a fresh chat in this folder.`;
+const CODEX_FRESH = 'Start a fresh chat in this folder so Codex loads the Orion skills.';
+const CODEX_RESUME = 'node update/plugin-setup.mjs resume';
 
-/** Codex has no established unattended install, so only `codex plugin list` can confirm one. */
+/** The plugin manifest version in a Codex cached copy: the portable root manifest first. */
+function cachedVersion(dir) {
+  for (const rel of ['plugin.json', '.codex-plugin/plugin.json', '.claude-plugin/plugin.json']) {
+    try { const version = JSON.parse(readFileSync(join(dir, rel), 'utf8')).version; if (version) return version; } catch { /* next */ }
+  }
+  return null;
+}
+
+/**
+ * Codex discovery evidence, read from the harness folder: Codex lists this folder's catalog
+ * (from its project config), lists Orion installed and on, Orion is not switched on
+ * user-wide, and the copy Codex actually loads, its cache, holds this release and every
+ * shipped skill. Codex caches a local plugin under the version `local`.
+ */
 function codexInspect(ctx) {
+  const seen = marketplaceConflict(ctx);
+  if (seen.error) return seen.error;
+  if (!seen.registered) {
+    return pending(ctx.tool, `Codex reads this folder's Orion settings (${CODEX_PROJECT_CONFIG}) only once you trust the folder. Open this folder in Codex and choose to trust it when Codex asks; then run Orion's plugin setup again from this folder (${CODEX_RESUME}).`, 'project_not_trusted', ctx.details());
+  }
   const listed = run(ctx, ['plugin', 'list', '--json']);
   if (listed.status !== 0 || listed.json === undefined) return failed(ctx.tool, 'plugin_list_failed', ctx.details({ message: listed.error }));
   const row = codexRow(ctx, listed.json);
   if (!row || row.installed === false) return pending(ctx.tool, codexInstallAction(ctx), 'not_installed', ctx.details());
   if (row.enabled === false) return pending(ctx.tool, `In Codex, type /plugins from this folder and switch Orion (${ctx.pluginId}) on; then start a fresh chat in this folder.`, 'disabled', ctx.details());
-  if (!row.version || row.version === 'local') {
-    return pending(ctx.tool, `In Codex's Plugins Directory, check that Orion from "${ctx.catalogName}" shows version ${ctx.version}; then start a fresh chat in this folder.`, 'version_unconfirmed', ctx.details({ found: row.version ?? null }));
+  // Orion stays on for this folder only: a user-wide switch would load it in every folder.
+  const user = codexUserEntries(ctx.catalogName, { env: ctx.env, home: ctx.home });
+  if (user.enabled === true) {
+    return pending(ctx.tool, `Codex has switched Orion on in your Codex user settings (${join(codexHome({ env: ctx.env, home: ctx.home }), 'config.toml')}, the [plugins."${ctx.pluginId}"] entry), which would load it in every folder, not only this one. Orion does not edit those settings, so its setup stays unfinished: delete that entry there (this folder's own ${CODEX_PROJECT_CONFIG} keeps Orion on here), then run "node update/plugin-setup.mjs verify" from this folder.`, 'enabled_user_wide', ctx.details());
   }
-  // Codex loads its cached copy; after an update it holds the previous release until reinstalled.
-  if (row.version !== ctx.version) {
-    return pending(ctx.tool, `In Codex, from this folder, open the Plugins Directory (desktop app) or type /plugins (CLI) and reinstall Orion from the "${ctx.catalogName}" catalog so its cached copy moves from ${row.version} to ${ctx.version}; then start a fresh chat in this folder.`, 'cached_copy_outdated', ctx.details({ expected: ctx.version, found: row.version }));
+  const reinstall = (found) => `In Codex, from this folder, open the Plugins Directory (desktop app) or type /plugins (CLI) and reinstall Orion from the "${ctx.catalogName}" catalog so the copy Codex loads moves${found ? ` from ${found}` : ''} to ${ctx.version}; then start a fresh chat in this folder.`;
+  if (row.version && row.version !== 'local' && row.version !== ctx.version) {
+    return pending(ctx.tool, reinstall(row.version), 'cached_copy_outdated', ctx.details({ expected: ctx.version, found: row.version }));
   }
-  return { state: 'complete', details: ctx.details({ version: row.version, verified_by: 'codex plugin list --json', next: 'Start a fresh chat in this folder so Codex loads the Orion skills.' }) };
+  const cache = join(codexHome({ env: ctx.env, home: ctx.home }), 'plugins/cache', ctx.catalogName, 'orion', row.version || 'local');
+  const found = cachedVersion(cache);
+  if (!found) {
+    return pending(ctx.tool, `Codex lists Orion as installed, but Orion cannot read the copy Codex loads (${cache}) to confirm its version. ${reinstall(null)}`, 'version_unconfirmed', ctx.details({ cache, found: row.version ?? null }));
+  }
+  if (found !== ctx.version) return pending(ctx.tool, reinstall(found), 'cached_copy_outdated', ctx.details({ cache, expected: ctx.version, found }));
+  const expected = packageSkills(ctx);
+  const cached = skillNames(join(cache, 'skills')) || [];
+  const missing = expected.filter((name) => !cached.includes(name));
+  if (!expected.length || missing.length) return pending(ctx.tool, reinstall(null), 'cached_copy_outdated', ctx.details({ cache, missing }));
+  return { state: 'complete', details: ctx.details({ version: found, scope: 'project', source: cache, skills: cached.filter((name) => expected.includes(name)), verified_by: `codex plugin marketplace list --json; codex plugin list --json; cached copy ${cache}`, next: CODEX_FRESH }) };
 }
 
+/**
+ * Codex registration is project-scoped: this folder's own .codex/config.toml names the
+ * catalog and switches Orion on, and nothing is written user-wide. There is no
+ * `codex plugin marketplace add` (it writes the user's config) and no unattended install.
+ */
 function codexSetup(ctx) {
-  const conflict = marketplaceConflict(ctx);
-  if (conflict.error) return conflict.error;
-  if (!conflict.registered) {
-    const added = run(ctx, ['plugin', 'marketplace', 'add', ctx.real, '--json']);
-    if (added.status !== 0) return failed(ctx.tool, 'marketplace_add_failed', ctx.details({ report: added.json ?? added.error }));
-    const confirmed = marketplaceConflict(ctx);
-    if (confirmed.error) return confirmed.error;
-    if (!confirmed.registered) return failed(ctx.tool, 'marketplace_not_listed_after_add', ctx.details());
-  }
+  const before = marketplaceConflict(ctx);
+  if (before.error) return before.error;
+  writeCodexProjectConfig(ctx.real, ctx.catalogName, ctx.real);
   return codexInspect(ctx);
 }
 
 function codexVerify(ctx) {
-  const conflict = marketplaceConflict(ctx);
-  if (conflict.error) return conflict.error;
-  if (!conflict.registered) return pending(ctx.tool, 'Run Orion\'s plugin setup again from this folder to register its catalog with Codex.', 'catalog_not_registered', ctx.details());
+  const project = codexProjectEntries(ctx.real, ctx.catalogName);
+  if (!project.marketplace || !samePath(project.marketplace.source || '', ctx.real) || project.enabled !== true) {
+    return pending(ctx.tool, `This folder's Codex settings (${CODEX_PROJECT_CONFIG}) do not yet name its Orion catalog. Run Orion's plugin setup from this folder (${CODEX_RESUME}).`, 'project_config_missing', ctx.details());
+  }
   return codexInspect(ctx);
 }
 const goneAlready = (call) => okOutcome(call) || /not[_ ]installed|not[_ ]found/i.test(`${call.json?.failureCode || ''} ${call.json?.message || ''}`);
@@ -288,8 +331,12 @@ function claudeRetire(ctx, registered) {
   return { state: 'complete', details: ctx.details({ retired: ctx.pluginId }) };
 }
 
-function codexRetire(ctx, registered) {
-  if (!registered) return { state: 'complete', details: ctx.details({ retired: 'nothing registered' }) };
+function codexRetire(ctx) {
+  const seen = marketplaceConflict(ctx);
+  if (seen.error) return seen.error;
+  const project = codexProjectEntries(ctx.real, ctx.catalogName);
+  const user = codexUserEntries(ctx.catalogName, { env: ctx.env, home: ctx.home });
+  if (!seen.registered && !project.text && !user.marketplace) return { state: 'complete', details: ctx.details({ retired: 'nothing registered' }) };
   const listed = run(ctx, ['plugin', 'list', '--json']);
   // An unreadable list proves nothing is installed no more than that something is: stop.
   if (listed.status !== 0 || listed.json === undefined) return failed(ctx.tool, 'plugin_list_failed', ctx.details({ message: listed.error }));
@@ -297,8 +344,12 @@ function codexRetire(ctx, registered) {
     const removed = run(ctx, ['plugin', 'remove', ctx.pluginId, '--json']);
     if (removed.status !== 0) return failed(ctx.tool, 'uninstall_failed', ctx.details({ report: removed.json ?? removed.error }));
   }
-  const dropped = run(ctx, ['plugin', 'marketplace', 'remove', ctx.catalogName, '--json']);
-  if (dropped.status !== 0) return failed(ctx.tool, 'marketplace_remove_failed', ctx.details({ report: dropped.json ?? dropped.error }));
+  removeCodexProjectConfig(ctx.real, ctx.catalogName);
+  // A user-wide registration of this harness's own uniquely named catalog, if one was made.
+  if (user.marketplace) {
+    const dropped = run(ctx, ['plugin', 'marketplace', 'remove', ctx.catalogName, '--json']);
+    if (dropped.status !== 0) return failed(ctx.tool, 'marketplace_remove_failed', ctx.details({ report: dropped.json ?? dropped.error }));
+  }
   return { state: 'complete', details: ctx.details({ retired: ctx.pluginId }) };
 }
 
@@ -309,7 +360,7 @@ function codexRetire(ctx, registered) {
 export function retirePlugin(options = {}) {
   const { ctx, early } = prepare({ ...options, requireCatalog: false });
   if (early) return early;
+  if (ctx.tool === 'codex') return codexRetire(ctx);
   const conflict = marketplaceConflict(ctx);
-  if (conflict.error) return conflict.error;
-  return ctx.tool === 'claude-code' ? claudeRetire(ctx, conflict.registered) : codexRetire(ctx, conflict.registered);
+  return conflict.error || claudeRetire(ctx, conflict.registered);
 }

@@ -20,6 +20,8 @@ const CLOUD_NAMES = ['CLAUDE_CODE_REMOTE', 'ORION_CLOUD', 'ORION_INSTALL_TOKEN',
 export const NO_NATIVE = Object.freeze({
   ORION_CLAUDE_BIN: join(tmpdir(), 'orion-no-native', 'claude'),
   ORION_CODEX_BIN: join(tmpdir(), 'orion-no-native', 'codex'),
+  // Never this machine's own Codex settings or plugin cache.
+  CODEX_HOME: join(tmpdir(), 'orion-no-native', 'codex-home'),
 });
 
 export function plainEnv(extra = {}) {

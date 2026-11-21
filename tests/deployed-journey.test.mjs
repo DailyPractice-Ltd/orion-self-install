@@ -30,7 +30,7 @@ function fakeNative(base) {
   const bin = join(base, 'bin'), statePath = join(base, 'native.json'), home = join(base, 'home');
   mkdirSync(bin); mkdirSync(home);
   writeFileSync(statePath, '{}');
-  const env = { FAKE_NATIVE_STATE: statePath, HOME: home };
+  const env = { FAKE_NATIVE_STATE: statePath, HOME: home, CODEX_HOME: join(home, '.codex') };
   for (const [name, envVar] of [['claude', 'ORION_CLAUDE_BIN'], ['codex', 'ORION_CODEX_BIN']]) {
     const file = join(bin, name);
     writeFileSync(file, `#!/bin/sh\nexec "${process.execPath}" "${join(checkout, 'tests/helpers/fake-native.mjs')}" ${name} "$@"\n`);
@@ -38,7 +38,10 @@ function fakeNative(base) {
     env[envVar] = file;
   }
   const edit = (change) => { const state = JSON.parse(readFileSync(statePath, 'utf8')); change(state); writeFileSync(statePath, JSON.stringify(state)); };
-  return { env: plainEnv(env), edit };
+  const fullEnv = plainEnv(env);
+  // What a person's install from Codex's Plugins Directory or /plugins leaves behind.
+  const humanInstall = (root, catalog) => spawnSync(process.execPath, [join(checkout, 'tests/helpers/fake-native.mjs'), 'codex', 'plugin', '__human-install', catalog], { cwd: root, env: fullEnv, encoding: 'utf8' });
+  return { env: fullEnv, edit, humanInstall };
 }
 const ok = result => assert.equal(result.status, 0, result.stdout + result.stderr);
 const status = root => JSON.parse(read(root, 'status/status.json'));
@@ -195,7 +198,7 @@ for (const tool of ['claude-code', 'codex']) {
 
     // Codex shows Orion installed for this folder only after the human's native install.
     const name = catalogName(status(client).plugin.catalog_identity);
-    native.edit((state) => { state.codex = { marketplaces: {}, adds: 0, installed: [{ id: `orion@${name}`, name: 'orion', marketplace: name, version: status(client).template_version, installed: true, enabled: true }] }; });
+    ok(native.humanInstall(client, name));
     const switched = spawnSync(process.execPath, [join(client, 'update/apply.mjs'), 'switch', '--root', client,
       '--release-repo', release, '--commit', commit, '--to', other(tool)], { cwd: client, encoding: 'utf8', env: native.env });
     ok(switched);

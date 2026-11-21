@@ -427,6 +427,24 @@ test('a pending update whose later check fails confirmedly names the restore tha
   assert.equal(w.status().plugin.update_backup, null, 'a confirmed release needs no way back');
 });
 
+test('restore and recovery write status only under the shared status lock', (t) => {
+  const w = world(t);
+  const run = w.update();
+  assert.equal(run.status, 0, out(run));
+  const { backup } = report(run);
+  const before = get(w.client, 'status/status.json');
+  // Another Orion command (the radio, a scheduled run) holds the status lock.
+  mkdirSync(join(w.client, 'status/.radio-lock'));
+  const blocked = w.restore(backup);
+  assert.equal(blocked.status, 2, out(blocked));
+  assert.match(blocked.stderr, /Status is locked/);
+  assert.equal(get(w.client, 'status/status.json'), before);
+  assert.equal(get(w.client, 'AGENTS.md'), 'agents v2\n', 'nothing restored without the lock');
+  rmSync(join(w.client, 'status/.radio-lock'), { recursive: true });
+  assert.equal(w.restore(backup).status, 0);
+  assert.equal(w.status().template_version, '1.0.0');
+});
+
 const SETTINGS = '.claude/settings.local.json';
 const priorSettings = (client) => ({
   extraKnownMarketplaces: { [CATALOG]: { source: { source: 'directory', path: client }, autoUpdate: false } },

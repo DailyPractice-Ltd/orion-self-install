@@ -64,7 +64,7 @@ import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { reportSignal, reportAsset } from './report.mjs';
+import { reportSignal } from './report.mjs';
 import { changeStatus } from './store.mjs';
 import { runtimeLayout } from '../update/destination-resolver.mjs';
 import {
@@ -333,11 +333,6 @@ if (command === 'check') {
   console.log('Read the message above to the client in full. If they want to answer,');
   console.log('take their words and run this, replacing only the message:');
   console.log(`  node status/radio.mjs reply --nudge ${newest.key} --message "their words" --yes`);
-  for (const offer of offers) {
-    console.log(`A skill is on offer: ${offer.slug}. To show the client what it is, with nothing written yet:`);
-    console.log(`  node status/radio.mjs library --install ${offer.slug}`);
-    console.log('Run it again with --yes only when they say yes. Never before.');
-  }
   await rememberHeard(newest.at);
   process.exit(0);
 }

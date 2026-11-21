@@ -7,7 +7,7 @@
 - Existing label: `Bug`; reuse its current ID.
 - Card language: follow the board's existing English report style unless Henri asks otherwise.
 - Optional repository: `DailyPractice-Ltd/dailypractice-mono`.
-- Optional file: `docs/known-issue-k<number>.md`, using the Trello K number. `K18` maps to `docs/known-issue-k18.md`.
+- Optional file in that repository (another repository, not this Orion folder): `docs/known-issue-k<number>.md`, using the Trello K number. `K18` maps to `docs/known-issue-k18.md`.
 
 These defaults scope the search; do not inspect unrelated businesses or harness folders. A user's explicit destination overrides them. A new destination needs its own duplicate and numbering check.
 

@@ -63,16 +63,23 @@ jobs:
         with:
           node-version: 22
 
+      # Packaging and deployment must pass for both tools, at the tag's version,
+      # on the candidate itself: either tool failing blocks the tag and release.
       - name: Validate the release contract on the candidate
         env:
           CANDIDATE: ${{ steps.v.outputs.candidate }}
+          VERSION: ${{ steps.v.outputs.version }}
         run: |
           git worktree add --detach "$RUNNER_TEMP/orion-release-candidate" "$CANDIDATE"
           cd "$RUNNER_TEMP/orion-release-candidate"
           for tool in codex claude-code; do
-            echo "Checking Orion deployment for $tool at $CANDIDATE"
-            node update/release-contract.mjs --tool "$tool" > /dev/null
+            echo "Checking Orion packaging and deployment for $tool at $CANDIDATE (v$VERSION)"
+            node update/release-contract.mjs --tool "$tool" --version "$VERSION" > /dev/null
           done
+
+      - name: Run the candidate's tests
+        working-directory: ${{ runner.temp }}/orion-release-candidate
+        run: node --test
 
       - name: Extract release notes from CHANGELOG.md
         id: notes

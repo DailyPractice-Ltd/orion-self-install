@@ -44,6 +44,43 @@ replaced and retired files, retires listed files that match shipped fingerprints
 checks the incoming scripts and records the version after applying the update.
 On the same version it reports an up-to-date result when there is no work.
 
+### The Orion plugin in an update
+
+The shipped package `plugins/orion/` is release-managed and replaced as a unit. The
+helper first copies the complete previous package, in-place edits included, into the
+backup (`<backup>/package/plugins/orion/`) and lists edited files under
+`package.edits_backed_up`. Customizations belong in client skills under `.claude/skills/`
+or `.agents/skills/`, which the update never touches. It also backs up the selected
+tool's catalog (`.claude-plugin/marketplace.json` or `.agents/plugins/marketplace.json`),
+which keeps the same catalog identity, and this folder's own registration entries for
+that tool (`<backup>/registration.json`): Orion's two keys in
+`.claude/settings.local.json`, or Orion's two tables in `.codex/config.toml`. Nothing
+else in those files is recorded or put back. It then refreshes the selected tool with
+`node update/plugin-setup.mjs resume` logic:
+
+- **Failed** (a check or native command failed): the previous package, catalog,
+  registration entries, files and version are put back, the report says
+  `"state": "rolled_back"` and the helper
+  exits 3. Recovery is not claimed until a fresh session confirms it: follow the
+  report's `remaining_action`.
+- **Pending or registered**: the files are at the new release, but the update is not
+  active yet. `status.json` keeps the last confirmed release in `plugin.verified_version`
+  and the target in `plugin.pending_version`; the report says `"active": false` with
+  the exact remaining step. Do not tell the client the new version is active. Claude Code
+  loads the package in place, so a fresh session (or `/reload-plugins`) picks it up.
+  Codex loads a cached copy, so reinstall Orion from its Plugins Directory or `/plugins`,
+  then start a fresh chat. Then run `node update/plugin-setup.mjs verify --discovered`;
+  that clears `pending_version`. Until then `plugin.update_backup` names the update's
+  backup: if a later `resume` or `verify` fails, `remaining_action` gives the exact
+  restore command that puts the previous release back.
+
+Marketplace auto-updates never replace the pinned release: the Claude Code catalog is a
+local folder read in place, and Orion never runs `codex plugin marketplace upgrade`.
+
+An interrupted update is rolled back from its journal with
+`node update/apply.mjs recover --root .`. Recovery restores only what the update wrote.
+If a path changed since, it stops, overwrites nothing and names the paths and the step to take.
+
 When upgrading a harness that predates the 1.5.0 sending rule, run
 `node status/send.mjs migrate` as described in [AGENTS.md](../AGENTS.md).
 Updates never start or renew a connection allowance. All unpaired folders must
@@ -56,6 +93,33 @@ check support messages separately with `node status/radio.mjs check`. Report the
 any replaced edited runtime scripts and the backup path. Remove the temporary
 source checkout after the operation.
 
+## Switch AI assistants
+
+Switching is local and needs no release clone: from the Orion folder root, run
+
+```sh
+node switch_ai.mjs
+```
+
+It switches to the other assistant; add `--to claude-code` or `--to codex` to name one.
+It reuses the same package, version and catalog identity. It writes the target tool's
+catalog and sets Orion up with that tool first. Only when the target tool's own
+inspection shows the same discovery evidence as plugin setup (see
+[Finish the Orion plugin](setup.md#finish-the-orion-plugin): every shipped skill at this
+version, enabled for this folder only) does it move client skills to the new skill
+folder and record the new selection. After that commit it removes Orion from the
+previous tool, and then that tool's catalog, so a failure before the commit leaves the
+previous tool exactly as it was. For Codex, removing Orion means `codex plugin remove`
+and deleting Orion's two tables from `.codex/config.toml`. Other plugins, caches and
+settings of either tool are left alone.
+If the target still needs a step (Codex's native install, a missing app), the switch is
+pending: `ai_assistant` keeps the current tool and `plugin.pending_switch` records the
+target and the remaining step. Do that step, then run `node switch_ai.mjs` again to
+finish. To cancel it, run `node switch_ai.mjs --to <the current tool>`. If the target's
+setup fails, nothing is switched (exit 3) and the current tool keeps its Orion setup.
+Review your scheduled tasks in the app that owns them before switching. The switch
+reports its backup of the old skills and status. To switch back, run it again.
+
 ## Restore
 
 Use the backup path printed by update:
@@ -67,7 +131,12 @@ node update/apply.mjs restore --root . --backup .update-backup/VERSION-TIMESTAMP
 For an update, restore puts prior released files back and removes newly installed
 files. A file changed after update is kept and reported. It restores the prior
 version and retired checklist keys without replacing the client's live status
-wholesale. Keep the backup for audit.
+wholesale. It also puts back the previous plugin package, catalog and this folder's
+own registration entries, leaving other settings as they are now. If the package
+changed after the update, restore stops before changing anything and says how to keep
+those edits. After a restore, the report says `reload_required`: start a fresh session,
+and confirm discovery with `node update/plugin-setup.mjs verify --discovered` before
+telling the client the previous version is running again. Keep the backup for audit.
 
 ## Older same-path folders
 
@@ -96,8 +165,8 @@ lists the three `.claude/skills/` source files removed from the release. An olde
 same-path updater can still refresh the other listed files; it will leave those
 three installed skills as they are. To receive current skill definitions, migrate
 the harness into a separate client folder with `install.mjs --migrate-from` above,
-or follow the pinned update procedure in an already deployed folder. It maps the
-`skills/` sources to the chosen runtime paths and recognizes historical Claude
-copies by fingerprint. `deployment` is the contract for separate client folders.
+or follow the pinned update procedure in an already deployed folder. It installs
+the `orion` plugin package at `plugins/orion/` for either tool and recognizes
+historical Claude copies by fingerprint. `deployment` is the contract for separate client folders.
 Maintainers run
 `node tests/helpers/pristine.mjs --write` after release edits and before tagging.

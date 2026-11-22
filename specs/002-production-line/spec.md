@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-25
 
-**Status**: Draft
+**Status**: Updated for required-pairing candidate
 
 **Input**: "The production line: setup wizard, README control panel, library packaging,
 client-side bridge wiring." Builds on feature `001-self-install` (the foundation repo).
@@ -29,15 +29,15 @@ tools already live here (Claude? ChatGPT? Copilot?), is anything missing? It wri
 it finds into the bookmark file, then walks the remaining checks one at a time. At every
 password moment it stops, opens the right window, and says: *"Type your password here —
 I'll wait."* The client types it themselves; the wizard verifies and moves on. At the end,
-the wizard hands over a pre-written prompt that drops the client into a working session
-with their own AI — which takes the install from there.
+the wizard hands over a prompt for the recorded supported tool only after verified
+pairing and setup report acknowledgment. The assistant then continues installation.
 
 **Why this priority**: this is the single biggest remover of cognitive effort. Every
 minute a non-technical client spends guessing is a minute closer to abandoning.
 
-**Independent Test**: on a machine with an AI assistant installed, a tester runs the
-start command and reaches the handoff prompt without typing any other command, and
-without the wizard ever seeing a password.
+**Independent Test**: in an installed Codex or Claude Code folder, a tester obtains
+a self-service code and reaches handoff only after accepted matching verification
+and a setup report acknowledgment. Missing or failed steps preserve unfinished setup.
 
 **Acceptance Scenarios**:
 
@@ -52,12 +52,11 @@ without the wizard ever seeing a password.
 3. **Given** the wizard finishes its checks, **When** it hands off, **Then** the client
    has a copy-ready prompt that starts their AI on the install sequence, and the bookmark
    file shows where the wizard left things.
-4. **Given** a client on a plain website chat (no file access, can't run anything),
-   **When** they can't use the wizard, **Then** the existing conversational path still
-   carries them through — the wizard is a fast lane, never a toll gate.
-5. **Given** the start command fails because the machine can't run it (e.g. Node is not
-   installed), **When** the client returns to the README, **Then** an "if that didn't
-   work" line routes them to a no-wizard path with the same outcome.
+4. **Given** a plain website-only or paste-only chat, **When** setup is requested,
+   **Then** route to an installed folder in Codex or Claude Code; this surface cannot
+   run pairing or fresh connection checks and cannot hand off Orion work.
+5. **Given** Node is missing, **When** the wizard cannot run, **Then** guide Node
+   installation before setup; there is no script-free equivalent of the work guard.
 
 ---
 
@@ -115,49 +114,42 @@ tested*. These three are the "gym protocol" answer to install overwhelm.
 
 ### User Story 4 - The two-way radio (Priority: P2)
 
-If the client says yes during the wizard (the box is pre-ticked, plainly worded, one
-click to decline), their harness checks in with Daily Practice: "I'm alive, I just did
-real work, here's what I have installed." And the radio works both ways — at the start of
-each session, the client's agent checks the mailbox. Example: Daily Practice posts
-*"Your follow-up agent hasn't run in 6 days — want us to look?"*; the agent reads it out;
-the client answers; the reply lands back with Daily Practice.
+Pairing links this folder to a signed-in Daily Practice account and enables required
+operational check-ins. The payload remains the existing labels-only disclosure.
+Support messages remain separate; replies and contributions need per-item consent.
 
-**Why this priority**: this is how installs stop being launch-and-hope. Signals are also
-literally how a running harness gets counted toward the North Star.
+**Independent test**: self-service code issuance, transactional exchange, matching
+read-only verification, stable setup report acknowledgment and handoff. Before
+interactive/scheduled work, fresh accepted verification and pending-report delivery
+establish the shared silent 48-hour connection allowance; unpaired work is blocked.
 
-**Independent Test**: with a welcome pack (key + address) configured, a signal sent from
-the client machine lands with Daily Practice; a nudge posted by Daily Practice is read
-out at the next session start; the reply arrives back.
+**Acceptance scenarios**:
 
-**Acceptance Scenarios**:
-
-1. **Given** the wizard's check-in step, **When** the client accepts the default,
-   **Then** the pack's address and key are written into the bookmark file's sharing
-   settings and the first signal is sent during the install session itself.
-2. **Given** the client declines, **When** the install continues, **Then** everything
-   else works identically and nothing outbound is ever sent (current behavior preserved).
-3. **Given** a nudge waiting, **When** the client starts any session, **Then** the agent
-   presents it in plain words and offers to send a reply; no reply is sent without the
-   client's yes.
-4. **Given** a package installs, **When** the radio is on, **Then** the install is
-   reported ("Prospecting v1.x on this machine") so Daily Practice's shelf stays accurate.
+1. Missing, invalid, expired or used code; failed exchange/check/report: setup stays
+   unfinished with saved answers and no handoff. Resume by verifying saved exchange
+   or obtaining a fresh code when no credential survived.
+2. A failed pre-work check pauses tasks, messages, CRM writes and scheduled work
+   after the connection allowance expires; diagnosis, inspection, updating and re-pairing remain available.
+3. A report failure after allowed work keeps its labels and original event time in
+   a durable local outbox. Verified recovery replays the original identities without
+   duplicate counts before new work after the connection allowance expires.
+4. A support nudge is delivered in plain words after allowance; send a reply only
+   with the client's explicit yes. Verification never consumes support messages.
 
 ---
 
 ### Edge Cases
 
-- Node absent → Press Start fails gracefully; README's "if that didn't work" routes to
-  the conversational path (US1 scenario 5). The wizard must never be the only door.
-- No welcome pack (bought but pack not yet issued) → radio stays silently off; install
-  proceeds; wizard says what's missing and who to ask.
-- Two AI tools on one machine (e.g. ChatGPT app + Claude) → wizard asks ONE question:
-  "which do you want to run your harness?" — the only fork a human must pick.
-- Windows vs Mac → detection copy stays plain ("This is a Windows machine"); paths and
-  key names adjust silently.
-- Wizard re-run after partial install → reads the bookmark, says "welcome back — you're
-  at step N", never restarts from zero (Article II).
-- Client on paste-only chat never sees the wizard's check-in choice → the conversational
-  path presents the same choice in the same plain words.
+- Node absent: help install it, then resume saved setup in Codex or Claude Code.
+- No code: obtain or renew it from signed-in `/home/pair`, without support or payment.
+- Previously declined/unpaired existing folder: pair before any normal work;
+  preserve historical decline until explicit pairing.
+- Already paired enabled legacy folder: reuse accepted credentials without a new
+  code. Establish connection time through verification and complete delivery.
+- At exactly 48 elapsed hours, block new tasks; admitted tasks finish and report.
+  Revocation invalidates the allowance; unsafe local state requires recovery.
+- Wizard interruption: saved exchange/progress is resumed, never claimed complete
+  until accepted verification and the stable setup report's acknowledgment.
 
 ---
 
@@ -173,37 +165,25 @@ out at the next session start; the reply arrives back.
   the value themselves (into the destination tool or a masked prompt), verify it works,
   and continue. Credentials MUST never be requested in plain chat, echoed back, or stored
   anywhere except the tool that needs them.
-- **FR-003**: The wizard MUST end by producing the handoff prompt that starts the
-  client's AI on the `AGENTS.md` install sequence, and MUST be re-runnable — resume from
-  the bookmark, never restart from zero.
-- **FR-004**: The README MUST lead with Press Start (one command + ZIP/no-wizard
-  fallback) and link to built-in skills and instructions for receiving radio offers.
+- **FR-003**: The wizard MUST produce handoff only after accepted matching server verification and setup report acknowledgment. It MUST resume saved answers without repetition.
+- **FR-004**: README MUST lead with executable install and Press Start, route unsupported surfaces to Codex or Claude Code, and link built-in skills and pairing/recovery guidance.
 - **FR-005**: Built-in skills live at `skills/<slug>/SKILL.md` and ship through the
   deployment manifest. Optional skills come from the Daily Practice library over the radio.
 - **FR-006**: The three day-one skills (Prospecting, Call-Planner Control Tower,
   Friday Report) MUST be extracted from the live Workweek harness — behavior distilled,
   placeholders per Article VI — and MUST pass the scrub check (zero Workweek identifiers)
   before entering the repo.
-- **FR-007**: Package installs MUST report to Daily Practice's shelf endpoint when (and
-  only when) the radio is on.
-- **FR-008**: The wizard MUST present the check-in choice pre-ticked with the plain-words
-  explanation and one-click decline; declining MUST leave every other function intact.
-  Accepting MUST write endpoint + key from the welcome pack into `status.json` sharing
-  settings and send the first signal during the install session.
-- **FR-009**: At session start, the agent MUST check the nudge mailbox when the radio is
-  on, present any nudge in plain words, and send a reply only on the client's yes.
-- **FR-010**: The existing conversational (no-wizard) path MUST reach every outcome the
-  wizard reaches, including the check-in choice — feature parity, slower lane.
-- **FR-011**: Nothing external ever sends without the client's explicit yes — restated:
-  constitution Articles III/V bind every new package and the radio.
-
+- **FR-007**: Operational package reports MUST persist allowlisted labels with original installation identity before network delivery; failed reports survive restart and replay idempotently.
+- **FR-008**: The wizard MUST use the approved short explanation from 007, obtain a self-service single-use code, save the exchanged credential privately and verify matching server acceptance before setup completes. Pairing is account linkage, not payment.
+- **FR-009**: Every task and scheduled run MUST attempt verification and pending-report delivery with the shared guard. Temporary failures permit silent work within the shared 48-hour allowance; credential refusal or expiry blocks new work. Support messages are checked separately; replies require explicit per-item consent.
+- **FR-010**: Direct conversational installs in executable supported folders MUST run the same wizard/guard. Website-only and paste-only chat can provide recovery guidance but cannot finish installation or authorize work.
+- **FR-011**: Sending follows the chosen risk level and CRM standing scope. Operational labels follow required pairing; words and artifacts to Daily Practice retain per-item consent.
 ### Key Entities
 
 - **Machine profile** — what the wizard learned about this computer (OS, tools found,
   chosen AI surface); lives inside `status/status.json`.
-- **Welcome pack** — what the client receives at sale: client id, harness id, the key
-  (install token), the radio address (endpoint URL). Issued by Daily Practice; consumed
-  by the wizard's check-in step.
+- **Pairing code** — a signed-in account issues or renews a single-use 15-minute
+  code; exchange derives folder identity and private credential. No hand-carried token.
 - **Package** — one Library unit: `PACKAGE.md` (name/kind/version/requires) + install
   prompt + smoke test + changelog line.
 - **Nudge** — one message from Daily Practice to this harness, or the reply back.
@@ -215,9 +195,9 @@ out at the next session start; the reply arrives back.
 
 ### Measurable Outcomes
 
-- **SC-001**: On a machine with an AI assistant installed, Press Start → handoff prompt
-  in under 10 minutes, zero commands typed beyond the start command, zero credentials
-  seen by the wizard.
+- **SC-001**: In a supported installed folder, only accepted verification and the
+  setup report acknowledgment permit handoff. A one-time code is the only pairing
+  value the human enters; install tokens never appear in output or logs.
 - **SC-002**: A first-time reader locates "what do I press first" and "where do I add
   capabilities" within one screen of the README (observed in the dry run, not assumed).
 - **SC-003**: All three day-one skills pass their smoke tests on live non-Workweek data
@@ -227,7 +207,7 @@ out at the next session start; the reply arrives back.
   identifiers returns zero hits in the public repo.
 - **SC-005**: With the radio on: first signal lands during the install session; a nudge
   posted before a session is presented at that session's start; the reply arrives back.
-  With the radio off: zero outbound calls.
+  With the radio disabled: no new work when the shared guard blocks; recovery remains available.
 - **SC-006**: The standing acceptance gate holds: a real non-technical person reaches
   `validated` unassisted (`NON-TECHNICAL-DRY-RUN.md`, feature 001 T033).
 
@@ -236,8 +216,9 @@ out at the next session start; the reply arrives back.
 - The Daily Practice doors this feature calls (`/api/bridge/signals`, `/api/bridge/nudges`,
   `/api/bridge/assets`) are delivered by `dailypractice-mono` feature
   `002-intelligence-bridge` — built first; this repo's radio work lands behind it.
-- Welcome packs (key + address) are minted manually by Daily Practice at sale for now; no
-  self-service registration endpoint exists or is wanted yet.
+- Self-service `/home/pair`, `/pairing-code`, `/pair` and read-only `/verify` are
+  implemented in the mono on `feature/required-pairing`; deployment, database runner
+  and real-account verification are still pending, not inferred from route tests.
 - The repo becomes public on GitHub (public + MIT, standing recommendation) before Kira's
   install; screenshots per `SHOTLIST.md` follow the push.
 - The Workweek harness on the founder's machine is the extraction source of record; its

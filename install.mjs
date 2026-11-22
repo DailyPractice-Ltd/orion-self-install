@@ -5,6 +5,8 @@ import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve, relative, sep, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { planForTool, fingerprint, safePath } from './update/destination-resolver.mjs';
+import { ensurePluginRegion } from './update/plugin-package.mjs';
+import { checkFolder, describe, runPluginSetup, RESUME_COMMAND } from './update/plugin-setup.mjs';
 
 const release = dirname(fileURLToPath(import.meta.url));
 const usage = 'Usage: node install.mjs --tool <claude-code|codex> --target <new client folder> [--migrate-from <legacy checkout>] [--github-repo OWNER/NAME | --remote https://github.com/OWNER/NAME.git | --local-only]';
@@ -14,7 +16,7 @@ function arg(name) {
   return i < 0 ? undefined : process.argv[i + 1];
 }
 
-function install() {
+async function install() {
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
     console.log(usage);
     return;
@@ -136,7 +138,6 @@ function install() {
       delete oldStatus.checklist.n8n_wf02_imported;
       oldStatus.sharing={...template.sharing,...oldStatus.sharing,pairing:{...template.sharing.pairing,...oldStatus.sharing?.pairing}};
       oldStatus.scopes={...template.scopes,...oldStatus.scopes};
-      oldStatus.memory={...template.memory,...oldStatus.memory};
       oldStatus.schema_version=template.schema_version;
       oldStatus.ai_assistant = ai_assistant;
       oldStatus.template_version=manifest.template_version;
@@ -146,6 +147,13 @@ function install() {
       writeFileSync(join(stage,'status/status.json'),JSON.stringify(oldStatus,null,2)+'\n');
       if(collisions.length) console.log(`Migration collisions (client edits preserved): ${collisions.sort().join(', ')}`);
     }
+    // The plugin: this harness's catalog identity (made once) and the selected tool's
+    // catalog only, both checked here in the stage. Registration waits for the final path.
+    const stagedStatus = JSON.parse(readFileSync(join(stage, 'status/status.json'), 'utf8'));
+    const { catalog_identity: identity } = ensurePluginRegion(stagedStatus, { create: true });
+    writeFileSync(join(stage, 'status/status.json'), JSON.stringify(stagedStatus, null, 2) + '\n');
+    const packageErrors = checkFolder(stage, { tool: ai_assistant, identity, version: manifest.template_version, write: true });
+    if (packageErrors.length) throw new Error(`The Orion plugin package did not validate:\n  ${packageErrors.join('\n  ')}`);
     const init = spawnSync('git', ['-C', stage, 'init', '-q', '-b', 'main'], { encoding: 'utf8' });
     if (init.status !== 0) throw new Error(`Could not create client repository: ${init.stderr.trim()}`);
     if(!useLocal) {
@@ -174,11 +182,17 @@ function install() {
     renameSync(stage, target);
     console.log(`Created ${ai_assistant} client repository at ${target}`);
     console.log(useLocal?'Local Git repository ready; a private GitHub remote can be added later.':`Private GitHub repository provisioned: ${githubRepo||remoteRepo}`);
-    console.log(`Next: cd ${JSON.stringify(target)} and run node start.mjs`);
   } finally {
     if (existsSync(stage)) rmSync(stage, { recursive: true, force: true });
   }
+  // Only now, at its final path, is the harness registered with the selected tool.
+  let plugin;
+  try { plugin = await runPluginSetup(target, { mode: 'setup' }); }
+  catch (error) { plugin = { setup_state: 'failed', tool: ai_assistant, reason: error.message, errors: [], remaining_action: `Plugin setup stopped before it could finish (${error.message}). Your new folder is installed and keeps its progress: from that folder run "${RESUME_COMMAND}" to try again.` }; }
+  console.log(describe(plugin));
+  console.log(`Next: cd ${JSON.stringify(target)} and run node start.mjs`);
+  if (plugin.setup_state === 'failed') process.exitCode = 3;
 }
 
-try { install(); }
+try { await install(); }
 catch (error) { console.error(error.message); process.exitCode = 2; }

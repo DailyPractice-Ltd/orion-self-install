@@ -1,5 +1,8 @@
 # Orion — turn your own AI assistant into your sales agent
 
+Every harness and its assistant are named **Orion**. Setup personalizes your business
+context, tone and working preferences; there is no naming step.
+
 Orion is a personal sales agent that learns your business, your customers, and how you
 actually sell — then takes on the parts of selling that aren't talking to people. You
 tell it about a prospect; it researches them and drafts a message for you to look over.
@@ -7,20 +10,20 @@ After a call, you tell it how it went; it writes the summary, updates your pipel
 drafts your follow-up. What goes out on its own is up to you: you set a risk level, and
 nothing sends above it.
 
-Nobody sits with you for this. Your own AI assistant — Claude, ChatGPT,
-Copilot, Codex, whichever you already use — installs it with you, using the files in
-this folder. **Press Start** below gets you going in three small moves, and the
+Your own AI assistant in **Codex or Claude Code** installs Orion with you, using
+the files in this folder. A signed-in Daily Practice account and a working connection
+are required to finish setup and use Orion. **Press Start** below gets you going in three small moves, and the
 skills section shows what Orion can do for you.
 
-**Three things worth knowing before you start:**
+**Before you start:**
 
-- **You don't need to know how to code, and you don't need to install anything new**
-  beyond an AI assistant you probably already have.
+- **You don't need to know how to code.** You need Node.js, git, and Codex or Claude Code.
+  Your assistant can help you install a missing tool.
 - **This usually takes a few sittings, not one.** You can stop anytime — see
   ["You can stop anytime"](#you-can-stop-anytime-and-pick-up-right-where-you-left-off)
   below — and nothing is lost.
-- **Nothing happens without you saying yes.** Not one email, not one change to your
-  contacts list, ever, without you approving it first. More on this below.
+- **You set the send risk level.** Messages within it can send on their own; above
+  it they wait for you. CRM writes use the standing scope described below.
 - **It keeps up without you.** Daily Practice ships improvements as numbered
   [releases](https://github.com/DailyPractice-Ltd/orion-self-install/releases). Ask your
   AI "what version is my harness on?", and if it is behind, say "update my harness".
@@ -41,8 +44,12 @@ node install.mjs --tool claude-code --target /path/to/my-orion
 ```
 
 The target must be a new or empty folder outside this release. The installer creates
-a separate local Git repository, copies the shipped skills into your chosen
-tool's layout, and records that choice in `status/status.json`.
+a separate local Git repository, copies Orion's skills in as the `orion` plugin
+(`plugins/orion/`), registers that plugin with your chosen tool for this folder only,
+and records that choice in `status/status.json`. If the tool still needs a step from
+you (installing Orion from Codex's plugin list, or a fresh session), the installer
+prints it; [setup and recovery](docs/setup.md#finish-the-orion-plugin) explains how
+to resume.
 It leaves the release sources, tests, and project specifications behind. Then enter your new folder and
 press Start:
 
@@ -51,8 +58,14 @@ cd /path/to/my-orion
 node start.mjs
 ```
 
-The wizard checks your computer, offers the radio choice, and gives you the prompt
-to start working with your AI assistant. Keep this client folder as your business's
+The wizard checks your computer, saves your answers, and requires verified pairing
+before it gives you the prompt to start working with your AI assistant.
+
+Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.
+
+Get your code at [Daily Practice](https://www.dailypractice.world/home/pair).
+[Setup and recovery](docs/setup.md) covers interrupted setup, connection failures,
+and the silent 48-hour connection allowance after verified pairing. Keep this client folder as your business's
 Orion home. The downloaded release folder is only the source for installing and
 updating it. If you already created an empty
 private repository, use `--remote https://github.com/YOUR-USERNAME/my-orion.git`
@@ -71,17 +84,21 @@ only `@AGENTS.md`. Keep the shared instructions in one place.
 
 ## Built-in skills
 
-The installer includes
-[Prospecting](skills/prospecting/SKILL.md), [Call Planner](skills/call-planner/SKILL.md), and
-[Friday Report](skills/friday-report/SKILL.md), and these two skills:
+The installer includes these skills in the `orion` plugin, among others:
+[Prospecting](plugins/orion/skills/prospecting/SKILL.md),
+[Call Planner](plugins/orion/skills/call-planner/SKILL.md),
+[Friday Report](plugins/orion/skills/friday-report/SKILL.md), and
 
-- **[Prospect Research → Outreach](skills/prospect-research-outreach/SKILL.md)** — give Orion
+- **[Prospect Research → Outreach](plugins/orion/skills/prospect-research-outreach/SKILL.md)** — give Orion
   a prospect to research, prepare outreach, and record the next step in your CRM.
-- **[Post-Call Debrief](skills/post-call-debrief/SKILL.md)** — give Orion call notes for a
+- **[Post-Call Debrief](plugins/orion/skills/post-call-debrief/SKILL.md)** — give Orion call notes for a
   summary, CRM update, and follow-up draft.
 
-In an installed harness, find these files in `.agents/skills/` for Codex or
-`.claude/skills/` for Claude Code. Tell Orion which task to do or teach it a new procedure.
+In an installed harness they live in `plugins/orion/skills/`, and "update my harness"
+replaces that package as a whole. In Claude Code you can call one directly as
+`/orion:<skill>`, such as `/orion:friday-report`. Skills you create or add yourself are
+yours: they go in `.agents/skills/` for Codex or `.claude/skills/` for Claude Code, and
+updates leave them alone. Tell Orion which task to do or teach it a new procedure.
 Use [Codex scheduled tasks or Claude Routines](docs/scheduled-work.md) for recurring work.
 Daily Practice can offer additional skills [over the radio](docs/radio.md).
 
@@ -102,9 +119,8 @@ it outside the downloaded release folder.
 ## Step 3 — Install and Press Start
 
 Open Terminal (Mac) or Windows Terminal (Windows). Type `cd `, drag the extracted
-release folder into the terminal window, and press Enter. Sign in with
-`gh auth login`, then run the install command for the tool you use. Replace
-`YOUR-USERNAME` with your GitHub username:
+release folder into the terminal window, and press Enter. Run the install command
+for the tool you use:
 
 ```bash
 node install.mjs --tool codex --target /path/to/my-orion
@@ -128,16 +144,10 @@ AI assistant to help with the manual setup.
 
 ## Step 4 — Open Orion with your AI assistant
 
-Whatever AI you use — Claude, ChatGPT, Copilot, Codex, Cursor, or something else — the
-move is always the same: **if your AI can open folders, open Orion's folder with it; if
-it can't, hand it one file (`AGENTS.md`)**. Pick whichever description below sounds
-like you; if you ran the wizard, it already told you which lane is yours.
+Open the installed client folder in **Codex or Claude Code** after verified setup.
+These tools can read and write the files and run the required connection check.
 
 ### Opening Orion from your desktop agent
-
-This is for AI apps that live on your computer and can open folders: the **Claude**
-desktop app (its **Code** tab), **Codex**, **Claude Code**, **Cursor**, or **VS Code
-with Copilot**.
 
 1. Open your AI app.
 2. Find its open-a-folder control — in the Claude app: click **Code** near the top,
@@ -156,45 +166,12 @@ with Copilot**.
 **You'll know it worked when**: it introduces itself and asks about your business —
 not about your computer.
 
-### Just a website — no app needed, always works
+### If you currently use a website or paste-only chat
 
-A website chat can't reach into folders on your computer, so you hand it the brief
-directly. The move is the same on every AI website: **make a dedicated space, and give
-it the file `AGENTS.md` from your Orion folder** — the same everyday action as
-attaching a file to an email. What that space is called depends on the tool:
-
-- **Claude** (claude.ai): **Projects → New Project** — name it anything, "My Orion" is
-  fine — then add `AGENTS.md` via its add-files/knowledge button.
-- **ChatGPT** (chatgpt.com): **Explore GPTs → Create** (needs a paid plan — on the free
-  plan, use the copy-paste route below instead; it works just as well).
-- **Copilot** (Microsoft 365): look for **Create agent**.
-
-<!-- SCREENSHOT: docs/img/06a-claude-project-create.png
-     alt: "The claude.ai interface showing the 'Create project' button and a newly named project"
-     caption: "Example, in claude.ai: Projects → Create project → name it 'My Orion'. Every AI website has an equivalent." -->
-![Creating a new Project in claude.ai](docs/img/06a-claude-project-create.png)
-
-<!-- SCREENSHOT: docs/img/06b-claude-project-upload-files.png
-     alt: "The Project settings screen in claude.ai with the file upload button highlighted and AGENTS.md selected"
-     caption: "Then add one file from your Orion folder: AGENTS.md." -->
-![Uploading AGENTS.md into a claude.ai Project](docs/img/06b-claude-project-upload-files.png)
-
-Then start chatting and say: **"Read AGENTS.md and let's get started."** As it asks for
-anything else it needs (it will tell you exactly what and why), upload that file the
-same way — you'll never touch more than a handful of files.
-
-**You'll know it worked when**: it introduces itself and starts asking about your
-business — not about the file you just uploaded.
-
-**If uploading files isn't working for some reason**: open `AGENTS.md` in any plain
-text program (Notes, Notepad, TextEdit — whatever came with your computer), select all
-the text, copy it, and paste it directly as your first message instead. This always
-works, on anything that can have a conversation with you. (On Windows, if
-double-clicking the file doesn't open anything obvious, right-click it and choose
-**Open with → Notepad**.) One difference with this path: since there's no file for it
-to check on its own, it'll show you a short block of text before you finish each
-session and ask you to save it (a Notes app is fine) — paste that back first next time,
-so it still knows exactly where you left off.
+Website-only Projects, Custom GPTs, Copilot chats and pasted instructions cannot
+execute Orion’s pairing and pre-work checks. They are no longer supported install
+or work paths. Open your saved Orion folder in Codex or Claude Code and follow
+[setup and recovery](docs/setup.md); your existing business files stay in that folder.
 
 ---
 
@@ -211,13 +188,14 @@ it'll explain what it's for before asking you to do it.
 
 ## Once installed, use Orion from any project
 
-The folder you homed in Step 2 is Orion's memory — your knowledge base, your bookmark
+The folder you homed in Step 2 holds your knowledge base, your bookmark
 file, your installed packages all live there. But you don't have to "go there" to work:
 your AI remembers it as one of your projects. Tomorrow, next month, mid-way through
 something else entirely — open your AI, switch to your Orion project (desktop agents
-keep a recent-folders list; websites keep the space you made), and say **"let's
+keep a recent-folders list), and say **"let's
 continue"** or just start working. One download, one home, then it's simply *there*,
-one switch away, whatever you're working on.
+one switch away, whatever you're working on. Every session starts with a fresh
+connection check; if it fails, Orion work pauses until recovery.
 
 <!-- SCREENSHOT: docs/img/07-use-orion-from-any-project.png
      alt: "A desktop AI agent's folder picker at the Github folder level, with arrows showing you can hop into Projects — or any folder — and Orion is one open away"
@@ -249,13 +227,12 @@ running `node start.mjs` again greets you with exactly where things stand.)
 - **It won't write anything that could embarrass you or your business.** If you ask for
   something that crosses a line, it'll tell you plainly and suggest a better way — not
   just refuse and leave you stuck.
-- **It won't send information about your business anywhere without telling you.** Orion
-  can keep a small check-in "radio" open with Daily Practice. It shares which install
-  step you're on, what kind of task finished (a general tag such as "prospecting", a
-  count, and which skill or agent ran), and which packages you have. Never the
-  content of anything. It's presented to you plainly as a pre-ticked choice you can decline with
-  one keystroke, during setup, and you can switch it off anytime after.
-  [The radio, in plain words](docs/radio.md) is the whole story — no fine print.
+- **The required radio shares operational labels.** It reports install stage,
+  finished-work tag and count, event time, and skill or package names and versions.
+  It does not share your business content, prospects or messages as operational
+  data. Words and artifacts cross only after separate per-item consent. Disabling
+  the connection pauses supported work outside the existing-user transition.
+  [The radio, in plain words](docs/radio.md) gives the full disclosure.
 
 ---
 
@@ -272,6 +249,7 @@ alone — that's what it's built for. If it genuinely can't help, reach out to
 
 ---
 
-*For Daily Practice maintainers evolving this repository itself — not installing it for a
-client — the technical specifications live in `specs/001-self-install/`
-and `specs/002-production-line/`.*
+*Agents use `docs/` for operational and development guidance. `specs/` stays in
+this development repository as a human-only implementation record. Agents must
+not read it, code and tests must not load it, and installations exclude it.
+If permitted documentation is incomplete, agents ask the human.*

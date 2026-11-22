@@ -1,6 +1,14 @@
 # Contract — agent anatomy (the shape of a hired agent)
 
-**Scope**: the artefacts `library/HIRING.md` produces. Article X: agent setup is inside
+**Current compatibility scope: this release ships no hired-agent
+runtime or hiring workflow. Existing client-owned job sheets and schedules are
+preserved as history. Migrate native prompts in place using
+[scheduled work](../../../docs/scheduled-work.md); every interactive, scheduled or
+handoff invocation must run `node status/guard.mjs check --quiet` first and stop
+on exit 2 when the shared guard blocks. The following anatomy documents legacy
+job sheets, not an alternate ungated work path.
+
+**Historical scope**: the artefacts `library/HIRING.md` produces. Article X: agent setup is inside
 the install journey (the gate's own enumeration), so this is a contract under
 002-production-line, not a new spec. Article VII: this shape exists before anything is
 built against it. If HIRING.md and this contract disagree, this contract wins and the
@@ -30,7 +38,7 @@ tools and the report. Missing any one of those → not hired (the roster may not
 6. **Report**: the mandatory last step of every piece of work, whether a person
    asked for it or the schedule started it. One command, `node status/done.mjs`: a
    line on the client's machine, written whether the radio is on or off, plus one
-   radio signal when check-ins are on.
+   operational report retained durably if delivery fails.
 
 **Hired** means the agent has done its job once on real work and reported it. It does
 not depend on a schedule. **Schedule proven** is a separate fact, and only agents
@@ -117,7 +125,7 @@ is not a shift. The line's text is **local only**: the radio carries labels and 
 count, never the line (constitution Article V), and `done.mjs` has no flag that
 could send it.
 
-Radio signal, when on, sent by `done.mjs` through `radio.mjs signal`:
+Operational signal, written ahead and sent by `done.mjs` through `radio.mjs signal`:
 
 - a shift → `routine_completed` ("routine" is only the wire name for a shift), with
   `routine: {name}`, `tag` and `count` (0 allowed: it ran and found nothing to do);
@@ -131,16 +139,18 @@ under the work's own line: "(radio unreachable)" when there was no answer, or
 "(radio refused {status})" when there was one that was not a yes. It learns the
 outcome from a machine-readable line `radio.mjs signal` prints on request
 (`--result-line`), never from the sentences written for people. A marker line
-carries no `auto:`, so it can never read as proof that a schedule fired.
+carries no `auto:`, so it can never read as proof that a schedule fired. Pending
+labels retain original event identity in the durable outbox and replay before new
+work when the shared guard blocks; verification alone never discards pending reports.
 
 `routine_completed` has been live server-side since 14 Aug 2026 (mono PR #20): the
 replay key is
-(harness, type, occurred_at, routine), so same-second shifts from different agents are
+(harness, type, occurred_at, routine, asset, tag), so same-second shifts from different agents are
 distinct rows. The interim two-type mapping (crm_updated / workflow_execution_completed)
 is retired; signals sent under it remain valid history. An agent hired before 1.1.0
 keeps its older report step (a hand-written shift-log line, then
-`radio.mjs signal --type routine_completed --routine {name} --count {N}`). That stays
-valid, and its signals simply carry no tag.
+`radio.mjs signal --type routine_completed --routine {name} --count {N}`). Its history stays valid; migrate the live prompt to the shared guard and current
+`done.mjs --shift` report sequence before enabling its next run.
 
 The standing yes: the client's approval of the job sheet at hire time **is** the
 written yes covering the shift's enumerated staging work and its report. AGENTS.md

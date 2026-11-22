@@ -28,7 +28,8 @@ keys `status.json`'s `packages` map and the Daily Practice shelf).
    output; instruct it to run the smoke test; and instruct it to record the install in
    `status/status.json`'s `packages` map and — only if the radio is on — report it via
    `node status/radio.mjs report-install`. The prompt must work on both code-capable and
-   paste-only surfaces (FR-010).
+   supported executable Codex or Claude Code surfaces (FR-010). Website-only or
+   paste-only users follow docs/setup.md before work.
 
 4. **What it does / What it doesn't do** — honest scope, including anything the source
    harness achieved with paid external services that this package does not include.

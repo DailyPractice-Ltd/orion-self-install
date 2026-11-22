@@ -23,17 +23,14 @@
  *
  * It does three things, in this order.
  *
- * 1. The local record, when --line is given. It never skips: radio on or off,
- *    memory on or off. One dated line, appended to a plain file in status/.
+ * 1. The local record, when --line is given. It never skips: radio on or off.
+ *    One dated line, appended to a plain file in status/.
  *    A shift's line goes to status/shift-log.md as
  *      {YYYY-MM-DD HH:MM} | {agent} | count: {N} | auto: {line}
  *    This script writes the auto: marker itself, because that marker is what
  *    proves a schedule fired on its own. A task a person asked for goes to
  *    status/work-log.md as
  *      {YYYY-MM-DD HH:MM} | {who} | count: {N} | {tag} | {line}
- *    The same dated line is also written to the memory log,
- *    memory/agents/<who>/log.md, when memory is on. <who> is --agent, or else
- *    this harness's own agent_name. Memory trouble never blocks anything.
  *
  * 2. The radio half, only when the radio is on: one signal through
  *    status/radio.mjs, carrying labels only. The tag, the count, the time, and
@@ -72,7 +69,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   isWorkTag, workTagMenu, labelProblem, countProblem, looksLikeCredential, LINE_MAX,
-  radioOn, readRadioKeyFile, memoryOn, homeOn,
+  radioOn, readRadioKeyFile, homeOn,
 } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -236,7 +233,7 @@ function runSibling(script, args, timeoutMs) {
 
 // What gets recorded locally: one dated line, in the shape of the log it joins.
 // A shift goes to the shift log. Work a person asked for goes to the work log.
-// Neither depends on the radio, and neither depends on memory.
+// Neither depends on the radio.
 const stamp = localStamp();
 const logPath = shift ? SHIFT_LOG_PATH : WORK_LOG_PATH;
 const logName = shift ? 'status/shift-log.md' : 'status/work-log.md';
@@ -267,18 +264,10 @@ if (status === null) {
   process.exit(0);
 }
 
-// The same dated line, into the team's memory, when memory is on. The file
-// above is the record that never skips. This one is for the notebook.
-if (localLine !== null && memoryOn(status) && (agent || ownName)) {
-  // memory.mjs prints its own one line, whether it wrote the note or could not.
-  const note = runSibling('memory.mjs', ['note', '--to', `agents/${agent || ownName}/log.md`, '--line', localLine], 15000);
-  if (note.out) console.log(note.out);
-}
-
 // ── 2. The radio half: labels only ──────────────────────────────────────────
 // The line is never passed below. Off means off: nothing sent, nothing said.
 
-if (radioOn(status, { keyFile: readRadioKeyFile(__dirname, { readFileSync }) })) {
+{
   const args = [
     'signal',
     '--type', shift ? 'routine_completed' : 'task_completed',
@@ -294,19 +283,19 @@ if (radioOn(status, { keyFile: readRadioKeyFile(__dirname, { readFileSync }) }))
   // Ask the radio to say what happened in one line a script can read, so this
   // never depends on the wording of the sentences it prints for people.
   args.push('--result-line', 'yes');
-  const radio = runSibling('radio.mjs', args, 30000);
+  const radio = runSibling('radio.mjs', args, 0);
   const lines = radio.out ? radio.out.split('\n') : [];
   const resultAt = lines.findIndex((l) => l.startsWith('[radio-result] '));
   const result = resultAt === -1 ? null : lines[resultAt].slice('[radio-result] '.length).trim();
   const forPeople = lines.filter((_, i) => i !== resultAt).join('\n').trim();
-  if (forPeople) console.log(forPeople);
+  if (forPeople && result !== 'off') console.log(forPeople);
   else if (result === null) console.log('The radio script could not finish, so nothing was sent. Nothing is lost locally.');
 
   // Anything but "sent" means Daily Practice did not get this piece of work. Say
   // so under the local line, as one more appended line. Never by rewriting the
   // log: two agents can finish at the same minute, and an append cannot lose the
   // other one's line.
-  if (logged && result !== 'sent') {
+  if (logged && result !== 'sent' && result !== 'off') {
     const why = result === null || result === 'unreachable'
       ? '(radio unreachable)'
       : `(radio ${result})`;

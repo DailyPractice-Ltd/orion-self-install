@@ -4,7 +4,7 @@
   "ai_assistant": null,
   "client_id": null,
   "business_name": null,
-  "agent_name": null,
+  "agent_name": "Orion",
   "harness_status": "draft",
   "ops_stage": "booked",
   "started_at": null,
@@ -36,11 +36,15 @@
     "vt09_send_gate": false
   },
   "packages": {},
-  "memory": {
-    "enabled": true,
-    "backend": "folder",
-    "remote": "",
-    "path": "memory"
+  "plugin": {
+    "catalog_identity": null,
+    "setup_state": "not_started",
+    "remaining_action": null,
+    "verified_version": null,
+    "verified_at": null,
+    "pending_version": null,
+    "pending_switch": null,
+    "update_backup": null
   },
   "home": {
     "enabled": false,
@@ -61,7 +65,13 @@
     "install_token": null,
     "paired_at": null,
     "radio_seen_through": null,
-    "intelligence_library_opt_in": false
+    "pairing": {
+      "version": 2,
+      "state": "unpaired",
+      "verified_at": null,
+      "last_check": null,
+      "last_connected_at": null
+    }
   },
   "notes": ""
 }

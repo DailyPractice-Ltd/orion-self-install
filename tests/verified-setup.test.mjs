@@ -6,12 +6,13 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { plainEnv } from './helpers/env.mjs';
+import { copyReleaseManifest } from './helpers/manifest.mjs';
 import { statusTemplate } from '../status/store.mjs';
 const source = new URL('../', import.meta.url);
 function harness(t, initial = {}) {
  const root = mkdtempSync(join(tmpdir(), 'orion-setup-')); t.after(() => rmSync(root,{recursive:true,force:true}));
  cpSync(new URL('status/',source), join(root,'status'), {recursive:true}); copyFileSync(new URL('start.mjs',source),join(root,'start.mjs'));
- mkdirSync(join(root,'update')); copyFileSync(new URL('update/manifest.json',source),join(root,'update/manifest.json'));
+ copyReleaseManifest(root);
  const status = {...statusTemplate(root), ai_assistant:'codex', ...initial};
  writeFileSync(join(root,'status/status.json'),JSON.stringify(status));
  const mock=join(root,'fetch.mjs');

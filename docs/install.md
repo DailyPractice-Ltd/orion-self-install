@@ -25,8 +25,9 @@ You are the installer; there is no coach in the session.
 
 ## Start or resume
 
-- **No `status/status.json`**: copy `status/status.schema-template.json` to
-  `status/status.json` and start at `ops_stage: "booked"`.
+- **No `status/status.json`**: run `node status/emit-status.mjs` (no flags). It creates
+  `status/status.json` from the template, stamped with this release's version; start at
+  `ops_stage: "booked"`. Never copy the template by hand.
 - **A status file**: resume at its `ops_stage`; skip every checklist step already `true`.
   When `machine_profile` is filled, the Press Start wizard (`start.mjs`) already recorded
   the OS, Node, git, the AI tools present and the client's choice: never re-ask them. When

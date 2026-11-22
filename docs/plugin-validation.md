@@ -70,7 +70,7 @@ Codex has no established unattended install, so the report stays `pending`:
 - If it says the folder must be trusted, open the folder in Codex and accept the trust
   prompt, then run `node update/plugin-setup.mjs resume`. Record whether Codex asked.
 - From the folder, open the Plugins Directory (desktop) or type `/plugins` (CLI).
-- Choose the `orion-<12 hex>` catalog and install Orion.
+- Search for "orion" and install Orion.
 - Start a fresh chat in the folder. Restart the desktop app if the catalog does not appear.
 - Record whether Codex's install wrote `[plugins."orion@orion-<12 hex>"]` into
   `~/.codex/config.toml`. If it did, Orion reports `enabled_user_wide` and stays pending

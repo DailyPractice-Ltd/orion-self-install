@@ -18,8 +18,9 @@ function docs() {
 const squash = (text) => text.replace(/\s+/g, ' ');
 
 for (const [rule, home, pattern] of [
-  ['the guard-run paragraph', 'docs/install.md', /admit the whole invocation with/i],
-  ['the 48-hour connection allowance', 'docs/install.md', /48[- ](elapsed )?hours?/i],
+  // Match the rule's working parts, not one sentence, so a reworded copy is caught too.
+  ['the guard-run paragraph', 'docs/install.md', /admit the whole invocation with|guard\.mjs run --|run -- sh -c/i],
+  ['the 48-hour connection allowance', 'docs/install.md', /\b48[- ]?(elapsed )?(hours?|hrs?|h\b)|forty[- ]eight hours/i],
 ]) {
   test(`${rule} lives only in ${home}`, () => {
     const found = docs().filter((path) => pattern.test(squash(readFileSync(join(repo, path), 'utf8'))));

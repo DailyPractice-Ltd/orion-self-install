@@ -111,7 +111,7 @@ follow [Finish the Orion plugin](docs/install.md#finish-the-orion-plugin).
      connector is live, in the conversation otherwise) and end with, word for word:
      "This message falls outside of your risk parameters, and you need to approve this
      manually." Then give the score, the level and what would bring it inside, as the
-     script printed them.
+     script printed them. Never say "I can't".
    - "Send it" on a waiting message is the client's yes for that one message: send it and
      record `node status/send.mjs verdict approved ...`; "no" records `rejected`.
    - Never claim something was sent that was not. Without scripts, score by hand from
@@ -131,7 +131,8 @@ follow [Finish the Orion plugin](docs/install.md#finish-the-orion-plugin).
    stage the write as a draft. A delete, a merge, an owner change or a lifecycle-stage move
    is never covered by the scope: read back exactly what will change and wait for the
    client's yes. When a property does not exist and the connector cannot create it, follow
-   the property route in the README for this harness's CRM under `crm/`.
+   the property route in the README for this harness's CRM under `crm/`; never stop to ask
+   for a key.
 
 2. **Reputation safety.** Refuse to draft anything a reasonable person would consider
    reputationally harmful to the client if a prospect received it: shaming, harassment,

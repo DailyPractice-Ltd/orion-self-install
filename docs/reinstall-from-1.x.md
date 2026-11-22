@@ -8,7 +8,15 @@ Say this to the client first, in one plain sentence: the new version is installe
 next to the old one, their business answers and their own skills come with it, and they
 will pair it with a new one-time code.
 
-## 1. Install fresh
+## 1. Deliver what the old folder still owes
+
+When the 1.x folder has `status/guard.mjs`, run `node status/guard.mjs check --quiet`
+there once. It delivers any
+finished work still queued in `status/radio-outbox.json`. That queue belongs to the old
+folder's pairing: never copy it. If the check cannot deliver, say so to the client and
+carry on; the old folder keeps the queue.
+
+## 2. Install fresh
 
 From a fresh copy of the 2.0.0 release, install into a **new, empty** folder with the AI
 tool the client uses:
@@ -21,18 +29,26 @@ node install.mjs --tool codex --target /path/to/new-orion
 
 The installer refuses a folder that already holds an Orion 1.x harness, or any files.
 
-## 2. Copy the client's files
+## 3. Copy the client's files
 
-From the 1.x folder into the new one, copy:
+From the 1.x folder into the new one, copy, at the same paths:
 
 - `agent/knowledge-base/01-*.md` through `07-*.md`: the client's business, in their words.
+- `status/no-contact.md`: the people and domains the client never wants contacted. Copy
+  it whenever it exists; without it, Orion could message someone who asked not to hear
+  from them.
+- `status/send-log.md`, `status/work-log.md` and `status/shift-log.md`: the client's own
+  history, when they exist.
 - The client's own skills: `.claude/skills/` (Claude Code) or `.agents/skills/` (Codex).
   Leave out any skill whose name matches one shipped in `plugins/orion/skills/`.
+- A hired team in `.claude/agents/`: copy it to `legacy/claude-agents/` in the new folder,
+  for reference. 2.0.0 does not load it.
 
-Copy nothing else. In particular, never copy `status/status.json`, `sharing.install_token`
-or `status/radio.key`: the new folder gets its own key when it pairs.
+Copy nothing else. In particular, never copy `status/status.json`,
+`status/radio-outbox.json`, `sharing.install_token` or `status/radio.key`: the new folder
+gets its own key when it pairs.
 
-## 3. Pair and resume
+## 4. Pair and resume
 
 In the new folder, run `node start.mjs` and pair with a new one-time code (see
 [Install Orion](install.md#pair-orion)). The install starts again at `ops_stage: booked`;

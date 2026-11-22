@@ -4,7 +4,7 @@
   "_regenerate": "Map every file under plugins/orion/ in deployment.entries, once each, with no per-tool destinations: the package ships at its own path for every tool. Run node tests/helpers/pristine.mjs --write after release edits.",
   "template_version": "2.0.0",
   "never_touch": {
-    "status/status.json": "The client's own record: preserve pairing, setup checkpoint, migration timestamps, stages, packages and choices. An update edits template_version, appends one notes line, and deletes only remove_status_checklist_keys. node status/send.mjs migrate may add the default send level. On first updated runtime use, the shared guard atomically adds/updates sharing.pairing for the one-time 30-day transition; it never resets a recorded clock. Setup may persist its own checkpoint. These runtime state changes do not authorize replacing the client's status file.",
+    "status/status.json": "The client's own record: preserve pairing, setup checkpoint, stages, packages and choices. An update edits template_version and appends one notes line. node status/send.mjs migrate may add the default send level. The shared guard updates sharing.pairing at runtime; it never resets a recorded clock. Setup may persist its own checkpoint. These runtime state changes do not authorize replacing the client's status file.",
     "status/send-log.md": "the client's own record of every send decision and verdict, content-free (since 1.5.0)",
     "status/no-contact.md": "the client's own no-contact list, for good (since 1.5.0)",
     "status/waiting.md": "the client's list of messages waiting for them, rewritten by every run (since 1.5.0)",

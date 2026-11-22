@@ -128,7 +128,8 @@ so nothing is repeated at the next session.
 A report can fail after an allowed task. The task still happened: `done.mjs` keeps its
 local work-log line, and the reporting helper writes the report's **labels and original
 event time** to `status/radio-outbox.json` before attempting delivery. Retries keep the
-original identity, so Daily Practice never counts the same work twice.
+original identity, so Daily Practice never counts the same work twice. Lost or malformed
+receipts keep a report pending: a successful connection alone never deletes it.
 
 The queue contains only allowlisted signal and installed-package metadata: folder
 identity, event type/time, stage/status/template version, public tag, count, routine

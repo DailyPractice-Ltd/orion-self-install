@@ -46,7 +46,7 @@ test('each manifest format validates on its own schema and rejects drift from th
     const errors = (change) => validatePluginManifest(tool, { ...structuredClone(good), ...change }, { version: release.template_version }).join('\n');
     assert.match(errors({ name: 'orion-plus' }), /name must be "orion"/);
     assert.match(errors({ version: ' ' }), /version must not be blank/);
-    assert.match(errors({ version: '9.9.9' }), /version 9\.9\.9 must equal the release version 2\.0\.0/);
+    assert.ok(errors({ version: '9.9.9' }).includes(`version 9.9.9 must equal the release version ${release.template_version}`));
     assert.match(errors({ description: '' }), /description/);
     assert.match(errors({ skills: './elsewhere/' }), /skills/);
     assert.match(errors({ bogus: true }), /unknown key "bogus"/);

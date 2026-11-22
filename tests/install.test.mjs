@@ -61,7 +61,9 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(wizard.status, 2, wizard.stderr);
     assert.doesNotMatch(wizard.stdout, /Step 3 of 3|Read AGENTS.md and/);
     assert.equal(JSON.parse(read('status/status.json')).machine_profile.chosen_surface, tool);
-    assert.equal(JSON.parse(read('status/status.json')).schema_version, '2.0.0');
+    const fresh = JSON.parse(read('status/status.json'));
+    assert.equal(fresh.template_version, JSON.parse(readFileSync(join(release, 'update/manifest.json'), 'utf8')).template_version);
+    assert.deepEqual(Object.keys(fresh).filter((k) => k.endsWith('_version')), ['template_version'], 'the record carries one version');
     // Exercise the actual deployed wizard: all guard/report dependencies must ship.
     const mock = join(base, 'pairing-fetch.mjs');
     writeFileSync(mock, `globalThis.fetch = async url => {

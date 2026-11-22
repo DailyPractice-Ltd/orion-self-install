@@ -6,6 +6,7 @@ import { dirname, join, resolve, relative, sep, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { planForTool } from './update/destination-resolver.mjs';
 import { ensurePluginRegion } from './update/plugin-package.mjs';
+import { statusTemplate } from './status/store.mjs';
 import { checkFolder, describe, runPluginSetup, RESUME_COMMAND } from './update/plugin-setup.mjs';
 
 const release = dirname(fileURLToPath(import.meta.url));
@@ -67,7 +68,7 @@ async function install() {
   try {
     // Record the choice before copying any release file into the staged harness.
     mkdirSync(join(stage, 'status'));
-    const status = JSON.parse(readFileSync(join(release, 'status/status.schema-template.json'), 'utf8'));
+    const status = statusTemplate(release);
     status.ai_assistant = ai_assistant;
     writeFileSync(join(stage, 'status/status.json'), JSON.stringify(status, null, 2) + '\n');
     for (const entry of plan) {

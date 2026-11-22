@@ -75,8 +75,8 @@ try {
 }
 
 // Every file the bump may write, as it is now (null: absent), to put back on any failure.
-const written = [CHANGELOG, MANIFEST, ...Object.values(MANIFEST_PATHS), PRISTINE];
-const original = new Map(written.map(path => [path, existsSync(join(root, path)) ? readFileSync(join(root, path)) : null]));
+const mayWrite = [CHANGELOG, MANIFEST, ...Object.values(MANIFEST_PATHS), PRISTINE];
+const original = new Map(mayWrite.map(path => [path, existsSync(join(root, path)) ? readFileSync(join(root, path)) : null]));
 let manifests;
 try {
   writeFileSync(join(root, CHANGELOG), next.changelog);

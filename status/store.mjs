@@ -47,12 +47,13 @@ const keyPath = root => join(root, 'status', 'radio.key');
 /**
  * A fresh status record: the template, stamped with the release's one version
  * from update/manifest.json. Both files ship in every harness and every release,
- * so this resolves them from the root it is given. Nothing else parses the template.
+ * so this resolves them from the root it is given. No other runtime code parses
+ * the template (tests read it directly to check its shape).
  */
 export function statusTemplate(root) {
   const read = path => JSON.parse(readFileSync(join(root, path), 'utf8'));
   const { template_version } = read('update/manifest.json');
-  return { template_version, ...read('status/status.schema-template.json') };
+  return { ...read('status/status.schema-template.json'), template_version };
 }
 
 async function readJson(path, missing) {

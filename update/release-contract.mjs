@@ -52,7 +52,7 @@ function simulateDeployment(ai_assistant, entries, version) {
     const catalog = JSON.parse(readFileSync(join(harness, path), 'utf8'));
     if (path !== TOOL_LAYOUT[ai_assistant].catalogPath) return [`catalog written at ${path}, expected ${TOOL_LAYOUT[ai_assistant].catalogPath}`];
     return [
-      ...validatePackage(harness, { version }).map(error => `deployed ${error}`),
+      ...validatePackage(harness, { version, tool: ai_assistant }).map(error => `deployed ${error}`),
       ...validateCatalog(ai_assistant, catalog, { root: harness, identity }),
       ...businessState(harness).map(error => `deployed ${error}`),
     ];

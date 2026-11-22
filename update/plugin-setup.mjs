@@ -65,7 +65,7 @@ async function harness(root, store) {
 /** Errors in this folder's package and selected-tool catalog; with `write`, the catalog is regenerated first. */
 export function checkFolder(root, { tool, identity, version, write = false }) {
   if (write) writeCatalog(root, tool, identity);
-  const errors = validatePackage(root, { version });
+  const errors = validatePackage(root, { version, tool });
   let catalog;
   try { catalog = JSON.parse(readFileSync(safePath(root, TOOL_LAYOUT[tool].catalogPath), 'utf8')); }
   catch { return [...errors, `${TOOL_LAYOUT[tool].catalogPath}: missing or unreadable; run ${RESUME_COMMAND}`]; }

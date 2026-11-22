@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, existsSync, readdirSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -31,6 +31,10 @@ for (const tool of ['claude-code', 'codex']) {
     assert.match(rename.stderr, /always Orion/);
     assert.equal(JSON.parse(read('status/status.json')).agent_name, 'Orion');
     assert.ok(existsSync(join(target, 'AGENTS.md')));
+    const manifests = { codex: 'plugins/orion/plugin.json', 'claude-code': 'plugins/orion/.claude-plugin/plugin.json' };
+    for (const [selected, path] of Object.entries(manifests)) assert.equal(existsSync(join(target, path)), selected === tool);
+    for (const path of ['switch_ai.mjs', 'update/plugin-package.mjs', 'status/store.mjs']) assert.ok(existsSync(join(target, path)), `${path} supports offline switching`);
+
     const skillRoot = tool === 'codex' ? '.agents/skills' : '.claude/skills';
     for (const path of ['memory', 'status/memory.mjs', 'docs/memory.md', `${skillRoot}/memory-consolidation`]) {
       assert.equal(existsSync(join(target, path)), false, `${path} leaked into fresh install`);
@@ -39,7 +43,7 @@ for (const tool of ['claude-code', 'codex']) {
     for (const path of ['AGENTS.md']) {
       assert.doesNotMatch(read(path), /memory\/|memory\.mjs|memory-consolidation/);
     }
-    for (const name of ['prospecting', 'call-planner', 'friday-report', 'prospect-research-outreach', 'post-call-debrief']) {
+    for (const name of readdirSync(join(release, 'plugins/orion/skills'))) {
       assert.ok(existsSync(join(target, 'plugins/orion/skills', name, 'SKILL.md')));
     }
     assert.equal(existsSync(join(target, skillRoot)), false, 'client-owned skills start empty; shipped skills live in the package');

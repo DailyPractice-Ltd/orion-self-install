@@ -24,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PACKAGE_ROOT, TOOL_LAYOUT, destinationState, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
-import { catalogName, catalogText, ensurePluginRegion } from './plugin-package.mjs';
+import { MANIFEST_PATHS, catalogName, catalogText, ensurePluginRegion } from './plugin-package.mjs';
 import { lowerFirst } from './plugin-native.mjs';
 import { captureRegistration, restoreRegistration } from './plugin-registration.mjs';
 import { RESUME_COMMAND, VERIFY_COMMAND, runPluginSetup } from './plugin-setup.mjs';
@@ -113,7 +113,16 @@ async function update(store,root,repo,commit) {
     if (newer(status.template_version,manifest.template_version)) throw new Error('Refusing to roll back the harness version');
     if (status.plugin?.pending_switch) throw new Error(`A switch to ${product(status.plugin.pending_switch.to)} has started but is not finished, and an update now could leave the two tools on different releases. Finish the switch first (run "node switch_ai.mjs" again) or cancel it (run "node switch_ai.mjs --to ${ai_assistant}"), then update`);
     const withPlugin=hasPackage(manifest.deployment);
-    const plan=planForTool(manifest.deployment,ai_assistant,{releaseRoot:snapshot,root});
+    // Preserve legacy dual-manifest packages; never reintroduce metadata omitted by
+    // a tool-specific install. Filter the snapshot before hashing or staging it.
+    const otherTool = Object.keys(MANIFEST_PATHS).find(tool => tool !== ai_assistant);
+    const includeOtherMetadata = existsSync(safe(root, MANIFEST_PATHS[otherTool]));
+    const plan=planForTool(manifest.deployment,ai_assistant,{releaseRoot:snapshot,root,includeOtherMetadata});
+    if (withPlugin && !includeOtherMetadata) {
+      const omitted = safe(snapshot, MANIFEST_PATHS[otherTool]);
+      rmSync(omitted, { force: true });
+      pruneParents(snapshot, [MANIFEST_PATHS[otherTool]]);
+    }
     const retired=(manifest.deployment.retired||[]).map(e=>({source:e.source,destination:e.destinations?.[ai_assistant]||e.destination,ownership:'release',fingerprint_key:e.sources?.[ai_assistant]||e.fingerprint_key||e.source}));
     const commonRetired=(manifest.remove||[]).map(path=>({source:path,destination:path,ownership:'release',fingerprint_key:path}));
     const actions=[], report={from:status.template_version,to:manifest.template_version,commit,ai_assistant,refreshed:[],added:[],retired:[],kept:[],collisions:[]};

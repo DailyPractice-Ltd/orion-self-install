@@ -141,3 +141,17 @@ telling the client the previous version is running again. Keep the backup for au
 ## Maintainers
 
 Run `node tests/helpers/pristine.mjs --write` after release edits and before tagging.
+
+### Tool-specific metadata
+
+Fresh installations carry only their selected tool's plugin manifest. Updates preserve
+that layout; existing packages carrying both manifests keep both. No migration or
+retroactive cleanup runs.
+
+`node switch_ai.mjs` generates the target manifest locally from the installed release
+version, using the shipped generator; no release download is needed. While native setup
+is pending, the current manifest and selected tool stay in place. Cancellation or failure
+restores the target metadata's prior contents or absence. On success, the previous tool
+is retired and its manifest and catalog are removed. Client-owned skills move to the
+selected tool's skill folder; business state, release version and catalog identity stay.
+The switch backup includes manifests and the prior target metadata journal.

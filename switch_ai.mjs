@@ -23,7 +23,7 @@
  *   4. after the commit, the previous assistant's Orion (its install and its catalog) is
  *      retired last. Nothing else in either assistant's settings is touched.
  */
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmdirSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withStatusLock } from './status/store.mjs';
@@ -82,11 +82,11 @@ function currentTool(root, status) {
 /** The plugin helpers, loaded only in a folder that carries the Orion plugin package. */
 async function pluginKit(root) {
   if (!existsSync(join(root, PACKAGE))) return null;
-  const [resolver, pkg, native, setup] = await Promise.all([
+  const [resolver, pkg, native, setup, registration] = await Promise.all([
     import('./update/destination-resolver.mjs'), import('./update/plugin-package.mjs'),
-    import('./update/plugin-native.mjs'), import('./update/plugin-setup.mjs'),
+    import('./update/plugin-native.mjs'), import('./update/plugin-setup.mjs'), import('./update/plugin-registration.mjs'),
   ]);
-  return { ...resolver, ...pkg, ...native, ...setup };
+  return { ...resolver, ...pkg, ...native, ...setup, ...registration };
 }
 
 /**
@@ -132,8 +132,29 @@ async function switchLocked(store, root, statusPath, to, kit) {
     const catalogPath = kit.TOOL_LAYOUT[to].catalogPath, text = kit.catalogText(to, identity);
     const existing = existsSync(join(root, catalogPath)) ? readFileSync(join(root, catalogPath), 'utf8') : null;
     if (existing !== null && existing !== text) throw new Error(`Nothing was changed, because ${catalogPath} already exists and is not this folder's Orion catalog. Move it out of the way, then run this again.`);
-    plugin = { identity, catalogName: kit.catalogName(identity), version: status.template_version, oldCatalog: kit.TOOL_LAYOUT[from].catalogPath };
-    const target = kit.nativeStep(root, { tool: to, identity, version: plugin.version, mode: 'setup' });
+    const manifestPath = kit.MANIFEST_PATHS[to];
+    const manifestFile = kit.safePath(root, manifestPath);
+    const metadataBefore = waiting?.metadata_before ?? {
+      [manifestPath]: existsSync(manifestFile) ? readFileSync(manifestFile, 'utf8') : null,
+      [catalogPath]: existing,
+    };
+    const registrationBefore = waiting?.registration_before ?? kit.captureRegistration(root, to, kit.catalogName(identity));
+    plugin = { registrationBefore, metadataBefore, identity, catalogName: kit.catalogName(identity), version: status.template_version, oldCatalog: kit.TOOL_LAYOUT[from].catalogPath };
+    // Journal before creating metadata: resuming after a stopped process or cancelling
+    // can always distinguish the original files from this switch's additions.
+    status.plugin.pending_switch = { to, registration_before: registrationBefore, metadata_before: metadataBefore };
+    await store.writeStatus(status);
+    let target;
+    try {
+      mkdirSync(dirname(manifestFile), { recursive: true });
+      writeFileSync(manifestFile, JSON.stringify(kit.pluginManifests(plugin.version)[manifestPath], null, 2) + '\n');
+      target = kit.nativeStep(root, { tool: to, identity, version: plugin.version, mode: 'setup' });
+    } catch (error) {
+      undoTarget(root, to, plugin, kit);
+      status.plugin.pending_switch = null;
+      await store.writeStatus(status);
+      throw error;
+    }
     if (target.state === 'failed') {
       undoTarget(root, to, plugin, kit);
       status.plugin.pending_switch = null;
@@ -142,7 +163,7 @@ async function switchLocked(store, root, statusPath, to, kit) {
       return { state: 'rolled_back', from, to, selected: from, reason: target.details?.reason, errors: target.details?.errors || [] };
     }
     if (target.state === 'pending') {
-      status.plugin.pending_switch = { to, remaining_action: target.remaining_action };
+      status.plugin.pending_switch = { to, registration_before: registrationBefore, metadata_before: metadataBefore, remaining_action: target.remaining_action };
       await store.writeStatus(status);
       return { state: 'pending_switch', from, to, selected: from, remaining_action: `${target.remaining_action} Then run "node switch_ai.mjs" again to finish the switch.` };
     }
@@ -155,6 +176,13 @@ async function switchLocked(store, root, statusPath, to, kit) {
   if (existsSync(backup)) throw new Error(`${backupRel} already exists. Wait a moment and run this again.`);
   for (const rel of files) copy(join(root, SKILLS[from], rel), join(backup, SKILLS[from], rel));
   copy(statusPath, join(backup, 'status/status.json'));
+  if (plugin) {
+    for (const path of Object.values(kit.MANIFEST_PATHS)) {
+      if (existsSync(kit.safePath(root, path))) copy(join(root, path), join(backup, path));
+    }
+    writeFileSync(join(backup, 'registration-before.json'), JSON.stringify(plugin.registrationBefore, null, 2) + '\n');
+    writeFileSync(join(backup, 'metadata-before.json'), JSON.stringify(plugin.metadataBefore, null, 2) + '\n');
+  }
 
   const created = [];
   try {
@@ -203,7 +231,11 @@ async function switchLocked(store, root, statusPath, to, kit) {
     result.active = false;
     result.remaining_action = status.plugin.remaining_action;
     const retired = kit.retirePlugin({ root, tool: from, catalogName: plugin.catalogName });
-    if (retired.state === 'complete') removeCatalog(root, plugin.oldCatalog, kit.catalogText(from, plugin.identity));
+    if (retired.state === 'complete') {
+      removeCatalog(root, plugin.oldCatalog, kit.catalogText(from, plugin.identity));
+      rmSync(kit.safePath(root, kit.MANIFEST_PATHS[from]), { force: true });
+      pruneParents(root, kit.MANIFEST_PATHS[from]);
+    }
     else result.previous_tool_action = `Orion could not remove itself from ${NAME[from]} for this folder (${retired.details?.reason || 'its program was not reachable'}), so ${NAME[from]} may still offer the Orion skills here. Remove Orion there by hand; nothing else in ${NAME[from]} was changed, and ${plugin.oldCatalog} stays until then.`;
   }
   return result;
@@ -220,13 +252,21 @@ function removeCatalog(root, rel, text) {
 /** Undo Orion's own registration with a switch target, and its catalog; nothing else. */
 function undoTarget(root, to, plugin, kit) {
   kit.retirePlugin({ root, tool: to, catalogName: plugin.catalogName });
+  kit.restoreRegistration(root, plugin.registrationBefore);
   removeCatalog(root, kit.TOOL_LAYOUT[to].catalogPath, kit.catalogText(to, plugin.identity));
+  for (const [path, before] of Object.entries(plugin.metadataBefore || {})) {
+    // Only restore the two known target metadata paths from the switch journal.
+    if (![kit.MANIFEST_PATHS[to], kit.TOOL_LAYOUT[to].catalogPath].includes(path)) throw new Error('Invalid switch metadata backup');
+    const target = kit.safePath(root, path);
+    if (before === null) { rmSync(target, { force: true }); pruneParents(root, path); }
+    else { mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, before); }
+  }
 }
 
 /** `--to <current assistant>` while a switch waits: cancel it, leaving the current assistant as it is. */
 async function cancelWaiting(store, root, status, from, waiting, kit) {
   const identity = status.plugin.catalog_identity;
-  undoTarget(root, waiting.to, { identity, catalogName: kit.catalogName(identity) }, kit);
+  undoTarget(root, waiting.to, { identity, catalogName: kit.catalogName(identity), metadataBefore: waiting.metadata_before, registrationBefore: waiting.registration_before }, kit);
   status.plugin.pending_switch = null;
   status.notes = [status.notes || '', `cancelled the switch to ${waiting.to}`].filter(Boolean).join('\n');
   await store.writeStatus(status);

@@ -173,13 +173,15 @@ export function catalogNameErrors(name) {
 }
 
 /**
- * Errors in the package under `root` (a release checkout or a harness): both
- * manifests on their own schemas, at `version` when given, and every skill
+ * Errors in the package under `root`: both manifests for a release, or only
+ * the selected `tool` manifest for a harness, at `version` when given. Every skill
  * folder in the standard skills/<name>/SKILL.md layout.
  */
-export function validatePackage(root, { version } = {}) {
+export function validatePackage(root, { version, tool } = {}) {
   const errors = [];
+  if (tool !== undefined) supported(tool);
   for (const [ai_assistant, path] of Object.entries(MANIFEST_PATHS)) {
+    if (tool !== undefined && ai_assistant !== tool) continue;
     let manifest;
     try { manifest = JSON.parse(readFileSync(safePath(root, path), 'utf8')); }
     catch (error) { errors.push(`${path}: missing or unreadable (${error.code || error.message})`); continue; }

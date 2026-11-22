@@ -75,7 +75,7 @@ export function destinationState(root, entry, pristine) {
 }
 
 /** The sole source-to-destination mapper for release and deployed harnesses. */
-export function planForTool(deployment, ai_assistant, { releaseRoot = RELEASE_ROOT, root } = {}) {
+export function planForTool(deployment, ai_assistant, { releaseRoot = RELEASE_ROOT, root, includeOtherMetadata = false } = {}) {
   if (!deployment.tools.includes(ai_assistant)) throw new Error(`Unsupported AI assistant: ${ai_assistant || '(missing)'}`);
   const packageDir = join(releaseRoot, PACKAGE_ROOT);
   const packageFiles = (existsSync(packageDir) ? readdirSync(packageDir, { recursive: true, withFileTypes: true }) : [])
@@ -90,7 +90,7 @@ export function planForTool(deployment, ai_assistant, { releaseRoot = RELEASE_RO
   }
   const entries = [
     ...deployment.common_sources.map((source) => ({ source, destination: source, ownership: 'release', fingerprint_key: source })),
-    ...deployment.entries.map((entry) => ({ source: entry.sources?.[ai_assistant] || entry.source, destination: entry.destinations ? entry.destinations[ai_assistant] : entry.source, ownership: entry.ownership, fingerprint_key: entry.sources?.[ai_assistant] || entry.fingerprint_key })),
+    ...deployment.entries.filter(entry => includeOtherMetadata || !entry.tools || entry.tools.includes(ai_assistant)).map((entry) => ({ source: entry.sources?.[ai_assistant] || entry.source, destination: entry.destinations ? entry.destinations[ai_assistant] : entry.source, ownership: entry.ownership, fingerprint_key: entry.sources?.[ai_assistant] || entry.fingerprint_key })),
   ];
   const destinations = new Set();
   for (const entry of entries) {

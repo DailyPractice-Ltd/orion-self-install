@@ -5,6 +5,8 @@ to change or inspect Orion select this path before the client session starts.
 It stays outside the deployment map in `update/manifest.json`; installed client
 folders continue to use the client instructions in `AGENTS.md`.
 
+The same maintenance workflow applies in Codex and Claude Code.
+
 Use the source, tests and permitted documentation in this checkout. The Sources
 and Credentials restrictions in `AGENTS.md` apply here too. Client setup, pairing,
 guard, radio, waiting-list and finished-work reporting procedures do not apply to
@@ -13,8 +15,9 @@ maintenance. Leave client status, credentials and business records alone.
 ## Finish a change
 
 1. Check the working tree and requested base branch. Preserve existing work and
-   create a `codex/` branch from the requested base (otherwise the project's current
-   integration branch). Use only this checkout.
+   create a descriptive branch using the user's or repository's naming convention
+   from the requested base (otherwise the project's current integration branch).
+   Use only this checkout.
 2. Make the change and record user-visible behavior in the current Unreleased
    changelog section. Keep ordinary changes unreleased unless a release is requested.
 3. Regenerate ownership fingerprints after editing deployed files:
@@ -22,8 +25,8 @@ maintenance. Leave client status, credentials and business records alone.
    step so `update/pristine.json` includes the final deployed contents.
 4. Run checks appropriate to the change and review `git diff --check` and the diff.
    For deployment or package changes, also run the release contract below for both
-   assistants. Resolve failures before committing; report any checks that could
-   not run and why.
+   supported tools, regardless of which assistant is running. Resolve failures
+   before committing; report any checks that could not run and why.
 5. When requested, commit only the intended files. Push the branch and open a PR
    against the requested base when authorized. Report the commit, PR and validation.
 

@@ -45,7 +45,3 @@ once rather than assuming the abbreviation is familiar.
 7. **This can take more than one sitting.** If the client wants to stop after two sections,
    that's fine — the whole point of `status/status.json` is that you'll know exactly where
    you left off next time, even if "next time" is a different AI assistant entirely.
-
-Each template file below contains the capture prompts (the questions to ask) as HTML
-comments — use them as your own conversation starters, and delete them once the section's
-real content replaces them.

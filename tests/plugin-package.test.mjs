@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { plainEnv } from './helpers/env.mjs';
+import { copyReleaseManifest } from './helpers/manifest.mjs';
 import { MANIFEST_PATHS, catalogIdentity, catalogName, catalogNameErrors, defaultPluginRegion, pluginManifests, validateCatalog, validatePackage, validatePluginManifest, writeCatalog } from '../update/plugin-package.mjs';
 import { planForTool } from '../update/destination-resolver.mjs';
 
@@ -45,7 +46,7 @@ test('each manifest format validates on its own schema and rejects drift from th
     const errors = (change) => validatePluginManifest(tool, { ...structuredClone(good), ...change }, { version: release.template_version }).join('\n');
     assert.match(errors({ name: 'orion-plus' }), /name must be "orion"/);
     assert.match(errors({ version: ' ' }), /version must not be blank/);
-    assert.match(errors({ version: '9.9.9' }), /version 9\.9\.9 must equal the release version 2\.0\.0/);
+    assert.ok(errors({ version: '9.9.9' }).includes(`version 9.9.9 must equal the release version ${release.template_version}`));
     assert.match(errors({ description: '' }), /description/);
     assert.match(errors({ skills: './elsewhere/' }), /skills/);
     assert.match(errors({ bogus: true }), /unknown key "bogus"/);
@@ -155,6 +156,7 @@ test('the status template and the setup wizard carry the plugin region, keeping 
     t.after(() => rmSync(root, { recursive: true, force: true }));
     cpSync(join(repo, 'status'), join(root, 'status'), { recursive: true, filter: (path) => !/(status|radio-outbox)\.json$|radio\.key$|-log\.md$/.test(path) });
     copyFileSync(join(repo, 'start.mjs'), join(root, 'start.mjs'));
+    copyReleaseManifest(root);
     const status = { ...structuredClone(template), ai_assistant: 'codex' };
     if (before) status.plugin = before; else delete status.plugin;
     writeFileSync(join(root, 'status/status.json'), JSON.stringify(status));

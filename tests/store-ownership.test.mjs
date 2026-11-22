@@ -75,13 +75,26 @@ test('changeStatus refuses an unreadable status file rather than writing over it
 test('createStatus makes status.json from the template once, and never replaces one', async (t) => {
   const dir = harness(t);
   rmSync(join(dir, 'status', 'status.json'));
+  const manifestPath = join(dir, 'update', 'manifest.json');
+  writeFileSync(manifestPath, JSON.stringify({ ...JSON.parse(readFileSync(manifestPath, 'utf8')), template_version: '9.9.9' }));
   assert.equal(await readStatus(dir), null);
   assert.equal(await createStatus(dir), true);
-  const template = JSON.parse(readFileSync(join(dir, 'status', 'status.schema-template.json'), 'utf8'));
-  assert.equal(statusOf(dir).schema_version, template.schema_version);
+  assert.equal(statusOf(dir).template_version, '9.9.9', 'the version comes from the manifest');
+  assert.deepEqual(Object.keys(statusOf(dir)).filter((k) => k.endsWith('_version')), ['template_version'], 'the record carries one version');
   await changeStatus(dir, (status) => { status.agent_name = 'Orion'; });
   assert.equal(await createStatus(dir), false);
   assert.equal(statusOf(dir).agent_name, 'Orion');
+});
+
+test('createStatus takes the version from the manifest even when a template carries its own', async (t) => {
+  const dir = harness(t);
+  rmSync(join(dir, 'status', 'status.json'));
+  const templatePath = join(dir, 'status', 'status.schema-template.json');
+  writeFileSync(templatePath, JSON.stringify({ ...JSON.parse(readFileSync(templatePath, 'utf8')), template_version: '0.0.1' }));
+  const manifestPath = join(dir, 'update', 'manifest.json');
+  writeFileSync(manifestPath, JSON.stringify({ ...JSON.parse(readFileSync(manifestPath, 'utf8')), template_version: '9.9.9' }));
+  assert.equal(await createStatus(dir), true);
+  assert.equal(statusOf(dir).template_version, '9.9.9');
 });
 
 test('the key is written owner-only and read back, and removed, only under the lock', async (t) => {

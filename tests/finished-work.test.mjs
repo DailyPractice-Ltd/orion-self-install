@@ -32,6 +32,7 @@ import {
   countProblem, looksLikeCredential, LINE_MAX,
 } from '../status/shapes.mjs';
 import { plainEnv } from './helpers/env.mjs';
+import { copyReleaseManifest } from './helpers/manifest.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..');
@@ -776,6 +777,7 @@ test('tripwire: required setup explanation agrees across brief, wizard and radio
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, 'status'));
   copyFileSync(join(repo, 'start.mjs'), join(dir, 'start.mjs'));
+  copyReleaseManifest(dir);
   for (const f of ['shapes.mjs', 'guard.mjs', 'store.mjs', 'report.mjs', 'status.schema-template.json']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
   const noNetwork = join(dir, 'no-network.mjs');
   writeFileSync(noNetwork, `globalThis.fetch = async () => { throw new Error('unexpected network'); };`);
@@ -791,9 +793,9 @@ test('tripwire: the release has one version, and it ships done.mjs', () => {
   const manifest = JSON.parse(readFileSync(join(repo, 'update', 'manifest.json'), 'utf8'));
   const template = JSON.parse(readFileSync(join(statusDir, 'status.schema-template.json'), 'utf8'));
   const changelog = readFileSync(join(repo, 'CHANGELOG.md'), 'utf8');
-  const newest = changelog.match(/^## (\d+\.\d+\.\d+) — \d{4}-\d{2}-\d{2}$/m);
+  const newest = changelog.match(/^## (\d+\.\d+\.\d+) — \d{4}-\d{2}-\d{2}(?: — .+)?$/m);
   assert.ok(newest, 'CHANGELOG.md should open with a "## X.Y.Z — date" heading');
-  assert.equal(template.template_version, manifest.template_version);
+  assert.deepEqual(Object.keys(template).filter((k) => k.endsWith('_version')), [], 'the manifest declares the version; the template carries none');
   assert.equal(newest[1], manifest.template_version);
   // A script the manifest does not list never reaches an installed harness.
   for (const script of ['status/done.mjs', 'status/radio.mjs', 'status/shapes.mjs']) {

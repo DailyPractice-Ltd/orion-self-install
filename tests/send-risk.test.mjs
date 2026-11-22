@@ -16,6 +16,7 @@ import { WAITING_SENTENCE, RISK_MATRIX, FACTOR_WORDS, SEND_THRESHOLDS, SEND_CEIL
 import { RULE_ONE, RETIRED, retiredRe } from '../status/send.mjs';
 import { pathToFileURL } from 'node:url';
 import { plainEnv } from './helpers/env.mjs';
+import { copyReleaseManifest } from './helpers/manifest.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** A harness folder with the real scripts in it, one level, and one hired agent. */
@@ -309,7 +310,7 @@ for (const tag of ['v1.3.0', 'v1.4.0']) {
     assert.ok(def.includes("1. SEND INSIDE Priya'S RISK LEVEL"), def.slice(0, 400));
     assert.ok(def.replace(/\s+/g, ' ').includes(WAITING_SENTENCE), 'the exact sentence is in rule 1');
     assert.match(def, /CRM WRITES NEED NO YES/, 'the CRM paragraph is there on both trees');
-    assert.match(def, /--agent Orion/, 'the agent\'s own name went into the command');
+    assert.match(def, /--agent orion/, 'the agent\'s own name went into the command');
     assert.match(def, /5\. STAY IN YOUR LANE\. You draft, research, summarise, and send inside Priya's risk/);
     assert.equal((def.match(/\{\{/g) || []).length, (before['agent/agent-definition.md'].match(/\{\{/g) || []).length, 'no placeholder came back');
     for (const f of ['AGENTS.md', 'agent/adapters/claude-code.md', 'agent/adapters/claude.md', 'agent/adapters/codex.md', 'agent/adapters/chatgpt.md', 'agent/adapters/copilot.md']) {
@@ -386,7 +387,7 @@ test('tripwire: the plain-words matrix is the matrix in shapes.mjs, row for row'
 test('tripwire: rule 1 in AGENTS.md carries the score command, the waiting sentence and the CRM scope', () => {
   const rules = squash(read('AGENTS.md'));
   assert.match(rules, /1\. \*\*Send inside the client's risk level, never above it\.\*\*/);
-  assert.ok(rules.includes(squash('node status/send.mjs score --agent Orion --to <address> --channel <email|linkedin|slack|dm|whatsapp|sms> \\ --relationship <reply|follow-up|known|cold> --content <logistics|information|claim|money> [--customer] [--replied]')));
+  assert.ok(rules.includes(squash('node status/send.mjs score --agent orion --to <address> --channel <email|linkedin|slack|dm|whatsapp|sms> \\ --relationship <reply|follow-up|known|cold> --content <logistics|information|claim|money> [--customer] [--replied]')));
   assert.ok(rules.includes(WAITING_SENTENCE));
   assert.match(rules, /CRM writes need no yes/);
   assert.doesNotMatch(rules, /\{\{[A-Z_]+\}\}/, 'no placeholders');
@@ -462,6 +463,7 @@ test('the status template and wizard default to low, and the update prompts call
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, 'status'));
   copyFileSync(join(ROOT, 'start.mjs'), join(dir, 'start.mjs'));
+  copyReleaseManifest(dir);
   for (const f of ['shapes.mjs', 'guard.mjs', 'store.mjs', 'report.mjs', 'status.schema-template.json']) copyFileSync(join(ROOT, 'status', f), join(dir, 'status', f));
   const noNetwork = join(dir, 'no-network.mjs');
   writeFileSync(noNetwork, 'globalThis.fetch = async () => { throw new Error("the wizard must not dial out in this test"); };');

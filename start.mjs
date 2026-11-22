@@ -9,7 +9,7 @@ import { dirname, join, delimiter } from 'node:path';
 import os from 'node:os';
 import { reportSignal, validateOutbox } from './status/report.mjs';
 import { checkWork } from './status/guard.mjs';
-import { withStatusLock, changeStatus, createStatus } from './status/store.mjs';
+import { withStatusLock, changeStatus, createStatus, statusTemplate } from './status/store.mjs';
 import {
   bridgeBase,
   normalizePairingCode,
@@ -24,7 +24,6 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_PATH = join(__dirname, 'status', 'status.json');
-const TEMPLATE_PATH = join(__dirname, 'status', 'status.schema-template.json');
 
 /**
  * Where the radio key may be besides the bookmark file (status/shapes.mjs,
@@ -234,10 +233,9 @@ function migrate(status, { firstRun = false } = {}) {
   // update/plugin-package.mjs defaultPluginRegion); an identity is never made
   // here — only update/plugin-package.mjs creates it, once.
   if (!status.plugin || typeof status.plugin !== 'object' || Array.isArray(status.plugin)) status.plugin = {};
-  for (const [key, value] of Object.entries(JSON.parse(readFileSync(TEMPLATE_PATH, 'utf8')).plugin)) {
+  for (const [key, value] of Object.entries(statusTemplate(__dirname).plugin)) {
     if (!(key in status.plugin)) status.plugin[key] = value;
   }
-  status.schema_version = '2.0.0';
   return status;
 }
 

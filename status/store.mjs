@@ -16,7 +16,7 @@
  * The lock is a directory, status/.radio-lock, because creating one is atomic on
  * every supported system. It is named for the radio because the radio's outbox
  * was the first thing it guarded; it now guards all three files, and the name is
- * kept because the recovery steps in docs/setup.md point at that path.
+ * kept because the recovery steps in docs/install.md point at that path.
  *
  * Never acquire the lock recursively: a changeStatus or withStatusLock inside
  * another one, in this process or a child it waits on, blocks until it gives up.

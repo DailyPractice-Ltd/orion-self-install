@@ -16,6 +16,20 @@ function arg(name) {
   return i < 0 ? undefined : process.argv[i + 1];
 }
 
+/** A 1.x harness: its agent definition, or a status file from before 2.0.0. */
+function isOrion1x(folder) {
+  if (!lstatSync(folder).isDirectory()) return false;
+  if (existsSync(join(folder, 'agent/agent-definition.md'))) return true;
+  const statusPath = join(folder, 'status/status.json');
+  if (!existsSync(statusPath)) return false;
+  try {
+    const version = JSON.parse(readFileSync(statusPath, 'utf8')).template_version;
+    return typeof version !== 'string' || /^[01]\./.test(version);
+  } catch {
+    return false;
+  }
+}
+
 async function install() {
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
     console.log(usage);
@@ -45,6 +59,7 @@ async function install() {
     throw new Error('Choose a client folder outside the release checkout.');
   }
   if (existsSync(target)) {
+    if (isOrion1x(target)) throw new Error('This folder holds an Orion 1.x harness. Orion 2.0.0 installs into a new, empty folder: follow docs/reinstall-from-1.x.md. The existing folder was left alone.');
     if (!lstatSync(target).isDirectory() || readdirSync(target).length) throw new Error('The client folder must be new or empty; existing files were left alone.');
   }
   const git = spawnSync('git', ['--version'], { encoding: 'utf8' });

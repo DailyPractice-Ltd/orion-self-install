@@ -48,7 +48,7 @@ a separate local Git repository, copies Orion's skills in as the `orion` plugin
 (`plugins/orion/`), registers that plugin with your chosen tool for this folder only,
 and records that choice in `status/status.json`. If the tool still needs a step from
 you (installing Orion from Codex's plugin list, or a fresh session), the installer
-prints it; [setup and recovery](docs/setup.md#finish-the-orion-plugin) explains how
+prints it; [setup and recovery](docs/install.md#finish-the-orion-plugin) explains how
 to resume.
 It leaves the release sources, tests, and project specifications behind. Then enter your new folder and
 press Start:
@@ -64,8 +64,8 @@ before it gives you the prompt to start working with your AI assistant.
 Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.
 
 Get your code at [Daily Practice](https://www.dailypractice.world/home/pair).
-[Setup and recovery](docs/setup.md) covers interrupted setup, connection failures,
-and the silent 48-hour connection allowance after verified pairing. Keep this client folder as your business's
+[Setup and recovery](docs/install.md) covers interrupted setup, connection failures,
+and the silent connection allowance after verified pairing. Keep this client folder as your business's
 Orion home. The downloaded release folder is only the source for installing and
 updating it. If you already created an empty
 private repository, use `--remote https://github.com/YOUR-USERNAME/my-orion.git`
@@ -171,7 +171,7 @@ not about your computer.
 Website-only Projects, Custom GPTs, Copilot chats and pasted instructions cannot
 execute Orion’s pairing and pre-work checks. They are no longer supported install
 or work paths. Open your saved Orion folder in Codex or Claude Code and follow
-[setup and recovery](docs/setup.md); your existing business files stay in that folder.
+[setup and recovery](docs/install.md); your existing business files stay in that folder.
 
 ---
 

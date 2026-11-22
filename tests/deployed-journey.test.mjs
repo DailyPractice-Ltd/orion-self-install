@@ -96,9 +96,6 @@ for (const tool of ['claude-code', 'codex']) {
     const retiredMeetingPackage = 'library/skills/meeting-sizing/PACKAGE.md';
     const oldMeetingPackage = git(release, 'show', `c933b9ff05ce5825f09a2ec2adc2d6d8e38b1e7a:${retiredMeetingPackage}`) + '\n';
     put(client, retiredMeetingPackage, oldMeetingPackage);
-    const retiredDisclosure = 'docs/intelligence-library-opt-in.md';
-    const oldDisclosure = git(release, 'show', `5eb0eaa23679caede3a1f7bbae722df8b7ce433e:${retiredDisclosure}`) + '\n';
-    put(client, retiredDisclosure, oldDisclosure);
     const prior = status(client);
     const packageHistory = { 'post-call-debrief': { kind: 'workflow', version: '2.0.0', smoke_test_passed: true } };
     put(client, 'status/status.json', JSON.stringify({ ...prior, packages: packageHistory, sharing: { ...prior.sharing} }));
@@ -140,9 +137,6 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(read(client, editedPage), '# Client debrief instructions\n');
     assert.equal(read(client, `${report.backup}/files/${retiredPage}`), oldPage);
     assert.deepEqual(status(client).packages, packageHistory);
-    assert.ok(report.retired.includes(retiredDisclosure));
-    assert.equal(existsSync(join(client, retiredDisclosure)), false);
-    assert.equal(read(client, `${report.backup}/files/${retiredDisclosure}`), oldDisclosure);
     for (const slug of ['prospect-research-outreach', 'post-call-debrief']) {
       assert.ok(existsSync(join(client, pkg, slug, 'SKILL.md')), slug);
     }
@@ -155,7 +149,6 @@ for (const tool of ['claude-code', 'codex']) {
     }
     ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
     assert.equal(read(client, retiredMeetingPackage), oldMeetingPackage);
-    assert.equal(read(client, retiredDisclosure), oldDisclosure);
     assert.equal(read(client, 'AGENTS.md'), original);
     assert.equal(read(client, `${skill(tool)}/hire-agent/SKILL.md`), 'Custom legacy instructions\n');
     assert.equal(existsSync(join(client, `${pkg}/new-release/SKILL.md`)), false);

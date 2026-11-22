@@ -74,7 +74,7 @@ A skill or scheduled task can constrain Orion to drafting or reading. The harnes
 - A follow-up to someone who has replied in that thread: answer them instead.
 - Anything past a pacing cap you set with the level (`--cap-email`, `--cap-dm`, `--cap-sms`, per day).
 - A skill or scheduled task is scoped to drafts or read-only work.
-- Anything that would harm your reputation (rule 2 of the agent definition): that is
+- Anything that would harm your reputation (rule 2 in AGENTS.md): that is
   refused before it is scored, not scored.
 
 ## What a waiting message says

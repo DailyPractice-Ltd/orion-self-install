@@ -72,8 +72,6 @@ export function computePristine() {
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
   const aliases = manifest.deployment?.fingerprints?.legacy_aliases || {};
   const sources = new Set([
-    ...manifest.refresh,
-    ...(manifest.remove || []),
     ...(manifest.deployment?.retired || []).map((entry) => entry.fingerprint_key || entry.source),
     ...(manifest.deployment?.retired || []).flatMap((entry) => Object.values(entry.sources || {})),
     ...Object.values(aliases),

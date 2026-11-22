@@ -23,8 +23,9 @@ for (const tool of ['claude-code', 'codex']) {
     const read = (path) => readFileSync(join(target, path), 'utf8');
     assert.equal(JSON.parse(read('status/status.json')).ai_assistant, tool);
     assert.equal(JSON.parse(read('status/status.json')).agent_name, 'Orion');
-    assert.match(read('agent/agent-definition.md'), /^You are Orion,/m);
-    assert.doesNotMatch(read('agent/agent-definition.md'), /\{\{AGENT_NAME\}\}/);
+    assert.match(read('AGENTS.md'), /^You are \*\*Orion\*\*/m);
+    assert.equal(existsSync(join(target, 'agent/agent-definition.md')), false, 'the 1.x agent definition is gone');
+    assert.doesNotMatch(read('AGENTS.md'), /\{\{[A-Z_]+\}\}/, 'no placeholders: client specifics come from the knowledge base and status');
     const rename = spawnSync(process.execPath, [join(target, 'status/emit-status.mjs'), '--agent_name', 'Neo'], { encoding: 'utf8', cwd: target });
     assert.equal(rename.status, 1);
     assert.match(rename.stderr, /always Orion/);
@@ -35,7 +36,7 @@ for (const tool of ['claude-code', 'codex']) {
       assert.equal(existsSync(join(target, path)), false, `${path} leaked into fresh install`);
     }
     assert.equal('memory' in JSON.parse(read('status/status.json')), false);
-    for (const path of ['AGENTS.md', 'agent/agent-definition.md']) {
+    for (const path of ['AGENTS.md']) {
       assert.doesNotMatch(read(path), /memory\/|memory\.mjs|memory-consolidation/);
     }
     for (const name of ['prospecting', 'call-planner', 'friday-report', 'prospect-research-outreach', 'post-call-debrief']) {
@@ -84,6 +85,26 @@ for (const tool of ['claude-code', 'codex']) {
     const second = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', target, '--local-only'], { encoding: 'utf8', env: noNative });
     assert.notEqual(second.status, 0);
     assert.equal(JSON.parse(read('status/status.json')).ai_assistant, tool);
+  });
+}
+
+for (const [name, files] of [
+  ['an agent definition', { 'agent/agent-definition.md': 'You are Orion, Priya\'s personal sales agent.\n' }],
+  ['a 1.x status file', { 'status/status.json': JSON.stringify({ template_version: '1.9.0', business_name: 'Northwind' }) }],
+]) {
+  test(`install CLI refuses a 1.x harness folder (${name}) and points at the reinstall guide`, (t) => {
+    const base = mkdtempSync(join(tmpdir(), 'orion-install-1x-'));
+    t.after(() => rmSync(base, { recursive: true, force: true }));
+    const target = join(base, 'old-orion');
+    for (const [path, text] of Object.entries(files)) {
+      mkdirSync(dirname(join(target, path)), { recursive: true });
+      writeFileSync(join(target, path), text);
+    }
+    const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', 'claude-code', '--target', target, '--local-only'], { encoding: 'utf8', env: noNative });
+    assert.notEqual(run.status, 0);
+    assert.match(run.stderr, /Orion 1\.x/);
+    assert.match(run.stderr, /docs\/reinstall-from-1\.x\.md/);
+    for (const [path, text] of Object.entries(files)) assert.equal(readFileSync(join(target, path), 'utf8'), text, `${path} left alone`);
   });
 }
 

@@ -1,14 +1,12 @@
 # The radio — Orion's check-in with Daily Practice, in plain words
 
-Orion uses a required two-way operational connection to Daily Practice. Pairing
-links your signed-in account to this folder and does not check payment. Failed
-connection checks pause supported work outside the one-time existing-user
-transition. This is constitution Article V, channel 1, in plain words.
+Orion uses a required two-way operational connection to Daily Practice. This page says
+exactly what crosses it and when. This is constitution Article V, channel 1, in plain words.
 
 Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.
 
-[Setup and recovery](setup.md) covers code renewal, interrupted setup, the 48-hour
-connection allowance and paused-work recovery.
+Pairing, the before-work check, the connection allowance and recovery are in
+[Install Orion](install.md).
 
 ## What goes out, exactly
 
@@ -125,73 +123,19 @@ reply happens on its own.
 Each message is read to you once. Your harness remembers what you have already heard,
 so nothing is repeated at the next session.
 
-## Pairing and the existing-user transition
+## The report queue
 
-Sign in at [Daily Practice](https://www.dailypractice.world/home/pair) and request
-or renew your one-time code. It has twelve consonants in three groups, such as
-`BCDF-GHJK-LMNP`, and expires in 15 minutes. Run `node start.mjs --code YOUR-CODE`
-in your installed folder. It exchanges the code, saves the credential, verifies
-that the server accepts this folder, and delivers the setup report before handoff.
-Missing codes, failed verification and failed reports leave setup unfinished.
-
-Ordinary folders store the returned key in `sharing.install_token`; a homed folder
-uses machine-local `status/radio.key`, excluded from its home repository. Never
-print a key or any suffix. Environment and supported cloud-attached credentials
-still require a matching server check; local key shape is not proof of acceptance.
-
-All unpaired harnesses must pair before normal work, including the first updated
-run. Existing accepted credentials need no new code. Temporary verification or
-reporting failures permit work silently for 48 elapsed hours after accepted
-verification and acknowledged delivery of all queued reports. Only that complete
-cycle refreshes `last_connected_at`; partial replay, failures, restarts and updates
-never do. At exactly 48 hours, block the next task or scheduled run unless current
-verification and delivery succeed. An admitted task may finish and report afterward.
-Invalid/revoked credentials clear the allowance immediately. Disabled radio and
-unsafe local state require recovery. Historical migration fields are readable but
-inert; never infer the connection time from old verification or migration dates.
-Preserve a declined choice until explicit pairing. Setup still requires current
-accepted verification and acknowledged setup reporting.
-
-Updating, inspection, diagnosis and re-pairing remain available. Website-only or
-paste-only chat cannot run the guard; use Codex or Claude Code in this folder.
-
-## If the radio can't get through
-
-Run `node status/guard.mjs check --quiet` before every interactive Orion session
-and scheduled run. Exit 0 permits work; exit 2 pauses tasks, outbound messages and
-CRM writes. The guard uses the side-effect-free `/verify` endpoint, not the
-support-message `/nudges` endpoint. A saved `verified` state is only history.
-
-| Outcome | What to do |
-|---|---|
-| Accepted and no pending reports | Continue work; check support messages separately |
-| Invalid or revoked key | Renew your code and run `node start.mjs --code YOUR-CODE` |
-| Unreachable service after the allowance expires | Restore the network, then rerun the guard |
-| Server error after the allowance expires | Rerun the guard once service is restored; preserve saved state |
-| Pending reports after expiry, or unsafe local state at any time | Follow [recovery](setup.md); keep the outbox and original identities |
-
-If the assistant's sandbox blocks the network, approve the required command and
-retry. The [Codex adapter](../agent/adapters/codex.md) explains that surface. On a
-company network, ask IT to allow HTTPS to `www.dailypractice.world`. Temporary failures permit silent work within the shared 48-hour allowance;
-after expiry, new work waits for verified connection and complete delivery.
-
-A report can fail after an allowed task. The task still happened: `done.mjs` keeps
-its local work-log line, and the reporting helper writes its **labels and original
-event time** to `status/radio-outbox.json` before attempting delivery. The guard
-attempts replay at each task boundary. Pending reports use the same remaining
-48-hour allowance, and never create a separate blocker or renew the clock. Retry preserves the original
-identity, and bridge deduplication prevents duplicate counts. Lost or malformed
-receipts keep the report pending; a successful connection alone never deletes it.
+A report can fail after an allowed task. The task still happened: `done.mjs` keeps its
+local work-log line, and the reporting helper writes the report's **labels and original
+event time** to `status/radio-outbox.json` before attempting delivery. Retries keep the
+original identity, so Daily Practice never counts the same work twice.
 
 The queue contains only allowlisted signal and installed-package metadata: folder
 identity, event type/time, stage/status/template version, public tag, count, routine
-or skill/asset slug, kind/version and applicable enum labels. Pending package reports
-from older releases retain their original installation time and version for replay. It never contains credentials, local
-work-log text, prospect names, client words, artifact content or a package's
-free-text purpose. Tier 2 messages remain separate explicit
-consent operations and never enter this operational queue. Corrupt data requires
-repair rather than deletion. See [setup](setup.md) for safe lock recovery.
+or skill/asset slug, kind/version and applicable enum labels. It never contains
+credentials, local work-log text, prospect names, client words, artifact content or a
+package's free-text purpose. Tier 2 messages remain separate explicit-consent
+operations and never enter this queue.
 
 “Running” means finished work was reported in the last 14 days; a connection check
-alone does not create activity. The requirement is a supported flow in editable
-local files and native AI prompts, not tamper-proof licensing.
+alone does not create activity.

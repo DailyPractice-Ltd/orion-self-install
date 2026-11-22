@@ -43,10 +43,9 @@ line remains. Only operational labels and original time enter the durable outbox
 Restart and replay keep the same identity, so duplicate acknowledgments do not add
 counts. The assistant claims delivery only after acknowledgment and an empty queue.
 
-An existing previously declined folder is a separate cohort: first updated use
-requires pairing before work. Paired folders continue silently through temporary
-failures for 48 elapsed hours after verified connection and complete report delivery.
-At expiry the next task blocks; admitted tasks finish and report.
+Paired folders continue silently through temporary failures within the connection
+allowance (docs/install.md). At expiry the next task blocks; admitted tasks finish
+and report.
 
 ## Evidence boundary
 

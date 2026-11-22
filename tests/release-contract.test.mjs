@@ -25,9 +25,11 @@ test('release contract plans one selected runtime from portable sources', (t) =>
     assert.equal(run.status, 0, run.stderr);
     const plan = JSON.parse(run.stdout);
     const destinations = plan.entries.map((entry) => entry.destination);
-    for (const path of ['status/guard.mjs', 'status/store.mjs', 'status/report.mjs', 'docs/setup.md']) {
+    for (const path of ['status/guard.mjs', 'status/store.mjs', 'status/report.mjs', 'docs/install.md', 'docs/reinstall-from-1.x.md']) {
       assert.ok(destinations.includes(path), `${path} must reach an installed ${tool} folder`);
-      assert.ok(manifest.refresh.includes(path), `${path} must also reach legacy updates`);
+    }
+    for (const path of ['agent/agent-definition.md', 'docs/setup.md', 'agent/adapters/claude.md']) {
+      assert.ok(!destinations.includes(path), `${path} was retired in 2.0.0`);
     }
     assert.ok(!destinations.some(path => path.startsWith('.specify/')), 'maintainer governance stays in the release');
     assert.ok(!plan.entries.some(entry => [entry.source, entry.destination].some(path => path.split('/').includes('specs'))), 'human-only records stay out of every deployment');
@@ -117,11 +119,11 @@ test('update/pristine.json is up to date with everything this release ships', (t
 
 
 test('supported instructions route website chat to an executable paired folder', () => {
-  for (const file of ['README.md', 'AGENTS.md', 'agent/adapters/chatgpt.md', 'agent/adapters/claude.md', 'agent/adapters/copilot.md']) {
+  for (const file of ['README.md', 'AGENTS.md', 'agent/adapters/chatgpt.md', 'agent/adapters/claude-web.md', 'agent/adapters/copilot.md']) {
     const text = readFileSync(join(repo, file), 'utf8');
     assert.match(text, /Codex.*Claude Code|Claude Code.*Codex/s, `${file} names the supported tools`);
     assert.match(text, /website|paste-only/i, `${file} explains the unsupported surface`);
-    assert.match(text, /docs\/setup\.md|setup\.md/, `${file} points at executable setup and recovery`);
+    assert.match(text, /docs\/install\.md|install\.md/, `${file} points at executable setup and recovery`);
     assert.doesNotMatch(text, /always works|works just as well|nothing else about your install is affected|your work is unaffected|You can switch this off\. Keep check-ins on/);
   }
 });
@@ -137,11 +139,9 @@ test('deployed documentation uses permitted sources without directing agents int
       assert.doesNotMatch(text, /specs\/[\w.-]+\//, `${source} must not point inside human-only records`);
     }
   }
-  for (const source of ['AGENTS.md', 'agent/agent-definition.md']) {
-    const text = readFileSync(join(repo, source), 'utf8');
-    assert.match(text, /specs\/.*human-only/i);
-    assert.match(text, /ask (the human|\{\{CLIENT_NAME\}\})/);
-  }
+  const text = readFileSync(join(repo, 'AGENTS.md'), 'utf8');
+  assert.match(text, /specs\/.*human-only/i);
+  assert.match(text, /ask the human/);
 });
 
 /** A synthetic release candidate: exactly the files the release contract reads. */

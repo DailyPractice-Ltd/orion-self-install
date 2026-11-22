@@ -155,6 +155,8 @@ test('the status template and the setup wizard carry the plugin region, keeping 
     t.after(() => rmSync(root, { recursive: true, force: true }));
     cpSync(join(repo, 'status'), join(root, 'status'), { recursive: true, filter: (path) => !/(status|radio-outbox)\.json$|radio\.key$|-log\.md$/.test(path) });
     copyFileSync(join(repo, 'start.mjs'), join(root, 'start.mjs'));
+    mkdirSync(join(root, 'update'));
+    copyFileSync(join(repo, 'update/manifest.json'), join(root, 'update/manifest.json'));
     const status = { ...structuredClone(template), ai_assistant: 'codex' };
     if (before) status.plugin = before; else delete status.plugin;
     writeFileSync(join(root, 'status/status.json'), JSON.stringify(status));

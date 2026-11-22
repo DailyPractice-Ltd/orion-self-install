@@ -9,6 +9,7 @@
  *
  *   changeStatus(root, mutate)   one change to status.json
  *   createStatus(root)           status.json from the template, when it has none
+ *   statusTemplate(root)         the fresh record every reader starts from
  *   readStatus(root)             a read-only look, no lock
  *   withStatusLock(root, action) several steps that must not be interleaved:
  *                                status, outbox and key together
@@ -22,6 +23,7 @@
  * another one, in this process or a child it waits on, blocks until it gives up.
  */
 import { open, readFile, rename, unlink, mkdir, rmdir } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
@@ -41,7 +43,17 @@ export class StatusLockedError extends Error {
 
 const statusPath = root => join(root, 'status', 'status.json');
 const keyPath = root => join(root, 'status', 'radio.key');
-const templatePath = root => join(root, 'status', 'status.schema-template.json');
+
+/**
+ * A fresh status record: the template, stamped with the release's one version
+ * from update/manifest.json. Both files ship in every harness and every release,
+ * so this resolves them from the root it is given. Nothing else parses the template.
+ */
+export function statusTemplate(root) {
+  const read = path => JSON.parse(readFileSync(join(root, path), 'utf8'));
+  const { template_version } = read('update/manifest.json');
+  return { template_version, ...read('status/status.schema-template.json') };
+}
 
 async function readJson(path, missing) {
   let text;
@@ -161,7 +173,7 @@ export async function changeStatus(root, mutate, { wait } = {}) {
 export async function createStatus(root) {
   return withStatusLock(root, async store => {
     if (await readStatus(root) !== null) return false;
-    await store.writeStatus(JSON.parse(await readFile(templatePath(root), 'utf8')));
+    await store.writeStatus(statusTemplate(root));
     return true;
   });
 }

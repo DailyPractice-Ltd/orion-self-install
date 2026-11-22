@@ -3,9 +3,10 @@
 Human-readable companion to `status.schema-template.json`. Use this reference
 and [setup and recovery](../docs/install.md) for status fields and operational guidance.
 
-**On session 1**: `status/status.json` doesn't exist yet. Copy
-`status.schema-template.json` to `status.json` and start filling it in — the template file
-itself never gets edited, only copied.
+**On session 1**: `status/status.json` doesn't exist yet. Run
+`node status/emit-status.mjs` (no flags): it creates `status.json` from the template with
+`template_version` taken from `update/manifest.json`. Never copy the template by hand; the
+template file itself carries no version and never gets edited.
 
 **On every subsequent session**: read `status.json` first, before asking the client
 anything. Its contents ARE the answer to "where did we leave off."

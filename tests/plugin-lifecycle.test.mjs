@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { buildCatalog, catalogName, pluginManifests } from '../update/plugin-package.mjs';
+import { buildCatalog, catalogName, MANIFEST_PATHS, pluginManifests } from '../update/plugin-package.mjs';
 import { codexOwnedText } from '../update/plugin-registration.mjs';
 import { runPluginSetup } from '../update/plugin-setup.mjs';
 import { plainEnv } from './helpers/env.mjs';
@@ -138,6 +138,7 @@ test('update replaces the package as a unit, keeps client skills and records the
   assert.equal(has(w.client, 'plugins/orion/skills/gone'), false);
   assert.equal(has(w.client, 'plugins/orion/skills/extra'), false);
   assert.equal(JSON.parse(get(w.client, 'plugins/orion/.claude-plugin/plugin.json')).version, '2.0.0');
+  assert.equal(JSON.parse(get(w.client, 'plugins/orion/plugin.json')).version, '2.0.0', 'existing dual-manifest installations retain both');
   // ...and the complete prior package, in-place edits included, is in the backup.
   assert.equal(get(w.client, `${r.backup}/package/plugins/orion/skills/hello/SKILL.md`), 'hello v1 with my in-place edit\n');
   assert.equal(get(w.client, `${r.backup}/package/plugins/orion/skills/extra/SKILL.md`), 'a file I dropped into the package\n');
@@ -364,4 +365,19 @@ test('a failed plugin refresh puts back this harness\'s own Codex project entrie
   assert.equal(run.status, 3, out(run));
   assert.equal(report(run).state, 'rolled_back');
   assert.equal(get(w.client, '.codex/config.toml'), prior);
+});
+
+for (const tool of ['codex', 'claude-code']) test(`update preserves the ${tool} manifest layout and restore recovers it`, (t) => {
+  const w = world(t, { tool, at: '2.0.0', codexInstalled: '2.0.0' });
+  const other = tool === 'codex' ? 'claude-code' : 'codex';
+  rmSync(join(w.client, MANIFEST_PATHS[other]));
+  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'local edit\n');
+  const result = w.update();
+  assert.equal(result.status, 0, out(result));
+  assert.equal(has(w.client, MANIFEST_PATHS[other]), false);
+  assert.ok(has(w.client, MANIFEST_PATHS[tool]));
+  assert.equal(w.status().plugin.setup_state, 'registered');
+  assert.equal(w.restore(report(result).backup).status, 0);
+  assert.equal(has(w.client, MANIFEST_PATHS[other]), false);
+  assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'local edit\n');
 });

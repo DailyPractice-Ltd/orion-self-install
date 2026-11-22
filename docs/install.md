@@ -99,7 +99,14 @@ delivery result; it is progress, never authorization.
 
 ## Finish the Orion plugin
 
-Orion's shipped skills arrive as the `orion` plugin in `plugins/orion/`. Its setup is
+Orion's shipped skills arrive as the `orion` plugin in `plugins/orion/`. A fresh harness
+contains every shipped skill and only the selected tool's manifest: `plugin.json` for
+Codex, `.claude-plugin/plugin.json` for Claude Code. Shared runtime files, adapters and
+the local manifest generator remain available for offline switching. Release validation
+checks both formats; harness setup checks only the selected tool's requirements.
+Existing installations are not cleaned up by this feature.
+
+Its setup is
 separate from pairing. The installer registers it with the selected tool, scoped to this
 folder, and records progress in `status/status.json` under `plugin`:
 

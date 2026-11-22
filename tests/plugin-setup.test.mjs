@@ -58,10 +58,10 @@ test('Claude Code install: package, own catalog, local-scope registration at the
   const real = realpathSync(w.target);
 
   // Layout: the package and the selected tool's catalog only; no loose shipped skills.
-  for (const path of ['plugins/orion/plugin.json', 'plugins/orion/.claude-plugin/plugin.json', 'plugins/orion/skills/prospecting/SKILL.md', '.claude-plugin/marketplace.json']) {
+  for (const path of ['plugins/orion/.claude-plugin/plugin.json', 'plugins/orion/skills/prospecting/SKILL.md', '.claude-plugin/marketplace.json']) {
     assert.ok(existsSync(join(w.target, path)), path);
   }
-  for (const path of ['.agents', '.claude/skills', 'skills']) assert.equal(existsSync(join(w.target, path)), false, `${path} must not exist`);
+  for (const path of ['plugins/orion/plugin.json', '.agents', '.claude/skills', 'skills']) assert.equal(existsSync(join(w.target, path)), false, `${path} must not exist`);
 
   const { plugin } = w.status();
   assert.match(plugin.catalog_identity, UUID);

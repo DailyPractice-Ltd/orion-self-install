@@ -21,7 +21,7 @@
     "anything outside the deployment map": "an update writes only the destinations the deployment map plans for the recorded tool, and retires only listed retired entries; nothing else may be touched"
   },
   "deployment": {
-    "_contract": "Ship every file under plugins/orion/ (the Orion plugin package) exactly once, at the same path in the harness for every tool; the package is release-owned as a unit. Client-owned skills live in the selected tool’s skills directory (.claude/skills/ or .agents/skills/) and are never shipped. update/destination-resolver.mjs runtimeLayout names those per-tool paths.",
+    "_contract": "Shared files and all shipped skills deploy to either tool. Entries with tools deploy only to that tool. Both manifests remain in the release source; deployed harnesses retain the local generator for offline switching. Existing layouts are preserved on update.",
     "tools": [
       "claude-code",
       "codex"
@@ -486,12 +486,18 @@
       {
         "source": "plugins/orion/plugin.json",
         "ownership": "release",
-        "fingerprint_key": "plugins/orion/plugin.json"
+        "fingerprint_key": "plugins/orion/plugin.json",
+        "tools": [
+          "codex"
+        ]
       },
       {
         "source": "plugins/orion/.claude-plugin/plugin.json",
         "ownership": "release",
-        "fingerprint_key": "plugins/orion/.claude-plugin/plugin.json"
+        "fingerprint_key": "plugins/orion/.claude-plugin/plugin.json",
+        "tools": [
+          "claude-code"
+        ]
       },
       {
         "source": "plugins/orion/skills/create-skill/SKILL.md",

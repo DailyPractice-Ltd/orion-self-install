@@ -28,10 +28,10 @@ test('both committed plugin manifests are the generator output for this release'
   }
 });
 
-test('the release ships both manifests and no harness catalog, for either tool', () => {
+test('the release retains both manifests but deploys only the selected tool metadata', () => {
   for (const tool of release.deployment.tools) {
     const destinations = planForTool(release.deployment, tool, { releaseRoot: repo }).map(entry => entry.destination);
-    for (const path of Object.values(MANIFEST_PATHS)) assert.ok(destinations.includes(path), `${path} ships to ${tool}`);
+    for (const [selected, path] of Object.entries(MANIFEST_PATHS)) assert.equal(destinations.includes(path), selected === tool, `${path} deployment to ${tool}`);
     for (const path of ['.agents/plugins/marketplace.json', '.claude-plugin/marketplace.json']) {
       assert.ok(!destinations.includes(path), `${path} is per harness, never a release artifact`);
     }

@@ -72,7 +72,7 @@ test('release contract rejects an unsupported tool and keeps historical ownershi
   assert.ok(pristine.files['agents/README.md'].length > 0);
 });
 
-test('release contract ships every package file exactly once, at its own path, for both tools', () => {
+test('release contract ships shared package files and only the selected manifest', () => {
   assert.equal(existsSync(join(repo, 'skills')), false, 'the package is the one maintained skill source');
   const sources = readdirSync(join(repo, 'plugins/orion'), { recursive: true, withFileTypes: true })
     .filter(entry => entry.isFile())
@@ -87,7 +87,8 @@ test('release contract ships every package file exactly once, at its own path, f
     assert.equal(run.status, 0, run.stderr);
     const plan = JSON.parse(run.stdout);
     for (const source of sources) {
-      assert.deepEqual(plan.entries.filter(entry => entry.source === source).map(entry => entry.destination), [source], `package file: ${source}`);
+      const omitted = tool === 'codex' ? 'plugins/orion/.claude-plugin/plugin.json' : 'plugins/orion/plugin.json';
+      assert.deepEqual(plan.entries.filter(entry => entry.source === source).map(entry => entry.destination), source === omitted ? [] : [source], `package file: ${source}`);
     }
     assert.ok(!plan.entries.some(entry => /^\.(claude|agents)\/skills\//.test(entry.destination)), 'client skill folders hold no shipped files');
   }

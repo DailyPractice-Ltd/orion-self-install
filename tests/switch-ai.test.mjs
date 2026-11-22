@@ -4,7 +4,7 @@ import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsS
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { buildCatalog, catalogName, pluginManifests } from '../update/plugin-package.mjs';
+import { buildCatalog, catalogName, MANIFEST_PATHS, pluginManifests } from '../update/plugin-package.mjs';
 import { codexOwnedText } from '../update/plugin-registration.mjs';
 import { plainEnv } from './helpers/env.mjs';
 
@@ -320,4 +320,71 @@ test('the previous tool\'s Orion is retired only after the switch is committed',
   assert.equal(Object.keys(w.native().claude.installs).length, 1);
   assert.ok(has(w.client, CATALOG_PATH['claude-code']));
   assert.equal(get(w.client, '.claude/skills/mine/SKILL.md'), 'my own skill\n');
+});
+
+for (const tool of ['codex', 'claude-code']) {
+  test(`tool-specific ${tool} generates offline switch metadata and retires the source manifest`, (t) => {
+    const w = pluginWorld(t, { tool });
+    const to = other(tool);
+    rmSync(join(w.client, MANIFEST_PATHS[to]));
+    const source = get(w.client, MANIFEST_PATHS[tool]);
+    let result = w.switchTo(to);
+    assert.equal(result.status, 0, out(result));
+    assert.deepEqual(JSON.parse(get(w.client, MANIFEST_PATHS[to])), pluginManifests('2.0.0')[MANIFEST_PATHS[to]]);
+    if (report(result).state === 'pending_switch') {
+      assert.equal(get(w.client, MANIFEST_PATHS[tool]), source);
+      assert.equal(w.status().ai_assistant, tool);
+      assert.equal(w.humanInstall().status, 0);
+      result = w.switchTo();
+    }
+    assert.equal(report(result).state, 'switched', out(result));
+    assert.equal(has(w.client, MANIFEST_PATHS[tool]), false);
+    assert.equal(w.status().template_version, '2.0.0');
+    assert.equal(w.status().plugin.catalog_identity, ID);
+    assert.equal(get(w.client, `${skills(to)}/mine/SKILL.md`), 'my own skill\n');
+    assert.equal(get(w.client, `${report(result).backup}/${MANIFEST_PATHS[tool]}`), source);
+  });
+  test(`tool-specific ${tool} restores manifest absence after failure or cancellation`, (t) => {
+    const to = other(tool);
+    for (const more of [{ ORION_SWITCH_FAIL_BEFORE_COMMIT: '1' }, { ORION_SWITCH_FAIL_AFTER: '1' }]) {
+      const w = pluginWorld(t, { tool });
+      rmSync(join(w.client, MANIFEST_PATHS[to]));
+      let result = w.switchTo(to, more);
+      if (result.status === 0 && report(result).state === 'pending_switch') {
+        assert.equal(w.humanInstall().status, 0);
+        result = w.switchTo(to, more);
+      }
+      assert.equal(result.status, 2, out(result));
+      assert.equal(w.status().ai_assistant, tool);
+      assert.equal(has(w.client, MANIFEST_PATHS[to]), false);
+      assert.ok(has(w.client, MANIFEST_PATHS[tool]));
+    }
+    const w = pluginWorld(t, { tool, faults: tool === 'codex' ? { detailsSkills: ['hello'] } : {} });
+    rmSync(join(w.client, MANIFEST_PATHS[to]));
+    assert.equal(report(w.switchTo(to)).state, 'pending_switch');
+    assert.equal(report(w.switchTo(tool)).state, 'cancelled');
+    assert.equal(has(w.client, MANIFEST_PATHS[to]), false);
+    assert.ok(has(w.client, MANIFEST_PATHS[tool]));
+  });
+}
+
+test('failed native setup removes a generated target manifest', (t) => {
+  const w = pluginWorld(t, { tool: 'codex', faults: { validate: true } });
+  rmSync(join(w.client, MANIFEST_PATHS['claude-code']));
+  const result = w.switchTo('claude-code');
+  assert.equal(result.status, 3, out(result));
+  assert.equal(has(w.client, MANIFEST_PATHS['claude-code']), false);
+  assert.ok(has(w.client, MANIFEST_PATHS.codex));
+});
+
+test('cancelling restores pre-existing target manifest bytes and removes newly added local settings', (t) => {
+  const w = pluginWorld(t, { tool: 'codex', faults: { detailsSkills: ['hello'] } });
+  const manifest = MANIFEST_PATHS['claude-code'];
+  const original = JSON.stringify(pluginManifests('2.0.0')[manifest]);
+  put(w.client, manifest, original);
+  assert.equal(has(w.client, '.claude/settings.local.json'), false);
+  assert.equal(report(w.switchTo('claude-code')).state, 'pending_switch');
+  assert.equal(report(w.switchTo('codex')).state, 'cancelled');
+  assert.equal(get(w.client, manifest), original);
+  assert.equal(has(w.client, '.claude/settings.local.json'), false);
 });

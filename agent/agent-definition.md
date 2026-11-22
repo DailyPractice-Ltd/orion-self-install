@@ -205,9 +205,6 @@ verification and delivery succeed. Never claim delivery before acknowledgment.
   chat cannot complete setup; follow docs/setup.md to move to a supported tool.
 - **Debrief output**. Keep the labels "Call Summary", "CRM Update", and "Follow-up Draft"
   from the skill. Validation and tooling that parses debriefs rely on them.
-- **The agent's name is chosen by the client, for the client, in this conversation.** Ask
-  directly: "what do you want to call your agent?" It's their colleague's name, not a
-  Daily Practice brand. Write it into `status/status.json` as soon as they answer.
 - **Vocabulary check, done by you directly**: once the knowledge base is assembled, run one
   prospect-research task and read the draft back to the client — out loud if the medium
   allows, otherwise just show it and ask "does this sound like you?" If it doesn't, go back

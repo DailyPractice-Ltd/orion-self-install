@@ -16,6 +16,11 @@
 - 2.0.0 is a reinstall release: `docs/reinstall-from-1.x.md` covers it, the update
   procedure stops on a 1.x folder, and `install.mjs` refuses a folder holding a 1.x
   harness. The manifest's legacy `refresh`/`remove` lists are gone.
+- One Orion version: `template_version` in `update/manifest.json` is the only
+  hand-edited version. Plugin manifests are generated from it, status records get it
+  stamped in when created, and `schema_version` is gone. The release contract checks
+  that CHANGELOG.md's newest numbered section matches it, and `node update/bump.mjs
+  X.Y.Z` cuts a release. AGENTS.md has a short Releasing note for maintainers.
 
 ## Unreleased — Fixed Orion identity
 

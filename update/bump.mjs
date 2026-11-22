@@ -9,24 +9,26 @@
  * one "## Unreleased — <title>" section. Then, in order: renames that heading to
  * "## X.Y.Z — <today> — <title>", sets template_version in update/manifest.json,
  * regenerates the plugin manifests, and regenerates update/pristine.json.
- * It never commits, tags or pushes.
+ * All or nothing: if any write fails, every file it may write is put back
+ * byte for byte. It never commits, tags or pushes.
  */
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { writePluginManifests } from './plugin-package.mjs';
+import { MANIFEST_PATHS, writePluginManifests } from './plugin-package.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = 'update/manifest.json';
 const CHANGELOG = 'CHANGELOG.md';
+const PRISTINE = 'update/pristine.json';
 const UNRELEASED = /^## Unreleased — (.+)$/;
 
 const read = (path) => readFileSync(join(root, path), 'utf8');
-const parts = (version) => version.split('.').map(Number);
+const versionParts = (version) => version.split('.').map(Number);
 
-function greater(a, b) {
-  const [x, y] = [parts(a), parts(b)];
+function isNewer(a, b) {
+  const [x, y] = [versionParts(a), versionParts(b)];
   for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i];
   return false;
 }
@@ -42,7 +44,7 @@ function plan(version) {
   }
   const manifestText = read(MANIFEST);
   const current = JSON.parse(manifestText).template_version;
-  if (!greater(version, current)) throw new Error(`${version} is not greater than the current template_version ${current}.`);
+  if (!isNewer(version, current)) throw new Error(`${version} is not greater than the current template_version ${current}.`);
 
   const lines = read(CHANGELOG).split('\n');
   const headings = lines.map((line, at) => ({ line: line.replace(/\r$/, ''), at })).filter(({ line }) => line.startsWith('## '));
@@ -72,12 +74,22 @@ try {
   process.exit(2);
 }
 
-writeFileSync(join(root, CHANGELOG), next.changelog);
-writeFileSync(join(root, MANIFEST), next.manifest);
-const manifests = writePluginManifests(root);
-const pristine = spawnSync(process.execPath, [join(root, 'tests/helpers/pristine.mjs'), '--write'], { cwd: root, encoding: 'utf8' });
-if (pristine.status !== 0) {
-  console.error(`Bumped ${CHANGELOG}, ${MANIFEST} and ${manifests.join(', ')}, but regenerating update/pristine.json failed:\n${pristine.stderr || pristine.stdout}`);
+// Every file the bump may write, as it is now (null: absent), to put back on any failure.
+const written = [CHANGELOG, MANIFEST, ...Object.values(MANIFEST_PATHS), PRISTINE];
+const original = new Map(written.map(path => [path, existsSync(join(root, path)) ? readFileSync(join(root, path)) : null]));
+let manifests;
+try {
+  writeFileSync(join(root, CHANGELOG), next.changelog);
+  writeFileSync(join(root, MANIFEST), next.manifest);
+  manifests = writePluginManifests(root);
+  const pristine = spawnSync(process.execPath, [join(root, 'tests/helpers/pristine.mjs'), '--write'], { cwd: root, encoding: 'utf8' });
+  if (pristine.status !== 0) throw new Error(`Regenerating ${PRISTINE} failed:\n${pristine.stderr || pristine.stdout}`);
+} catch (error) {
+  for (const [path, bytes] of original) {
+    if (bytes === null) rmSync(join(root, path), { force: true });
+    else writeFileSync(join(root, path), bytes);
+  }
+  console.error(`Bump failed; nothing was changed.\n${error.message}`);
   process.exit(2);
 }
 

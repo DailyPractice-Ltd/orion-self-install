@@ -793,7 +793,7 @@ test('tripwire: the release has one version, and it ships done.mjs', () => {
   const manifest = JSON.parse(readFileSync(join(repo, 'update', 'manifest.json'), 'utf8'));
   const template = JSON.parse(readFileSync(join(statusDir, 'status.schema-template.json'), 'utf8'));
   const changelog = readFileSync(join(repo, 'CHANGELOG.md'), 'utf8');
-  const newest = changelog.match(/^## (\d+\.\d+\.\d+) — \d{4}-\d{2}-\d{2}$/m);
+  const newest = changelog.match(/^## (\d+\.\d+\.\d+) — \d{4}-\d{2}-\d{2}(?: — .+)?$/m);
   assert.ok(newest, 'CHANGELOG.md should open with a "## X.Y.Z — date" heading');
   assert.deepEqual(Object.keys(template).filter((k) => k.endsWith('_version')), [], 'the manifest declares the version; the template carries none');
   assert.equal(newest[1], manifest.template_version);

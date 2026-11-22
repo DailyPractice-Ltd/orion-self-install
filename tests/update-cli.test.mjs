@@ -73,3 +73,18 @@ test('failed update rolls back writes from the predeclared transaction',t=>{
   assert.equal(JSON.parse(get(client,'status/status.json')).template_version,'1.0.0');
   const recovery=run('recover','--root',client);assert.equal(recovery.status,0,recovery.stderr);
 });
+
+for (const marker of ['agent/agent-definition.md','agent/adapters/claude.md']) test(`update refuses a 1.x harness (${marker}) and points at the reinstall guide`,t=>{
+  const base=mkdtempSync(join(tmpdir(),'orion-update-1x-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
+  const source=join(base,'release'),client=join(base,'client');mkdirSync(source);mkdirSync(client);
+  const manifest={template_version:'2.0.0',deployment:{tools:['claude-code','codex'],common_sources:['AGENTS.md'],entries:[]}};
+  put(source,'AGENTS.md','new agents\n');put(source,'update/manifest.json',JSON.stringify(manifest));
+  put(source,'update/pristine.json',JSON.stringify({files:{'AGENTS.md':[requireHash('old agents\n')]}}));
+  git(source,'init','-q');git(source,'add','.');git(source,'-c','user.email=test@example.com','-c','user.name=Test','commit','-qm','release');
+  const status=JSON.stringify({template_version:'1.9.0',ai_assistant:'claude-code'});
+  put(client,'status/status.json',status);put(client,'AGENTS.md','old agents\n');put(client,marker,'old\n');
+  const result=run('update','--root',client,'--release-repo',source,'--commit',git(source,'rev-parse','HEAD'));
+  assert.equal(result.status,2,result.stdout+result.stderr);
+  assert.match(result.stderr,/docs\/reinstall-from-1\.x\.md/);
+  assert.equal(get(client,'AGENTS.md'),'old agents\n');assert.equal(get(client,'status/status.json'),status);
+});

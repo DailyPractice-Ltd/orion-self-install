@@ -106,6 +106,9 @@ async function update(store,root,repo,commit) {
     const manifest=json(join(snapshot,'update/manifest.json'));
     const pristine=json(join(snapshot,'update/pristine.json'));
     const statusPath=safe(root,'status/status.json'), status=await store.readStatus();
+    // 2.0.0 is a reinstall release: a 1.x folder is never updated in place.
+    const legacyMarker=['agent/agent-definition.md','agent/adapters/claude.md'].find(path=>existsSync(join(root,path)));
+    if (legacyMarker) throw new Error(`This folder is an Orion 1.x harness (it has ${legacyMarker}). Orion 2.0.0 is installed fresh, not updated in place: follow docs/reinstall-from-1.x.md. Nothing was changed`);
     const ai_assistant=resolveAiAssistant(status,manifest.deployment);
     if (newer(status.template_version,manifest.template_version)) throw new Error('Refusing to roll back the harness version');
     if (status.plugin?.pending_switch) throw new Error(`A switch to ${product(status.plugin.pending_switch.to)} has started but is not finished, and an update now could leave the two tools on different releases. Finish the switch first (run "node switch_ai.mjs" again) or cancel it (run "node switch_ai.mjs --to ${ai_assistant}"), then update`);

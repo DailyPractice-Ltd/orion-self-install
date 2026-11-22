@@ -769,7 +769,7 @@ test('tripwire: the tag menu in docs/radio.md is the menu in shapes.mjs', () => 
 
 test('tripwire: required setup explanation agrees across brief, wizard and radio guide', (t) => {
   const explanation = 'Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.';
-  for (const file of ['AGENTS.md', 'docs/radio.md', 'docs/setup.md']) {
+  for (const file of ['docs/install.md', 'docs/radio.md']) {
     assert.ok(squash(readFileSync(join(repo, file), 'utf8').replace(/^> ?/gm, '')).includes(explanation), `${file} must use the approved short explanation`);
   }
   const dir = mkdtempSync(join(tmpdir(), 'orion-wizard-required-'));

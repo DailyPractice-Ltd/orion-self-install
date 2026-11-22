@@ -11,11 +11,11 @@ three sections in the same response.
 1. **Call Summary**. Capture what happened, the decisions and buying signals, and
    the agreed next steps.
 2. **CRM Update**. Log a note, create the follow-up task, and update properties the
-   call evidence supports. Apply the agent definition's CRM rule to each change.
+   call evidence supports. Apply the CRM rule in AGENTS.md (rule 1) to each change.
    Show the note and exact field changes. Report completed writes in one line and
    clearly identify any changes that need the client's approval.
 3. **Follow-up Draft**. Draft the next message in the client's voice. Follow rule 1
-   in the agent definition to score it and decide whether to send it or leave it
+   in AGENTS.md to score it and decide whether to send it or leave it
    waiting. Keep a waiting message in the client's own Drafts if the email connector
    is live, or show it in the conversation and say where it is.
 

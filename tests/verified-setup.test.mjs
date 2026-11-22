@@ -169,7 +169,7 @@ test('no detected app routes setup to Codex or Claude Code installation',t=>{
  const run=h.run([],'',{HOME:home,PATH:'',NODE_OPTIONS:`--import=${pathToFileURL(detection).href}`});
  assert.equal(run.status,2,run.stdout+run.stderr); assert.deepEqual(h.status().machine_profile.surfaces_found,[]);
  assert.match(run.stdout,/Install Codex or Claude Code, then open this folder there/);
- assert.match(run.stdout,/docs\/setup\.md/);
+ assert.match(run.stdout,/docs\/install\.md/);
  assert.doesNotMatch(run.stdout,/websites .*work for everyone|README.s Step 4 shows that lane/);
 });
 

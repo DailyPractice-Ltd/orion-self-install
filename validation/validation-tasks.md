@@ -26,7 +26,7 @@ Rules:
 (`agent/adapters/`); use Codex or Claude Code with Node.js execution. Confirm
 `status/status.json` is readable and `node status/guard.mjs check --quiet` exits 0.
 Website-only and paste-only chat must move to a supported tool using
-[setup and recovery](../docs/setup.md).
+[setup and recovery](../docs/install.md).
 
 **Pass criteria**: your AI tells you, in one plain sentence, which adapter it is using
 and confirms this folder passed a fresh server check. A failed check pauses
@@ -34,7 +34,7 @@ validation work; code renewal, inspection, updating and recovery remain availabl
 
 ## VT-01 · Prospect research end-to-end
 
-**Runs**: the Prospect Research → Outreach skill (agent-definition task 1), the way you'll
+**Runs**: the Prospect Research → Outreach skill (AGENTS.md, job 1), the way you'll
 actually use it day to day.
 
 **Steps**: pick a real prospect you haven't contacted yet → hand them to your agent
@@ -79,13 +79,13 @@ confirmed by looking at the CRM itself, not the agent's word for it.
 
 ## VT-04 · Post-call debrief end-to-end
 
-**Runs**: the Post-Call Debrief skill (agent-definition task 2), on a real
+**Runs**: the Post-Call Debrief skill (AGENTS.md, job 2), on a real
 recent call (transcript or your own notes).
 
 **Pass criteria**:
-- All three sections (Call Summary / CRM Update / Follow-up Draft) in **the same
-  sitting**, each clearly labelled; the CRM Update is already written and reported in
-  one line, the Follow-up Draft is staged
+- All three labelled sections of the `post-call-debrief` skill in **the same
+  sitting**; the CRM update is already written and reported in one line, and the
+  follow-up draft is staged
 - Follow-up draft staged in your Drafts, in your tone (chat-only surface: in the
   conversation, said plainly)
 - With no yes asked: CRM note logged + task created and properties updated, matching what
@@ -172,7 +172,7 @@ Never delete pending reports to make this check pass.
 conversation; failed checks stop new work after the connection allowance expires, and recovery preserves
 finished reports without duplicates. Record sanitized receipts only, never keys or
 client content. Use `NON-TECHNICAL-DRY-RUN.md` for the observed live journey and
-`docs/setup.md` for setup and recovery. Record remaining blockers with the
+`docs/install.md` for setup and recovery. Record remaining blockers with the
 sanitized validation results.
 
 ---

@@ -22,8 +22,14 @@ git -C "$scratch/source" show "$commit:update/manifest.json"
 Read the pinned `docs/updating.md` and follow its apply instructions. If the
 source version is older than the installed version, report both versions and
 stop. If the fetch fails in Codex, see the [network instructions](../agent/adapters/codex.md).
-Use [the migration procedure](#older-same-path-folders) for a separate deployed layout
-if status has no recorded AI assistant.
+
+## Orion 1.x: reinstall instead
+
+This procedure updates 2.0.0 and later. When the deployed `template_version` is below
+2.0.0, or status has no recorded AI assistant, do not apply anything: tell the client
+that 2.0.0 is installed fresh, then follow
+[reinstall-from-1.x.md](reinstall-from-1.x.md) from the pinned source
+(`$scratch/source/docs/reinstall-from-1.x.md`). Remove the temporary checkout afterwards.
 
 ## Apply the pinned update
 
@@ -81,15 +87,9 @@ An interrupted update is rolled back from its journal with
 `node update/apply.mjs recover --root .`. Recovery restores only what the update wrote.
 If a path changed since, it stops, overwrites nothing and names the paths and the step to take.
 
-When upgrading a harness that predates the 1.5.0 sending rule, run
-`node status/send.mjs migrate` as described in [AGENTS.md](../AGENTS.md).
-Updates never start or renew a connection allowance. All unpaired folders must
-pair before normal work. Older pairing markers upgrade to version 2 without
-inferring last_connected_at from verification or migration dates. A successful
-verification and complete report delivery establish the silent 48-hour allowance.
-Before resuming Orion work, run `node status/guard.mjs check --quiet`; exit 2
-keeps work paused while diagnosis, updating and re-pairing remain available. Then
-check support messages separately with `node status/radio.mjs check`. Report the version, changed files, preserved edits,
+Updates never start or renew the connection allowance. Before resuming Orion work, run
+`node status/guard.mjs check --quiet` (see [Install Orion](install.md#before-work)).
+Report the version, changed files, preserved edits,
 any replaced edited runtime scripts and the backup path. Remove the temporary
 source checkout after the operation.
 
@@ -105,7 +105,7 @@ It switches to the other assistant; add `--to claude-code` or `--to codex` to na
 It reuses the same package, version and catalog identity. It writes the target tool's
 catalog and sets Orion up with that tool first. Only when the target tool's own
 inspection shows the same discovery evidence as plugin setup (see
-[Finish the Orion plugin](setup.md#finish-the-orion-plugin): every shipped skill at this
+[Finish the Orion plugin](install.md#finish-the-orion-plugin): every shipped skill at this
 version, enabled for this folder only) does it move client skills to the new skill
 folder and record the new selection. After that commit it removes Orion from the
 previous tool, and then that tool's catalog, so a failure before the commit leaves the
@@ -138,35 +138,6 @@ those edits. After a restore, the report says `reload_required`: start a fresh s
 and confirm discovery with `node update/plugin-setup.mjs verify --discovered` before
 telling the client the previous version is running again. Keep the backup for audit.
 
-## Older same-path folders
+## Maintainers
 
-Older folders that used the release checkout as their business folder must first be
-migrated into a separate deployed repository for an explicitly chosen AI assistant. From a
-fresh release checkout, run:
-
-```sh
-node install.mjs --tool claude-code --target /path/to/new-client-folder \
-  --migrate-from /path/to/legacy-checkout --github-repo OWNER/PRIVATE-REPO
-```
-
-Use `--tool codex` only when the legacy status already records Codex. The migration
-copies the client's status and logs, knowledge, skills, roster and job sheets,
-as well as other client-created files such as notes and playbooks, then overlays edited
-deployed files. Release-only source trees, maintainer files, and retired workflows stay
-behind. Computer schedules refer to the original folder. Review them there before
-replacing them in the native scheduler. The new
-private repository becomes the home, while `--local-only` leaves home disabled. The legacy
-checkout is left intact. The command creates and pushes a private GitHub repository;
-`--remote https://github.com/OWNER/PRIVATE-REPO.git` uses an existing private
-repository, verified through `gh`. With no GitHub option, installation creates a local Git repository; `--local-only` is the explicit equivalent. A private remote can be connected later with `node status/home.mjs prepare --remote <address> --yes`.
-
-The manifest's legacy `refresh` list remains for old same-path updaters, but no longer
-lists the three `.claude/skills/` source files removed from the release. An older
-same-path updater can still refresh the other listed files; it will leave those
-three installed skills as they are. To receive current skill definitions, migrate
-the harness into a separate client folder with `install.mjs --migrate-from` above,
-or follow the pinned update procedure in an already deployed folder. It installs
-the `orion` plugin package at `plugins/orion/` for either tool and recognizes
-historical Claude copies by fingerprint. `deployment` is the contract for separate client folders.
-Maintainers run
-`node tests/helpers/pristine.mjs --write` after release edits and before tagging.
+Run `node tests/helpers/pristine.mjs --write` after release edits and before tagging.

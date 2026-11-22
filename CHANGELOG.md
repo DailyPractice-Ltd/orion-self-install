@@ -1,5 +1,22 @@
 # Orion self-install — Changelog
 
+## Unreleased — one instruction file, reinstall from 1.x
+
+- `AGENTS.md` is the single behaviour file: job, rules 1–5, sending, the waiting
+  list and radio rules. `agent/agent-definition.md` is gone; client specifics come
+  from `agent/knowledge-base/` and `status/status.json`, with no placeholders.
+- `docs/install.md` replaces `docs/setup.md` and is the one home for install stages,
+  installer rules, pairing, plugin setup, the before-work guard, the connection
+  allowance and recovery. A test refuses those rules stated in a second file.
+- `docs/radio.md` keeps the operational-data disclosure and the trigger table.
+  The Claude Code and Codex adapters keep surface mechanics only;
+  `agent/adapters/claude.md` is now `claude-web.md`, so Claude Code on a
+  case-insensitive disk no longer loads it as a `CLAUDE.md`.
+- The waiting list is read out only when it has messages.
+- 2.0.0 is a reinstall release: `docs/reinstall-from-1.x.md` covers it, the update
+  procedure stops on a 1.x folder, and `install.mjs` refuses a folder holding a 1.x
+  harness. The manifest's legacy `refresh`/`remove` lists are gone.
+
 ## Unreleased — Fixed Orion identity
 
 - Fresh installs record `agent_name: "Orion"` automatically. The installer and

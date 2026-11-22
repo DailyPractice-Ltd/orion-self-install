@@ -32,6 +32,7 @@ test('release contract plans one selected runtime from portable sources', (t) =>
       assert.ok(!destinations.includes(path), `${path} was retired in 2.0.0`);
     }
     assert.ok(!destinations.some(path => path.startsWith('.specify/')), 'maintainer governance stays in the release');
+    assert.ok(!destinations.includes('docs/maintaining.md'), 'the maintainer route stays out of client folders');
     assert.ok(!plan.entries.some(entry => [entry.source, entry.destination].some(path => path.split('/').includes('specs'))), 'human-only records stay out of every deployment');
     const skills = 'plugins/orion/skills';
     for (const name of ['prospecting', 'call-planner', 'friday-report']) {

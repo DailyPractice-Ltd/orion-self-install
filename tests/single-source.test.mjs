@@ -21,7 +21,7 @@ for (const [rule, home, pattern] of [
   // Match the rule's working parts, not one sentence, so a reworded copy is caught too.
   ['the guard-run paragraph', 'docs/install.md', /admit the whole invocation with|guard\.mjs run --|run -- sh -c/i],
   ['the 48-hour connection allowance', 'docs/install.md', /\b48[- ]?(elapsed )?(hours?|hrs?|h\b)|forty[- ]eight hours/i],
-  ['the release procedure', 'AGENTS.md', /bump\.mjs|plugin-package\.mjs --write|one hand-edited version/i],
+  ['the release procedure', 'docs/maintaining.md', /bump\.mjs|plugin-package\.mjs --write|one hand-edited version/i],
 ]) {
   test(`${rule} lives only in ${home}`, () => {
     const found = docs().filter((path) => pattern.test(squash(readFileSync(join(repo, path), 'utf8'))));

@@ -2,6 +2,9 @@
 
 ## Unreleased — one instruction file, reinstall from 1.x
 
+- Source maintenance routes before client setup to release-only `docs/maintaining.md`,
+  covering version selection, checks, commits and tags without client pairing or radio.
+  Installed folders retain the client workflow.
 - `AGENTS.md` is the single behaviour file: job, rules 1–5, sending, the waiting
   list and radio rules. `agent/agent-definition.md` is gone; client specifics come
   from `agent/knowledge-base/` and `status/status.json`, with no placeholders.

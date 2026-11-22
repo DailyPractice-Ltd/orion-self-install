@@ -156,7 +156,11 @@ function candidate(t) {
     mkdirSync(dirname(join(release, path)), { recursive: true });
     copyFileSync(join(repo, path), join(release, path));
   }
-  return { release, version: manifest.template_version };
+  // A candidate being tagged opens its CHANGELOG with its own version, above any Unreleased notes.
+  const version = manifest.template_version;
+  const log = readFileSync(join(release, 'CHANGELOG.md'), 'utf8');
+  writeFileSync(join(release, 'CHANGELOG.md'), log.replace(/^## /m, `## ${version} — candidate\n\n## `));
+  return { release, version };
 }
 const contract = (release, ...args) => spawnSync(process.execPath, [join(release, 'update/release-contract.mjs'), ...args], { encoding: 'utf8' });
 
@@ -215,4 +219,35 @@ test('the release workflow runs the full contract for both tools at the tag vers
   assert.ok(tests > 0, 'the candidate’s own tests run');
   const tag = workflow.indexOf('git tag -a');
   assert.ok(validate < tag && tests < tag, 'validation happens before the tag is pushed');
+});
+
+const changelog = (release, text) => writeFileSync(join(release, 'CHANGELOG.md'), `# Changelog\n\n${text}`);
+
+test('release contract fails when the newest numbered CHANGELOG section is not the candidate version', (t) => {
+  const { release, version } = candidate(t);
+  changelog(release, '## Unreleased — next\n\n- a\n\n## 1.9.9 — 2026-01-01\n\n- b\n');
+  const run = contract(release, '--tool', 'codex');
+  assert.notEqual(run.status, 0);
+  assert.match(run.stderr, /CHANGELOG\.md/);
+  assert.match(run.stderr, /1\.9\.9/);
+  assert.match(run.stderr, new RegExp(version.replaceAll('.', '\\.')));
+});
+
+test('release contract accepts Unreleased sections above the candidate version, or no numbered section at all', (t) => {
+  const { release, version } = candidate(t);
+  changelog(release, `## Unreleased — next\n\n- a\n\n## Unreleased — other\n\n- b\n\n## ${version} — 2026-11-12\n\n- c\n\n## 1.0.0\n`);
+  assert.equal(contract(release, '--tool', 'codex').status, 0, 'Unreleased above the matching section');
+  changelog(release, '## Unreleased — first\n\n- a\n');
+  assert.equal(contract(release, '--tool', 'codex').status, 0, 'no numbered section yet');
+});
+
+test('releasing a version requires the CHANGELOG to open with that version', (t) => {
+  const { release, version } = candidate(t);
+  changelog(release, `## Unreleased — next\n\n- a\n\n## ${version} — 2026-11-12\n\n- c\n`);
+  const run = contract(release, '--tool', 'codex', '--version', version);
+  assert.notEqual(run.status, 0);
+  assert.match(run.stderr, /CHANGELOG\.md/);
+  assert.match(run.stderr, new RegExp(version.replaceAll('.', '\\.')));
+  changelog(release, `## ${version} — 2026-11-12\n\n- c\n`);
+  assert.equal(contract(release, '--tool', 'codex', '--version', version).status, 0);
 });

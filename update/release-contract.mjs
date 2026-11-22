@@ -61,6 +61,22 @@ function simulateDeployment(ai_assistant, entries, version) {
   }
 }
 
+/** The candidate CHANGELOG's newest numbered section must be the version being released. */
+function changelogErrors(version, requested) {
+  const path = join(root, 'CHANGELOG.md');
+  if (!existsSync(path)) return [];
+  const headings = readFileSync(path, 'utf8').split(/\r?\n/).filter(line => line.startsWith('## '));
+  const numbered = headings.map(line => /^## (\d+\.\d+\.\d+)(?:\s|$)/.exec(line)).find(Boolean);
+  const errors = [];
+  if (numbered && numbered[1] !== version) {
+    errors.push(`CHANGELOG.md's newest numbered section is ${numbered[1]}, expected template_version ${version}`);
+  }
+  if (requested !== undefined && !(headings[0] ?? '').match(new RegExp(`^## ${requested.replaceAll('.', '\\.')}(?:\\s|$)`))) {
+    errors.push(`CHANGELOG.md must open with a "## ${requested}" section to release ${requested}, found ${headings[0] ? `"${headings[0]}"` : 'no section'}`);
+  }
+  return errors;
+}
+
 function check(ai_assistant, requested) {
   const manifest = JSON.parse(readFileSync(join(root, 'update/manifest.json'), 'utf8'));
   const version = manifest.template_version;
@@ -71,6 +87,7 @@ function check(ai_assistant, requested) {
     if (!/^\d+\.\d+\.\d+$/.test(requested)) errors.push(`--version ${requested} is not an X.Y.Z release version`);
     else if (requested !== version) errors.push(`release version ${requested} does not equal the candidate's template_version ${version}`);
   }
+  errors.push(...changelogErrors(version, requested));
   errors.push(...staleManifests(root).map(path => `${path} is stale: regenerate it from template_version ${version} (node update/plugin-package.mjs --write)`));
   errors.push(...validatePackage(root, { version: requested ?? version }));
   if (!errors.length) errors.push(...simulateDeployment(ai_assistant, entries, requested ?? version));

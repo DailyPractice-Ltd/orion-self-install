@@ -735,9 +735,7 @@ test('a label is a slug or a roster name, never words', () => {
     assert.ok(!isLabel(bad, 'skill'), `should not be a slug: ${JSON.stringify(bad)}`);
     assert.equal(typeof labelProblem(bad, 'agent'), 'string', `should have a plain reason: ${JSON.stringify(bad)}`);
   }
-  // A skill the radio can install is a skill a report can name: the library's
-  // slug rule lets a slug start with a digit. A roster name still starts with a
-  // letter (library/HIRING.md).
+  // Skill slugs may start with a digit; roster names start with a letter.
   assert.ok(isLabel('5-whys', 'skill') && isLabel('9lives', 'skill'));
   assert.ok(!isLabel('lead-', 'skill') && !isLabel('a--b', 'skill'), 'a slug has single hyphens between words');
   assert.ok(!isLabel('5-whys', 'agent') && !isLabel('9lives', 'agent'));

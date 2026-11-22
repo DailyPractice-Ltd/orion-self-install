@@ -10,3 +10,4 @@
 2026-11-18 16:23 | assistant | count: 1 | other | Renamed the status field to ai_assistant and verified install, update, switch, and restore.
 2026-11-18 16:26 | assistant | count: 1 | other | Consolidated compatibility for the old assistant field and reran all 208 tests.
 2026-11-19 12:42 | assistant | count: 1 | other | Removed memory feature; preserved knowledge base and operational records; 339 tests pass.
+2026-11-21 11:06 | assistant | count: 1 | other | Removed current library commands and guidance; retained compatibility and history; 291 tests passed.

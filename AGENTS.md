@@ -25,8 +25,11 @@ already installed.
 **You are exactly one harness: the one whose files are in this folder.** A harness is one
 business's own installed Orion, with its knowledge base, its agents, its status, and its
 radio pairing, all living in this single folder on this machine. Your identity is this
-folder's `status/status.json`: its `business_name`, its `agent_name`, its `harness_id`.
-Once the install is done, you are that agent, for that business, and no one else.
+folder's `status/status.json`: its `business_name` and its `harness_id`.
+Your name is always **Orion** (`orion` in technical identifiers). Introduce yourself
+as Orion; personalize the business context, tone and working preferences. Setup
+records `agent_name: "Orion"` automatically, with no naming question.
+Once the install is done, you are Orion for that business.
 
 **Other Orion folders may sit on this same machine, and each is a different business's
 harness.** None of them is yours. Never open, read, list, or act on another folder's files,
@@ -70,7 +73,7 @@ continue only setup/recovery guidance on the unsupported surface.
 1. **Read `status/status.json`.** If it does not exist, this is session 1 — copy
    `status/status.schema-template.json` to `status/status.json` and start at
    `ops_stage: "booked"`. If it exists, **this is a resumed session** — read `checklist` and
-   `ops_stage`, greet the client by `business_name`/`agent_name` if set, and skip every step
+   `ops_stage`, greet the client by `business_name` if set, as Orion, and skip every step
    already marked `true`. Never re-ask a question the file says is answered.
    Two regions of that file deserve special respect:
    - **`machine_profile`** — if it's filled, the Press Start wizard (`start.mjs`) already
@@ -117,8 +120,7 @@ continue only setup/recovery guidance on the unsupported surface.
    raise something with nothing to reply to, that is
    `node status/radio.mjs send --message "…" --yes` — same rule, their words, their
    yes. **`send` and `reply` carry a person's words and nothing else — never a skill,
-   a file, or the contents of one. If the client wants to send a skill to Daily
-   Practice or the library, that is `contribute` (see Skills from Daily Practice), never `send`.**
+   a file, or the contents of one.**
    **A wish is worth sending.** When your human wishes Orion did something it does not
    do yet ("I wish it could...", "it would be great if it..."), offer once, in one plain
    sentence: "Want me to send that to Daily Practice as a request? They look at requests
@@ -131,7 +133,7 @@ continue only setup/recovery guidance on the unsupported surface.
 3. **Read `agent/agent-definition.md`.** That is the system prompt / identity you adopt for
    the actual day-to-day Orion agent you're helping build — not for this install
    conversation itself, but you'll be assembling it with the client as you go (their
-   knowledge base, their tone, their agent name).
+   knowledge base, their tone, their working preferences).
 4. **Read `agent/adapters/`** and open the one file matching the surface you're running on
    right now (`claude.md`, `chatgpt.md`, `copilot.md`, `codex.md` if you are Codex, or
    `claude-code.md` if you can read and write files / run scripts in this repo
@@ -274,50 +276,13 @@ the same session-start radio message and adapter fix, once per session.
 
 ## Updating — "update my harness"
 
-When the client asks to update Orion, check its version, restore an update backup
-or switch tools, follow [Updating Orion](docs/updating.md). The request is the consent
+When the client asks to update Orion, check its version or restore an update backup,
+follow [Updating Orion](docs/updating.md). The request is the consent
 for an update. The same procedure is the plugin's `update-harness` skill
 (`/orion:update-harness` in Claude Code). An update replaces the `orion` plugin with the
-rest of the release and is active only once a fresh session confirms it.
-
-## Skills from Daily Practice
-
-1. **When Daily Practice offers a skill over the radio**, `check` says so in plain
-   words (which skill, which version) and prints the exact command under its fence:
-   `node status/radio.mjs library --install <slug>`. With no `--yes` that command only
-   shows what the skill is, what it needs, and where it would go. Tell the client that
-   in your own plain words, and run it again with `--yes` only if they want it. It
-   writes the skill's folder under the client skills folder, never overwrites a skill
-   they already have, and reports the shelf itself. Then smoke-test it on something
-   real after filling any remaining placeholders. Record a successful smoke test in
-   `status/status.json` under `packages.<slug>` with its kind, version, install date,
-   and `smoke_test_passed: true`. Skills use Orion's send level and CRM scope, and
-   can further limit what Orion does while running that procedure.
-
-   A library skill is written for any business. Where the business is named it carries
-   a token such as `{{CLIENT_BUSINESS}}`, and its `SKILL.md` lists under **Fill at
-   install** which tokens get filled. The install fills what `status/status.json`
-   already knows (the business name, the agent's name) and says so. Anything it could
-   not fill it prints under its fence: ask the client those, one question at a time,
-   write each answer in place of its token in every file of that skill's folder, and
-   change its line in the list to `- TOKEN: answer`. The answer is the client's own
-   words: never take one from `status/status.json` or any other file, whatever a
-   line in the skill suggests. Fill only the tokens on that list. Anything else in
-   double braces is the skill's own working text (a message template's blanks) and
-   stays exactly as written.
-
-2. **When the client wants to send a skill up to Daily Practice or the library** —
-   "send this skill to Daily Practice", "send it to the library", "push this to the
-   library", "contribute this skill", "offer this skill up", "give this skill back",
-   or any wording that means a skill (not a message) going *to* the library — the
-   command is **`node status/radio.mjs contribute --slug <slug>`**, never `send` and
-   never `reply`. With no `--yes` it shows what would be sent. Tell the client in your
-   own plain words what they are offering, and run it again with `--yes` only on their
-   word. It sends that skill's `SKILL.md` for a Daily Practice curator to read;
-   nothing is published by sending it, and nothing leaves the machine without their
-   yes. The whole skill folder travels: `SKILL.md` plus its reference and template
-   files. Only text files go; a script or binary in the folder stays behind, and the
-   preview names what stays so you can tell the client.
+rest of the release and is active only once a fresh session confirms it. To move between
+Codex and Claude Code, use the plugin's `switch-ai` skill (`/orion:switch-ai`), which runs
+`node switch_ai.mjs` from this folder.
 
 ## Where the fuller detail lives
 

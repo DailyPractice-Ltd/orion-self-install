@@ -1,8 +1,8 @@
 /**
- * Pinned, manifest-driven update, tool switch, restore and recovery for a deployed Orion harness.
+ * Pinned, manifest-driven update, restore and recovery for a deployed Orion harness.
+ * Switching between Codex and Claude Code is switch_ai.mjs at the harness root.
  *
  *   node update/apply.mjs update  --root <harness> [--release-repo <repo>] --commit <hash>
- *   node update/apply.mjs switch  --root <harness> [--release-repo <repo>] --commit <hash> --to <tool>
  *   node update/apply.mjs restore --root <harness> --backup .update-backup/<name>
  *   node update/apply.mjs recover --root <harness>
  *
@@ -14,11 +14,8 @@
  *   failed             a confirmed failure: the previous coordinated state is restored (exit 3)
  *   pending/registered the update stays pending in status.json `plugin.pending_version`
  *                      until a fresh session confirms discovery; it is never announced as active
- * A switch writes the target tool's catalog and sets that tool up first. The selected tool
- * (`ai_assistant`) changes only once the target's own inspection shows the same discovery
- * evidence as plugin setup; until then the switch is pending (`plugin.pending_switch`) and
- * the same command resumes it. The previous tool's Orion is retired after the commit.
- * Every status.json write holds the shared status lock (status/store.mjs).
+ * The whole run holds the shared status lock (status/store.mjs), from the first read of
+ * status.json to the journal's last word, so no other Orion command's change is lost to it.
  * Neither tool's marketplace auto-update is used: the harness supplies the pinned package.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -28,9 +25,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PACKAGE_ROOT, TOOL_LAYOUT, destinationState, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
 import { catalogName, catalogText, ensurePluginRegion } from './plugin-package.mjs';
-import { lowerFirst, retirePlugin } from './plugin-native.mjs';
+import { lowerFirst } from './plugin-native.mjs';
 import { captureRegistration, restoreRegistration } from './plugin-registration.mjs';
-import { RESUME_COMMAND, VERIFY_COMMAND, nativeStep, runPluginSetup } from './plugin-setup.mjs';
+import { RESUME_COMMAND, VERIFY_COMMAND, runPluginSetup } from './plugin-setup.mjs';
 import { withStatusLock } from '../status/store.mjs';
 
 const arg = name => { const i=process.argv.indexOf(name); return i<0 ? undefined : process.argv[i+1]; };
@@ -40,12 +37,8 @@ const copyTo = (from,to) => { mkdirSync(dirname(to),{recursive:true}); copyFileS
 const versionParts = version => String(version).split('.').map(Number);
 const newer = (a,b) => { const x=versionParts(a),y=versionParts(b); for(let i=0;i<3;i++) {if((x[i]||0)!==(y[i]||0)) return (x[i]||0)>(y[i]||0);} return false; };
 const writeJson = (path,value) => writeFileSync(path,JSON.stringify(value,null,2));
-/**
- * Every status.json write goes through the shared status lock (status/store.mjs) as a
- * read-modify-write of the fields this command owns, so a radio or scheduled run writing
- * at the same moment keeps its own changes.
- */
-const editStatus = (root,change) => withStatusLock(root, async store => { const status=await store.readStatus(); const result=change(status); await store.writeStatus(status); return result; });
+/** A read-modify-write of the status fields this command owns, under the run's lock. */
+const editStatus = async (store,change) => { const status=await store.readStatus(); const result=change(status); await store.writeStatus(status); return result; };
 const note = (status,line) => { status.notes=[status.notes||'',line].filter(Boolean).join('\n'); };
 const product = tool => TOOL_LAYOUT[tool].product;
 const fileHash = path => existsSync(path) && lstatSync(path).isFile() ? fingerprint(readFileSync(path)) : null;
@@ -106,16 +99,16 @@ function pruneParents(root, paths) {
 
 const freshCheck = tool => `Start a fresh ${product(tool)} session in this folder${tool==='claude-code'?' (or run /reload-plugins)':''}, then ask your assistant to confirm it sees the Orion skills (it runs "${VERIFY_COMMAND}").`;
 
-async function update(root,repo,commit) {
-  await recoverPendingUpdates(root);
+async function update(store,root,repo,commit) {
+  await recoverPendingUpdates(store,root);
   const snapshot=sourceSnapshot(repo,commit);
   try {
     const manifest=json(join(snapshot,'update/manifest.json'));
     const pristine=json(join(snapshot,'update/pristine.json'));
-    const statusPath=safe(root,'status/status.json'), status=json(statusPath);
+    const statusPath=safe(root,'status/status.json'), status=await store.readStatus();
     const ai_assistant=resolveAiAssistant(status,manifest.deployment);
     if (newer(status.template_version,manifest.template_version)) throw new Error('Refusing to roll back the harness version');
-    if (status.plugin?.pending_switch) throw new Error(`A switch to ${product(status.plugin.pending_switch.to)} has started but is not finished, and an update now could leave the two tools on different releases. Finish the switch first (run the same switch command again) or cancel it with "node update/apply.mjs restore --root . --backup ${status.plugin.pending_switch.backup}", then update`);
+    if (status.plugin?.pending_switch) throw new Error(`A switch to ${product(status.plugin.pending_switch.to)} has started but is not finished, and an update now could leave the two tools on different releases. Finish the switch first (run "node switch_ai.mjs" again) or cancel it (run "node switch_ai.mjs --to ${ai_assistant}"), then update`);
     const withPlugin=hasPackage(manifest.deployment);
     const plan=planForTool(manifest.deployment,ai_assistant,{releaseRoot:snapshot,root});
     const retired=(manifest.deployment.retired||[]).map(e=>({source:e.source,destination:e.destinations?.[ai_assistant]||e.destination,ownership:'release',fingerprint_key:e.sources?.[ai_assistant]||e.fingerprint_key||e.source}));
@@ -258,19 +251,19 @@ async function update(root,repo,commit) {
         step();
       }
       pruneParents(root,report.retired.filter(path => path.startsWith('library/')));
-      await editStatus(root,commitStatus);
+      await editStatus(store,commitStatus);
       journal.state='complete';writeJson(join(backup,'journal.json'),journal);
     } catch(error) {
-      await rollbackUpdate(root,backup,journal);
+      await rollbackUpdate(store,root,backup,journal);
       journal.state='recovered';writeJson(join(backup,'journal.json'),journal);
       throw error;
     }
     if (!withPlugin) return {...report,backup:backupRel};
 
     // Refresh the selected tool. Only a confirmed failure rolls the update back.
-    const refreshed=await runPluginSetup(root,{mode:'setup'});
+    const refreshed=await runPluginSetup(root,{mode:'setup',store});
     if (refreshed.setup_state==='failed') {
-      const plugin=await rollbackUpdate(root,backup,journal,restored=>{
+      const plugin=await rollbackUpdate(store,root,backup,journal,restored=>{
         const region=ensurePluginRegion(restored);
         region.setup_state='pending';
         region.pending_version=restored.template_version;
@@ -288,248 +281,13 @@ async function update(root,repo,commit) {
 
 const pluginReport = plugin => ({setup_state:plugin?.setup_state,pending_version:plugin?.pending_version??null,verified_version:plugin?.verified_version??null,remaining_action:plugin?.remaining_action??null});
 
-// A switch moves the active layout and plugin registration. Historical job files stay in place.
-async function switchTool(root,repo,commit,ai_assistant,legacyTool) {
-  await recoverPendingSwitches(root);
-  await recoverPendingUpdates(root);
-  const snapshot=sourceSnapshot(repo,commit);
-  try {
-    const manifest=json(join(snapshot,'update/manifest.json'));
-    const pristine=json(join(snapshot,'update/pristine.json'));
-    const deployment=manifest.deployment;
-    const statusPath=safe(root,'status/status.json'), status=json(statusPath);
-    const from=resolveAiAssistant(status,deployment,{legacyTool});
-    if (status.template_version !== manifest.template_version ||
-        !existsSync(safe(root,'update/manifest.json')) ||
-        fingerprint(readFileSync(safe(root,'update/manifest.json'))) !== fingerprint(readFileSync(safe(snapshot,'update/manifest.json')))) {
-      throw new Error(`Update this harness to pinned release ${manifest.template_version} before switching tools`);
-    }
-    for(const path of deployment.common_sources.filter(p=>/^status\/[^/]+\.mjs$/.test(p) || /^update\/(manifest\.json|apply\.mjs|destination-resolver\.mjs|release-contract\.mjs)$/.test(p))) {
-      const installed=safe(root,path), released=safe(snapshot,path);
-      if(!existsSync(installed) || fingerprint(readFileSync(installed))!==fingerprint(readFileSync(released))) {
-        throw new Error(`Update this harness to the pinned release before switching: ${path}`);
-      }
-    }
-    if (!deployment.tools.includes(ai_assistant) || ai_assistant===from) throw new Error(`Choose the other supported tool (current: ${from})`);
-    const withPlugin=hasPackage(deployment);
-    const waiting=status.plugin?.pending_switch;
-    if (waiting && waiting.to!==ai_assistant) throw new Error(`A switch to ${product(waiting.to)} has started but is not finished, and only one switch can run at a time. Finish it with --to ${waiting.to}, or cancel it with "node update/apply.mjs restore --root . --backup ${waiting.backup}"`);
-
-    let backupRel, backup, journal, count=0;
-    const step=()=>{ if(process.env.ORION_SWITCH_FAIL_AFTER && ++count===Number(process.env.ORION_SWITCH_FAIL_AFTER)) throw new Error('Injected switch interruption'); };
-    if (waiting) {
-      backupRel=waiting.backup; backup=safe(root,backupRel); journal=json(join(backup,'journal.json'));
-      if (journal.kind!=='switch' || journal.state!=='awaiting_target' || journal.to!==ai_assistant) throw new Error(`The waiting switch's backup ${backupRel} is ${journal.state}; run "node update/apply.mjs recover --root ." and switch again`);
-    } else {
-      const stamp=new Date().toISOString().replace(/[:.]/g,'-');
-      backupRel=`.update-backup/switch-${from}-to-${ai_assistant}-${stamp}`;
-      backup=safe(root,backupRel);if(existsSync(backup)) throw new Error('Backup already exists');
-      mkdirSync(backup,{recursive:true});copyTo(statusPath,join(backup,'status/status.json'));
-      journal={kind:'switch',state:'pending',from,to:ai_assistant,actions:[],retire:[],plugin:withPlugin};
-    }
-
-    if (withPlugin && !waiting) {
-      // Prepare: the target tool's catalog, from the same identity, beside the current one.
-      const identity=ensurePluginRegion(status,{create:true}).catalog_identity;
-      const path=TOOL_LAYOUT[ai_assistant].catalogPath, text=catalogText(ai_assistant,identity), current=fileHash(safe(root,path));
-      if (current!==null && current!==fingerprint(text)) throw new Error(`Target collision: ${path}`);
-      if (current===null) {
-        mkdirSync(dirname(join(backup,'stage',path)),{recursive:true});writeFileSync(join(backup,'stage',path),text);
-        journal.actions.push({destination:path,kind:'copy',hash:fingerprint(text),prior_hash:null});
-      }
-      writeJson(join(backup,'journal.json'),journal);
-      try {
-        for (const a of journal.actions) { copyTo(join(backup,'stage',a.destination),safe(root,a.destination)); step(); }
-        await editStatus(root,current=>{
-          const plugin=ensurePluginRegion(current);
-          if (plugin.catalog_identity==null) plugin.catalog_identity=identity;
-          plugin.pending_switch={to:ai_assistant,backup:backupRel,remaining_action:null};
-        });
-        journal.state='awaiting_target';writeJson(join(backup,'journal.json'),journal);
-      } catch(error) {
-        await rollbackSwitch(root,backup,journal);
-        journal.state='recovered';writeJson(join(backup,'journal.json'),journal);
-        throw error;
-      }
-    }
-    if (withPlugin) {
-      const identity=status.plugin.catalog_identity;
-      const target=nativeStep(root,{tool:ai_assistant,identity,version:manifest.template_version,mode:'setup'});
-      journal.target_touched=true;
-      if (target.state==='failed') {
-        await rollbackSwitch(root,backup,journal);
-        retirePlugin({root,tool:ai_assistant,catalogName:catalogName(identity)});
-        journal.state='rolled_back';journal.reason=target.details?.reason;writeJson(join(backup,'journal.json'),journal);
-        process.exitCode=3;
-        return {state:'rolled_back',from,to:ai_assistant,reason:target.details?.reason,errors:target.details?.errors||[],selected:from,backup:backupRel};
-      }
-      if (target.state==='pending') {
-        await editStatus(root,current=>{ ensurePluginRegion(current).pending_switch={to:ai_assistant,backup:backupRel,remaining_action:target.remaining_action}; });
-        writeJson(join(backup,'journal.json'),journal);
-        return {state:'pending_switch',from,to:ai_assistant,selected:from,remaining_action:`${target.remaining_action} Then run this same switch command again to finish.`,backup:backupRel};
-      }
-      journal.target_next=target.details?.next;
-    }
-    return await commitSwitch({root,snapshot,deployment,pristine,from,to:ai_assistant,backup,backupRel,journal,withPlugin,version:manifest.template_version,step});
-  } finally {rmSync(snapshot,{recursive:true,force:true});}
-}
-
-async function commitSwitch({root,snapshot,deployment,pristine,from,to,backup,backupRel,journal,withPlugin,version,step}) {
-  const status=json(safe(root,'status/status.json'));
-  const sourcePlan=planForTool(deployment,from,{releaseRoot:snapshot,root});
-  const targetPlan=planForTool(deployment,to,{releaseRoot:snapshot,root});
-  const actions=[], retire=[];
-  const targetPaths=new Set(journal.actions.map(a=>a.destination));
-  const add=(destination,source,kind='copy') => {
-    safe(root,destination);
-    if (targetPaths.has(destination)) throw new Error(`Duplicate switch destination: ${destination}`);
-    targetPaths.add(destination);
-    if (existsSync(safe(root,destination))) throw new Error(`Target collision: ${destination}`);
-    if (!lstatSync(source).isFile()) throw new Error(`Not a regular source file: ${source}`);
-    actions.push({kind,destination,source});
-  };
-  for (const entry of deployment.entries) {
-    // Package entries have no per-tool destinations: they stay at their own path.
-    const at=tool=>entry.destinations?entry.destinations[tool]:entry.source;
-    const old=sourcePlan.find(e=>e.destination===at(from)), next=targetPlan.find(e=>e.destination===at(to));
-    const oldPath=safe(root,old.destination);
-    const state=destinationState(root,old,pristine);
-    if (old.destination===next.destination) {
-      if (old.source!==next.source && entry.ownership==='release') {
-        if (state==='absent') add(next.destination,safe(snapshot,next.source));
-        else if (state==='owned') {
-          targetPaths.add(next.destination);
-          actions.push({kind:'replace',destination:next.destination,source:safe(snapshot,next.source)});
-        }
-      }
-      continue;
-    }
-    if (state==='preserve' && existsSync(oldPath) && lstatSync(oldPath).isSymbolicLink()) throw new Error(`Source symlink collision: ${old.destination}`);
-    if (state==='absent') {
-      if (entry.ownership==='release') add(next.destination,safe(snapshot,entry.source));
-      continue;
-    }
-    if (state==='owned') add(next.destination,safe(snapshot,entry.source));
-    else if (lstatSync(oldPath).isFile()) add(next.destination,oldPath);
-    else throw new Error(`Source collision: ${old.destination}`);
-    retire.push(old.destination);
-  }
-  const oldSkill=TOOL_LAYOUT[from].skillRoot, newSkill=TOOL_LAYOUT[to].skillRoot;
-  // Client skills move with the selected tool; maintainer-only speckit skills are retired.
-  const portable=(oldRoot,newRoot) => {
-    const base=safe(root,oldRoot);
-    if (!existsSync(base)) return;
-    const walk=(dir,prefix='') => {
-      for(const item of readdirSync(dir,{withFileTypes:true})) {
-        const rel=prefix?`${prefix}/${item.name}`:item.name, path=join(dir,item.name);
-        if(rel.split('/')[0].startsWith('speckit-')) {
-          if(item.isDirectory()) walk(path,rel);
-          else if(item.isFile()) retire.push(`${oldRoot}/${rel}`);
-          else throw new Error(`Source symlink or special file: ${oldRoot}/${rel}`);
-          continue;
-        }
-        if(item.isDirectory()) walk(path,rel);
-        else if(item.isFile()) {
-          const destination=`${newRoot}/${rel}`;
-          if(!targetPaths.has(destination)) add(destination,path);
-          retire.push(`${oldRoot}/${rel}`);
-        } else throw new Error(`Source symlink or special file: ${oldRoot}/${rel}`);
-      }
-    };
-    walk(base);
-  };
-  portable(oldSkill,newSkill);
-  // Only the previous tool's Orion catalog leaves; its other settings stay. It is backed up
-  // with the other retired files but removed last, after that tool's Orion is retired.
-  const oldCatalog=TOOL_LAYOUT[from].catalogPath;
-  if (withPlugin && existsSync(safe(root,oldCatalog))) retire.push(oldCatalog);
-  // Stage expected bytes and all backups before touching the deployed tree.
-  for(const a of actions) {
-    if(a.kind==='replace') copyTo(safe(root,a.destination),join(backup,'files',a.destination));
-    copyTo(a.source,join(backup,'stage',a.destination));
-  }
-  const retired=[...new Set(retire)];
-  for(const destination of retired) copyTo(safe(root,destination),join(backup,'files',destination));
-  const staged=actions.map(a=>({destination:a.destination,kind:a.kind||'copy',hash:fingerprint(readFileSync(join(backup,'stage',a.destination))),prior_hash:a.kind==='replace'?fingerprint(readFileSync(join(backup,'files',a.destination))):null}));
-  journal.actions=[...journal.actions,...staged];
-  journal.retire=retired;
-  journal.state='pending';
-  writeJson(join(backup,'journal.json'),journal);
-  try {
-    for(const a of staged) {
-      const dest=safe(root,a.destination);
-      copyTo(join(backup,'stage',a.destination),dest);
-      if(fingerprint(readFileSync(dest))!==a.hash) throw new Error(`Validation failed: ${a.destination}`);
-      step();
-    }
-    const removeNow=retired.filter(path=>!(withPlugin && path===oldCatalog));
-    for(const destination of removeNow) rmSync(safe(root,destination));
-    pruneParents(root,removeNow);
-    if (process.env.ORION_SWITCH_FAIL_BEFORE_COMMIT) throw new Error('Injected switch interruption');
-    await editStatus(root,current=>{
-      current.ai_assistant = to;
-      if (withPlugin) {
-        const plugin=ensurePluginRegion(current);
-        plugin.pending_switch=null;
-        plugin.setup_state='registered';
-        plugin.pending_version=version;
-        plugin.remaining_action=`${journal.target_next || ''} Then ask your assistant to confirm it sees the Orion skills (it runs "${VERIFY_COMMAND}").`.trim();
-        status.plugin.remaining_action=plugin.remaining_action;
-      }
-      note(current,`switched from ${from} to ${to}; backup in ${backupRel}`);
-    });
-    journal.state='complete';
-    writeJson(join(backup,'journal.json'),journal);
-  } catch(error) {
-    await rollbackSwitch(root,backup,journal);
-    if (withPlugin && journal.target_touched) retirePlugin({root,tool:to,catalogName:catalogName(status.plugin.catalog_identity)});
-    journal.state='recovered';writeJson(join(backup,'journal.json'),journal);
-    throw error;
-  }
-  // Committed. Only now does the previous tool's Orion go, and its catalog after it, so a
-  // failure before this point leaves that tool exactly as it was.
-  const result={state:'switched',from,to,selected:to,backup:backupRel,installed:journal.actions.map(a=>a.destination),retired};
-  if (withPlugin) {
-    const oldRetired=retirePlugin({root,tool:from,catalogName:catalogName(status.plugin.catalog_identity)});
-    result.active=false;
-    result.remaining_action=status.plugin.remaining_action;
-    if (oldRetired.state==='complete') {
-      if (existsSync(safe(root,oldCatalog))) { rmSync(safe(root,oldCatalog)); pruneParents(root,[oldCatalog]); }
-    } else {
-      result.retired=retired.filter(path=>path!==oldCatalog);
-      result.previous_tool_action=`Orion could not remove itself from ${product(from)} for this folder (${oldRetired.details?.reason || 'its program was not reachable'}), so ${product(from)} may still offer the Orion skills here. Remove Orion there by hand; nothing else in ${product(from)} was changed, and ${oldCatalog} stays until then.`;
-    }
-  }
-  return result;
-}
-
-async function recoverPendingSwitches(root) {
-  const backups=safe(root,'.update-backup');
-  if(!existsSync(backups)) return [];
-  const recovered=[];
-  for(const name of readdirSync(backups).filter(n=>n.startsWith('switch-'))) {
-    const backup=safe(root,`.update-backup/${name}`), path=join(backup,'journal.json');
-    if(!existsSync(path)) continue;
-    const journal=json(path);
-    if(journal.kind==='switch' && journal.state==='pending') {
-      await rollbackSwitch(root,backup,journal);
-      const identity=json(safe(root,'status/status.json')).plugin?.catalog_identity;
-      if (journal.plugin && journal.target_touched && identity) retirePlugin({root,tool:journal.to,catalogName:catalogName(identity)});
-      journal.state='recovered';writeJson(path,journal);
-      recovered.push(name);
-    }
-  }
-  return recovered;
-}
-
 const RECOVERY_ACTION = (backup,command,kind='update') => `These files changed after the ${kind}, and putting the backup back would overwrite those changes, so Orion stopped. Nothing was overwritten. Move your changes to those paths somewhere outside this folder (keep them: edits to Orion's own skills belong in a client skill under .claude/skills or .agents/skills), put the paths back as the backup in ${backup} has them or delete them, then run "${command}" again.`;
 
 /**
- * Undo an update's own changes under the status lock; `adjust` may change more owned status
- * fields in the same write, and its return value is returned.
+ * Undo an update's own changes under the run's status lock; `adjust` may change more owned
+ * status fields in the same write, and its return value is returned.
  */
-const rollbackUpdate = (root,backup,journal,adjust) => withStatusLock(root, store => rollbackUpdateLocked(root,backup,journal,store,adjust));
-async function rollbackUpdateLocked(root,backup,journal,store,adjust) {
+async function rollbackUpdate(store,root,backup,journal,adjust) {
   const backupRel=`.update-backup/${backup.split(/[\\/]/).pop()}`;
   const conflicts=journal.actions.filter(a=>{
     const dest=safe(root,a.destination);
@@ -573,7 +331,7 @@ async function rollbackUpdateLocked(root,backup,journal,store,adjust) {
   return result;
 }
 
-async function recoverPendingUpdates(root) {
+async function recoverPendingUpdates(store,root) {
   const backups=safe(root,'.update-backup');if(!existsSync(backups)) return [];
   const recovered=[];
   for(const name of readdirSync(backups)) {
@@ -581,68 +339,17 @@ async function recoverPendingUpdates(root) {
     if(!existsSync(path)) continue;
     const journal=json(path);
     if(journal.kind==='update' && journal.state==='pending') {
-      await rollbackUpdate(root,backup,journal);
+      await rollbackUpdate(store,root,backup,journal);
       journal.state='recovered';writeJson(path,journal);recovered.push(name);
     }
   }
   return recovered;
 }
 
-/** Undo a switch's own file changes under the status lock; status keeps every field it did not own. */
-const rollbackSwitch = (root,backup,journal) => withStatusLock(root, store => rollbackSwitchLocked(root,backup,journal,store));
-async function rollbackSwitchLocked(root,backup,journal,store) {
-  const conflicts=journal.actions.filter(a=>{
-    const path=safe(root,a.destination);
-    return existsSync(path) && (!lstatSync(path).isFile() || ![a.hash,a.prior_hash].includes(fingerprint(readFileSync(path))));
-  }).map(a=>a.destination);
-  const backupRel=`.update-backup/${backup.split(/[\\/]/).pop()}`;
-  if(conflicts.length) throw new Error(`Switch recovery collisions: ${conflicts.join(', ')}. ${RECOVERY_ACTION(backupRel,'node update/apply.mjs recover --root .','switch')}`);
-  const removed=[];
-  for(const action of [...journal.actions].reverse()) {
-    const path=safe(root,action.destination);
-    if(action.kind==='replace') copyTo(join(backup,'files',action.destination),path);
-    else if(existsSync(path)) {rmSync(path);removed.push(action.destination);}
-  }
-  pruneParents(root,removed);
-  for(const destination of journal.retire) {
-    const old=join(backup,'files',destination);
-    if(existsSync(old)) copyTo(old,safe(root,destination));
-  }
-  const status=await store.readStatus();
-  status.ai_assistant=json(join(backup,'status/status.json')).ai_assistant;
-  if (status.plugin && typeof status.plugin==='object') status.plugin.pending_switch=null;
-  await store.writeStatus(status);
-}
-
-/** Restore one backup; its file work and its status change happen under one status lock. */
-const restore = (root,backupRel) => withStatusLock(root, store => restoreLocked(root,backupRel,store));
-async function restoreLocked(root,backupRel,store) {
+/** Restore one update backup; its file work and its status change happen under the run's status lock. */
+async function restore(store,root,backupRel) {
   const backup=safe(root,backupRel); const journal=json(join(backup,'journal.json'));
-  if(journal.kind==='switch') {
-    if(!['complete','awaiting_target'].includes(journal.state)) throw new Error(`Switch backup is ${journal.state}; only completed or waiting switches can be restored`);
-    const conflicts=journal.actions.filter(a=>{
-      const dest=safe(root,a.destination);
-      return existsSync(dest) && fingerprint(readFileSync(dest))!==a.hash;
-    }).map(a=>a.destination);
-    if(conflicts.length) throw new Error(`Restore collisions: ${conflicts.join(', ')}. ${RECOVERY_ACTION(backupRel,`node update/apply.mjs restore --root . --backup ${backupRel}`,'switch')}`);
-    const waiting=journal.state==='awaiting_target';
-    await rollbackSwitchLocked(root,backup,journal,store);
-    const result={restored:journal.retire,removed:journal.actions.map(a=>a.destination),backup:backupRel};
-    const status=await store.readStatus();
-    if (journal.plugin && !waiting) {
-      const plugin=ensurePluginRegion(status);
-      plugin.setup_state='pending';
-      plugin.pending_version=status.template_version;
-      plugin.remaining_action=`Re-register Orion with ${product(journal.from)}: from this folder run "${RESUME_COMMAND}". ${freshCheck(journal.from)} Orion may still be listed in ${product(journal.to)}; remove it there if you no longer use it.`;
-      Object.assign(result,{reload_required:true,remaining_action:plugin.remaining_action});
-    } else if (waiting) {
-      result.remaining_action=`The waiting switch was cancelled. Orion may be listed in ${product(journal.to)}; remove it there if you no longer use it.`;
-    }
-    note(status,`${waiting?'cancelled switch':'restored'} from ${backupRel}`);
-    await store.writeStatus(status);
-    journal.state=waiting?'cancelled':'restored';writeJson(join(backup,'journal.json'),journal);
-    return result;
-  }
+  if(journal.kind==='switch') throw new Error('This backup is from a tool switch, which switch_ai.mjs undoes by switching again. To switch back, run: node switch_ai.mjs');
   if(journal.state!=='complete') throw new Error(`Update backup is ${journal.state}; only completed updates can be restored`);
   // The package is restored as a unit, so a later edit inside it stops the whole restore first.
   if (journal.package && treeHash(safe(root,PACKAGE_ROOT))!==journal.package.installed_hash) {
@@ -697,10 +404,11 @@ async function restoreLocked(root,backupRel,store) {
 async function main() {
   const command=process.argv[2], root=arg('--root'); if(!root) throw new Error('--root is required');
   const repo=arg('--release-repo')||dirname(dirname(fileURLToPath(import.meta.url)));
-  if (command==='update') return update(root,repo,arg('--commit'));
-  if (command==='switch') return switchTool(root,repo,arg('--commit'),arg('--to'),arg('--legacy-tool'));
-  if (command==='restore') return restore(root,arg('--backup'));
-  if (command==='recover') return {recovered:[...await recoverPendingUpdates(root),...await recoverPendingSwitches(root)]};
-  throw new Error('Use update, switch, restore or recover');
+  if (command==='switch') throw new Error('To switch AI assistants, run: node switch_ai.mjs');
+  if (!['update','restore','recover'].includes(command)) throw new Error('Use update, restore or recover');
+  return withStatusLock(root, store =>
+    command==='update' ? update(store,root,repo,arg('--commit'))
+      : command==='restore' ? restore(store,root,arg('--backup'))
+      : recoverPendingUpdates(store,root).then(recovered=>({recovered})));
 }
 main().then(result=>console.log(JSON.stringify(result,null,2))).catch(error=>{console.error(error.message);process.exitCode=2;});

@@ -8,10 +8,7 @@
  *
  *   node --test
  *
- * The thing check must never do: read "[library:install] x@1.0.0" to a person as
- * if a colleague had said it. The coach side mints that line (library-ship.mjs
- * and the admin Ship button in dailypractice-mono); the client turns it into
- * words and the exact command, against the server's own format byte for byte.
+ * Legacy machine directives are hidden; support messages are still delivered.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +19,6 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { parseInstallDirective, LIBRARY_INSTALL_DIRECTIVE_PREFIX } from '../status/shapes.mjs';
 import { plainEnv } from './helpers/env.mjs';
 
 /**
@@ -35,48 +31,21 @@ const FAKE_KEY = 'orion_' + 'test'.repeat(6);
 const here = dirname(fileURLToPath(import.meta.url));
 const statusDir = join(here, '..', 'status');
 
-// Byte for byte what apps/enablement/scripts/library-ship.mjs mints with no --note.
+// A message retained on the bridge from before skill distribution was retired.
 const DIRECTIVE_BODY =
   '[library:install] meeting-sizing@1.0.0\n' +
   'New from the library: Meeting sizing. Your agent will ask before installing anything.';
-
-test('parses the directive exactly as the server formats it', () => {
-  assert.equal(LIBRARY_INSTALL_DIRECTIVE_PREFIX, '[library:install]');
-  assert.deepEqual(parseInstallDirective(DIRECTIVE_BODY), { slug: 'meeting-sizing', version: '1.0.0' });
-  assert.deepEqual(parseInstallDirective('[library:install] prospect-research@1.4.0'), {
-    slug: 'prospect-research',
-    version: '1.4.0',
-  });
-  assert.deepEqual(parseInstallDirective('  [library:install] meeting-sizing@1.0.0  \nprose'), {
-    slug: 'meeting-sizing',
-    version: '1.0.0',
-  });
-  for (const notAnOffer of [
-    'Your follow-up agent has been quiet. Want a look?',
-    '',
-    null,
-    undefined,
-    42,
-    '[library:install]',
-    '[library:install] meeting-sizing',
-    '[library:install] meeting-sizing@',
-    '[library:install] Meeting-Sizing@1.0.0',
-    '[library:install] bad slug@1.0.0',
-    'install meeting-sizing@1.0.0',
-    'Hello\n[library:install] meeting-sizing@1.0.0',
-  ]) {
-    assert.equal(parseInstallDirective(notAnOffer), null, `should be null: ${JSON.stringify(notAnOffer)}`);
-  }
-});
 
 /**
  * Run the real radio in a scratch harness folder. Returns what it printed, the
  * status.json it left behind, and every call the bridge received.
  */
-function checkRadio({ thread, sharing = {} }) {
+function checkRadio({ thread, sharing = {}, locked = false, args = ['check'] }) {
   const dir = mkdtempSync(join(tmpdir(), 'orion-radio-'));
   try {
     mkdirSync(join(dir, 'status'));
+    // Another Orion command holding the status lock for the whole check.
+    if (locked) mkdirSync(join(dir, 'status', '.radio-lock'));
     for (const f of ['radio.mjs', 'shapes.mjs', 'report.mjs', 'store.mjs']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
     mkdirSync(join(dir, 'update'));
     for (const f of ['manifest.json', 'destination-resolver.mjs']) copyFileSync(join(statusDir, '..', 'update', f), join(dir, 'update', f));
@@ -111,7 +80,7 @@ function checkRadio({ thread, sharing = {} }) {
     `);
     const r = spawnSync(
       process.execPath,
-      ['--import', pathToFileURL(mock).href, join(dir, 'status', 'radio.mjs'), 'check'],
+      ['--import', pathToFileURL(mock).href, join(dir, 'status', 'radio.mjs'), ...args],
       { encoding: 'utf8', env: plainEnv() },
     );
     const status = JSON.parse(readFileSync(join(dir, 'status', 'status.json'), 'utf8'));
@@ -137,23 +106,31 @@ const fromUs = (over) => ({
   ...over,
 });
 
-test('check tells the client about an offer in words and prints the exact install command', () => {
+test('check hides a legacy offer directive while retaining human prose and reply support', () => {
   const at = now();
   const { code, out, err, status, calls } = checkRadio({ thread: { version: 1, messages: [fromUs({ at })] } });
   assert.equal(code, 0, err);
   assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), ['GET /api/bridge/nudges?v=1']);
   assert.match(out, /From Oliver Carter, just now:/);
-  assert.match(out, /Daily Practice is offering you a skill: meeting-sizing, version 1\.0\.0\./);
+  assert.doesNotMatch(out, /offering you a skill|library --install/);
   assert.match(out, /New from the library: Meeting sizing\. Your agent will ask before installing anything\./);
-  assert.match(out, /^  node status\/radio\.mjs library --install meeting-sizing$/m);
   assert.doesNotMatch(out, /\[library:install\]/, 'the machine line must never be read to a person');
   assert.match(out, /reply --nudge b1c2d3e4-0000-0000-0000-000000000000 --message "their words" --yes/);
   // The client's part comes first; everything about commands sits under the fence.
   const fence = out.indexOf('--- for the assistant');
   assert.ok(fence > 0);
-  assert.ok(out.indexOf('library --install') > fence);
   assert.equal(status.sharing.radio_seen_through, at, 'the message read out is remembered');
   assert.equal(status.sharing.install_token, FAKE_KEY, 'the rest of the file survives');
+});
+
+test('a busy status lock never stops the message being read out; it is only remembered next time', () => {
+  const at = now();
+  const started = Date.now();
+  const { code, out, err, status } = checkRadio({ thread: { version: 1, messages: [fromUs({ at })] }, locked: true });
+  assert.equal(code, 0, err);
+  assert.match(out, /From Oliver Carter, just now:/);
+  assert.equal(status.sharing.radio_seen_through, undefined, 'the mark is skipped, never written around the lock');
+  assert.ok(Date.now() - started < 10000, 'the radio waits only briefly for the lock');
 });
 
 test('a plain message is still read as written, with no install command', () => {
@@ -193,4 +170,27 @@ test('with no mark yet, only what the server just delivered is read out', () => 
   assert.match(out, /^  One more thing\.$/m);
   assert.doesNotMatch(out, /Hi Kira/);
   assert.equal(status.sharing.radio_seen_through, '2026-09-17T15:00:00.000Z');
+});
+
+for (const command of ['library', 'contribute', 'report-install']) {
+  test(`retired command ${command} is rejected before any network call or state change`, () => {
+    const { code, out, err, calls, status } = checkRadio({
+      thread: {}, args: [command, '--install', 'example', '--slug', 'example', '--yes'],
+    });
+    assert.equal(code, 1, err);
+    assert.deepEqual(calls, []);
+    assert.match(out, /<check \| reply \| send \| signal>/);
+    assert.doesNotMatch(out, /library|contribute|report-install/);
+    assert.equal(status.sharing.radio_seen_through, undefined);
+  });
+}
+
+test('legacy directive-only and malformed directive lines never produce install guidance', () => {
+  const { code, out, err, status } = checkRadio({ thread: { messages: [
+    fromUs({ body: '[library:install] bad slug@\n  [library:install]\nHello from Oliver.' }),
+  ] } });
+  assert.equal(code, 0, err);
+  assert.match(out, /Hello from Oliver/);
+  assert.doesNotMatch(out, /library|install|offering you a skill/);
+  assert.ok(status.sharing.radio_seen_through);
 });

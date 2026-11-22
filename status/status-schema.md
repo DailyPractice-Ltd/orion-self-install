@@ -14,7 +14,7 @@ anything. Its contents ARE the answer to "where did we leave off."
 |---|---|---|
 | `client_id` | slugified business name | as soon as `business_name` is known |
 | `business_name` | the client's business, human-readable | first thing captured (knowledge base §1) |
-| `agent_name` | the name the client chose for their agent | during agent identity setup |
+| `agent_name` | fixed identity: `Orion` | set automatically on fresh install |
 | `harness_status` | forward-only: `draft → configured → connected → validated → installed/running` | on each real lifecycle transition — never skip a step, never move backward |
 | `ops_stage` | forward-only: `booked → day1_encode → day2_wire_and_run → validated → seven_day_checkin → formalised` | tracks alongside `harness_status`, one notch coarser |
 | `machine_profile` | what the Press Start wizard learned about this computer (OS, Node, git, AI tools found, which one the client chose) | written by `start.mjs` only; `null` means the wizard never ran here — ask conversationally instead, never assume. If it's filled, **don't re-ask any of it** |
@@ -30,7 +30,6 @@ anything. Its contents ARE the answer to "where did we leave off."
 | `sharing.bridge_url` / `sharing.harness_id` / `sharing.install_token` | the radio's address and key, from the client's pairing code exchange | during the wizard's check-in step (or its conversational equivalent). Exchange returns the token to the folder; the human enters only a short code. Fresh matching server verification, not local shape, authorizes work. Never display/log even token suffixes |
 | `status/radio.key` (a file, not a field) | the radio key, one line, when it does not live in `sharing.install_token` (since 1.3.0). The radio uses the first well-shaped key it finds in: `ORION_INSTALL_TOKEN` in the machine's environment, this file, then `sharing.install_token` | written by `status/home.mjs` when the folder gets a home, and by the wizard when a folder that has one is paired. Never by hand, never printed, never saved anywhere but this machine |
 | ~~`sharing.status_signal_endpoint`~~ | removed in schema 1.2.0 (002a reconciliation) — the 001-era unauthenticated webhook is gone; the authenticated radio (`bridge_url` + key) is the only outbound path | delete it if an old status.json still carries it |
-| `sharing.intelligence_library_opt_in` | default `false` | only on the client's explicit, separate say-so — see `docs/intelligence-library-opt-in.md` |
 | `sharing.radio_seen_through` | `null` until the radio has read a message out; then the time of the newest Daily Practice message already read to the client (schema 1.4.0). Messages up to it are not repeated at the next check | written by `radio.mjs check` after it reads a message out. Never by hand. Deleting it only means the most recent message may be read once more |
 | `notes` | free text scratch space | anything you want your future (possibly resumed, possibly different-AI-tool) self to know |
 

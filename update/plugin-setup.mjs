@@ -21,7 +21,8 @@
  *   complete     registered, and an assistant in a fresh session here confirmed the skills (--discovered)
  * `verified_version` is the last release confirmed active; `pending_version` an installed release
  * awaiting that confirmation (an update's target), and `update_backup` that update's backup, named
- * in remaining_action if a later check fails. See update/apply.mjs for updates and switches.
+ * in remaining_action if a later check fails. See update/apply.mjs for updates and switch_ai.mjs
+ * for tool switches.
  *
  * Native inspection alone, including any stubbed CLI, never earns `complete`: every report names the
  * program that answered. The catalog identity is created once and reused; registration is idempotent.
@@ -37,23 +38,28 @@ import { withStatusLock } from '../status/store.mjs';
 export const RESUME_COMMAND = 'node update/plugin-setup.mjs resume';
 export const VERIFY_COMMAND = 'node update/plugin-setup.mjs verify --discovered';
 
-async function update(root, change) {
-  return withStatusLock(root, async (store) => {
+/**
+ * One read-modify-write of status.json. `held` is the store of a caller that already holds
+ * the status lock (update/apply.mjs); the lock is never taken twice.
+ */
+async function update(root, change, held) {
+  const apply = async (store) => {
     const status = await store.readStatus();
     const result = change(status);
     await store.writeStatus(status);
     return result;
-  });
+  };
+  return held ? apply(held) : withStatusLock(root, apply);
 }
 
 /** Read the selected tool, version and catalog identity, creating the identity once. */
-async function harness(root) {
+async function harness(root, store) {
   return update(root, (status) => {
     const tool = status.ai_assistant;
     if (!Object.hasOwn(TOOL_LAYOUT, tool)) throw new Error(`This folder's AI assistant (${tool ?? 'none'}) has no Orion plugin setup; choose codex or claude-code.`);
     const identity = ensurePluginRegion(status, { create: true }).catalog_identity;
     return { tool, identity, version: status.template_version };
-  });
+  }, store);
 }
 
 /** Errors in this folder's package and selected-tool catalog; with `write`, the catalog is regenerated first. */
@@ -68,7 +74,7 @@ export function checkFolder(root, { tool, identity, version, write = false }) {
 
 /**
  * Check the folder, then run one tool's native setup or inspection for it. Also used by
- * update/apply.mjs for a tool switch's target, before that tool is the selected one.
+ * switch_ai.mjs for a tool switch's target, before that tool is the selected one.
  */
 export function nativeStep(root, { tool, identity, version, mode = 'setup', env = process.env, home }) {
   const errors = checkFolder(root, { tool, identity, version, write: mode === 'setup' });
@@ -88,10 +94,11 @@ function updateOrigin(root, backup) {
  * and record the outcome in its status.json. Returns the recorded plugin region plus `checked_with`.
  * `verified_version` is the last release confirmed active (discovered in a fresh session);
  * it changes only on that confirmation. `pending_version` is an installed release still
- * awaiting it, such as an update's target; it clears on confirmation.
+ * awaiting it, such as an update's target; it clears on confirmation. `store` is passed by a
+ * caller that already holds the status lock.
  */
-export async function runPluginSetup(root, { mode = 'setup', discovered = false, env = process.env, home, now = () => new Date() } = {}) {
-  const { tool, identity, version } = await harness(root);
+export async function runPluginSetup(root, { mode = 'setup', discovered = false, env = process.env, home, now = () => new Date(), store } = {}) {
+  const { tool, identity, version } = await harness(root, store);
   const native = nativeStep(root, { tool, identity, version, mode, env, home });
   const checked_with = native.details?.binary || null;
   return update(root, (status) => {
@@ -123,7 +130,7 @@ export async function runPluginSetup(root, { mode = 'setup', discovered = false,
       plugin.remaining_action = `${native.details.next} Then ask your assistant to confirm it sees the Orion skills (it runs "${VERIFY_COMMAND}").`;
     }
     return { ...plugin, tool, checked_with, reason: native.details?.reason, errors: native.details?.errors || [] };
-  });
+  }, store);
 }
 
 /** One plain report; "plugin setup complete" only for a confirmed discovery. */

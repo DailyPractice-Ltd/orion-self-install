@@ -145,10 +145,12 @@ Run these only in disposable harness folders.
   the cached copy's manifest version. If a later `verify` fails, confirm its next step
   names `node update/apply.mjs restore --root . --backup <the update's backup>`.
 - **Restore:** use `node update/apply.mjs restore` with the reported backup.
-- **Tool switch:** use `apply.mjs switch --to <other tool>`. Confirm the target shows
-  Orion's full skill inventory before the switch commits, that the previous tool's Orion
-  (and then its catalog) is removed only after the commit, and that other plugins are
-  untouched.
+- **Tool switch:** run `node switch_ai.mjs` from the harness root (`--to <other tool>`
+  to name it). Confirm the target shows Orion's full skill inventory before the switch
+  commits, that a switch to Codex waits (`pending_switch`) until the Plugins Directory
+  install and finishes on a second run, that `--to <current tool>` cancels a waiting
+  switch, that the previous tool's Orion (and then its catalog) is removed only after the
+  commit, and that other plugins are untouched.
 
 ## Reporting
 

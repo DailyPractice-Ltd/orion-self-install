@@ -8,3 +8,6 @@ status/radio-outbox.json
 status/.radio-lock/
 status/status.json.*.tmp
 status/radio-outbox.json.*.tmp
+.claude
+.specify/*
+.specify

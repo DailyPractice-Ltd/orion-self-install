@@ -17,10 +17,10 @@ skills come from the `orion` plugin in `plugins/orion/`, offered through this fo
 own catalog (`.agents/plugins/marketplace.json`), which this folder's own
 `.codex/config.toml` registers and switches on for this folder only (nothing user-wide).
 Codex reads that file only once the client trusts the folder. Codex installs a cached
-copy, so the client installs Orion once from the Plugins Directory (desktop app) or
-`/plugins` (CLI), then starts a fresh chat; after each update they reinstall it the same
-way. Setup counts as done only when Codex lists Orion here and its cached copy holds this
-release and every shipped skill. Skills the
+copy, so the client opens the Plugins Directory (desktop app) or `/plugins` (CLI),
+searches for "orion", installs Orion, then starts a fresh chat; after each update they
+reinstall it the same way. You might need to restart Codex. Setup counts as done only when Codex lists Orion here and its
+cached copy holds this release and every shipped skill. Skills the
 client creates or adds live in `.agents/skills/`; updates never touch them. If the Orion
 skills are missing, read `plugin` in `status/status.json` and follow
 [Finish the Orion plugin](../../docs/setup.md#finish-the-orion-plugin).

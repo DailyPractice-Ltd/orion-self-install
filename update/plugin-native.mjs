@@ -249,7 +249,7 @@ function claudeVerify(ctx) {
   return conflict.error || claudeInspect(ctx).result;
 }
 
-const codexInstallAction = (ctx) => `In Codex, from this folder, open the Plugins Directory (desktop app) or type /plugins (CLI), choose the "${ctx.catalogName}" catalog and install Orion; then start a fresh chat in this folder.`;
+const codexInstallAction = () => `In Codex, from this folder, open the Plugins Directory (desktop app) or type /plugins (CLI), search for "orion" and install Orion; then start a fresh chat in this folder. You might need to restart Codex.`;
 const CODEX_FRESH = 'Start a fresh chat in this folder so Codex loads the Orion skills.';
 const CODEX_RESUME = 'node update/plugin-setup.mjs resume';
 
@@ -283,7 +283,7 @@ function codexInspect(ctx) {
   if (user.enabled === true) {
     return pending(ctx.tool, `Codex has switched Orion on in your Codex user settings (${join(codexHome({ env: ctx.env, home: ctx.home }), 'config.toml')}, the [plugins."${ctx.pluginId}"] entry), which would load it in every folder, not only this one. Orion does not edit those settings, so its setup stays unfinished: delete that entry there (this folder's own ${CODEX_PROJECT_CONFIG} keeps Orion on here), then run "node update/plugin-setup.mjs verify" from this folder.`, 'enabled_user_wide', ctx.details());
   }
-  const reinstall = (found) => `In Codex, from this folder, open the Plugins Directory (desktop app) or type /plugins (CLI) and reinstall Orion from the "${ctx.catalogName}" catalog so the copy Codex loads moves${found ? ` from ${found}` : ''} to ${ctx.version}; then start a fresh chat in this folder.`;
+  const reinstall = (found) => `In Codex, from this folder, open the Plugins Directory (desktop app) or type /plugins (CLI), search for "orion" and reinstall Orion so the copy Codex loads moves${found ? ` from ${found}` : ''} to ${ctx.version}; then start a fresh chat in this folder. You might need to restart Codex.`;
   if (row.version && row.version !== 'local' && row.version !== ctx.version) {
     return pending(ctx.tool, reinstall(row.version), 'cached_copy_outdated', ctx.details({ expected: ctx.version, found: row.version }));
   }

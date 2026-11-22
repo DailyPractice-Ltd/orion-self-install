@@ -140,7 +140,7 @@ test('Codex install prepares its own catalog and leaves the native install as th
   const name = `orion-${plugin.catalog_identity.replaceAll('-', '').slice(0, 12)}`;
   assert.equal(plugin.setup_state, 'pending');
   assert.match(plugin.remaining_action, /\/plugins/);
-  assert.ok(plugin.remaining_action.includes(name));
+  assert.match(plugin.remaining_action, /search for "orion" and install Orion/);
   assert.ok(run.stdout.includes(plugin.remaining_action));
   // Registered in this folder's own Codex config only; nothing user-wide.
   const config = readFileSync(join(w.target, '.codex/config.toml'), 'utf8');

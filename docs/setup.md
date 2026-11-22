@@ -39,7 +39,8 @@ progress in `status/status.json` under `plugin`:
   user-wide Codex settings. Codex reads a project's `.codex/config.toml` only once you
   trust the folder, so the first step may be to open the folder in Codex and trust it.
   Installing Orion is then your step in Codex: the Plugins Directory (desktop app) or
-  `/plugins` (CLI), choosing the `orion-<12 hex>` catalog. If Codex records Orion as
+  `/plugins` (CLI): search for "orion" and install Orion. You might need to restart Codex.
+  If Codex records Orion as
   switched on in your user-wide `~/.codex/config.toml`, that would load it in every
   folder: setup stays unfinished and says which entry to delete there.
 

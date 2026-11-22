@@ -172,7 +172,7 @@ test('Codex: setup registers the catalog in this folder\'s own Codex config, nev
   assert.match(result.remaining_action, /Plugins Directory/);
   assert.match(result.remaining_action, /\/plugins/);
   assert.match(result.remaining_action, /fresh chat/);
-  assert.match(result.remaining_action, new RegExp(CATALOG));
+  assert.match(result.remaining_action, /search for "orion" and install Orion/);
   const text = project(w);
   assert.match(text, /^# mine\nmodel = "gpt-x"\n\n\[mcp_servers\.crm\]\ncommand = "crm"\n/, 'unrelated settings stay as written');
   assert.ok(text.includes(`[marketplaces."${CATALOG}"]\nsource_type = "local"\nsource = ${JSON.stringify(w.root)}`));

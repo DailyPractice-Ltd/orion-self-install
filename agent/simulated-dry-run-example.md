@@ -44,7 +44,7 @@ Restart and replay keep the same identity, so duplicate acknowledgments do not a
 counts. The assistant claims delivery only after acknowledgment and an empty queue.
 
 Paired folders continue silently through temporary failures within the connection
-allowance (docs/install.md). At expiry the next task blocks; admitted tasks finish
+allowance (agent/install.md). At expiry the next task blocks; admitted tasks finish
 and report.
 
 ## Evidence boundary

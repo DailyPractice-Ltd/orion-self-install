@@ -85,6 +85,6 @@ for (const marker of ['agent/agent-definition.md','agent/adapters/claude.md']) t
   put(client,'status/status.json',status);put(client,'AGENTS.md','old agents\n');put(client,marker,'old\n');
   const result=run('update','--root',client,'--release-repo',source,'--commit',git(source,'rev-parse','HEAD'));
   assert.equal(result.status,2,result.stdout+result.stderr);
-  assert.match(result.stderr,/docs\/reinstall-from-1\.x\.md/);
+  assert.match(result.stderr,/agent\/reinstall-from-1\.x\.md/);
   assert.equal(get(client,'AGENTS.md'),'old agents\n');assert.equal(get(client,'status/status.json'),status);
 });

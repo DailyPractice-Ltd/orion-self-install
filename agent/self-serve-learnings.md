@@ -41,7 +41,7 @@ never-met-us reader on the live GitHub page. Four defects found, all fixed the s
    never named it. Fix: `codex` added to the surface vocabulary (contract first), the
    wizard's detection and handoff, and the README's tool lists.
 
-Also captured: the real screenshots for the whole journey (docs/img/01–07, redacted
+Also captured: the real screenshots for the whole journey (img/01–07, redacted
 per the SHOTLIST rule before entering the public repo).
 
 ## Vol. 1 — (pending)

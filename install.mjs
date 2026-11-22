@@ -42,7 +42,7 @@ async function install() {
   const target = resolve(targetArg);
   const releaseReal = realpathSync(release);
   const manifest = JSON.parse(readFileSync(join(release, 'update/manifest.json'), 'utf8'));
-  if (process.argv.includes('--migrate-from')) throw new Error('Orion 2.0.0 does not migrate an older folder. Install into a new, empty folder and follow docs/reinstall-from-1.x.md; the old folder is left alone.');
+  if (process.argv.includes('--migrate-from')) throw new Error('Orion 2.0.0 does not migrate an older folder. Install into a new, empty folder and follow agent/reinstall-from-1.x.md; the old folder is left alone.');
   const githubRepo=arg('--github-repo'), remote=arg('--remote'), localOnly=process.argv.includes('--local-only');
   if([!!githubRepo,!!remote,localOnly].filter(Boolean).length>1) throw new Error('Choose at most one of --github-repo, --remote, or --local-only.');
   const useLocal = !githubRepo && !remote;
@@ -58,7 +58,7 @@ async function install() {
     throw new Error('Choose a client folder outside the release checkout.');
   }
   if (existsSync(target)) {
-    if (isOrion1x(target)) throw new Error('This folder holds an Orion 1.x harness. Orion 2.0.0 installs into a new, empty folder: follow docs/reinstall-from-1.x.md. The existing folder was left alone.');
+    if (isOrion1x(target)) throw new Error('This folder holds an Orion 1.x harness. Orion 2.0.0 installs into a new, empty folder: follow agent/reinstall-from-1.x.md. The existing folder was left alone.');
     if (!lstatSync(target).isDirectory() || readdirSync(target).length) throw new Error('The client folder must be new or empty; existing files were left alone.');
   }
   const git = spawnSync('git', ['--version'], { encoding: 'utf8' });

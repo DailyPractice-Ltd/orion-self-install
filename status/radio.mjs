@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The radio, client side — talks to Daily Practice's bridge doors when (and only when)
- * the radio is on. Contract: docs/radio.md.
+ * the radio is on. Contract: agent/radio.md.
  *
  *   node status/radio.mjs check
  *       Read the radio (GET /nudges). Run at session start. An empty radio is the
@@ -117,7 +117,7 @@ for (let i = 0; i < rest.length; i++) {
 
 function usage() {
   console.log('Usage: node status/radio.mjs <check | reply | send | signal> [--flags]');
-  console.log('Details in the header of this file, or docs/radio.md.');
+  console.log('Details in the header of this file, or agent/radio.md.');
 }
 
 if (!command || !['check', 'reply', 'send', 'signal'].includes(command)) {
@@ -413,7 +413,7 @@ if (command === 'signal') {
   // There is deliberately no free-text field. The one-line story of the work lives
   // on this machine, in status/work-log.md or status/shift-log.md. The radio carries
   // labels, a count, and a time, never content (constitution Article V;
-  // docs/radio.md).
+  // agent/radio.md).
   const work = {};
   if (flags.count !== undefined) {
     // One rule for a count, shared with done.mjs (shapes.mjs). Zero is decided per

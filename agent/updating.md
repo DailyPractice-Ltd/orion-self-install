@@ -19,9 +19,9 @@ commit=$(git -C "$scratch/source" rev-parse HEAD)
 git -C "$scratch/source" show "$commit:update/manifest.json"
 ```
 
-Read the pinned `docs/updating.md` and follow its apply instructions. If the
+Read the pinned `agent/updating.md` and follow its apply instructions. If the
 source version is older than the installed version, report both versions and
-stop. If the fetch fails in Codex, see the [network instructions](../agent/adapters/codex.md).
+stop. If the fetch fails in Codex, see the [network instructions](adapters/codex.md).
 
 ## Orion 1.x: reinstall instead
 
@@ -29,7 +29,7 @@ This procedure updates 2.0.0 and later. When the deployed `template_version` is 
 2.0.0, or status has no recorded AI assistant, do not apply anything: tell the client
 that 2.0.0 is installed fresh, then follow
 [reinstall-from-1.x.md](reinstall-from-1.x.md) from the pinned source
-(`$scratch/source/docs/reinstall-from-1.x.md`). Remove the temporary checkout afterwards.
+(`$scratch/source/agent/reinstall-from-1.x.md`). Remove the temporary checkout afterwards.
 
 ## Apply the pinned update
 
@@ -41,7 +41,7 @@ node "$scratch/source/update/apply.mjs" update --root "$harness" --commit "$comm
 ```
 
 The helper excludes human-only implementation records from its source snapshot
-and rejects deployment paths into them. Agents use `docs/` for update guidance.
+and rejects deployment paths into them. Agents use `agent/` for update guidance.
 
 The helper uses the deployment allowlist for your AI assistant. A file the client has changed is kept
 and reported. The runtime scripts under `status/` are refreshed together, and

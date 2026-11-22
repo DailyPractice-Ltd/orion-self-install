@@ -140,7 +140,7 @@ In a fresh session in the harness folder:
 Run these only in disposable harness folders.
 
 - **Update:** use `node update/apply.mjs update` from a newer release checkout, per
-  `docs/updating.md`. Confirm the report says `active: false` until the fresh-session
+  `agent/updating.md`. Confirm the report says `active: false` until the fresh-session
   step and `verify --discovered` are done. For Codex, confirm the reinstall step moves
   the cached copy's manifest version. If a later `verify` fails, confirm its next step
   names `node update/apply.mjs restore --root . --backup <the update's backup>`.

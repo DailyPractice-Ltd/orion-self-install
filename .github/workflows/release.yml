@@ -96,7 +96,7 @@ jobs:
             echo
             echo '---'
             echo
-            echo 'To move an installed harness to this version, open your Orion folder in your agent and say **update my harness**. Your knowledge base, hired agents, taught skills and status are untouched by construction; a full backup is taken first and **restore my harness from the backup** undoes it. Details: `docs/updating.md`.'
+            echo 'To move an installed harness to this version, open your Orion folder in your agent and say **update my harness**. Your knowledge base, hired agents, taught skills and status are untouched by construction; a full backup is taken first and **restore my harness from the backup** undoes it. Details: `agent/updating.md`.'
           } >> notes.md
           echo "Notes for ${VERSION}:"; cat notes.md
 

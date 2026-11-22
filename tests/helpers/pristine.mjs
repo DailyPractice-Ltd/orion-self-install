@@ -25,7 +25,7 @@ export const PRISTINE_PATH = 'update/pristine.json';
 
 /**
  * Line endings are normalised first, so one of our files checked out with CRLF
- * still reads as ours. docs/updating.md gives the installer the same one-liner.
+ * still reads as ours. agent/updating.md gives the installer the same one-liner.
  */
 export const fingerprint = (buf) =>
   createHash('sha256').update(Buffer.from(buf).toString('utf8').replace(/\r\n/g, '\n')).digest('hex');
@@ -88,7 +88,7 @@ export function computePristine() {
   for (const path of [...sources].sort()) {
     // This file has no entry for itself. It cannot hold its own fingerprint, and
     // listing its earlier copies would change it on every regeneration. It is pure
-    // data that nobody edits, so an update always replaces it (docs/updating.md, step 4).
+    // data that nobody edits, so an update always replaces it (agent/updating.md, step 4).
     if (path === PRISTINE_PATH) continue;
     const prints = new Set();
     for (const id of idsByPath.get(path)) if (blobs.has(id)) prints.add(fingerprint(blobs.get(id)));
@@ -98,7 +98,7 @@ export function computePristine() {
     files[path] = [...prints].sort();
   }
   return {
-    _what: "Fingerprints are keyed by stable release source path, independent of deployed destination. Legacy Claude paths contribute historical hashes to their portable source key. A destination whose fingerprint is not listed under its source key is client-edited and must be preserved. Historical legacy refresh keys remain in this registry for clients still on a same-path updater, although the retired .claude skill sources are no longer in the refresh list. Contract: update/manifest.json deployment and docs/updating.md.",
+    _what: "Fingerprints are keyed by stable release source path, independent of deployed destination. Legacy Claude paths contribute historical hashes to their portable source key. A destination whose fingerprint is not listed under its source key is client-edited and must be preserved. Historical legacy refresh keys remain in this registry for clients still on a same-path updater, although the retired .claude skill sources are no longer in the refresh list. Contract: update/manifest.json deployment and agent/updating.md.",
     _fingerprint: 'SHA-256, as lowercase hex, of the file read as UTF-8 text with every CRLF turned into LF.',
     _regenerate: 'node tests/helpers/pristine.mjs --write, before every release. node --test fails if it is stale.',
     files,

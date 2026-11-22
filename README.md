@@ -28,7 +28,7 @@ skills section shows what Orion can do for you.
   [releases](https://github.com/DailyPractice-Ltd/orion-self-install/releases). Ask your
   AI "what version is my harness on?", and if it is behind, say "update my harness".
   Your edits and business records are preserved by the update rules
-  ([how updates and backups work](docs/updating.md)).
+  ([how updates and backups work](agent/updating.md)).
 
 ---
 
@@ -48,7 +48,7 @@ a separate local Git repository, copies Orion's skills in as the `orion` plugin
 (`plugins/orion/`), registers that plugin with your chosen tool for this folder only,
 and records that choice in `status/status.json`. If the tool still needs a step from
 you (installing Orion from Codex's plugin list, or a fresh session), the installer
-prints it; [setup and recovery](docs/install.md#finish-the-orion-plugin) explains how
+prints it; [setup and recovery](agent/install.md#finish-the-orion-plugin) explains how
 to resume.
 It leaves the release sources, tests, and project specifications behind. Then enter your new folder and
 press Start:
@@ -64,7 +64,7 @@ before it gives you the prompt to start working with your AI assistant.
 Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.
 
 Get your code at [Daily Practice](https://www.dailypractice.world/home/pair).
-[Setup and recovery](docs/install.md) covers interrupted setup, connection failures,
+[Setup and recovery](agent/install.md) covers interrupted setup, connection failures,
 and the silent connection allowance after verified pairing. Keep this client folder as your business's
 Orion home. The downloaded release folder is only the source for installing and
 updating it. If you already created an empty
@@ -99,8 +99,8 @@ replaces that package as a whole. In Claude Code you can call one directly as
 `/orion:<skill>`, such as `/orion:friday-report`. Skills you create or add yourself are
 yours: they go in `.agents/skills/` for Codex or `.claude/skills/` for Claude Code, and
 updates leave them alone. Tell Orion which task to do or teach it a new procedure.
-Use [Codex scheduled tasks or Claude Routines](docs/scheduled-work.md) for recurring work.
-Daily Practice can offer additional skills [over the radio](docs/radio.md).
+Use [Codex scheduled tasks or Claude Routines](agent/scheduled-work.md) for recurring work.
+Daily Practice can offer additional skills [over the radio](agent/radio.md).
 
 ---
 
@@ -158,10 +158,10 @@ These tools can read and write the files and run the required connection check.
 4. Say: **"Read AGENTS.md and let's get started."** (Or paste the fuller prompt the
    wizard printed.)
 
-<!-- SCREENSHOT: docs/img/05-desktop-agent-open-folder.png
+<!-- SCREENSHOT: img/05-desktop-agent-open-folder.png
      alt: "A desktop AI agent's folder picker open at Github → Projects with the orion-self-install-main folder selected"
      caption: "In your desktop agent, open the client folder created by the installer." -->
-![A desktop AI agent opening the Orion folder from Github/Projects](docs/img/05-desktop-agent-open-folder.png)
+![A desktop AI agent opening the Orion folder from Github/Projects](img/05-desktop-agent-open-folder.png)
 
 **You'll know it worked when**: it introduces itself and asks about your business —
 not about your computer.
@@ -171,7 +171,7 @@ not about your computer.
 Website-only Projects, Custom GPTs, Copilot chats and pasted instructions cannot
 execute Orion’s pairing and pre-work checks. They are no longer supported install
 or work paths. Open your saved Orion folder in Codex or Claude Code and follow
-[setup and recovery](docs/install.md); your existing business files stay in that folder.
+[setup and recovery](agent/install.md); your existing business files stay in that folder.
 
 ---
 
@@ -197,10 +197,10 @@ continue"** or just start working. One download, one home, then it's simply *the
 one switch away, whatever you're working on. Every session starts with a fresh
 connection check; if it fails, Orion work pauses until recovery.
 
-<!-- SCREENSHOT: docs/img/07-use-orion-from-any-project.png
+<!-- SCREENSHOT: img/07-use-orion-from-any-project.png
      alt: "A desktop AI agent's folder picker at the Github folder level, with arrows showing you can hop into Projects — or any folder — and Orion is one open away"
      caption: "Later, from anywhere: your agent's folder picker gets you back to Orion (or into any other project) in two clicks." -->
-![A desktop agent's folder picker showing Orion one switch away](docs/img/07-use-orion-from-any-project.png)
+![A desktop agent's folder picker showing Orion one switch away](img/07-use-orion-from-any-project.png)
 
 ---
 
@@ -232,7 +232,7 @@ running `node start.mjs` again greets you with exactly where things stand.)
   It does not share your business content, prospects or messages as operational
   data. Words and artifacts cross only after separate per-item consent. Disabling
   the connection pauses supported work outside the existing-user transition.
-  [The radio, in plain words](docs/radio.md) gives the full disclosure.
+  [The radio, in plain words](agent/radio.md) gives the full disclosure.
 
 ---
 
@@ -249,7 +249,7 @@ alone — that's what it's built for. If it genuinely can't help, reach out to
 
 ---
 
-*Agents use `docs/` for operational and development guidance. `specs/` stays in
+*Agents use `agent/` for operational and development guidance. `specs/` stays in
 this development repository as a human-only implementation record. Agents must
 not read it, code and tests must not load it, and installations exclude it.
 If permitted documentation is incomplete, agents ask the human.*

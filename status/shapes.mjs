@@ -215,7 +215,7 @@ export function homeOn(status) {
  * task. The tag says what kind of work it was. The content stays on this machine.
  *
  * This is the one copy of the menu on the client side. status/done.mjs and
- * status/radio.mjs refuse any tag that is not on it, docs/radio.md lists the same
+ * status/radio.mjs refuse any tag that is not on it, agent/radio.md lists the same
  * tags in the same words, and tests/finished-work.test.mjs fails if the two
  * drift. The server keeps a twin (WORK_TAGS in packages/harness/src/bridge in the
  * mono) so the console can group by tag. When nothing fits, the tag is `other`.

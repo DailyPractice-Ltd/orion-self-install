@@ -461,7 +461,7 @@ const NAME = '{{CLIENT_NAME}}';
 export const RULE_ONE = `1. SEND INSIDE ${NAME}'S RISK LEVEL, NEVER ABOVE IT. Every message to a person
    outside this folder (email, a calendar invite, LinkedIn, Slack, WhatsApp, SMS, any DM)
    is scored before it goes. Run
-   \`node status/send.mjs score --agent Orion --to <address> --channel <email|linkedin|slack|dm|whatsapp|sms>
+   \`node status/send.mjs score --agent orion --to <address> --channel <email|linkedin|slack|dm|whatsapp|sms>
    --relationship <reply|follow-up|known|cold> --content <logistics|information|claim|money>
    [--customer] [--replied]\` and do what its decision says. "send": send it, record it
    (\`node status/send.mjs outcome sent ...\`) and report it in one line. "waiting": leave it

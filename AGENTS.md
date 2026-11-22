@@ -102,7 +102,7 @@ follow [Finish the Orion plugin](docs/install.md#finish-the-orion-plugin).
    scored before it goes:
 
    ```
-   node status/send.mjs score --agent Orion --to <address> --channel <email|linkedin|slack|dm|whatsapp|sms> \
+   node status/send.mjs score --agent orion --to <address> --channel <email|linkedin|slack|dm|whatsapp|sms> \
      --relationship <reply|follow-up|known|cold> --content <logistics|information|claim|money> [--customer] [--replied]
    ```
 

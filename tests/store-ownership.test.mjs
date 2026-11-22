@@ -86,6 +86,17 @@ test('createStatus makes status.json from the template once, and never replaces 
   assert.equal(statusOf(dir).agent_name, 'Orion');
 });
 
+test('createStatus takes the version from the manifest even when a template carries its own', async (t) => {
+  const dir = harness(t);
+  rmSync(join(dir, 'status', 'status.json'));
+  const templatePath = join(dir, 'status', 'status.schema-template.json');
+  writeFileSync(templatePath, JSON.stringify({ ...JSON.parse(readFileSync(templatePath, 'utf8')), template_version: '0.0.1' }));
+  const manifestPath = join(dir, 'update', 'manifest.json');
+  writeFileSync(manifestPath, JSON.stringify({ ...JSON.parse(readFileSync(manifestPath, 'utf8')), template_version: '9.9.9' }));
+  assert.equal(await createStatus(dir), true);
+  assert.equal(statusOf(dir).template_version, '9.9.9');
+});
+
 test('the key is written owner-only and read back, and removed, only under the lock', async (t) => {
   const dir = harness(t);
   await withStatusLock(dir, async (store) => {

@@ -145,8 +145,12 @@ test('deployed documentation uses permitted sources without directing agents int
   assert.match(text, /ask the human/);
 });
 
-/** A synthetic release candidate: exactly the files the release contract reads. */
-function candidate(t) {
+/**
+ * A synthetic release candidate: exactly the files the release contract reads,
+ * CHANGELOG.md as it is in this checkout. `tagged` makes it a candidate being
+ * tagged, for `--version` runs: its CHANGELOG opens with its own version.
+ */
+function candidate(t, { tagged = false } = {}) {
   const release = mkdtempSync(join(tmpdir(), 'orion-release-candidate-'));
   t.after(() => rmSync(release, { recursive: true, force: true }));
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
@@ -156,16 +160,17 @@ function candidate(t) {
     mkdirSync(dirname(join(release, path)), { recursive: true });
     copyFileSync(join(repo, path), join(release, path));
   }
-  // A candidate being tagged opens its CHANGELOG with its own version, above any Unreleased notes.
   const version = manifest.template_version;
-  const log = readFileSync(join(release, 'CHANGELOG.md'), 'utf8');
-  writeFileSync(join(release, 'CHANGELOG.md'), log.replace(/^## /m, `## ${version} — candidate\n\n## `));
+  if (tagged) {
+    const log = readFileSync(join(release, 'CHANGELOG.md'), 'utf8');
+    writeFileSync(join(release, 'CHANGELOG.md'), log.replace(/^## /m, `## ${version} — candidate\n\n## `));
+  }
   return { release, version };
 }
 const contract = (release, ...args) => spawnSync(process.execPath, [join(release, 'update/release-contract.mjs'), ...args], { encoding: 'utf8' });
 
 test('release contract passes both tools at the candidate version and refuses any other version', (t) => {
-  const { release, version } = candidate(t);
+  const { release, version } = candidate(t, { tagged: true });
   for (const tool of ['codex', 'claude-code']) {
     const run = contract(release, '--tool', tool, '--version', version);
     assert.equal(run.status, 0, run.stderr);
@@ -177,7 +182,7 @@ test('release contract passes both tools at the candidate version and refuses an
 });
 
 test('release preparation fails when one tool’s packaging is broken in the candidate', (t) => {
-  const { release, version } = candidate(t);
+  const { release, version } = candidate(t, { tagged: true });
   const claudeManifest = join(release, 'plugins/orion/.claude-plugin/plugin.json');
   writeFileSync(claudeManifest, JSON.stringify({ name: 'claude-orion', version, description: 'x' }));
   const broken = contract(release, '--tool', 'claude-code', '--version', version);
@@ -198,7 +203,7 @@ test('release preparation fails when one tool’s packaging is broken in the can
 });
 
 test('release contract refuses a package carrying client credentials or business state', (t) => {
-  const { release, version } = candidate(t);
+  const { release, version } = candidate(t, { tagged: true });
   for (const path of ['plugins/orion/status/status.json', 'plugins/orion/skills/prospecting/radio.key', 'plugins/orion/.env']) {
     mkdirSync(dirname(join(release, path)), { recursive: true });
     writeFileSync(join(release, path), '{}');
@@ -219,6 +224,36 @@ test('the release workflow runs the full contract for both tools at the tag vers
   assert.ok(tests > 0, 'the candidate’s own tests run');
   const tag = workflow.indexOf('git tag -a');
   assert.ok(validate < tag && tests < tag, 'validation happens before the tag is pushed');
+});
+
+test('a pull request runs the release contract on the CHANGELOG as committed', (t) => {
+  const { release, version } = candidate(t);
+  const committed = readFileSync(join(repo, 'CHANGELOG.md'), 'utf8');
+  assert.equal(readFileSync(join(release, 'CHANGELOG.md'), 'utf8'), committed, 'the candidate CHANGELOG is the real one');
+  for (const tool of ['codex', 'claude-code']) {
+    const run = contract(release, '--tool', tool);
+    assert.equal(run.status, 0, `${tool}: ${run.stderr}`);
+  }
+  // A hand-added numbered section ahead of the manifest fails the pull request's tests.
+  const [major, minor, patch] = version.split('.').map(Number);
+  const ahead = `${major}.${minor}.${patch + 1}`;
+  writeFileSync(join(release, 'CHANGELOG.md'), committed.replace(/^## /m, `## ${ahead} — 2026-12-01\n\n- by hand\n\n## `));
+  for (const tool of ['codex', 'claude-code']) {
+    const run = contract(release, '--tool', tool);
+    assert.notEqual(run.status, 0, `${tool}: a CHANGELOG ahead of template_version must fail`);
+    assert.match(run.stderr, new RegExp(`CHANGELOG\\.md.*${ahead.replaceAll('.', '\\.')}.*${version.replaceAll('.', '\\.')}`, 's'));
+  }
+});
+
+test('release contract fails when CHANGELOG.md is missing', (t) => {
+  const { release, version } = candidate(t);
+  rmSync(join(release, 'CHANGELOG.md'));
+  for (const tool of ['codex', 'claude-code']) {
+    const run = contract(release, '--tool', tool);
+    assert.notEqual(run.status, 0, `${tool}: a missing CHANGELOG.md must fail`);
+    assert.match(run.stderr, /CHANGELOG\.md/);
+    assert.match(run.stderr, new RegExp(version.replaceAll('.', '\\.')));
+  }
 });
 
 const changelog = (release, text) => writeFileSync(join(release, 'CHANGELOG.md'), `# Changelog\n\n${text}`);

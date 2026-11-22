@@ -5,7 +5,9 @@
  *
  * It refuses a package carrying client credentials or business state, checks
  * the plugin manifests are fresh from the candidate's template_version (and
- * equal `--version` when given), validates the package, then simulates a
+ * equal `--version` when given), checks CHANGELOG.md exists and its newest
+ * numbered section is that template_version (and, with `--version`, that it
+ * opens with a section for that version), validates the package, then simulates a
  * fresh deployment for the tool into a temporary folder: deployment plan plus
  * that tool's catalog under a synthetic catalog identity, validated against
  * the deployed package. Prints the deployment plan; exits 2 naming the tool on
@@ -64,7 +66,7 @@ function simulateDeployment(ai_assistant, entries, version) {
 /** The candidate CHANGELOG's newest numbered section must be the version being released. */
 function changelogErrors(version, requested) {
   const path = join(root, 'CHANGELOG.md');
-  if (!existsSync(path)) return [];
+  if (!existsSync(path)) return [`CHANGELOG.md is missing, expected one whose newest numbered section is template_version ${version}`];
   const headings = readFileSync(path, 'utf8').split(/\r?\n/).filter(line => line.startsWith('## '));
   const numbered = headings.map(line => /^## (\d+\.\d+\.\d+)(?:\s|$)/.exec(line)).find(Boolean);
   const errors = [];
@@ -82,6 +84,8 @@ function check(ai_assistant, requested) {
   const version = manifest.template_version;
   const errors = businessState(root);
   if (errors.length) return { entries: [], errors };
+  // The deployment plan ships CHANGELOG.md, so name the CHANGELOG rule before planning trips on it.
+  if (!existsSync(join(root, 'CHANGELOG.md'))) return { entries: [], errors: changelogErrors(version, requested) };
   const entries = planForTool(manifest.deployment, ai_assistant, { releaseRoot: root });
   if (requested !== undefined) {
     if (!/^\d+\.\d+\.\d+$/.test(requested)) errors.push(`--version ${requested} is not an X.Y.Z release version`);

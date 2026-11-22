@@ -98,3 +98,18 @@ test('bump refuses before writing anything', { skip: !hasFullHistory() && 'needs
     assert.deepEqual(snapshot(release), before, `${why}: every file byte-identical`);
   }
 });
+
+test('bump puts every file back when a late step fails', { skip: !hasFullHistory() && 'needs full git history' }, (t) => {
+  const release = candidate(t);
+  const current = templateVersion(release);
+  changelog(release, `## Unreleased — a\n\n- a note\n\n## ${current} — 2026-11-12\n\n- older\n`);
+  // The pristine step, run last, half-writes its file and then fails.
+  writeFileSync(join(release, 'tests/helpers/pristine.mjs'),
+    `import { writeFileSync } from 'node:fs';\nwriteFileSync('update/pristine.json', '{"half":');\nconsole.error('pristine exploded');\nprocess.exit(1);\n`);
+  const before = snapshot(release);
+  const run = bump(release, nextPatch(current));
+  assert.notEqual(run.status, 0);
+  assert.match(run.stderr, /pristine exploded/);
+  assert.match(run.stderr, /nothing was changed/i);
+  assert.deepEqual(snapshot(release), before, 'every file byte-identical');
+});

@@ -6,10 +6,22 @@
  *   node switch_ai.mjs --to claude-code   or name the one you want
  *   node switch_ai.mjs --to codex
  *
- * It moves every skill from one assistant's skills folder to the other's and records
+ * It moves every client skill from one assistant's skills folder to the other's and records
  * the new assistant in status/status.json. No release, git or internet is needed.
  * It refuses to overwrite anything, and keeps a copy of the old skills and status in
  * .update-backup/ first. To undo a switch, run it again.
+ *
+ * In a folder with the Orion plugin (plugins/orion), the plugin moves too, and the selected
+ * assistant changes only once the other assistant can use Orion:
+ *   1. the target assistant's catalog is written from the same catalog identity and the
+ *      target is set up through its own program (update/plugin-setup.mjs nativeStep);
+ *   2. only the same discovery evidence as plugin setup commits the switch. Until then the
+ *      switch waits in status.json `plugin.pending_switch` with the one step owed; running
+ *      this again finishes it, and `--to <current assistant>` cancels it;
+ *   3. a failed target setup or an interrupted commit puts the folder back and removes only
+ *      Orion's own registration with the target;
+ *   4. after the commit, the previous assistant's Orion (its install and its catalog) is
+ *      retired last. Nothing else in either assistant's settings is touched.
  */
 import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -20,10 +32,12 @@ const SKILLS = { codex: '.agents/skills', 'claude-code': '.claude/skills' };
 const TOP = { codex: '.agents', 'claude-code': '.claude' };
 const NAME = { codex: 'Codex', 'claude-code': 'Claude Code' };
 const TOOLS = Object.keys(SKILLS);
+const PACKAGE = 'plugins/orion';
 
 const arg = (name) => { const i = process.argv.indexOf(name); return i < 0 ? undefined : process.argv[i + 1]; };
 const isSymlink = (path) => { try { return lstatSync(path).isSymbolicLink(); } catch { return false; } };
 const copy = (from, to) => { mkdirSync(dirname(to), { recursive: true }); copyFileSync(from, to); };
+const injected = (name) => { if (process.env[name]) throw new Error('Injected switch interruption'); };
 
 /** Every file under dir, as paths relative to it. Refuses symlinks and special files. */
 function filesUnder(dir, label, prefix = '') {
@@ -44,6 +58,16 @@ function pruneEmpty(path) {
   if (readdirSync(path).length === 0) rmdirSync(path);
 }
 
+/** Remove the now-empty folders above a removed file, never above the folder root. */
+function pruneParents(root, rel) {
+  for (let parent = dirname(rel); parent !== '.'; parent = dirname(parent)) {
+    const dir = join(root, parent);
+    if (!existsSync(dir)) continue;
+    if (readdirSync(dir).length > 0) break;
+    rmdirSync(dir);
+  }
+}
+
 /** The assistant this folder uses now: recorded in status, or read from the folder layout. */
 function currentTool(root, status) {
   if (status.ai_assistant != null) {
@@ -55,6 +79,16 @@ function currentTool(root, status) {
   return present[0];
 }
 
+/** The plugin helpers, loaded only in a folder that carries the Orion plugin package. */
+async function pluginKit(root) {
+  if (!existsSync(join(root, PACKAGE))) return null;
+  const [resolver, pkg, native, setup] = await Promise.all([
+    import('./update/destination-resolver.mjs'), import('./update/plugin-package.mjs'),
+    import('./update/plugin-native.mjs'), import('./update/plugin-setup.mjs'),
+  ]);
+  return { ...resolver, ...pkg, ...native, ...setup };
+}
+
 /**
  * The whole switch holds the status lock, from reading status.json to the last
  * restore on failure, so no other Orion command's change is lost to it.
@@ -62,12 +96,19 @@ function currentTool(root, status) {
 export async function switchAi(root, to) {
   const statusPath = join(root, 'status/status.json');
   if (!existsSync(statusPath)) throw new Error('No status/status.json here. Run this from inside your Orion folder.');
-  return withStatusLock(root, (store) => switchLocked(store, root, statusPath, to));
+  const kit = await pluginKit(root);
+  return withStatusLock(root, (store) => switchLocked(store, root, statusPath, to, kit));
 }
 
-async function switchLocked(store, root, statusPath, to) {
+async function switchLocked(store, root, statusPath, to, kit) {
   const status = await store.readStatus();
   const from = currentTool(root, status);
+  const waiting = kit ? status.plugin?.pending_switch : null;
+  if (waiting) {
+    to ??= waiting.to;
+    if (to === from) return cancelWaiting(store, root, status, from, waiting, kit);
+    if (to !== waiting.to) throw new Error(`A switch to ${NAME[waiting.to]} has started but is not finished, and only one switch can run at a time. Run "node switch_ai.mjs" to finish it, or "node switch_ai.mjs --to ${from}" to cancel it.`);
+  }
   to ??= TOOLS.find((tool) => tool !== from);
   if (!TOOLS.includes(to)) throw new Error(`Choose --to claude-code or --to codex (not ${to}).`);
   if (to === from) throw new Error(`This folder already uses ${NAME[from]}.`);
@@ -84,6 +125,30 @@ async function switchLocked(store, root, statusPath, to) {
     throw new Error(`Nothing was changed, because these files already exist in ${SKILLS[to]}:\n${collisions.map((rel) => `  ${SKILLS[to]}/${rel}`).join('\n')}`);
   }
 
+  // The plugin: set the target up from the same identity before anything else moves.
+  let plugin = null;
+  if (kit) {
+    const identity = kit.ensurePluginRegion(status, { create: true }).catalog_identity;
+    const catalogPath = kit.TOOL_LAYOUT[to].catalogPath, text = kit.catalogText(to, identity);
+    const existing = existsSync(join(root, catalogPath)) ? readFileSync(join(root, catalogPath), 'utf8') : null;
+    if (existing !== null && existing !== text) throw new Error(`Nothing was changed, because ${catalogPath} already exists and is not this folder's Orion catalog. Move it out of the way, then run this again.`);
+    plugin = { identity, catalogName: kit.catalogName(identity), version: status.template_version, oldCatalog: kit.TOOL_LAYOUT[from].catalogPath };
+    const target = kit.nativeStep(root, { tool: to, identity, version: plugin.version, mode: 'setup' });
+    if (target.state === 'failed') {
+      undoTarget(root, to, plugin, kit);
+      status.plugin.pending_switch = null;
+      await store.writeStatus(status);
+      process.exitCode = 3;
+      return { state: 'rolled_back', from, to, selected: from, reason: target.details?.reason, errors: target.details?.errors || [] };
+    }
+    if (target.state === 'pending') {
+      status.plugin.pending_switch = { to, remaining_action: target.remaining_action };
+      await store.writeStatus(status);
+      return { state: 'pending_switch', from, to, selected: from, remaining_action: `${target.remaining_action} Then run "node switch_ai.mjs" again to finish the switch.` };
+    }
+    plugin.next = target.details?.next;
+  }
+
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupRel = `.update-backup/switch-${from}-to-${to}-${stamp}`;
   const backup = join(root, backupRel);
@@ -93,16 +158,25 @@ async function switchLocked(store, root, statusPath, to) {
 
   const created = [];
   try {
+    let count = 0;
     for (const rel of moving) {
       const target = join(root, SKILLS[to], rel);
       copy(join(root, SKILLS[from], rel), target);
       created.push(target);
+      if (process.env.ORION_SWITCH_FAIL_AFTER && ++count === Number(process.env.ORION_SWITCH_FAIL_AFTER)) throw new Error('Injected switch interruption');
     }
     for (const rel of files) rmSync(join(root, SKILLS[from], rel));
     pruneEmpty(join(root, SKILLS[from]));
     pruneEmpty(join(root, TOP[from]));
+    injected('ORION_SWITCH_FAIL_BEFORE_COMMIT');
     status.ai_assistant = to;
     if (status.machine_profile && typeof status.machine_profile === 'object') status.machine_profile.chosen_surface = to;
+    if (plugin) {
+      Object.assign(status.plugin, {
+        pending_switch: null, setup_state: 'registered', pending_version: plugin.version,
+        remaining_action: `${plugin.next || ''} Then ask your assistant to confirm it sees the Orion skills (it runs "${kit.VERIFY_COMMAND}").`.trim(),
+      });
+    }
     status.notes = [status.notes || '', `switched from ${from} to ${to}; backup in ${backupRel}`].filter(Boolean).join('\n');
     await store.writeStatus(status);
   } catch (error) {
@@ -114,10 +188,49 @@ async function switchLocked(store, root, statusPath, to) {
       const source = join(root, SKILLS[from], rel);
       if (!existsSync(source)) copy(join(backup, SKILLS[from], rel), source);
     }
-    await store.writeStatusText(readFileSync(join(backup, 'status/status.json'), 'utf8'));
+    const before = JSON.parse(readFileSync(join(backup, 'status/status.json'), 'utf8'));
+    if (plugin) {
+      // The previous assistant was never touched; only Orion's registration with the target goes.
+      undoTarget(root, to, plugin, kit);
+      kit.ensurePluginRegion(before).pending_switch = null;
+      await store.writeStatus(before);
+    } else await store.writeStatusText(readFileSync(join(backup, 'status/status.json'), 'utf8'));
     throw error;
   }
-  return { from, to, moved: moving.map((rel) => `${SKILLS[to]}/${rel}`), dropped: dropped.map((rel) => `${SKILLS[from]}/${rel}`), backup: backupRel };
+  const result = { state: 'switched', from, to, selected: to, moved: moving.map((rel) => `${SKILLS[to]}/${rel}`), dropped: dropped.map((rel) => `${SKILLS[from]}/${rel}`), backup: backupRel };
+  if (plugin) {
+    // Committed. Only now does the previous assistant's Orion go, and its catalog after it.
+    result.active = false;
+    result.remaining_action = status.plugin.remaining_action;
+    const retired = kit.retirePlugin({ root, tool: from, catalogName: plugin.catalogName });
+    if (retired.state === 'complete') removeCatalog(root, plugin.oldCatalog, kit.catalogText(from, plugin.identity));
+    else result.previous_tool_action = `Orion could not remove itself from ${NAME[from]} for this folder (${retired.details?.reason || 'its program was not reachable'}), so ${NAME[from]} may still offer the Orion skills here. Remove Orion there by hand; nothing else in ${NAME[from]} was changed, and ${plugin.oldCatalog} stays until then.`;
+  }
+  return result;
+}
+
+/** Remove this folder's Orion catalog for one assistant, only when it is exactly Orion's. */
+function removeCatalog(root, rel, text) {
+  const path = join(root, rel);
+  if (!existsSync(path) || readFileSync(path, 'utf8') !== text) return;
+  rmSync(path);
+  pruneParents(root, rel);
+}
+
+/** Undo Orion's own registration with a switch target, and its catalog; nothing else. */
+function undoTarget(root, to, plugin, kit) {
+  kit.retirePlugin({ root, tool: to, catalogName: plugin.catalogName });
+  removeCatalog(root, kit.TOOL_LAYOUT[to].catalogPath, kit.catalogText(to, plugin.identity));
+}
+
+/** `--to <current assistant>` while a switch waits: cancel it, leaving the current assistant as it is. */
+async function cancelWaiting(store, root, status, from, waiting, kit) {
+  const identity = status.plugin.catalog_identity;
+  undoTarget(root, waiting.to, { identity, catalogName: kit.catalogName(identity) }, kit);
+  status.plugin.pending_switch = null;
+  status.notes = [status.notes || '', `cancelled the switch to ${waiting.to}`].filter(Boolean).join('\n');
+  await store.writeStatus(status);
+  return { state: 'cancelled', from, to: waiting.to, selected: from, remaining_action: `The waiting switch to ${NAME[waiting.to]} was cancelled; this folder still uses ${NAME[from]}. If ${NAME[waiting.to]} still lists Orion, remove it there if you no longer use it.` };
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
@@ -125,12 +238,21 @@ if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToP
     const root = arg('--root') || dirname(fileURLToPath(import.meta.url));
     const result = await switchAi(root, arg('--to'));
     if (process.argv.includes('--json')) console.log(JSON.stringify(result, null, 2));
-    else {
+    else if (result.state === 'switched') {
       console.log(`Switched this Orion folder from ${NAME[result.from]} to ${NAME[result.to]}.`);
       console.log(`Moved ${result.moved.length} skill file(s) to ${SKILLS[result.to]}.`);
       if (result.dropped.length) console.log(`Left out ${result.dropped.length} Spec Kit file(s); they are in the backup.`);
       console.log(`Backup of the old skills and status: ${result.backup}`);
       console.log(`Open this folder in ${NAME[result.to]} to carry on. To switch back, run: node switch_ai.mjs`);
+      if (result.remaining_action) console.log(`Next for the Orion plugin: ${result.remaining_action}`);
+      if (result.previous_tool_action) console.log(result.previous_tool_action);
+    } else if (result.state === 'pending_switch') {
+      console.log(`This folder still uses ${NAME[result.from]}: the switch to ${NAME[result.to]} is waiting on one step.`);
+      console.log(result.remaining_action);
+    } else if (result.state === 'cancelled') console.log(result.remaining_action);
+    else {
+      console.log(`Nothing was switched: Orion could not be set up in ${NAME[result.to]} (${result.reason || 'unknown reason'}), so this folder still uses ${NAME[result.from]} as before.`);
+      for (const error of result.errors) console.log(`  - ${error}`);
     }
   } catch (error) {
     console.error(error.message);

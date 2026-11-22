@@ -36,6 +36,16 @@
     "vt09_send_gate": false
   },
   "packages": {},
+  "plugin": {
+    "catalog_identity": null,
+    "setup_state": "not_started",
+    "remaining_action": null,
+    "verified_version": null,
+    "verified_at": null,
+    "pending_version": null,
+    "pending_switch": null,
+    "update_backup": null
+  },
   "home": {
     "enabled": false,
     "branch": "main"

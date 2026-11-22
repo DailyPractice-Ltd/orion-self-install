@@ -22,10 +22,29 @@ expiry blocks new tasks while admitted work can finish and report. Setup still
 needs current acceptance and acknowledged reporting. Version-2 pairing state keeps
 legacy migration fields readable but inert. No payload expansion.
 
+Orion's shipped skills now come as the `orion` plugin in `plugins/orion/`, one package
+for Codex and Claude Code, versioned with the release. A fresh install registers it with
+the selected tool for that folder only, through the folder's own catalog, and records
+progress under `plugin` in `status/status.json`. Plugin setup is separate from pairing.
+It reports complete only after a fresh session confirms the skills
+(`node update/plugin-setup.mjs verify --discovered`). Unfinished setup resumes with
+`node update/plugin-setup.mjs resume`. Claude Code invokes the skills as `/orion:<skill>`.
+Codex installs Orion from its Plugins Directory or `/plugins`. Client-created skills
+stay in `.claude/skills/` or `.agents/skills/`. "Update my harness"
+replaces the package as a unit, backs it up first, and keeps the previous release
+active until a fresh session confirms the new one. Restore and tool switch reuse the
+same package and catalog identity. Release preparation validates the packaging and a
+fresh deployment for both tools. `docs/plugin-validation.md` (release repository only)
+is the manual checklist for native installation. Native compatibility is unverified
+until it has been run. Existing installed harnesses are not converted.
+
 Switching AI assistants is now local: run `node switch_ai.mjs` in the deployed
-folder. It moves every skill between `.agents/skills/` and `.claude/skills/`,
+folder. It moves every client skill between `.agents/skills/` and `.claude/skills/`,
 records the new assistant and backs up first, with no release clone, commit or
 version check. Run it again to switch back. `update/apply.mjs switch` is retired.
+With the `orion` plugin, the switch sets Orion up in the other assistant first and
+changes the folder over only on its discovery evidence; until then it waits, and
+running it again finishes it.
 
 
 Semantic versioning: a real self-serve install's corrections/learnings → minor; a change

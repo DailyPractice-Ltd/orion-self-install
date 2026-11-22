@@ -21,6 +21,57 @@ required checks: open this same folder in one of those supported tools to contin
    Run `node start.mjs` again to resume saved answers. If an exchange succeeded but
    its response was lost before saving, request a fresh code.
 
+## Finish the Orion plugin
+
+Orion's shipped skills arrive as the `orion` plugin in `plugins/orion/`. Its setup is
+separate from pairing: pairing does not depend on it, and it does not pair anything.
+The installer registers it with the selected tool, scoped to this folder, and records
+progress in `status/status.json` under `plugin`:
+
+- **Claude Code**: the installer validates the package and catalog, then runs
+  `claude plugin marketplace add <folder> --scope local` and
+  `claude plugin install orion@<catalog> --scope local` from this folder. Those write
+  this folder's `.claude/settings.local.json` (Claude Code also notes the uniquely named
+  catalog in its per-user list of known marketplaces; Orion is enabled only here).
+- **Codex**: the installer writes this folder's own `.codex/config.toml` with two
+  entries, `[marketplaces."<catalog>"]` (this folder) and `[plugins."orion@<catalog>"]`
+  `enabled = true`, keeping anything else in that file. It writes nothing to your
+  user-wide Codex settings. Codex reads a project's `.codex/config.toml` only once you
+  trust the folder, so the first step may be to open the folder in Codex and trust it.
+  Installing Orion is then your step in Codex: the Plugins Directory (desktop app) or
+  `/plugins` (CLI), choosing the `orion-<12 hex>` catalog. If Codex records Orion as
+  switched on in your user-wide `~/.codex/config.toml`, that would load it in every
+  folder: setup stays unfinished and says which entry to delete there.
+
+The states:
+
+- `pending`: one step is owed first (install the tool, trust the folder in Codex,
+  install Orion from Codex's `/plugins` or Plugins Directory, reinstall it, enable it,
+  or start a fresh session). `remaining_action` says exactly what.
+- `failed`: a check or native command failed; `remaining_action` says how to retry. After
+  an update whose check later fails, it also names the restore command for that update's
+  backup (`plugin.update_backup`).
+- `registered`: the tool's own inspection, run from this folder, shows Orion enabled for
+  this folder only, at this version, with every shipped skill (Claude Code:
+  `claude plugin list --json` and `claude plugin details`; Codex: `codex plugin
+  marketplace list --json`, `codex plugin list --json` and the cached copy Codex loads,
+  under `~/.codex/plugins/cache/<catalog>/orion/local/`). No fresh session has
+  confirmed it yet.
+- `complete`: that same native evidence, and an assistant in a fresh session in this
+  folder saw the Orion skills and confirmed it with
+  `node update/plugin-setup.mjs verify --discovered`. The flag alone never earns it.
+
+To resume unfinished plugin setup, run from this folder (safe to repeat; it reuses the
+folder's catalog identity and never registers twice):
+
+```text
+node update/plugin-setup.mjs resume
+```
+
+`node update/plugin-setup.mjs verify` inspects without changing anything, and
+`node update/plugin-setup.mjs status` prints where setup stands. Only report
+"plugin setup complete" when the command says so.
+
 Pairing links your account and folder; it does not check payment or subscription.
 The [radio guide](radio.md) explains exactly which operational labels are shared.
 

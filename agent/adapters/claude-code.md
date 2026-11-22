@@ -16,7 +16,12 @@ The installer does not add `CLAUDE.md`. Anthropic's `agents-md` plugin can load
 `AGENTS.md` when no `CLAUDE.md` is in scope, but this depends on that setup. If this
 Claude Code installation does not load it, create a client-folder `CLAUDE.md` whose
 only content is `@AGENTS.md`. Do not duplicate the instructions in that pointer.
-Installed skills are in `.claude/skills/`.
+
+Orion's shipped skills come from the `orion` plugin in `plugins/orion/`, installed
+for this folder only (local scope). Invoke one as `/orion:<skill>`, such as
+`/orion:update-harness`. Skills the client creates or adds live in `.claude/skills/`;
+updates never touch them. If the Orion skills are missing, read `plugin` in
+`status/status.json` and follow [Finish the Orion plugin](../../docs/setup.md#finish-the-orion-plugin).
 
 ## What you can do directly, that the chat-surface adapters can't
 

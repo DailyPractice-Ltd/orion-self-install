@@ -40,7 +40,7 @@ const DIRECTIVE_BODY =
  * Run the real radio in a scratch harness folder. Returns what it printed, the
  * status.json it left behind, and every call the bridge received.
  */
-function checkRadio({ thread, sharing = {}, locked = false }) {
+function checkRadio({ thread, sharing = {}, locked = false, args = ['check'] }) {
   const dir = mkdtempSync(join(tmpdir(), 'orion-radio-'));
   try {
     mkdirSync(join(dir, 'status'));

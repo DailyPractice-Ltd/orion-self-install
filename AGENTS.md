@@ -259,8 +259,13 @@ know why, just that the names are load-bearing; don't rename them.
 
 One Orion serves this business. It uses the connected tools and the same knowledge
 base and permissions across tasks. Add reusable procedures as skills.
-For "teach Orion" or an equivalent request, follow the `create-skill` procedure
-from your AI assistant's skills directory. The [README](README.md) lists the built-in skills.
+Orion's shipped skills come from the `orion` plugin (`plugins/orion/skills/`), which
+updates replace as a unit. Skills the client creates or adds are theirs and live in the
+client skills folder: `.claude/skills/` for Claude Code, `.agents/skills/` for Codex.
+For "teach Orion" or an equivalent request, follow the plugin's `create-skill` procedure;
+it writes the new skill to the client skills folder. The [README](README.md) lists the
+built-in skills. When the Orion skills are missing, read `plugin` in `status/status.json`
+and follow [Finish the Orion plugin](docs/setup.md#finish-the-orion-plugin).
 
 For recurring work, follow `docs/scheduled-work.md` and use Codex scheduled tasks
 or Claude Routines. If a legacy prompt requests a roster or job sheet run, refer
@@ -271,10 +276,13 @@ the same session-start radio message and adapter fix, once per session.
 
 ## Updating — "update my harness"
 
-When the client asks to update Orion, check its version, restore an update backup
+When the client asks to update Orion, check its version or restore an update backup,
 follow [Updating Orion](docs/updating.md). The request is the consent
-for an update. In Claude Code and Codex, the same procedure is available as
-`/update-harness`. To move between Codex and Claude Code, use `/switch-ai`.
+for an update. The same procedure is the plugin's `update-harness` skill
+(`/orion:update-harness` in Claude Code). An update replaces the `orion` plugin with the
+rest of the release and is active only once a fresh session confirms it. To move between
+Codex and Claude Code, use the plugin's `switch-ai` skill (`/orion:switch-ai`), which runs
+`node switch_ai.mjs` from this folder.
 
 ## Where the fuller detail lives
 

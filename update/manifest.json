@@ -66,6 +66,7 @@
       "status/status.schema-template.json",
       "switch_ai.mjs",
       "update/apply.mjs",
+      "update/preflight.mjs",
       "update/destination-resolver.mjs",
       "update/manifest.json",
       "update/plugin-native.mjs",

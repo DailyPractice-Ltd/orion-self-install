@@ -378,3 +378,20 @@ test('ORION_CLAUDE_BIN points at a client that is not on PATH', (t) => {
   const env = { ...w.env, PATH: w.home, ORION_CLAUDE_BIN: join(w.bin, process.platform === 'win32' ? 'claude.cmd' : 'claude') };
   assert.equal(setupPlugin(w.opts('claude-code', { env })).state, 'complete');
 });
+
+test('Codex handoff explains exact catalog selection and scope correction before installation', t => {
+  const w = world(t, { faults: { userEnable: true } });
+  const handoff = setupPlugin(w.opts('codex'));
+  assert.match(handoff.remaining_action, new RegExp(CATALOG));
+  assert.ok(handoff.remaining_action.includes(`codex plugin add orion@${CATALOG} --json`));
+  assert.ok(handoff.remaining_action.includes(userConfig(w)));
+  assert.match(handoff.remaining_action, /delete.*\[plugins\./i);
+  assert.match(handoff.remaining_action, /enabled = true/);
+  assert.match(handoff.remaining_action, /verify/);
+  humanInstall(w);
+  assert.equal(verifyPlugin(w.opts('codex')).details.reason, 'enabled_user_wide');
+  // Follow the handed-off scope correction; the project enablement remains on.
+  writeFileSync(userConfig(w), '# unrelated user settings\n');
+  assert.equal(verifyPlugin(w.opts('codex')).state, 'complete');
+  assert.match(project(w), /enabled = true/);
+});

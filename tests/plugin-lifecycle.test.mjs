@@ -60,7 +60,8 @@ function world(t, { tool = 'claude-code', at = '1.0.0', faults = {}, codexInstal
   for (const [path, body] of Object.entries(V2)) put(release, path, body);
   put(release, 'AGENTS.md', 'agents v2\n');
   put(release, 'update/manifest.json', json(manifest2));
-  const pristine = { files: { 'AGENTS.md': [hash('agents v1\n')] } };
+  // The frozen registry recognises everything the 1.0.0 harness was shipped with: it has no receipt.
+  const pristine = { files: { 'AGENTS.md': [hash('agents v1\n')], 'update/manifest.json': [hash(json(manifestFor('1.0.0', V1)))] } };
   for (const [path, body] of Object.entries(V1)) pristine.files[path] = [hash(body)];
   put(release, 'update/pristine.json', json(pristine));
   execFileSync('git', ['init', '-q'], { cwd: release });
@@ -137,6 +138,20 @@ test('update replaces the package as a unit, keeps client skills and records the
   put(w.client, 'plugins/orion/skills/extra/SKILL.md', 'a file I dropped into the package\n');
   const catalogBefore = get(w.client, CATALOG_PATH['claude-code']);
 
+  // This harness predates receipts: package bytes no release shipped stop the update before any change.
+  const blocked = w.update();
+  assert.equal(blocked.status, 2, out(blocked));
+  assert.deepEqual(report(blocked).conflicts, [
+    { path: 'plugins/orion/skills/extra/SKILL.md', reason: 'unknown' },
+    { path: 'plugins/orion/skills/hello/SKILL.md', reason: 'unknown' },
+  ]);
+  assert.equal(get(w.client, 'AGENTS.md'), 'agents v1\n');
+  assert.equal(has(w.client, 'status/installed-files.json'), false);
+  assert.equal(has(w.client, '.update-backup'), false);
+  // The client moves the edit out: the shipped file goes back and the dropped-in one leaves.
+  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1\n');
+  rmSync(join(w.client, 'plugins/orion/skills/extra'), { recursive: true });
+
   const run = w.update();
   assert.equal(run.status, 0, out(run));
   const r = report(run);
@@ -148,10 +163,10 @@ test('update replaces the package as a unit, keeps client skills and records the
   assert.equal(has(w.client, 'plugins/orion/skills/extra'), false);
   assert.equal(JSON.parse(get(w.client, 'plugins/orion/.claude-plugin/plugin.json')).version, '2.0.0');
   assert.equal(JSON.parse(get(w.client, 'plugins/orion/plugin.json')).version, '2.0.0', 'existing dual-manifest installations retain both');
-  // ...and the complete prior package, in-place edits included, is in the backup.
-  assert.equal(get(w.client, `${r.backup}/package/plugins/orion/skills/hello/SKILL.md`), 'hello v1 with my in-place edit\n');
-  assert.equal(get(w.client, `${r.backup}/package/plugins/orion/skills/extra/SKILL.md`), 'a file I dropped into the package\n');
-  assert.deepEqual(r.package.edits_backed_up.sort(), ['plugins/orion/skills/extra/SKILL.md', 'plugins/orion/skills/hello/SKILL.md']);
+  // ...and the complete prior package is in the backup.
+  assert.equal(get(w.client, `${r.backup}/package/plugins/orion/skills/hello/SKILL.md`), 'hello v1\n');
+  assert.equal(get(w.client, `${r.backup}/package/plugins/orion/skills/gone/SKILL.md`), 'gone v1\n');
+  assert.deepEqual(r.package.edits_backed_up, []);
 
   // Client-owned work and unrelated settings are untouched; the catalog keeps its identity.
   assert.equal(get(w.client, '.claude/skills/mine/SKILL.md'), 'my own skill\n');
@@ -198,12 +213,13 @@ test('Codex update counts a stale cached copy as pending, and never runs a marke
 
 test('a confirmed native failure restores the previous package, catalog and status, and asks for a fresh check', (t) => {
   const w = world(t, { faults: { validate: true } });
-  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1 with my in-place edit\n');
+  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1\r\n');
   const run = w.update();
   assert.equal(run.status, 3, out(run));
   const r = report(run);
   assert.equal(r.state, 'rolled_back');
-  assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v1 with my in-place edit\n');
+  assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v1\r\n');
+  assert.equal(has(w.client, 'status/installed-files.json'), false, 'a harness without a receipt has none again');
   assert.equal(get(w.client, 'plugins/orion/skills/gone/SKILL.md'), 'gone v1\n');
   assert.equal(has(w.client, 'plugins/orion/skills/fresh'), false);
   assert.equal(get(w.client, 'AGENTS.md'), 'agents v1\n');
@@ -260,7 +276,7 @@ test('a crashed update journal is recovered from its backup, but never over a co
 
 test('restore puts the package and catalog back and says a fresh check is needed; a later package edit stops it', (t) => {
   const w = world(t);
-  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1 with my in-place edit\n');
+  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1\r\n');
   const run = w.update();
   assert.equal(run.status, 0, out(run));
   const { backup } = report(run);
@@ -281,7 +297,7 @@ test('restore puts the package and catalog back and says a fresh check is needed
   const restored = w.restore(backup);
   assert.equal(restored.status, 0, out(restored));
   const r = report(restored);
-  assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v1 with my in-place edit\n');
+  assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v1\r\n');
   assert.equal(has(w.client, 'plugins/orion/skills/fresh'), false);
   assert.equal(JSON.parse(get(w.client, CATALOG_PATH['claude-code'])).name, CATALOG);
   assert.equal(get(w.client, '.claude/skills/later/SKILL.md'), 'made after the update\n');
@@ -380,7 +396,7 @@ for (const tool of ['codex', 'claude-code']) test(`update preserves the ${tool} 
   const w = world(t, { tool, at: '2.0.0', codexInstalled: '2.0.0' });
   const other = tool === 'codex' ? 'claude-code' : 'codex';
   rmSync(join(w.client, MANIFEST_PATHS[other]));
-  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'local edit\n');
+  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1\n'); // an older shipped version
   const result = w.update();
   assert.equal(result.status, 0, out(result));
   assert.equal(has(w.client, MANIFEST_PATHS[other]), false);
@@ -388,7 +404,7 @@ for (const tool of ['codex', 'claude-code']) test(`update preserves the ${tool} 
   assert.equal(w.status().plugin.setup_state, 'registered');
   assert.equal(w.restore(report(result).backup).status, 0);
   assert.equal(has(w.client, MANIFEST_PATHS[other]), false);
-  assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'local edit\n');
+  assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v1\n');
 });
 
 test('setup EPERM after files commit reports activation pending and survives an update retry', t => {

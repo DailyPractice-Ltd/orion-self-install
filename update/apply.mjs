@@ -9,8 +9,9 @@
  * Ownership comes from the harness's installed-file receipt (update/receipt.mjs): files still
  * as installed are updated, edited and unknown ones are kept, and an edited or unknown
  * runtime or plugin file the update would replace stops it before any change (state
- * "conflict"). An unreadable or invalid receipt stops it too. Without a receipt (a harness
- * from before receipts) the frozen fingerprints in update/pristine.json decide instead.
+ * "conflict"). An unreadable or invalid receipt stops it too. A harness from before receipts
+ * has none and migrates: its receipt starts as the files whose bytes the frozen fingerprints
+ * in update/pristine.json recognise (receipt.mjs legacyReceipt), and the same rules apply.
  * The receipt is backed up, journaled, written last under the lock and rolled back with the files.
  *
  * The Orion plugin package (plugins/orion) is release-managed and replaced as a unit; the
@@ -30,13 +31,13 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, exis
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PACKAGE_ROOT, TOOL_LAYOUT, destinationState, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
+import { PACKAGE_ROOT, TOOL_LAYOUT, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
 import { MANIFEST_PATHS, catalogName, catalogText, ensurePluginRegion } from './plugin-package.mjs';
 import { lowerFirst } from './plugin-native.mjs';
 import { captureRegistration, restoreRegistration, CODEX_PROJECT_CONFIG, CLAUDE_LOCAL_SETTINGS } from './plugin-registration.mjs';
 import { RESUME_COMMAND, VERIFY_COMMAND, runPluginSetup } from './plugin-setup.mjs';
 import { preflightDestinations } from './preflight.mjs';
-import { RECEIPT_PATH, isRuntimeDestination, readReceipt, receiptState, receiptText } from './receipt.mjs';
+import { RECEIPT_PATH, isRuntimeDestination, legacyReceipt, readReceipt, receiptState, receiptText } from './receipt.mjs';
 import { withStatusLock } from '../status/store.mjs';
 
 const arg = name => { const i=process.argv.indexOf(name); return i<0 ? undefined : process.argv[i+1]; };
@@ -120,7 +121,7 @@ async function update(store,root,repo,commit) {
     if (legacyMarker) throw new Error(`This folder is an Orion 1.x harness (it has ${legacyMarker}). Orion 2.0.0 is installed fresh, not updated in place: follow agent/reinstall-from-1.x.md. Nothing was changed`);
     const ai_assistant=resolveAiAssistant(status,manifest.deployment);
     // The receipt is this harness's ownership evidence. None is a harness from before
-    // receipts; one that cannot be trusted stops the update before anything changes.
+    // receipts, which migrates below; one that cannot be trusted stops the update before anything changes.
     let receipt;
     try { receipt=readReceipt(root); }
     catch (error) { throw new Error(`${error.message}. Orion cannot tell your changes from its own files without it, so it stopped; nothing was changed. ${RECEIPT_ACTION}`); }
@@ -139,22 +140,24 @@ async function update(store,root,repo,commit) {
     }
     const retired=(manifest.deployment.retired||[]).map(e=>({source:e.source,destination:e.destinations?.[ai_assistant]||e.destination,ownership:'release',fingerprint_key:e.sources?.[ai_assistant]||e.fingerprint_key||e.source}));
     const commonRetired=(manifest.remove||[]).map(path=>({source:path,destination:path,ownership:'release',fingerprint_key:path}));
+    // Migration: a harness without a receipt starts from the one it can prove, the files whose
+    // bytes the frozen registry recognises; from there it is updated like any receipt harness.
+    const migrating=receipt===null;
+    if (migrating) {
+      const packageFiles=withPlugin && existsSync(safe(root,PACKAGE_ROOT)) ? treeLines(safe(root,PACKAGE_ROOT)).map(line=>`${PACKAGE_ROOT}/${line.slice(0,line.lastIndexOf(' '))}`) : [];
+      const keyOf=new Map(plan.map(e=>[e.destination,e.fingerprint_key]));
+      const candidates=[...plan.filter(e=>e.ownership==='release'),...retired,...commonRetired].map(e=>({destination:e.destination,key:e.fingerprint_key}))
+        .concat(packageFiles.map(path=>({destination:path,key:keyOf.get(path)||path})));
+      receipt=legacyReceipt(root,candidates,{registry:pristine,aliases:manifest.deployment.fingerprints?.legacy_aliases,ai_assistant,template_version:status.template_version||'unknown'});
+    }
     const actions=[], report={from:status.template_version,to:manifest.template_version,commit,ai_assistant,refreshed:[],added:[],retired:[],kept:[],unknown:[],collisions:[]};
-    // With a receipt: conflicts stop the update; `verified` files already hold the incoming
+    // Conflicts stop the update; `verified` files already hold the incoming
     // bytes and `forgotten` receipt entries name retired files that are gone.
     const conflicts=[], verified=new Map(), forgotten=[];
     for (const e of plan) {
       // The package is replaced as a unit below, never file by file.
       if (withPlugin && isPackagePath(e.destination)) continue;
-      if (receipt) { classifyWithReceipt(e); continue; }
-      const dest=safe(root,e.destination), state=destinationState(root,e,pristine);
-      if (state==='client-owned') {report.collisions.push(e.destination);continue;}
-      if (state==='preserve' && !/^status\/[^/]+\.mjs$/.test(e.destination)) {report.kept.push(e.destination);continue;}
-      if (state==='preserve') report.replaced_edited_scripts=(report.replaced_edited_scripts||[]).concat(e.destination);
-      const src=safe(snapshot,e.source);
-      if (e.destination.endsWith('.mjs')) { const check=spawnSync(process.execPath,['--check',src],{encoding:'utf8'}); if(check.status!==0) throw new Error(`Invalid script ${e.source}: ${check.stderr}`); }
-      if (state==='absent') actions.push({kind:'add',e,src,dest,track:true});
-      else if (fingerprint(readFileSync(dest))!==fingerprint(readFileSync(src))) actions.push({kind:'replace',e,src,dest,track:true});
+      classifyWithReceipt(e);
     }
     function classifyWithReceipt(e) {
       const dest=safe(root,e.destination), src=safe(snapshot,e.source), incoming=fingerprint(readFileSync(src));
@@ -193,20 +196,10 @@ async function update(store,root,repo,commit) {
     const legacyHire = ai_assistant === 'codex' ? '.agents/skills/hire-agent' : '.claude/skills/hire-agent';
     collectLegacy(legacyHire, 'legacy/hire-agent');
     for (const e of [...retired,...commonRetired]) {
-      if (receipt) {
-        const dest=safe(root,e.destination), {state,baseline}=receiptState(root,e.destination,receipt);
-        if (state==='installed') { actions.push({kind:'retire',e,dest,track:true}); archives.delete(e.destination); }
-        else if (state==='absent') { if (baseline) forgotten.push(e.destination); }
-        else if (!archives.has(e.destination)) report[state==='unknown'?'unknown':'kept'].push(e.destination);
-        continue;
-      }
-      const dest=safe(root,e.destination), state=destinationState(root,e,pristine);
-      if (state==='owned') {
-        actions.push({kind:'retire',e,dest});
-        archives.delete(e.destination);
-      } else if (state==='preserve'||state==='client-owned') {
-        if (!archives.has(e.destination)) report.kept.push(e.destination);
-      }
+      const dest=safe(root,e.destination), {state,baseline}=receiptState(root,e.destination,receipt);
+      if (state==='installed') { actions.push({kind:'retire',e,dest,track:true}); archives.delete(e.destination); }
+      else if (state==='absent') { if (baseline) forgotten.push(e.destination); }
+      else if (!archives.has(e.destination)) report[state==='unknown'?'unknown':'kept'].push(e.destination);
     }
     for (const [oldPath, archive] of archives) archiveLegacy(oldPath, archive);
 
@@ -219,19 +212,14 @@ async function update(store,root,repo,commit) {
       const releasePackage=join(snapshot,PACKAGE_ROOT), harnessPackage=safe(root,PACKAGE_ROOT);
       const prior_hash=treeHash(harnessPackage), installed_hash=treeHash(releasePackage);
       if (prior_hash!==installed_hash) {
-        // Edits: prior package files that are neither installed (by the receipt, or a shipped
-        // fingerprint without one) nor the incoming bytes. With a receipt, they stop the update.
-        const edits=[];
+        // Prior package files that are neither as installed nor the incoming bytes stop the update.
         for (const line of existsSync(harnessPackage) ? treeLines(harnessPackage) : []) {
           const at=line.lastIndexOf(' '), rel=`${PACKAGE_ROOT}/${line.slice(0,at)}`, hash=line.slice(at+1);
-          if (receipt && (hash==='link' || hash==='special')) { conflicts.push({path:rel,reason:'not-a-file'}); continue; }
-          const incoming=fileHash(join(snapshot,rel));
-          if (receipt) {
-            const baseline=receipt.files[rel]?.hash;
-            if (hash!==incoming && hash!==baseline) conflicts.push({path:rel,reason:baseline?'modified':'unknown'});
-          } else if (hash!==incoming && !(pristine.files?.[rel]||[]).includes(hash)) edits.push(rel);
+          if (hash==='link' || hash==='special') { conflicts.push({path:rel,reason:'not-a-file'}); continue; }
+          const incoming=fileHash(join(snapshot,rel)), baseline=receipt.files[rel]?.hash;
+          if (hash!==incoming && hash!==baseline) conflicts.push({path:rel,reason:baseline?'modified':'unknown'});
         }
-        pkg={prior_hash,installed_hash,edits_backed_up:edits};
+        pkg={prior_hash,installed_hash,edits_backed_up:[]};
       }
       const path=TOOL_LAYOUT[ai_assistant].catalogPath, text=catalogText(ai_assistant,identity);
       const current=fileHash(safe(root,path));
@@ -259,7 +247,7 @@ async function update(store,root,repo,commit) {
     }
     if (catalog) destinations.push(catalog.path);
     if (withPlugin) destinations.push(ai_assistant === 'codex' ? CODEX_PROJECT_CONFIG : CLAUDE_LOCAL_SETTINGS);
-    if (receipt) destinations.push(RECEIPT_PATH);
+    destinations.push(RECEIPT_PATH);
     destinations.push('status/status.json', '.update-backup/.preflight');
     const permissions = preflightDestinations(root, destinations);
     if (permissions.length) {
@@ -273,7 +261,7 @@ async function update(store,root,repo,commit) {
     mkdirSync(backup,{recursive:true}); copyTo(statusPath,join(backup,'status/status.json'));
     // The receipt this update leaves when every action succeeds. It is written after the
     // files, so a failure before then leaves the prior one, and a rollback puts that back.
-    const installedReceipt = receipt && receiptText(nextReceipt());
+    const installedReceipt = receiptText(nextReceipt());
     function nextReceipt() {
       const files={...receipt.files};
       for (const [path,entry] of verified) files[path]=entry;
@@ -292,15 +280,18 @@ async function update(store,root,repo,commit) {
     }
     // Whenever this update writes a receipt, the journal says what to put back: the backed-up
     // copy, or (`prior: null`) no receipt at all for a harness that had none.
+    // A migrating harness also keeps the receipt it proved (`migrated`): the baselines its
+    // restored files go back to if the receipt changes after this update.
     const priorReceiptHash = fileHash(safe(root,RECEIPT_PATH));
-    if (installedReceipt && priorReceiptHash) copyTo(safe(root,RECEIPT_PATH),join(backup,'receipt',RECEIPT_PATH));
+    if (priorReceiptHash) copyTo(safe(root,RECEIPT_PATH),join(backup,'receipt',RECEIPT_PATH));
+    if (migrating) { mkdirSync(join(backup,'receipt'),{recursive:true}); writeFileSync(join(backup,'receipt','migrated.json'),receiptText(receipt)); }
     const journal={kind:'update',state:'pending',from:status.template_version,to:manifest.template_version,commit,ai_assistant,
       actions:actions.map(a=>({kind:a.kind,destination:a.e.destination,installed_hash:a.kind==='retire'?null:fingerprint(readFileSync(a.src)),prior_hash:a.kind==='add'?null:fingerprint(readFileSync(a.dest))})),
       remove_status_checklist_keys:checklistKeys,
       package:pkg && {path:PACKAGE_ROOT,prior_hash:pkg.prior_hash,installed_hash:pkg.installed_hash},
       catalog:catalog && {path:catalog.path,prior_hash:catalog.prior_hash,installed_hash:catalog.installed_hash},
       registration:registration ? 'registration.json' : null,
-      receipt:installedReceipt ? {path:RECEIPT_PATH,prior:priorReceiptHash?`receipt/${RECEIPT_PATH}`:null,prior_hash:priorReceiptHash,installed_hash:fingerprint(installedReceipt)} : null};
+      receipt:{path:RECEIPT_PATH,prior:priorReceiptHash?`receipt/${RECEIPT_PATH}`:null,prior_hash:priorReceiptHash,installed_hash:fingerprint(installedReceipt),...(migrating && {migrated:'receipt/migrated.json'})}};
     // The status fields this update owns, written under the lock once the files are in place.
     const commitStatus=current=>{
       for(const key of journal.remove_status_checklist_keys) delete current.checklist?.[key];
@@ -359,7 +350,7 @@ async function update(store,root,repo,commit) {
         step();
       }
       pruneParents(root,report.retired.filter(path => path.startsWith('library/')));
-      if (installedReceipt) { await store.writeReceiptText(installedReceipt); step(); }
+      await store.writeReceiptText(installedReceipt); step();
       await editStatus(store,commitStatus);
       journal.state='complete';writeJson(join(backup,'journal.json'),journal);
     } catch(error) {
@@ -535,7 +526,9 @@ async function restore(store,root,backupRel) {
     // The update wrote the harness's first receipt and nothing changed it since: none again.
     await store.removeReceipt();
   } else if (prior || receiptNow) {
-    const base=receiptNow||prior, files={...base.files}, priorFiles=prior?.files||{};
+    // A migrated harness had no receipt; its restored files take the baselines it proved then.
+    const migrated=!prior && journal.receipt?.migrated ? json(join(backup,journal.receipt.migrated)) : null;
+    const base=receiptNow||prior, files={...base.files}, priorFiles=(prior||migrated)?.files||{};
     const back = path => { if (priorFiles[path]) files[path]=priorFiles[path]; else delete files[path]; };
     for (const path of gone) delete files[path];
     for (const path of restored) {

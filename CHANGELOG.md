@@ -38,6 +38,11 @@ Write each section for the client who will read it there.
   `verify --discovered`) never moves a baseline. When the tool confirms a failure and
   the update is rolled back (exit 3), the receipt goes back with the files. The plugin
   catalog is tracked; the tool's own registration settings never are.
+- Folders installed before receipts update straight to the latest release, with no
+  intermediate release. Files matching a version Orion shipped update as before and
+  enter the new receipt; files no release shipped are kept, listed, and never claimed
+  as Orion's. A changed script or plugin skill in such a folder now stops the update
+  too, instead of being overwritten.
 
 ### For maintainers
 

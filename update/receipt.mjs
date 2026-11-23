@@ -119,6 +119,27 @@ export function receiptState(root, destination, receipt) {
   return { state, current, baseline };
 }
 
+/**
+ * The receipt a harness from before receipts can prove, from the frozen compatibility
+ * registry (update/pristine.json): one entry for each candidate `{destination, key}` whose
+ * current bytes are a version Orion shipped under that source identity or its legacy
+ * alias. Anything else gets no entry, so its bytes are never adopted as Orion's. The
+ * registry cannot list its own bytes; a harness's copy of it was always Orion's to replace.
+ */
+export function legacyReceipt(root, candidates, { registry, aliases = {}, registryPath = 'update/pristine.json', ai_assistant, template_version }) {
+  const empty = { schema: RECEIPT_SCHEMA, version: RECEIPT_VERSION, algorithm: RECEIPT_ALGORITHM, ai_assistant, template_version, recorded_by: 'migration', recorded_at: new Date().toISOString(), files: {} };
+  const reverse = Object.fromEntries(Object.entries(aliases).map(([key, alias]) => [alias, key]));
+  const shipped = key => [key, aliases[key], reverse[key]].filter(Boolean).flatMap(name => registry?.files?.[name] || []);
+  for (const { destination, key } of candidates) {
+    if (empty.files[destination]) continue;
+    const { state, current } = receiptState(root, destination, empty);
+    if (state !== 'unknown') continue;
+    if (destination === registryPath || shipped(key).includes(current)) empty.files[destination] = { key, hash: current, origin: 'release' };
+  }
+  const sorted = Object.fromEntries(Object.keys(empty.files).sort().map(path => [path, empty.files[path]]));
+  return validateReceipt({ ...empty, files: sorted });
+}
+
 /** The receipt's exact serialised form. */
 export function receiptText(receipt) {
   return `${JSON.stringify(validateReceipt(receipt), null, 2)}\n`;

@@ -144,6 +144,13 @@ export async function withStatusLock(root, action, { wait = LOCK_WAIT_MS } = {})
         await atomicText(keyPath(root), `${value}\n`);
         if ((await this.readKey()).trim() !== value) throw new Error('the key file did not read back as written');
       },
+      /**
+       * Saves the installed-file receipt (update/receipt.mjs) exactly as given, atomically,
+       * so a concurrent Orion command can neither interleave with nor overwrite it.
+       */
+      async writeReceiptText(text) {
+        await atomicText(join(directory, 'installed-files.json'), String(text));
+      },
       async removeKey() {
         await unlink(keyPath(root)).catch(error => { if (error.code !== 'ENOENT') throw error; });
       },

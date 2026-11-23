@@ -85,6 +85,40 @@ function isDanglingLink(path) {
   try { return lstatSync(path).isSymbolicLink(); } catch { return false; }
 }
 
+/**
+ * Managed runtime: code the harness runs, and the data that code reads. A client edit
+ * here that an update would replace stops the update, so the folder never runs a
+ * mixture of releases. Plugin package files are protected the same way by the updater.
+ */
+export function isRuntimeDestination(destination) {
+  return destination.endsWith('.mjs') || destination.startsWith('update/') || destination === 'status/status.schema-template.json';
+}
+
+/**
+ * What the receipt says about one destination as it stands now:
+ *   absent      nothing is there
+ *   not-a-file  a link (anywhere on the path), folder or special file: never read through
+ *   installed   the bytes Orion installed, unchanged (line endings aside)
+ *   modified    the receipt lists it and the bytes differ: a client edit
+ *   unknown     something is there that Orion never recorded installing
+ * `current` is the fingerprint of a regular file, `baseline` the receipt's.
+ */
+export function receiptState(root, destination, receipt) {
+  const baseline = receipt.files[destination]?.hash ?? null;
+  let part = root;
+  for (const segment of destination.split('/')) {
+    part = join(part, segment);
+    try { if (lstatSync(part).isSymbolicLink()) return { state: 'not-a-file', current: null, baseline }; }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  const target = safePath(root, destination);
+  if (!existsSync(target)) return { state: 'absent', current: null, baseline };
+  if (!lstatSync(target).isFile()) return { state: 'not-a-file', current: null, baseline };
+  const current = fingerprint(readFileSync(target));
+  const state = baseline === null ? 'unknown' : current === baseline ? 'installed' : 'modified';
+  return { state, current, baseline };
+}
+
 /** The receipt's exact serialised form. */
 export function receiptText(receipt) {
   return `${JSON.stringify(validateReceipt(receipt), null, 2)}\n`;

@@ -29,6 +29,7 @@ import { lowerFirst } from './plugin-native.mjs';
 import { captureRegistration, restoreRegistration, CODEX_PROJECT_CONFIG, CLAUDE_LOCAL_SETTINGS } from './plugin-registration.mjs';
 import { RESUME_COMMAND, VERIFY_COMMAND, runPluginSetup } from './plugin-setup.mjs';
 import { preflightDestinations } from './preflight.mjs';
+import { RECEIPT_PATH, isRuntimeDestination, readReceipt, receiptState, receiptText } from './receipt.mjs';
 import { withStatusLock } from '../status/store.mjs';
 
 const arg = name => { const i=process.argv.indexOf(name); return i<0 ? undefined : process.argv[i+1]; };
@@ -111,6 +112,11 @@ async function update(store,root,repo,commit) {
     const legacyMarker=['agent/agent-definition.md','agent/adapters/claude.md'].find(path=>existsSync(join(root,path)));
     if (legacyMarker) throw new Error(`This folder is an Orion 1.x harness (it has ${legacyMarker}). Orion 2.0.0 is installed fresh, not updated in place: follow agent/reinstall-from-1.x.md. Nothing was changed`);
     const ai_assistant=resolveAiAssistant(status,manifest.deployment);
+    // The receipt is this harness's ownership evidence. None is a harness from before
+    // receipts; one that cannot be trusted stops the update before anything changes.
+    let receipt;
+    try { receipt=readReceipt(root); }
+    catch (error) { throw new Error(`${error.message}. Orion cannot tell your changes from its own files without it, so it stopped; nothing was changed. ${RECEIPT_ACTION}`); }
     if (newer(status.template_version,manifest.template_version)) throw new Error('Refusing to roll back the harness version');
     if (status.plugin?.pending_switch) throw new Error(`A switch to ${product(status.plugin.pending_switch.to)} has started but is not finished, and an update now could leave the two tools on different releases. Finish the switch first (run "node switch_ai.mjs" again) or cancel it (run "node switch_ai.mjs --to ${ai_assistant}"), then update`);
     const withPlugin=hasPackage(manifest.deployment);
@@ -126,18 +132,35 @@ async function update(store,root,repo,commit) {
     }
     const retired=(manifest.deployment.retired||[]).map(e=>({source:e.source,destination:e.destinations?.[ai_assistant]||e.destination,ownership:'release',fingerprint_key:e.sources?.[ai_assistant]||e.fingerprint_key||e.source}));
     const commonRetired=(manifest.remove||[]).map(path=>({source:path,destination:path,ownership:'release',fingerprint_key:path}));
-    const actions=[], report={from:status.template_version,to:manifest.template_version,commit,ai_assistant,refreshed:[],added:[],retired:[],kept:[],collisions:[]};
+    const actions=[], report={from:status.template_version,to:manifest.template_version,commit,ai_assistant,refreshed:[],added:[],retired:[],kept:[],unknown:[],collisions:[]};
+    // With a receipt: conflicts stop the update; `verified` files already hold the incoming
+    // bytes and `forgotten` receipt entries name retired files that are gone.
+    const conflicts=[], verified=new Map(), forgotten=[];
     for (const e of plan) {
       // The package is replaced as a unit below, never file by file.
       if (withPlugin && isPackagePath(e.destination)) continue;
+      if (receipt) { classifyWithReceipt(e); continue; }
       const dest=safe(root,e.destination), state=destinationState(root,e,pristine);
       if (state==='client-owned') {report.collisions.push(e.destination);continue;}
       if (state==='preserve' && !/^status\/[^/]+\.mjs$/.test(e.destination)) {report.kept.push(e.destination);continue;}
       if (state==='preserve') report.replaced_edited_scripts=(report.replaced_edited_scripts||[]).concat(e.destination);
       const src=safe(snapshot,e.source);
       if (e.destination.endsWith('.mjs')) { const check=spawnSync(process.execPath,['--check',src],{encoding:'utf8'}); if(check.status!==0) throw new Error(`Invalid script ${e.source}: ${check.stderr}`); }
-      if (state==='absent') actions.push({kind:'add',e,src,dest});
-      else if (fingerprint(readFileSync(dest))!==fingerprint(readFileSync(src))) actions.push({kind:'replace',e,src,dest});
+      if (state==='absent') actions.push({kind:'add',e,src,dest,track:true});
+      else if (fingerprint(readFileSync(dest))!==fingerprint(readFileSync(src))) actions.push({kind:'replace',e,src,dest,track:true});
+    }
+    function classifyWithReceipt(e) {
+      const dest=safe(root,e.destination), src=safe(snapshot,e.source), incoming=fingerprint(readFileSync(src));
+      const {state,current,baseline}=receiptState(root,e.destination,receipt);
+      if (e.ownership==='client-template') { if (state!=='absent') report.collisions.push(e.destination); else actions.push({kind:'add',e,src,dest}); return; }
+      if (e.destination.endsWith('.mjs')) { const check=spawnSync(process.execPath,['--check',src],{encoding:'utf8'}); if(check.status!==0) throw new Error(`Invalid script ${e.source}: ${check.stderr}`); }
+      if (state==='absent') { actions.push({kind:'add',e,src,dest,track:true}); return; }
+      if (current===incoming) { verified.set(e.destination,{key:e.fingerprint_key,hash:incoming,origin:'release'}); return; }
+      if (state==='installed') { actions.push({kind:'replace',e,src,dest,track:true}); return; }
+      // A client's change, or bytes Orion never installed. Ordinary files are kept with
+      // their baseline; runtime the update would replace stops it instead.
+      if (isRuntimeDestination(e.destination) && !(state==='modified' && baseline===incoming)) { conflicts.push({path:e.destination,reason:state}); return; }
+      report[state==='unknown'?'unknown':'kept'].push(e.destination);
     }
     const archiveLegacy = (oldPath, archive) => {
       const src = safe(root, oldPath), dest = safe(root, archive);
@@ -163,6 +186,13 @@ async function update(store,root,repo,commit) {
     const legacyHire = ai_assistant === 'codex' ? '.agents/skills/hire-agent' : '.claude/skills/hire-agent';
     collectLegacy(legacyHire, 'legacy/hire-agent');
     for (const e of [...retired,...commonRetired]) {
+      if (receipt) {
+        const dest=safe(root,e.destination), {state,baseline}=receiptState(root,e.destination,receipt);
+        if (state==='installed') { actions.push({kind:'retire',e,dest,track:true}); archives.delete(e.destination); }
+        else if (state==='absent') { if (baseline) forgotten.push(e.destination); }
+        else if (!archives.has(e.destination)) report[state==='unknown'?'unknown':'kept'].push(e.destination);
+        continue;
+      }
       const dest=safe(root,e.destination), state=destinationState(root,e,pristine);
       if (state==='owned') {
         actions.push({kind:'retire',e,dest});
@@ -182,12 +212,17 @@ async function update(store,root,repo,commit) {
       const releasePackage=join(snapshot,PACKAGE_ROOT), harnessPackage=safe(root,PACKAGE_ROOT);
       const prior_hash=treeHash(harnessPackage), installed_hash=treeHash(releasePackage);
       if (prior_hash!==installed_hash) {
-        // Reported edits: prior package files that are neither a shipped fingerprint nor the incoming bytes.
+        // Edits: prior package files that are neither installed (by the receipt, or a shipped
+        // fingerprint without one) nor the incoming bytes. With a receipt, they stop the update.
         const edits=[];
         for (const line of existsSync(harnessPackage) ? treeLines(harnessPackage) : []) {
           const at=line.lastIndexOf(' '), rel=`${PACKAGE_ROOT}/${line.slice(0,at)}`, hash=line.slice(at+1);
+          if (receipt && (hash==='link' || hash==='special')) { conflicts.push({path:rel,reason:'not-a-file'}); continue; }
           const incoming=fileHash(join(snapshot,rel));
-          if (hash!==incoming && !(pristine.files?.[rel]||[]).includes(hash)) edits.push(rel);
+          if (receipt) {
+            const baseline=receipt.files[rel]?.hash;
+            if (hash!==incoming && hash!==baseline) conflicts.push({path:rel,reason:baseline?'modified':'unknown'});
+          } else if (hash!==incoming && !(pristine.files?.[rel]||[]).includes(hash)) edits.push(rel);
         }
         pkg={prior_hash,installed_hash,edits_backed_up:edits};
       }
@@ -197,6 +232,10 @@ async function update(store,root,repo,commit) {
       catalog={path,text,prior_hash:current,installed_hash:fingerprint(text),changed:current!==fingerprint(text)};
     }
 
+    if (conflicts.length) {
+      process.exitCode = 2;
+      return { ...report, state:'conflict', files_applied:false, active:false, conflicts, remaining_action:CONFLICT_ACTION };
+    }
     const checklistKeys = manifest.remove_status_checklist_keys || [];
     const hasRetiredChecklistKeys = checklistKeys.some(key => Object.hasOwn(status.checklist || {}, key));
     if (status.template_version === manifest.template_version && !actions.length && !pkg && !catalog?.changed && !hasRetiredChecklistKeys) {
@@ -213,6 +252,7 @@ async function update(store,root,repo,commit) {
     }
     if (catalog) destinations.push(catalog.path);
     if (withPlugin) destinations.push(ai_assistant === 'codex' ? CODEX_PROJECT_CONFIG : CLAUDE_LOCAL_SETTINGS);
+    if (receipt) destinations.push(RECEIPT_PATH);
     destinations.push('status/status.json', '.update-backup/.preflight');
     const permissions = preflightDestinations(root, destinations);
     if (permissions.length) {
@@ -224,12 +264,33 @@ async function update(store,root,repo,commit) {
     const backupRel=`.update-backup/${status.template_version}-${stamp}`;
     const backup=safe(root,backupRel); if(existsSync(backup)) throw new Error('Backup already exists');
     mkdirSync(backup,{recursive:true}); copyTo(statusPath,join(backup,'status/status.json'));
+    // The receipt this update leaves when every action succeeds. It is written after the
+    // files, so a failure before then leaves the prior one, and a rollback puts that back.
+    const installedReceipt = receipt && receiptText(nextReceipt());
+    function nextReceipt() {
+      const files={...receipt.files};
+      for (const [path,entry] of verified) files[path]=entry;
+      for (const path of forgotten) delete files[path];
+      for (const a of actions.filter(a=>a.track)) {
+        if (a.kind==='retire') delete files[a.e.destination];
+        else files[a.e.destination]={key:a.e.fingerprint_key,hash:fingerprint(readFileSync(a.src)),origin:'release'};
+      }
+      if (pkg) {
+        for (const path of Object.keys(files)) if (isPackagePath(path)) delete files[path];
+        for (const e of plan) if (isPackagePath(e.destination) && existsSync(safe(snapshot,e.source))) files[e.destination]={key:e.fingerprint_key,hash:fileHash(safe(snapshot,e.source)),origin:'release'};
+      }
+      if (catalog && (catalog.changed || catalog.prior_hash===catalog.installed_hash)) files[catalog.path]={key:catalog.path,hash:catalog.installed_hash,origin:'generated'};
+      const sorted=Object.fromEntries(Object.keys(files).sort().map(path=>[path,files[path]]));
+      return {...receipt,ai_assistant,template_version:manifest.template_version,recorded_by:'update',recorded_at:new Date().toISOString(),files:sorted};
+    }
+    if (receipt) copyTo(safe(root,RECEIPT_PATH),join(backup,'receipt',RECEIPT_PATH));
     const journal={kind:'update',state:'pending',from:status.template_version,to:manifest.template_version,commit,ai_assistant,
       actions:actions.map(a=>({kind:a.kind,destination:a.e.destination,installed_hash:a.kind==='retire'?null:fingerprint(readFileSync(a.src)),prior_hash:a.kind==='add'?null:fingerprint(readFileSync(a.dest))})),
       remove_status_checklist_keys:checklistKeys,
       package:pkg && {path:PACKAGE_ROOT,prior_hash:pkg.prior_hash,installed_hash:pkg.installed_hash},
       catalog:catalog && {path:catalog.path,prior_hash:catalog.prior_hash,installed_hash:catalog.installed_hash},
-      registration:registration ? 'registration.json' : null};
+      registration:registration ? 'registration.json' : null,
+      receipt:receipt ? {path:RECEIPT_PATH,prior:`receipt/${RECEIPT_PATH}`,prior_hash:fileHash(safe(root,RECEIPT_PATH)),installed_hash:fingerprint(installedReceipt)} : null};
     // The status fields this update owns, written under the lock once the files are in place.
     const commitStatus=current=>{
       for(const key of journal.remove_status_checklist_keys) delete current.checklist?.[key];
@@ -282,6 +343,7 @@ async function update(store,root,repo,commit) {
         step();
       }
       pruneParents(root,report.retired.filter(path => path.startsWith('library/')));
+      if (installedReceipt) { await store.writeReceiptText(installedReceipt); step(); }
       await editStatus(store,commitStatus);
       journal.state='complete';writeJson(join(backup,'journal.json'),journal);
     } catch(error) {
@@ -325,6 +387,8 @@ async function update(store,root,repo,commit) {
 
 const pluginReport = plugin => ({setup_state:plugin?.setup_state,pending_version:plugin?.pending_version??null,verified_version:plugin?.verified_version??null,remaining_action:plugin?.remaining_action??null});
 
+const RECEIPT_ACTION = `Put back ${RECEIPT_PATH} as it was (your folder's home repository or an earlier copy of the folder has it), then run the same update again. If you cannot, ask Daily Practice for help.`;
+const CONFLICT_ACTION = `These Orion runtime or plugin files changed in this folder, and the update would replace them, so Orion stopped before changing any file. Move your changes somewhere outside this folder (edits to Orion's own skills belong in a client skill under .claude/skills or .agents/skills), put back the files Orion installed or delete them, then run the same update again.`;
 const RECOVERY_ACTION = (backup,command,kind='update') => `These files changed after the ${kind}, and putting the backup back would overwrite those changes, so Orion stopped. Nothing was overwritten. Move your changes to those paths somewhere outside this folder (keep them: edits to Orion's own skills belong in a client skill under .claude/skills or .agents/skills), put the paths back as the backup in ${backup} has them or delete them, then run "${command}" again.`;
 
 /**
@@ -348,6 +412,10 @@ async function rollbackUpdate(store,root,backup,journal,adjust) {
     const current=fileHash(safe(root,journal.catalog.path));
     if (![journal.catalog.prior_hash,journal.catalog.installed_hash,null].includes(current)) conflicts.push(journal.catalog.path);
   }
+  if (journal.receipt) {
+    const current=fileHash(safe(root,journal.receipt.path));
+    if (![journal.receipt.prior_hash,journal.receipt.installed_hash].includes(current)) conflicts.push(journal.receipt.path);
+  }
   if(conflicts.length) throw new Error(`Update recovery collisions: ${conflicts.join(', ')}. ${RECOVERY_ACTION(backupRel,'node update/apply.mjs recover --root .')}`);
   for(const a of [...journal.actions].reverse()) {
     const dest=safe(root,a.destination);
@@ -364,6 +432,8 @@ async function rollbackUpdate(store,root,backup,journal,adjust) {
     if (journal.package.prior_hash) copyTree(join(backup,'package',PACKAGE_ROOT),safe(root,PACKAGE_ROOT));
   }
   if (journal.registration) restoreRegistration(root,json(join(backup,journal.registration)));
+  // The receipt goes back with the files it describes.
+  if (journal.receipt && fileHash(safe(root,journal.receipt.path))!==journal.receipt.prior_hash) await store.writeReceiptText(readFileSync(join(backup,journal.receipt.prior)));
   // Status: only the fields the update owns go back; everything written since stays.
   const status=await store.readStatus(), old=json(join(backup,'status/status.json'));
   status.template_version=old.template_version;

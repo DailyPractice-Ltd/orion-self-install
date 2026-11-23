@@ -161,3 +161,85 @@ test('a receipt harness updates untouched files and keeps edited and unknown one
   assert.equal(receipt.files['README.md'].hash,requireHash('readme v1\n'));
   assert.equal(receipt.files['AGENTS.md'].hash,requireHash('agents v3\n'));
 });
+
+test('a receipt harness stops before any release file changes when an edited runtime file would be replaced', t => {
+  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'status/a.mjs':'console.log("a v1")\n', 'status/b.mjs':'console.log("b v1")\n', 'start.mjs':'console.log("start v1")\n' } });
+  put(w.client,'status/a.mjs','console.log("client a")\n');        // edited, and the release changes it
+  put(w.client,'start.mjs','console.log("client start")\n');      // edited, but the release leaves it as installed
+  put(w.client,'status/c.mjs','console.log("client c")\n');        // a script Orion never installed, where the release adds one
+  const before = { agents:get(w.client,'AGENTS.md'), receipt:get(w.client,RECEIPT), status:get(w.client,'status/status.json') };
+  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'status/a.mjs':'console.log("a v2")\n', 'status/b.mjs':'console.log("b v2")\n', 'status/c.mjs':'console.log("c v2")\n', 'start.mjs':'console.log("start v1")\n', 'added.md':'added v2\n' });
+  const result = w.update(v2);
+  assert.equal(result.status,2,result.stdout+result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.state,'conflict');
+  assert.equal(report.files_applied,false);
+  assert.deepEqual(report.conflicts,[{path:'status/a.mjs',reason:'modified'},{path:'status/c.mjs',reason:'unknown'}]);
+  assert.match(report.remaining_action,/put back the files Orion installed or delete them/);
+  assert.equal(get(w.client,'AGENTS.md'),before.agents,'no ordinary change was applied either');
+  assert.equal(get(w.client,'status/b.mjs'),'console.log("b v1")\n');
+  assert.equal(existsSync(join(w.client,'added.md')),false);
+  assert.equal(get(w.client,'status/a.mjs'),'console.log("client a")\n');
+  assert.equal(get(w.client,RECEIPT),before.receipt);
+  assert.equal(get(w.client,'status/status.json'),before.status);
+  assert.equal(existsSync(join(w.client,'.update-backup')),false);
+
+  // Once the client moves the edits out, the same update applies, and the untouched edit stays.
+  rmSync(join(w.client,'status/a.mjs')); rmSync(join(w.client,'status/c.mjs'));
+  const retry = w.update(v2); assert.equal(retry.status,0,retry.stdout+retry.stderr);
+  assert.equal(get(w.client,'status/a.mjs'),'console.log("a v2")\n');
+  assert.equal(get(w.client,'start.mjs'),'console.log("client start")\n');
+  assert.deepEqual(JSON.parse(retry.stdout).kept,['start.mjs']);
+  assert.equal(receiptOf(w.client).files['status/c.mjs'].hash,requireHash('console.log("c v2")\n'));
+});
+
+const damagedReceipts = {
+  malformed: () => '{"schema":',
+  unsupported: text => JSON.stringify({ ...JSON.parse(text), version: 2 }),
+  'wrong-schema': text => JSON.stringify({ ...JSON.parse(text), schema: 'something-else' }),
+};
+for (const [name, damage] of Object.entries(damagedReceipts)) test(`a ${name} receipt stops the update before any change`, t => {
+  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n' } });
+  put(w.client, RECEIPT, damage(get(w.client, RECEIPT)));
+  const before = get(w.client, RECEIPT);
+  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n' });
+  const result = w.update(v2);
+  assert.equal(result.status,2,result.stdout+result.stderr);
+  assert.match(result.stderr,/installed-file receipt[\s\S]*nothing was changed/);
+  assert.equal(get(w.client,'AGENTS.md'),'agents v1\n','no fallback to the registry');
+  assert.equal(get(w.client,RECEIPT),before);
+  assert.equal(JSON.parse(get(w.client,'status/status.json')).template_version,'1.0.0');
+  assert.equal(existsSync(join(w.client,'.update-backup')),false);
+});
+
+test('an unreadable receipt stops the update before any change', t => {
+  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n' } });
+  rmSync(join(w.client, RECEIPT)); mkdirSync(join(w.client, RECEIPT));
+  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n' });
+  const result = w.update(v2);
+  assert.equal(result.status,2,result.stdout+result.stderr);
+  assert.match(result.stderr,/Cannot read the installed-file receipt/);
+  assert.equal(get(w.client,'AGENTS.md'),'agents v1\n');
+});
+
+test('a failed receipt update puts back files and receipt together, and a held lock changes nothing', t => {
+  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n' } });
+  const before = get(w.client, RECEIPT);
+  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n' });
+  // Each file is one step and the receipt write is the next: interrupt right after the receipt lands.
+  const steps = 4; // AGENTS.md, README.md, update/manifest.json, update/pristine.json are added or replaced first
+  const failed = w.update(v2, { ORION_UPDATE_FAIL_AFTER:String(steps + 1) });
+  assert.equal(failed.status,2,failed.stdout+failed.stderr); assert.match(failed.stderr,/Injected update interruption/);
+  assert.equal(get(w.client,'AGENTS.md'),'agents v1\n'); assert.equal(get(w.client,'README.md'),'readme v1\n');
+  assert.equal(existsSync(join(w.client,'update/manifest.json')),false);
+  assert.equal(get(w.client,RECEIPT),before);
+
+  mkdirSync(join(w.client,'status/.radio-lock'));
+  const locked = w.update(v2, { ORION_STATUS_LOCK_WAIT_MS:'200' });
+  assert.notEqual(locked.status,0); assert.match(locked.stderr,/Status is locked/);
+  assert.equal(get(w.client,RECEIPT),before); assert.equal(get(w.client,'AGENTS.md'),'agents v1\n');
+  rmSync(join(w.client,'status/.radio-lock'),{recursive:true});
+
+  const applied = w.update(v2); assert.equal(applied.status,0,applied.stderr);
+  assert.equal(receiptOf(w.client).files['README.md'].hash,requireHash('readme v2\n'));
+});

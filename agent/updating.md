@@ -140,7 +140,9 @@ telling the client the previous version is running again. Keep the backup for au
 
 ## Maintainers
 
-Run `node tests/helpers/pristine.mjs --write` after release edits and before tagging.
+`update/pristine.json` is frozen compatibility data for harnesses installed before
+installed-file receipts. Never regenerate it from Git history or add the bytes of a
+release edit to it; `node update/release-contract.mjs` validates its structure.
 
 ### Tool-specific metadata
 

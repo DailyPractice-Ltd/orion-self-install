@@ -1,7 +1,7 @@
 {
  "_what": "Fingerprints are keyed by stable release source path, independent of deployed destination. Legacy Claude paths contribute historical hashes to their portable source key. A destination whose fingerprint is not listed under its source key is client-edited and must be preserved. Historical legacy refresh keys remain in this registry for clients still on a same-path updater, although the retired .claude skill sources are no longer in the refresh list. Contract: update/manifest.json deployment and agent/updating.md.",
  "_fingerprint": "SHA-256, as lowercase hex, of the file read as UTF-8 text with every CRLF turned into LF.",
- "_regenerate": "node tests/helpers/pristine.mjs --write, before every release. node --test fails if it is stale.",
+ "_frozen": "Frozen compatibility data for harnesses installed before installed-file receipts. Never regenerated from git history and never extended with the bytes of a release edit. update/release-contract.mjs validates its structure and that every retirement identity and legacy alias in update/manifest.json is listed.",
  "files": {
   ".claude/agents/README.md": [
    "0d39b59963af9a056775580c67b2d3664ea8f589e5ea42b3c3dd212547100832",
@@ -210,6 +210,7 @@
    "c398db8d0bba9cc4f8cec0fc507d9ecb9f05a4259298d4df49c23d972d2c8a9d",
    "c553d29242e278396e19c284502b3120549006df83617fd4d8f299960e8651f3",
    "c810a1768e4ed30b8c5f6b08c081482d121abbbd6b57112530f1f8bf7ced5c65",
+   "cb48bdbfe9408627cde663a77a6154e9cfb5a42dccbf30e5969bca9afc232b64",
    "cb4fbdd002f694862c827ad1b88c6e1eb46e3b770614ceb7cf5bec7ae4bb6fa8",
    "cbfa15ac76f5b76e946c78dc7946b0e80368ce6a61f1517b6dfb77083204e6bb",
    "d381223a3187f5509e4d212ca1ab705f9f95f3f7bf8b1fe2d47f3fe4fccc0db4",
@@ -360,7 +361,8 @@
   ],
   "agent/install.md": [
    "32d84718ce5941b6c5b9b957be5691ea67ffe46a24ecd45f55f9128640eaaae1",
-   "34bef786d60ff6b95630eb3dc7c3e246cba200009875cd791b451e45d2572745"
+   "34bef786d60ff6b95630eb3dc7c3e246cba200009875cd791b451e45d2572745",
+   "40d4fb89edf20a02a7b37348eb76d5ffee7f047226a2273792260448cc55cb03",
    "df6172094cea732162c7ded97382f75c4443ffd8e3500f8665e69870db16700c"
   ],
   "agent/knowledge-base/README.md": [

@@ -5,23 +5,24 @@
  *   node update/bump.mjs X.Y.Z
  *
  * Checks first, writing nothing until every check passes: X.Y.Z format, greater
- * than the current template_version, and a CHANGELOG.md that opens with exactly
- * one "## Unreleased — <title>" section. Then, in order: renames that heading to
- * "## X.Y.Z — <today> — <title>", sets template_version in update/manifest.json,
- * regenerates the plugin manifests, and regenerates update/pristine.json.
+ * than the current template_version, a CHANGELOG.md that opens with exactly
+ * one "## Unreleased — <title>" section, and valid frozen compatibility
+ * fingerprints in update/pristine.json. Then, in order: renames that heading to
+ * "## X.Y.Z — <today> — <title>", sets template_version in update/manifest.json
+ * and regenerates the plugin manifests. update/pristine.json is frozen data: the
+ * bump validates it and never rewrites it, and needs no git history.
  * All or nothing: if any write fails, every file it may write is put back
  * byte for byte. It never commits, tags or pushes.
  */
-import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compatibilityErrors } from './destination-resolver.mjs';
 import { MANIFEST_PATHS, writePluginManifests } from './plugin-package.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = 'update/manifest.json';
 const CHANGELOG = 'CHANGELOG.md';
-const PRISTINE = 'update/pristine.json';
 const UNRELEASED = /^## Unreleased — (.+)$/;
 
 const read = (path) => readFileSync(join(root, path), 'utf8');
@@ -43,8 +44,10 @@ function plan(version) {
     throw new Error(`${version === undefined ? 'No version given' : `"${version}" is not an X.Y.Z version`}. Usage: node update/bump.mjs X.Y.Z`);
   }
   const manifestText = read(MANIFEST);
-  const current = JSON.parse(manifestText).template_version;
+  const { template_version: current, deployment } = JSON.parse(manifestText);
   if (!isNewer(version, current)) throw new Error(`${version} is not greater than the current template_version ${current}.`);
+  const compatibility = compatibilityErrors(root, deployment);
+  if (compatibility.length) throw new Error(compatibility.join('\n'));
 
   const lines = read(CHANGELOG).split('\n');
   const headings = lines.map((line, at) => ({ line: line.replace(/\r$/, ''), at })).filter(({ line }) => line.startsWith('## '));
@@ -75,19 +78,19 @@ try {
 }
 
 // Every file the bump may write, as it is now (null: absent), to put back on any failure.
-const mayWrite = [CHANGELOG, MANIFEST, ...Object.values(MANIFEST_PATHS), PRISTINE];
+const mayWrite = [CHANGELOG, MANIFEST, ...Object.values(MANIFEST_PATHS)];
 const original = new Map(mayWrite.map(path => [path, existsSync(join(root, path)) ? readFileSync(join(root, path)) : null]));
 let manifests;
 try {
   writeFileSync(join(root, CHANGELOG), next.changelog);
   writeFileSync(join(root, MANIFEST), next.manifest);
   manifests = writePluginManifests(root);
-  const pristine = spawnSync(process.execPath, [join(root, 'tests/helpers/pristine.mjs'), '--write'], { cwd: root, encoding: 'utf8' });
-  if (pristine.status !== 0) throw new Error(`Regenerating ${PRISTINE} failed:\n${pristine.stderr || pristine.stdout}`);
 } catch (error) {
   for (const [path, bytes] of original) {
+    const now = existsSync(join(root, path)) ? readFileSync(join(root, path)) : null;
     if (bytes === null) rmSync(join(root, path), { force: true });
-    else writeFileSync(join(root, path), bytes);
+    // A file the failed step never changed (it may be the one that refused the write) is left alone.
+    else if (now === null || !now.equals(bytes)) writeFileSync(join(root, path), bytes);
   }
   console.error(`Bump failed; nothing was changed.\n${error.message}`);
   process.exit(2);
@@ -97,6 +100,6 @@ console.log(`Bumped ${next.current} → ${version}:
   ${CHANGELOG}: ${next.heading}
   ${MANIFEST}: template_version ${version}
   ${manifests.join('\n  ')}: version ${version}
-  update/pristine.json: regenerated
+  update/pristine.json: frozen compatibility data, validated and unchanged
 
 Next: review the diff (git diff), commit it, then tag v${version}. Nothing was committed, tagged or pushed.`);

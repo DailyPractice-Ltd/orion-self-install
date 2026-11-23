@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { plainEnv } from './helpers/env.mjs';
+import { copyStatusResources } from './helpers/status.mjs';
 import { copyReleaseManifest } from './helpers/manifest.mjs';
 import { MANIFEST_PATHS, catalogIdentity, catalogName, catalogNameErrors, defaultPluginRegion, pluginManifests, validateCatalog, validatePackage, validatePluginManifest, writeCatalog } from '../update/plugin-package.mjs';
 import { planForTool } from '../update/destination-resolver.mjs';
@@ -154,7 +155,7 @@ test('the status template and the setup wizard carry the plugin region, keeping 
   ]) {
     const root = mkdtempSync(join(tmpdir(), 'orion-plugin-migrate-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
-    cpSync(join(repo, 'status'), join(root, 'status'), { recursive: true, filter: (path) => !/(status|radio-outbox)\.json$|radio\.key$|-log\.md$/.test(path) });
+    copyStatusResources(root);
     copyFileSync(join(repo, 'start.mjs'), join(root, 'start.mjs'));
     copyReleaseManifest(root);
     const status = { ...structuredClone(template), ai_assistant: 'codex' };

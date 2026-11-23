@@ -9,6 +9,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { plainEnv } from './helpers/env.mjs';
+import { copyStatusResources } from './helpers/status.mjs';
 
 const source = new URL('../', import.meta.url);
 const SCRIPT = 'plugins/orion/skills/call-planner/scripts/build-call-plan.mjs';
@@ -20,7 +21,8 @@ function machine(t) {
   t.after(() => rmSync(base, { recursive: true, force: true }));
   const harness = (name) => {
     const root = join(base, 'work', name);
-    for (const path of ['status', 'update', 'plugins/orion']) cpSync(new URL(path, source), join(root, path), { recursive: true });
+    copyStatusResources(root);
+    for (const path of ['update', 'plugins/orion']) cpSync(new URL(path, source), join(root, path), { recursive: true });
     const status = JSON.parse(readFileSync(new URL('status/status.schema-template.json', source), 'utf8'));
     status.ai_assistant = 'codex';
     status.business_name = name;

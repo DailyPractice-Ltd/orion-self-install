@@ -2,6 +2,9 @@
 
 ## Unreleased — one instruction file, reinstall from 1.x
 
+- Test harnesses copy only status code and the schema template, keeping local
+  queued reports, credentials, logs and locks out of fresh test scenarios.
+
 - Operational and maintenance guides move from `docs/` directly into `agent/`.
   Screenshots move to root `img/` and remain repository-only. Fresh installs and
   current instructions use the new paths; no legacy path migration is added.

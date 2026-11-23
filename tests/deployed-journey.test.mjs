@@ -170,6 +170,17 @@ for (const tool of ['claude-code', 'codex']) {
     put(client, `${pkg}/prospecting/SKILL.md`, installedSkill.replace(/\n/g, '\r\n'));
     put(client, 'status/guard.mjs', installedGuard);
     put(client, 'AGENTS.md', original.replace(/\n/g, '\r\n'));
+    // An update killed partway (the package is already replaced) is recovered with its receipt.
+    const killed = spawnSync(process.execPath, [join(client, 'update/apply.mjs'), 'update', '--root', client, '--release-repo', release, '--commit', pinned],
+      { cwd: client, encoding: 'utf8', env: plainEnv({ ORION_UPDATE_CRASH_AFTER: '2' }) });
+    assert.notEqual(killed.status, 0);
+    rmSync(join(client, 'status/.radio-lock'), { recursive: true });
+    ok(run(client, 'update/apply.mjs', 'recover', '--root', client));
+    assert.equal(read(client, 'status/installed-files.json'), receiptBefore);
+    assert.equal(read(client, `${pkg}/prospecting/SKILL.md`), installedSkill.replace(/\n/g, '\r\n'));
+    assert.equal(read(client, 'AGENTS.md'), original.replace(/\n/g, '\r\n'));
+    assert.equal(existsSync(join(client, `${pkg}/new-release/SKILL.md`)), false);
+    assert.equal(status(client).template_version, prior.template_version);
     const result = update();
     ok(result);
     const report = JSON.parse(result.stdout);
@@ -210,7 +221,14 @@ for (const tool of ['claude-code', 'codex']) {
     for (const forbidden of ['skills', tool === 'codex' ? '.claude' : '.agents', ...(tool === 'codex' ? [] : ['agents'])]) {
       assert.equal(existsSync(join(client, forbidden)), false, `${forbidden} after update`);
     }
-    ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
+    // A runtime edit made after the update is the client's: restore keeps it.
+    const updatedGuard = read(client, 'status/guard.mjs');
+    const laterGuard = updatedGuard + '\n// Client edit after the update.\n';
+    put(client, 'status/guard.mjs', laterGuard);
+    const restore = run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup);
+    ok(restore);
+    assert.ok(JSON.parse(restore.stdout).kept.includes('status/guard.mjs'));
+    assert.equal(read(client, 'status/guard.mjs'), laterGuard);
     assert.equal(read(client, retiredMeetingPackage), oldMeetingPackage);
     assert.equal(read(client, 'AGENTS.md'), original.replace(/\n/g, '\r\n'));
     assert.equal(read(client, `${skill(tool)}/hire-agent/SKILL.md`), 'Custom legacy instructions\n');
@@ -221,8 +239,23 @@ for (const tool of ['claude-code', 'codex']) {
     // The receipt follows the restored files: it no longer claims the update's files.
     const restoredReceipt = JSON.parse(read(client, 'status/installed-files.json'));
     assert.equal(restoredReceipt.files[`${pkg}/new-release/SKILL.md`], undefined);
+    assert.equal(restoredReceipt.files['status/guard.mjs'].hash, lfHash(Buffer.from(updatedGuard)), 'the kept edit keeps the update\'s baseline');
     for (const [path, entry] of Object.entries(restoredReceipt.files)) {
-      if (path !== 'README.md' && existsSync(join(client, path))) assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} after restore`);
+      if (!['README.md', 'status/guard.mjs'].includes(path) && existsSync(join(client, path))) assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} after restore`);
+    }
+
+    // Updating again uses those baselines: the restored files update, both edits stay.
+    const again = update();
+    ok(again);
+    const second = JSON.parse(again.stdout);
+    assert.ok(second.kept.includes('status/guard.mjs') && second.kept.includes('README.md'));
+    assert.equal(read(client, 'status/guard.mjs'), laterGuard);
+    assert.match(read(client, 'AGENTS.md'), /Release update\./);
+    assert.equal(read(client, `${pkg}/new-release/SKILL.md`), '# New release skill\n');
+    const finalReceipt = JSON.parse(read(client, 'status/installed-files.json'));
+    assert.equal(finalReceipt.files['status/guard.mjs'].hash, lfHash(Buffer.from(updatedGuard)));
+    for (const [path, entry] of Object.entries(finalReceipt.files)) {
+      if (!['README.md', 'status/guard.mjs'].includes(path)) assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} after the second update`);
     }
   });
 

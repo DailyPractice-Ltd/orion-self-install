@@ -101,7 +101,9 @@ Marketplace auto-updates never replace the pinned release: the Claude Code catal
 local folder read in place, and Orion never runs `codex plugin marketplace upgrade`.
 
 An interrupted update is rolled back from its journal with
-`node update/apply.mjs recover --root .`. Recovery restores only what the update wrote.
+`node update/apply.mjs recover --root .`. Recovery restores only what the update wrote,
+and puts the receipt back as it was (or removes it, for a folder that had none), so a retry
+never trusts a replacement that did not finish. The next update also recovers first.
 If a path changed since, it stops, overwrites nothing and names the paths and the step to take.
 
 Updates never start or renew the connection allowance. Before resuming Orion work, run
@@ -146,7 +148,10 @@ node update/apply.mjs restore --root . --backup .update-backup/VERSION-TIMESTAMP
 ```
 
 For an update, restore puts prior released files back and removes newly installed
-files. A file changed after update is kept and reported. It restores the prior
+files. A file changed after update, or a file written where the update retired one, is
+kept and reported. The receipt follows: restored files take back their earlier
+baselines, kept files keep the update's, so the next update still recognises the edit
+as the client's; files no longer there are no longer claimed. It restores the prior
 version and retired checklist keys without replacing the client's live status
 wholesale. It also puts back the previous plugin package, catalog and this folder's
 own registration entries, leaving other settings as they are now. If the package

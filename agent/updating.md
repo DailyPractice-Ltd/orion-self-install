@@ -155,3 +155,16 @@ restores the target metadata's prior contents or absence. On success, the previo
 is retired and its manifest and catalog are removed. Client-owned skills move to the
 selected tool's skill folder; business state, release version and catalog identity stay.
 The switch backup includes manifests and the prior target metadata journal.
+
+Before replacing files, the updater probes write access to its destinations, including
+Codex's `.agents` catalog and `.codex` project configuration. A `preflight_failed`
+result lists all access failures; allow those paths and rerun the pinned update.
+Probes are temporary and removed before release files are replaced. Permissions can
+still change after a probe; transaction recovery remains in place for write failures.
+
+If plugin setup throws after files were committed, the result reports
+`files_applied: true`, `activation_pending: true`, and the backup path. The file
+journal remains complete so that backup can still be restored. Resume plugin setup
+with `node update/plugin-setup.mjs resume` after fixing access. Repeating the update
+reports `files_up_to_date: true` with activation pending and the same backup, rather
+than claiming the whole update is up to date.

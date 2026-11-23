@@ -249,7 +249,8 @@ function claudeVerify(ctx) {
   return conflict.error || claudeInspect(ctx).result;
 }
 
-const codexInstallAction = () => `In Codex, from this folder, open the Plugins Directory (desktop app) or type /plugins (CLI), search for "orion" and install Orion; then start a fresh chat in this folder. You might need to restart Codex.`;
+const codexScopeAction = (ctx) => `Before starting a fresh chat, open your Codex user settings (${join(codexHome({ env: ctx.env, home: ctx.home }), 'config.toml')}). If installation wrote a [plugins."${ctx.pluginId}"] table with enabled = true, delete only that table; keep unrelated settings and this folder's ${CODEX_PROJECT_CONFIG}, where [plugins."${ctx.pluginId}"] must remain enabled = true. Run "node update/plugin-setup.mjs verify" from this folder to check the scope and cached version; then start a fresh chat here and confirm discovery with "node update/plugin-setup.mjs verify --discovered".`;
+const codexInstallAction = (ctx, found) => `In Codex, from this trusted folder, open the Plugins Directory (desktop app) or type /plugins (CLI), search for "orion" and ${found === undefined ? 'install Orion' : `reinstall Orion so the copy Codex loads moves${found ? ` from ${found}` : ''} to ${ctx.version}`}; select the entry from this folder's catalog "${ctx.catalogName}" (${ctx.pluginId}), not another Orion catalog. ${found === undefined ? `Alternatively, from this folder run "codex plugin add ${ctx.pluginId} --json". ` : ''}Installation can enable it user-wide. ${codexScopeAction(ctx)} You might need to restart Codex.`;
 const CODEX_FRESH = 'Start a fresh chat in this folder so Codex loads the Orion skills.';
 const CODEX_RESUME = 'node update/plugin-setup.mjs resume';
 
@@ -277,13 +278,13 @@ function codexInspect(ctx) {
   if (listed.status !== 0 || listed.json === undefined) return failed(ctx.tool, 'plugin_list_failed', ctx.details({ message: listed.error }));
   const row = codexRow(ctx, listed.json);
   if (!row || row.installed === false) return pending(ctx.tool, codexInstallAction(ctx), 'not_installed', ctx.details());
-  if (row.enabled === false) return pending(ctx.tool, `In Codex, type /plugins from this folder and switch Orion (${ctx.pluginId}) on; then start a fresh chat in this folder.`, 'disabled', ctx.details());
+  if (row.enabled === false) return pending(ctx.tool, `Run "${CODEX_RESUME}" from this folder to restore its project enablement. ${codexScopeAction(ctx)}`, 'disabled', ctx.details());
   // Orion stays on for this folder only: a user-wide switch would load it in every folder.
   const user = codexUserEntries(ctx.catalogName, { env: ctx.env, home: ctx.home });
   if (user.enabled === true) {
-    return pending(ctx.tool, `Codex has switched Orion on in your Codex user settings (${join(codexHome({ env: ctx.env, home: ctx.home }), 'config.toml')}, the [plugins."${ctx.pluginId}"] entry), which would load it in every folder, not only this one. Orion does not edit those settings, so its setup stays unfinished: delete that entry there (this folder's own ${CODEX_PROJECT_CONFIG} keeps Orion on here), then run "node update/plugin-setup.mjs verify" from this folder.`, 'enabled_user_wide', ctx.details());
+    return pending(ctx.tool, `Codex has switched Orion on in your Codex user settings, which would load it in every folder. ${codexScopeAction(ctx)}`, 'enabled_user_wide', ctx.details());
   }
-  const reinstall = (found) => `In Codex, from this folder, open the Plugins Directory (desktop app) or type /plugins (CLI), search for "orion" and reinstall Orion so the copy Codex loads moves${found ? ` from ${found}` : ''} to ${ctx.version}; then start a fresh chat in this folder. You might need to restart Codex.`;
+  const reinstall = (found) => codexInstallAction(ctx, found);
   if (row.version && row.version !== 'local' && row.version !== ctx.version) {
     return pending(ctx.tool, reinstall(row.version), 'cached_copy_outdated', ctx.details({ expected: ctx.version, found: row.version }));
   }

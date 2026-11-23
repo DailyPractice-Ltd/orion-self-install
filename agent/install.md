@@ -122,9 +122,19 @@ folder, and records progress in `status/status.json` under `plugin`:
   user-wide Codex settings. Codex reads a project's `.codex/config.toml` only once the
   folder is trusted, so the first step may be to open the folder in Codex and trust it.
   Installing Orion is then the client's step in Codex: the Plugins Directory (desktop
-  app) or `/plugins` (CLI), search for "orion" and install it. Codex may need a restart.
-  If Codex records Orion as switched on in the user-wide `~/.codex/config.toml`, it would
-  load in every folder: setup stays unfinished and says which entry to delete there.
+  app) or `/plugins` (CLI), search for "orion" and select the entry from this folder's
+  exact catalog named in `remaining_action`. Alternatively, from this trusted folder run
+  `codex plugin add orion@<catalog> --json`; the supported CLI uses `add` and has no
+  installation scope flag. Give the client all the following steps before handing off:
+  installation can also write `enabled = true` under `[plugins."orion@<catalog>"]`
+  in the user-wide Codex config (`$CODEX_HOME/config.toml`, otherwise
+  `~/.codex/config.toml`). Before starting a fresh chat, delete only that plugin table
+  from the user config if present, keeping unrelated settings and this folder's
+  `.codex/config.toml` with its own Orion entry enabled. Run
+  `node update/plugin-setup.mjs verify` here to check scope and the cached version,
+  then start a fresh chat here and confirm discovery with
+  `node update/plugin-setup.mjs verify --discovered`. Codex may need a restart.
+  Setup remains unfinished while Orion is enabled user-wide.
 
 The states:
 

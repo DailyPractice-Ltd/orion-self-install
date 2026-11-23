@@ -2,6 +2,13 @@
 
 ## Unreleased — one instruction file, reinstall from 1.x
 
+- Report applied update files separately from pending plugin activation when setup
+  throws, retain the restore backup, and keep unfinished activation visible on retry.
+- Give Codex installation handoffs the exact harness catalog, supported `plugin add`
+  command, and complete user-wide enablement correction before starting a fresh chat.
+- Probe destination permissions, including `.agents` and `.codex`, before replacing
+  release files and report all blocked paths together.
+
 - Simplify test maintenance by removing duplicate package checks and brittle prose
   snapshots. Keep behavioral regressions and shared policy consistency checks.
   Test fixtures copy release resources without inheriting local operational state.

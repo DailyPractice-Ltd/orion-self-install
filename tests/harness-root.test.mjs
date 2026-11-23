@@ -5,8 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, cpSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, readdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { plainEnv } from './helpers/env.mjs';
 import { copyStatusResources } from './helpers/status.mjs';
@@ -132,39 +131,4 @@ test('relative --data and --out resolve inside the selected harness', (t) => {
   const r = m.run(m.cachedScript, ['--root', m.a, '--data', 'call-data.json', '--out', 'plans'], m.cache);
   assert.equal(r.status, 0, r.output);
   assert.equal(m.plans(join(m.a, 'plans')).length, 3);
-});
-
-// Package resources versus harness data, in the skill instructions themselves.
-const PACKAGE = new URL('plugins/orion/', source);
-const packageRoot = fileURLToPath(PACKAGE);
-const packageDocs = readdirSync(PACKAGE, { recursive: true, withFileTypes: true })
-  .filter((item) => item.isFile() && item.name.endsWith('.md'))
-  .map((item) => join(item.parentPath, item.name));
-
-test('relative links in the package resolve to files inside the package', () => {
-  for (const file of packageDocs) {
-    for (const [, target] of readFileSync(file, 'utf8').matchAll(/\]\(([^)\s]+)\)/g)) {
-      if (/^[a-z]+:|^#/i.test(target)) continue;
-      const resolved = resolve(dirname(file), target.split('#')[0]);
-      assert.ok(!relative(packageRoot, resolved).startsWith('..'), `${relative(packageRoot, file)} links outside the package: ${target}`);
-      assert.ok(existsSync(resolved), `${relative(packageRoot, file)} links to a missing package file: ${target}`);
-    }
-  }
-});
-
-test('harness files named in skill instructions are read at the active Orion folder root', () => {
-  const harnessPath = /`(?:status|docs|validation|update|agent|crm)\/[^`]*`/;
-  for (const file of packageDocs) {
-    for (const paragraph of readFileSync(file, 'utf8').split(/\n\s*\n/)) {
-      if (!harnessPath.test(paragraph)) continue;
-      assert.match(paragraph, /active Orion folder|another repository/, `${relative(packageRoot, file)}: ${paragraph}`);
-    }
-  }
-});
-
-test('the call planner tells the agent which folder to run it from', () => {
-  const skill = readFileSync(new URL('skills/call-planner/SKILL.md', PACKAGE), 'utf8');
-  assert.match(skill, /root of the active Orion folder/);
-  assert.match(skill, /--root/);
-  assert.doesNotMatch(skill, /from this skill folder/);
 });

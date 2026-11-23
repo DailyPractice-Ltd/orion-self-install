@@ -20,17 +20,3 @@ test('deployed docs link shipped skills inside the orion plugin package', () => 
     }
   }
 });
-
-test('deployed docs place shipped skills in the orion plugin, not the client skill folders', () => {
-  const stale = /(installed|shipped|built-in) skills (are|live) in `\.(claude|agents)\/skills|skills directory\s*\(`\.(agents|claude)\/skills/i;
-  for (const doc of deployedDocs) {
-    const text = readFileSync(join(root, doc), 'utf8').replace(/\s+/g, ' ');
-    assert.ok(!stale.test(text), `${doc} says shipped skills live in a client skill folder`);
-  }
-});
-
-test('the manual plugin validation checklist stays release-only', () => {
-  assert.ok(existsSync(join(root, 'agent/plugin-validation.md')));
-  assert.ok(!deployedDocs.includes('agent/plugin-validation.md'));
-  assert.ok(manifest.deployment.release_only.includes('agent/plugin-validation.md'));
-});

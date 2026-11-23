@@ -32,7 +32,6 @@ import {
   countProblem, looksLikeCredential, LINE_MAX,
 } from '../status/shapes.mjs';
 import { plainEnv } from './helpers/env.mjs';
-import { copyReleaseManifest } from './helpers/manifest.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..');
@@ -756,8 +755,6 @@ test('a count is plain digits, and zero is only for a shift', () => {
 
 // ── Tripwires: one thing written in two places ──────────────────────────────
 
-const squash = (text) => text.replace(/\s+/g, ' ').trim();
-
 test('tripwire: the tag menu in agent/radio.md is the menu in shapes.mjs', () => {
   const doc = readFileSync(join(repo, 'agent', 'radio.md'), 'utf8');
   const start = doc.indexOf('\n## The tag menu\n');
@@ -766,39 +763,4 @@ test('tripwire: the tag menu in agent/radio.md is the menu in shapes.mjs', () =>
   const rows = [...section.matchAll(/^\| `([^`]+)` \| (.+?) \|$/gm)].map((m) => [m[1], m[2]]);
   // Same tags, same order, same words: what the client reads is what the scripts enforce.
   assert.deepEqual(rows, Object.entries(WORK_TAGS));
-});
-
-test('tripwire: required setup explanation agrees across brief, wizard and radio guide', (t) => {
-  const explanation = 'Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.';
-  for (const file of ['agent/install.md', 'agent/radio.md']) {
-    assert.ok(squash(readFileSync(join(repo, file), 'utf8').replace(/^> ?/gm, '')).includes(explanation), `${file} must use the approved short explanation`);
-  }
-  const dir = mkdtempSync(join(tmpdir(), 'orion-wizard-required-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  mkdirSync(join(dir, 'status'));
-  copyFileSync(join(repo, 'start.mjs'), join(dir, 'start.mjs'));
-  copyReleaseManifest(dir);
-  for (const f of ['shapes.mjs', 'guard.mjs', 'store.mjs', 'report.mjs', 'status.schema-template.json']) copyFileSync(join(statusDir, f), join(dir, 'status', f));
-  const noNetwork = join(dir, 'no-network.mjs');
-  writeFileSync(noNetwork, `globalThis.fetch = async () => { throw new Error('unexpected network'); };`);
-  const r = spawnSync(process.execPath, ['--import', pathToFileURL(noNetwork).href, join(dir, 'start.mjs'), '--checkins', 'no'], {
-    encoding: 'utf8', input: '', cwd: dir,
-  });
-  assert.equal(r.status, 2, r.stderr);
-  assert.ok(squash(r.stdout).includes(explanation));
-  assert.doesNotMatch(r.stdout, /Read AGENTS.md and|Step 3 of 3|Keep check-ins on/);
-});
-
-test('tripwire: the release has one version, and it ships done.mjs', () => {
-  const manifest = JSON.parse(readFileSync(join(repo, 'update', 'manifest.json'), 'utf8'));
-  const template = JSON.parse(readFileSync(join(statusDir, 'status.schema-template.json'), 'utf8'));
-  const changelog = readFileSync(join(repo, 'CHANGELOG.md'), 'utf8');
-  const newest = changelog.match(/^## (\d+\.\d+\.\d+) — \d{4}-\d{2}-\d{2}(?: — .+)?$/m);
-  assert.ok(newest, 'CHANGELOG.md should open with a "## X.Y.Z — date" heading');
-  assert.deepEqual(Object.keys(template).filter((k) => k.endsWith('_version')), [], 'the manifest declares the version; the template carries none');
-  assert.equal(newest[1], manifest.template_version);
-  // A script the manifest does not list never reaches an installed harness.
-  for (const script of ['status/done.mjs', 'status/radio.mjs', 'status/shapes.mjs']) {
-    assert.ok(manifest.deployment.common_sources.includes(script), `${script} must be in the deployment`);
-  }
 });

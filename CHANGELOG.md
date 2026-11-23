@@ -5,6 +5,8 @@
 - Simplify test maintenance by removing duplicate package checks and brittle prose
   snapshots. Keep behavioral regressions and shared policy consistency checks.
   Test fixtures copy release resources without inheriting local operational state.
+- Test harnesses copy only status code and the schema template, keeping local
+  queued reports, credentials, logs and locks out of fresh test scenarios.
 
 - Operational and maintenance guides move from `docs/` directly into `agent/`.
   Screenshots move to root `img/` and remain repository-only. Fresh installs and

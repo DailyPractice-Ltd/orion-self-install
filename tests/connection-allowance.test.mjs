@@ -69,13 +69,13 @@ test('setup-only verification cannot grant work or refresh the allowance even wi
 });
 function child(args,env) {return new Promise(resolve=>{const p=spawn(process.execPath,args,{env});let output='';p.stdout.on('data',b=>output+=b);p.stderr.on('data',b=>output+=b);p.on('close',code=>resolve({code,output}));});}
 test('allowed outages print nothing in quiet and normal CLI checks and post-work reporting',async t=>{
- const root=harness(t);const saved=read(root);copyStatusResources(root);save(root,saved);cpSync(new URL('../update/',import.meta.url),join(root,'update'),{recursive:true});
+ const root=harness(t);copyStatusResources(root);cpSync(new URL('../update/',import.meta.url),join(root,'update'),{recursive:true});
  const preload=join(root,'offline.mjs');writeFileSync(preload,`const D=Date;globalThis.Date=class extends D{constructor(...a){super(...(a.length?a:['2026-11-19T12:00:00Z']));}static now(){return 1795089600000;}};globalThis.fetch=async()=>{throw Error('offline');};`);
  for(const extra of [[],['--quiet']]) {const r=await child(['--import',preload,join(root,'status/guard.mjs'),'check',...extra],plainEnv());assert.equal(r.code,0,r.output);assert.equal(r.output,'');}
  const r=await child(['--import',preload,join(root,'status/done.mjs'),'--tag','research','--line','Finished locally'],plainEnv({NODE_OPTIONS:`--import=${pathToFileURL(preload).href}`}));assert.equal(r.code,0,r.output);assert.doesNotMatch(r.output,/radio|offline|recovery|connection|unreachable/i);
 });
 test('admitted invocation finishes nested gated effects and reporting after expiry; scope dies with the task',async t=>{
- const root=harness(t);const saved=read(root);copyStatusResources(root);save(root,saved);cpSync(new URL('../update/',import.meta.url),join(root,'update'),{recursive:true});
+ const root=harness(t);copyStatusResources(root);cpSync(new URL('../update/',import.meta.url),join(root,'update'),{recursive:true});
  const script=join(root,'task.mjs');writeFileSync(script,`import {checkWork} from './status/guard.mjs';import {reportSignal} from './status/report.mjs';import {writeFileSync} from 'node:fs';const p=await checkWork({root:process.cwd(),now:()=>new Date('${deadline}'),fetchImpl:async()=>{throw Error('offline');}});if(!p.allow)process.exit(3);writeFileSync('effect','finished');writeFileSync('old-scope',process.env.ORION_TASK_SCOPE);const r=await reportSignal({root:process.cwd(),signalType:'crm_updated',fetchImpl:async()=>{throw Error('offline');}});if(r.status!=='queued')process.exit(4);`);
  const code=await runWork({root,command:process.execPath,args:[script],now:at('2026-11-20T11:59:59.999Z'),fetchImpl:offline});assert.equal(code,0);assert.equal(readFileSync(join(root,'effect'),'utf8'),'finished');assert.equal(read(root).sharing.pairing.last_connected_at,time);
  assert.equal((await checkWork({root,now:at(deadline),fetchImpl:offline})).allow,false);

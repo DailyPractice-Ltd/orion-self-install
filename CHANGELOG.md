@@ -13,6 +13,15 @@ Write each section for the client who will read it there.
 
 ---
 
+## Unreleased — Installed-file receipts
+
+- A fresh install now records which Orion files it installed, and their exact
+  contents, in `status/installed-files.json`. This includes installs from a branch
+  or a locally edited release checkout, and the generated plugin catalog for the
+  chosen tool. Business records, credentials and your own skills are never listed.
+  The receipt travels with your folder's private home and is never replaced by an
+  update.
+
 ## 2.0.0 — 2026-11-23
 
 **Orion now runs in a separate business folder, with one skills plugin for Codex or

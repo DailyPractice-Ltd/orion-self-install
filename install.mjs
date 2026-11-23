@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { planForTool } from './update/destination-resolver.mjs';
 import { ensurePluginRegion } from './update/plugin-package.mjs';
 import { statusTemplate } from './status/store.mjs';
+import { buildReceipt, writeStagedReceipt } from './update/receipt.mjs';
 import { checkFolder, describe, runPluginSetup, RESUME_COMMAND } from './update/plugin-setup.mjs';
 
 const release = dirname(fileURLToPath(import.meta.url));
@@ -83,6 +84,10 @@ async function install() {
     writeFileSync(join(stage, 'status/status.json'), JSON.stringify(stagedStatus, null, 2) + '\n');
     const packageErrors = checkFolder(stage, { tool: ai_assistant, identity, version: manifest.template_version, write: true });
     if (packageErrors.length) throw new Error(`The Orion plugin package did not validate:\n  ${packageErrors.join('\n  ')}`);
+    // Every managed file now has its installed bytes: record them before the harness is
+    // published (and, with a home, before its first commit). Home preparation below edits
+    // .gitignore as client-home configuration, so that edit is the client's, not Orion's.
+    writeStagedReceipt(stage, buildReceipt(stage, plan, { ai_assistant, template_version: manifest.template_version, recorded_by: 'install' }));
     const init = spawnSync('git', ['-C', stage, 'init', '-q', '-b', 'main'], { encoding: 'utf8' });
     if (init.status !== 0) throw new Error(`Could not create client repository: ${init.stderr.trim()}`);
     if(!useLocal) {

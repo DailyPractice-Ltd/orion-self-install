@@ -18,6 +18,7 @@
     "status/radio-outbox.json": "Client-owned durable labels-only pending reports; never replace, retire or discard on update.",
     "status/.radio-lock/": "Client-owned cross-process runtime lock; recovery must establish that its owner has stopped before removal.",
     "status/radio.key": "Machine-local credential; never print, refresh, retire, or save to the home repository.",
+    "status/installed-files.json": "This harness's installed-file receipt: the Orion-managed files actually installed and their fingerprints. Harness-owned ownership evidence, written by Orion's installer and updater only; never replaced from a release.",
     "anything outside the deployment map": "an update writes only the destinations the deployment map plans for the recorded tool, and retires only listed retired entries; nothing else may be touched"
   },
   "deployment": {
@@ -72,6 +73,7 @@
       "update/plugin-native.mjs",
       "update/plugin-registration.mjs",
       "update/pristine.json",
+      "update/receipt.mjs",
       "update/plugin-package.mjs",
       "update/plugin-setup.mjs",
       "update/release-contract.mjs",

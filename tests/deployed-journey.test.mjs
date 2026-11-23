@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { plainEnv } from './helpers/env.mjs';
 import { planForTool } from '../update/destination-resolver.mjs';
 import { catalogName } from '../update/plugin-package.mjs';
@@ -46,7 +47,7 @@ function fakeNative(base) {
 const ok = result => assert.equal(result.status, 0, result.stdout + result.stderr);
 const status = root => JSON.parse(read(root, 'status/status.json'));
 
-function journey(t, tool) {
+function journey(t, tool, { beforeInstall } = {}) {
   const base = mkdtempSync(join(tmpdir(), 'orion-deployed-'));
   t.after(() => rmSync(base, { recursive: true, force: true }));
   const release = join(base, 'release');
@@ -64,8 +65,35 @@ function journey(t, tool) {
     git(release, 'add', '-A');
     git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'working release');
   }
+  beforeInstall?.(release);
   ok(run(release, 'install.mjs', '--tool', tool, '--target', client, '--local-only'));
   return { release, client };
+}
+
+const lfHash = bytes => createHash('sha256').update(bytes.toString('utf8').replace(/\r\n/g, '\n')).digest('hex');
+
+for (const tool of ['claude-code', 'codex']) {
+  test(`${tool} install from a locally modified, uncommitted checkout records the bytes it installed`, t => {
+    const edits = {
+      'AGENTS.md': 'You are **Orion**, from a maintainer branch.\r\nLocal edit, never committed.\r\n',
+      [`${pkg}/post-call-debrief/SKILL.md`]: null,
+    };
+    const { client } = journey(t, tool, {
+      beforeInstall: release => {
+        edits[`${pkg}/post-call-debrief/SKILL.md`] = `${read(release, `${pkg}/post-call-debrief/SKILL.md`)}\nLocal, uncommitted note.\n`;
+        for (const [path, text] of Object.entries(edits)) put(release, path, text);
+        assert.notEqual(git(release, 'status', '--porcelain'), '', 'the release checkout has uncommitted edits');
+      },
+    });
+    const receipt = JSON.parse(read(client, 'status/installed-files.json'));
+    for (const [path, text] of Object.entries(edits)) {
+      assert.equal(read(client, path), text, `${path} installed from the working tree`);
+      assert.equal(receipt.files[path].hash, lfHash(Buffer.from(text)), `${path} recorded as installed`);
+    }
+    // CRLF and LF installs of the same text record the same fingerprint.
+    assert.equal(receipt.files['AGENTS.md'].hash, lfHash(Buffer.from(edits['AGENTS.md'].replace(/\r\n/g, '\n'))));
+    for (const [path, entry] of Object.entries(receipt.files)) assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), path);
+  });
 }
 
 for (const tool of ['claude-code', 'codex']) {

@@ -8,8 +8,8 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { plainEnv } from './helpers/env.mjs';
-import { planForTool } from '../update/destination-resolver.mjs';
-import { catalogName } from '../update/plugin-package.mjs';
+import { TOOL_LAYOUT, planForTool } from '../update/destination-resolver.mjs';
+import { MANIFEST_PATHS, catalogName, pluginManifests } from '../update/plugin-package.mjs';
 
 const checkout = join(dirname(fileURLToPath(import.meta.url)), '..');
 const other = tool => tool === 'codex' ? 'claude-code' : 'codex';
@@ -70,7 +70,26 @@ function journey(t, tool, { beforeInstall } = {}) {
   return { release, client };
 }
 
-const lfHash = bytes => createHash('sha256').update(bytes.toString('utf8').replace(/\r\n/g, '\n')).digest('hex');
+/** The deployed switch_ai.mjs, run with stand-in native CLIs. */
+function switcher(client) {
+  const native = fakeNative(dirname(client));
+  const name = catalogName(status(client).plugin.catalog_identity);
+  const switchAi = (env = {}) => spawnSync(process.execPath, [join(client, 'switch_ai.mjs'), '--json'],
+    { cwd: client, encoding: 'utf8', env: { ...native.env, ...env } });
+  // Codex shows Orion installed for this folder only after the human's native install,
+  // so a switch to Codex waits for it, and the selected tool stays as it was.
+  const targetReady = (to) => {
+    if (to !== 'codex') return;
+    const waiting = switchAi();
+    ok(waiting);
+    assert.equal(JSON.parse(waiting.stdout).state, 'pending_switch');
+    assert.equal(status(client).ai_assistant, other(to));
+    ok(native.humanInstall(client, name));
+  };
+  return { native, name, switchAi, targetReady };
+}
+
+const lfHash = bytes =>createHash('sha256').update(bytes.toString('utf8').replace(/\r\n/g, '\n')).digest('hex');
 
 for (const tool of ['claude-code', 'codex']) {
   test(`${tool} install from a locally modified, uncommitted checkout records the bytes it installed`, t => {
@@ -263,20 +282,7 @@ for (const tool of ['claude-code', 'codex']) {
     const { release, client } = journey(t, tool);
     put(client, `${skill(tool)}/meeting-sizing/SKILL.md`, '# Meeting sizing\nSize the meeting.\n');
     put(client, `${jobs(tool)}/follow-up.md`, '---\nname: follow-up\ntools: Read\n---\n# Follow-up\n');
-    const native = fakeNative(dirname(client));
-    const name = catalogName(status(client).plugin.catalog_identity);
-    const switchAi = (env = {}) => spawnSync(process.execPath, [join(client, 'switch_ai.mjs'), '--json'],
-      { cwd: client, encoding: 'utf8', env: { ...native.env, ...env } });
-    // Codex shows Orion installed for this folder only after the human's native install,
-    // so a switch to Codex waits for it, and the selected tool stays as it was.
-    const targetReady = (to) => {
-      if (to !== 'codex') return;
-      const waiting = switchAi();
-      ok(waiting);
-      assert.equal(JSON.parse(waiting.stdout).state, 'pending_switch');
-      assert.equal(status(client).ai_assistant, other(to));
-      ok(native.humanInstall(client, name));
-    };
+    const { switchAi, targetReady, name } = switcher(client);
     targetReady(other(tool));
     const interrupted = switchAi({ ORION_SWITCH_FAIL_AFTER: '1' });
     assert.notEqual(interrupted.status, 0);
@@ -302,6 +308,82 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(catalogName(status(client).plugin.catalog_identity), name, 'the catalog identity survives both switches');
     assert.match(read(client, `${skill(tool)}/meeting-sizing/SKILL.md`), /Size the meeting/);
     assert.equal(existsSync(join(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`)), false);
+  });
+}
+
+for (const tool of ['claude-code', 'codex']) {
+  test(`${tool} deployed journey: the receipt follows tool switches and later updates keep client edits`, t => {
+    const { release, client } = journey(t, tool);
+    const { native, switchAi, targetReady } = switcher(client);
+    const receipt = () => JSON.parse(read(client, 'status/installed-files.json'));
+    const installedReadme = read(client, 'README.md');
+    const notes = installedReadme + '\nOur own notes.\n';
+    put(client, 'README.md', notes);
+    put(client, `${skill(tool)}/mine/SKILL.md`, '# Mine\n');
+    // Each release changes the version (so both plugin manifests), a package skill and AGENTS.md.
+    const manifest = JSON.parse(read(release, 'update/manifest.json'));
+    const skillPath = `${pkg}/prospecting/SKILL.md`, skillText = read(release, skillPath), agents = read(release, 'AGENTS.md');
+    let releases = 0;
+    const publish = () => {
+      releases += 1;
+      manifest.template_version = `9.${releases}.0`;
+      put(release, 'update/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
+      for (const [path, value] of Object.entries(pluginManifests(manifest.template_version))) put(release, path, JSON.stringify(value, null, 2) + '\n');
+      put(release, skillPath, `${skillText}\nRelease ${releases}.\n`);
+      put(release, 'AGENTS.md', `${agents}\nRelease ${releases}.\n`);
+      git(release, 'add', '.');
+      git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', `release ${releases}`);
+      return git(release, 'rev-parse', 'HEAD');
+    };
+    // The receipt is the installed baseline of every file it lists, except the client's README edit.
+    const matchesDisk = (selected) => {
+      const now = receipt();
+      assert.equal(now.ai_assistant, selected);
+      assert.equal(now.files['README.md'].hash, lfHash(Buffer.from(installedReadme)), 'the README edit keeps its installed baseline');
+      for (const [path, entry] of Object.entries(now.files)) {
+        if (path !== 'README.md') assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} is recorded as installed`);
+      }
+      for (const path of [`${skill(selected)}/mine/SKILL.md`, 'status/status.json']) assert.equal(now.files[path], undefined, path);
+      return now;
+    };
+    const updated = (selected) => {
+      const result = spawnSync(process.execPath, [join(client, 'update/apply.mjs'), 'update', '--root', client, '--release-repo', release, '--commit', publish()],
+        { cwd: client, encoding: 'utf8', env: native.env });
+      ok(result);
+      const report = JSON.parse(result.stdout);
+      assert.ok(report.kept.includes('README.md'), result.stdout);
+      assert.equal(read(client, 'README.md'), notes);
+      assert.match(read(client, 'AGENTS.md'), new RegExp(`Release ${releases}\\.`));
+      assert.match(read(client, skillPath), new RegExp(`Release ${releases}\\.`));
+      assert.equal(JSON.parse(read(client, MANIFEST_PATHS[selected])).version, manifest.template_version);
+      assert.equal(receipt().template_version, manifest.template_version);
+      matchesDisk(selected);
+    };
+
+    // A failed switch leaves the receipt exactly as it was, and the next update uses it.
+    targetReady(other(tool));
+    const before = read(client, 'status/installed-files.json');
+    const failed = switchAi({ ORION_SWITCH_FAIL_AFTER: '1' });
+    assert.notEqual(failed.status, 0);
+    assert.equal(read(client, 'status/installed-files.json'), before);
+    assert.equal(existsSync(join(client, MANIFEST_PATHS[other(tool)])), false);
+    updated(tool);
+
+    // Each successful switch records the target's generated manifest and catalog and drops the retired ones.
+    for (const to of [other(tool), tool]) {
+      const from = other(to);
+      targetReady(to);
+      ok(switchAi());
+      assert.equal(status(client).ai_assistant, to);
+      const now = matchesDisk(to);
+      assert.equal(now.files[MANIFEST_PATHS[to]].key, MANIFEST_PATHS[to]);
+      assert.equal(now.files[TOOL_LAYOUT[to].catalogPath].origin, 'generated');
+      for (const path of [MANIFEST_PATHS[from], TOOL_LAYOUT[from].catalogPath]) {
+        assert.equal(existsSync(join(client, path)), false, path);
+        assert.equal(now.files[path], undefined, `${path} is no longer claimed`);
+      }
+      updated(to);
+    }
   });
 }
 

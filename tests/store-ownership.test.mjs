@@ -172,7 +172,11 @@ test('a tool switch takes the lock: it waits, and changes nothing when the lock 
   const dir = harness(t);
   mkdirSync(join(dir, '.claude', 'skills', 'demo'), { recursive: true });
   writeFileSync(join(dir, '.claude', 'skills', 'demo', 'SKILL.md'), '# demo\n');
-  copyFileSync(join(ROOT, 'switch_ai.mjs'), join(dir, 'switch_ai.mjs'));
+  // A deployed folder carries the switch and the receipt modules it imports.
+  for (const path of ['switch_ai.mjs', 'update/destination-resolver.mjs', 'update/receipt.mjs']) {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    copyFileSync(join(ROOT, path), join(dir, path));
+  }
   mkdirSync(join(dir, 'status', '.radio-lock'));
   const { code, out } = node(dir, [join(dir, 'switch_ai.mjs')], SHORT_WAIT);
   assert.equal(code, 2, out);

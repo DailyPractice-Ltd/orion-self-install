@@ -33,6 +33,11 @@ Write each section for the client who will read it there.
   the update, and now also keeps a file you wrote where the update retired one instead
   of overwriting it; the receipt gives restored files their earlier baselines and keeps
   your later edits recognised as yours on the next update.
+- Switching between Codex and Claude Code keeps the receipt accurate. A finished
+  switch records the new assistant's plugin manifest and catalog, and drops the old
+  assistant's only once they are removed; your edits keep their installed baselines.
+  A failed, waiting or cancelled switch leaves the receipt unchanged, and a damaged
+  receipt stops the switch before anything changes.
 
 ### For maintainers
 

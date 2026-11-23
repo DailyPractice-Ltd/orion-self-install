@@ -109,6 +109,18 @@ export function compatibilityErrors(releaseRoot, deployment) {
   return errors;
 }
 
+/**
+ * The tool mapping alone: each deployment entry's source, destination and identity for
+ * one tool, without checking a release tree. planForTool adds those checks; a switch
+ * uses this directly to name the files it generates in a harness.
+ */
+export function toolEntries(deployment, ai_assistant, { includeOtherMetadata = false } = {}) {
+  return [
+    ...deployment.common_sources.map((source) => ({ source, destination: source, ownership: 'release', fingerprint_key: source })),
+    ...deployment.entries.filter(entry => includeOtherMetadata || !entry.tools || entry.tools.includes(ai_assistant)).map((entry) => ({ source: entry.sources?.[ai_assistant] || entry.source, destination: entry.destinations ? entry.destinations[ai_assistant] : entry.source, ownership: entry.ownership, fingerprint_key: entry.sources?.[ai_assistant] || entry.fingerprint_key })),
+  ];
+}
+
 /** The sole source-to-destination mapper for release and deployed harnesses. */
 export function planForTool(deployment, ai_assistant, { releaseRoot = RELEASE_ROOT, root, includeOtherMetadata = false } = {}) {
   if (!deployment.tools.includes(ai_assistant)) throw new Error(`Unsupported AI assistant: ${ai_assistant || '(missing)'}`);
@@ -123,10 +135,7 @@ export function planForTool(deployment, ai_assistant, { releaseRoot = RELEASE_RO
   for (const entry of packageEntries) {
     if (entry.destinations || entry.sources) throw new Error(`Package file ships at its own path for every tool: ${entry.source}`);
   }
-  const entries = [
-    ...deployment.common_sources.map((source) => ({ source, destination: source, ownership: 'release', fingerprint_key: source })),
-    ...deployment.entries.filter(entry => includeOtherMetadata || !entry.tools || entry.tools.includes(ai_assistant)).map((entry) => ({ source: entry.sources?.[ai_assistant] || entry.source, destination: entry.destinations ? entry.destinations[ai_assistant] : entry.source, ownership: entry.ownership, fingerprint_key: entry.sources?.[ai_assistant] || entry.fingerprint_key })),
-  ];
+  const entries = toolEntries(deployment, ai_assistant, { includeOtherMetadata });
   const destinations = new Set();
   for (const entry of entries) {
     safePath(releaseRoot, entry.source);

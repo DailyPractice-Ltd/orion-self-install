@@ -9,8 +9,9 @@
  * Ownership comes from the harness's installed-file receipt (update/receipt.mjs): files still
  * as installed are updated, edited and unknown ones are kept, and an edited or unknown
  * runtime or plugin file the update would replace stops it before any change (state
- * "conflict"). An unreadable or invalid receipt stops it too. Without a receipt (a harness
- * from before receipts) the frozen fingerprints in update/pristine.json decide instead.
+ * "conflict"). An unreadable or invalid receipt stops it too. A harness from before receipts
+ * has none and migrates: its receipt starts as the files whose bytes the frozen fingerprints
+ * in update/pristine.json recognise (receipt.mjs legacyReceipt), and the same rules apply.
  * The receipt is backed up, journaled, written last under the lock and rolled back with the files.
  *
  * The Orion plugin package (plugins/orion) is release-managed and replaced as a unit; the
@@ -277,16 +278,20 @@ async function update(store,root,repo,commit) {
       const sorted=Object.fromEntries(Object.keys(files).sort().map(path=>[path,files[path]]));
       return {...receipt,ai_assistant,template_version:manifest.template_version,recorded_by:'update',recorded_at:new Date().toISOString(),files:sorted};
     }
-    // A migrating harness had no receipt: the backup keeps the one it proved, as the restore baseline.
-    if (migrating) { mkdirSync(dirname(join(backup,'receipt',RECEIPT_PATH)),{recursive:true}); writeFileSync(join(backup,'receipt',RECEIPT_PATH),receiptText(receipt)); }
-    else copyTo(safe(root,RECEIPT_PATH),join(backup,'receipt',RECEIPT_PATH));
+    // Whenever this update writes a receipt, the journal says what to put back: the backed-up
+    // copy, or (`prior: null`) no receipt at all for a harness that had none.
+    // A migrating harness also keeps the receipt it proved (`migrated`): the baselines its
+    // restored files go back to if the receipt changes after this update.
+    const priorReceiptHash = fileHash(safe(root,RECEIPT_PATH));
+    if (priorReceiptHash) copyTo(safe(root,RECEIPT_PATH),join(backup,'receipt',RECEIPT_PATH));
+    if (migrating) { mkdirSync(join(backup,'receipt'),{recursive:true}); writeFileSync(join(backup,'receipt','migrated.json'),receiptText(receipt)); }
     const journal={kind:'update',state:'pending',from:status.template_version,to:manifest.template_version,commit,ai_assistant,
       actions:actions.map(a=>({kind:a.kind,destination:a.e.destination,installed_hash:a.kind==='retire'?null:fingerprint(readFileSync(a.src)),prior_hash:a.kind==='add'?null:fingerprint(readFileSync(a.dest))})),
       remove_status_checklist_keys:checklistKeys,
       package:pkg && {path:PACKAGE_ROOT,prior_hash:pkg.prior_hash,installed_hash:pkg.installed_hash},
       catalog:catalog && {path:catalog.path,prior_hash:catalog.prior_hash,installed_hash:catalog.installed_hash},
       registration:registration ? 'registration.json' : null,
-      receipt:{path:RECEIPT_PATH,prior:`receipt/${RECEIPT_PATH}`,prior_hash:fileHash(safe(root,RECEIPT_PATH)),installed_hash:fingerprint(installedReceipt)}};
+      receipt:{path:RECEIPT_PATH,prior:priorReceiptHash?`receipt/${RECEIPT_PATH}`:null,prior_hash:priorReceiptHash,installed_hash:fingerprint(installedReceipt),...(migrating && {migrated:'receipt/migrated.json'})}};
     // The status fields this update owns, written under the lock once the files are in place.
     const commitStatus=current=>{
       for(const key of journal.remove_status_checklist_keys) delete current.checklist?.[key];
@@ -319,7 +324,13 @@ async function update(store,root,repo,commit) {
     writeJson(join(backup,'journal.json'),journal);
     try {
       let count=0;
-      const step=()=>{ if(process.env.ORION_UPDATE_FAIL_AFTER && ++count===Number(process.env.ORION_UPDATE_FAIL_AFTER)) throw new Error('Injected update interruption'); };
+      // Test faults: FAIL throws (the rollback below runs); CRASH kills the process, leaving
+      // the journal pending for `recover` or the next update.
+      const step=()=>{
+        ++count;
+        if(count===Number(process.env.ORION_UPDATE_FAIL_AFTER)) throw new Error('Injected update interruption');
+        if(count===Number(process.env.ORION_UPDATE_CRASH_AFTER)) process.kill(process.pid,'SIGKILL');
+      };
       if (pkg) {
         rmSync(safe(root,PACKAGE_ROOT),{recursive:true,force:true});
         mkdirSync(dirname(safe(root,PACKAGE_ROOT)),{recursive:true});
@@ -410,7 +421,7 @@ async function rollbackUpdate(store,root,backup,journal,adjust) {
   }
   if (journal.receipt) {
     const current=fileHash(safe(root,journal.receipt.path));
-    if (![journal.receipt.prior_hash,journal.receipt.installed_hash].includes(current)) conflicts.push(journal.receipt.path);
+    if (![journal.receipt.prior_hash,journal.receipt.installed_hash,null].includes(current)) conflicts.push(journal.receipt.path);
   }
   if(conflicts.length) throw new Error(`Update recovery collisions: ${conflicts.join(', ')}. ${RECOVERY_ACTION(backupRel,'node update/apply.mjs recover --root .')}`);
   for(const a of [...journal.actions].reverse()) {
@@ -428,11 +439,10 @@ async function rollbackUpdate(store,root,backup,journal,adjust) {
     if (journal.package.prior_hash) copyTree(join(backup,'package',PACKAGE_ROOT),safe(root,PACKAGE_ROOT));
   }
   if (journal.registration) restoreRegistration(root,json(join(backup,journal.registration)));
-  // The receipt goes back with the files it describes.
+  // The receipt goes back with the files it describes; a harness that had none has none again.
   if (journal.receipt && fileHash(safe(root,journal.receipt.path))!==journal.receipt.prior_hash) {
-    // A harness that had no receipt before the update has none again.
-    if (journal.receipt.prior_hash===null) rmSync(safe(root,journal.receipt.path));
-    else await store.writeReceiptText(readFileSync(join(backup,journal.receipt.prior)));
+    if (journal.receipt.prior) await store.writeReceiptText(readFileSync(join(backup,journal.receipt.prior)));
+    else await store.removeReceipt();
   }
   // Status: only the fields the update owns go back; everything written since stays.
   const status=await store.readStatus(), old=json(join(backup,'status/status.json'));
@@ -471,20 +481,24 @@ async function restore(store,root,backupRel) {
   }
   const status=await store.readStatus(), old=json(join(backup,'status/status.json'));
   // Read before any file moves, so a receipt that cannot be trusted stops the restore first.
-  let receiptNow=null;
-  if (journal.receipt) {
-    try { receiptNow=readReceipt(root); }
-    catch (error) { throw new Error(`${error.message}. Nothing was restored. ${RECEIPT_ACTION.replace('the same update','the same restore')}`); }
-  }
-  const restored=[],kept=[];
+  let receiptNow;
+  try { receiptNow=readReceipt(root); }
+  catch (error) { throw new Error(`${error.message}. Nothing was restored. ${RECEIPT_ACTION.replace('the same update','the same restore')}`); }
+  const receiptHashNow=receiptNow && fileHash(safe(root,RECEIPT_PATH));
+  // `gone`: files the update added that the client has since deleted; nothing to restore,
+  // but the receipt must stop claiming them.
+  const restored=[],kept=[],gone=[];
   for(const a of [...journal.actions].reverse()) {
-    const dest=safe(root,a.destination), prior=join(backup,'files',a.destination);
+    const dest=safe(root,a.destination), prior=join(backup,'files',a.destination), current=fileHash(dest);
     if(a.kind==='add') {
-      if(!existsSync(dest)) continue;
-      if(fingerprint(readFileSync(dest))!==a.installed_hash) {kept.push(a.destination);continue;}
+      if(!existsSync(dest)) {gone.push(a.destination);continue;}
+      if(current!==a.installed_hash) {kept.push(a.destination);continue;}
       rmSync(dest);restored.push(a.destination);
     } else {
-      if(existsSync(dest) && a.installed_hash && fingerprint(readFileSync(dest))!==a.installed_hash) {kept.push(a.destination);continue;}
+      // What the update left (its bytes, or nothing for a retired file) is restored; anything
+      // written there since is the client's and is kept.
+      const left = a.kind==='retire' ? a.prior_hash : a.installed_hash;
+      if(existsSync(dest) && current!==left) {kept.push(a.destination);continue;}
       copyTo(prior,dest);restored.push(a.destination);
     }
   }
@@ -503,19 +517,28 @@ async function restore(store,root,backupRel) {
     }
   }
   if (journal.registration) { restoreRegistration(root,json(join(backup,journal.registration))); restored.push('registration'); }
-  if (journal.receipt) {
-    // Restored files take back their prior baselines; kept ones keep the update's, so a
-    // later edit to them is still recognised as the client's.
-    const prior=json(join(backup,journal.receipt.prior)), files={...(receiptNow||prior).files};
-    const back = path => { if (prior.files[path]) files[path]=prior.files[path]; else delete files[path]; };
+  // The receipt follows the files. Restored files take back their prior baselines (none when
+  // the harness had no receipt before the update); kept ones keep the update's, so a later
+  // edit to them is still recognised as the client's. Files the update added and the client
+  // deleted are no longer claimed.
+  const prior=journal.receipt?.prior ? json(join(backup,journal.receipt.prior)) : null;
+  if (!prior && receiptNow && journal.receipt && receiptHashNow===journal.receipt.installed_hash) {
+    // The update wrote the harness's first receipt and nothing changed it since: none again.
+    await store.removeReceipt();
+  } else if (prior || receiptNow) {
+    // A migrated harness had no receipt; its restored files take the baselines it proved then.
+    const migrated=!prior && journal.receipt?.migrated ? json(join(backup,journal.receipt.migrated)) : null;
+    const base=receiptNow||prior, files={...base.files}, priorFiles=(prior||migrated)?.files||{};
+    const back = path => { if (priorFiles[path]) files[path]=priorFiles[path]; else delete files[path]; };
+    for (const path of gone) delete files[path];
     for (const path of restored) {
       if (path===PACKAGE_ROOT) {
         for (const key of Object.keys(files)) if (isPackagePath(key)) delete files[key];
-        for (const key of Object.keys(prior.files)) if (isPackagePath(key)) files[key]=prior.files[key];
+        for (const key of Object.keys(priorFiles)) if (isPackagePath(key)) files[key]=priorFiles[key];
       } else if (path!=='registration') back(path);
     }
     const sorted=Object.fromEntries(Object.keys(files).sort().map(path=>[path,files[path]]));
-    await store.writeReceiptText(receiptText({...(receiptNow||prior),template_version:old.template_version,recorded_by:'restore',recorded_at:new Date().toISOString(),files:sorted}));
+    await store.writeReceiptText(receiptText({...base,template_version:old.template_version,recorded_by:'restore',recorded_at:new Date().toISOString(),files:sorted}));
   }
   for(const key of journal.remove_status_checklist_keys) if(Object.hasOwn(old.checklist||{},key)) {status.checklist ||= {};status.checklist[key]=old.checklist[key];}
   status.template_version=old.template_version;

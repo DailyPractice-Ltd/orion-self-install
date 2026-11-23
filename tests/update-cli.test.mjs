@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -122,7 +122,10 @@ function receiptWorld(t, { installed, keys = {}, retired = [], pristine = {}, al
   put(client,'status/status.json',JSON.stringify({template_version:'1.0.0',ai_assistant:'codex',notes:'before'}));
   put(client,RECEIPT,JSON.stringify({ schema:'orion-installed-files', version:1, algorithm:'sha256-utf8-lf', ai_assistant:'codex', template_version:'1.0.0', recorded_by:'install', recorded_at:'2026-11-01T00:00:00.000Z', files },null,2));
   const update = (commit, env = {}) => spawnSync(process.execPath,[script,'update','--root',client,'--release-repo',source,'--commit',commit],{encoding:'utf8',env:plainEnv(env)});
-  return { source, client, publish, update };
+  const command = (name, args, env = {}) => spawnSync(process.execPath,[script,name,'--root',client,...args],{encoding:'utf8',env:plainEnv(env)});
+  const restore = backup => command('restore',['--backup',backup]);
+  const recover = () => command('recover',[]);
+  return { source, client, publish, update, restore, recover };
 }
 
 test('a receipt harness updates untouched files and keeps edited and unknown ones, across two updates', t => {
@@ -301,4 +304,163 @@ test('a harness without a receipt migrates: shipped files update, unknown ones a
   receipt = receiptOf(w.client);
   assert.equal(receipt.files['AGENTS.md'].hash,requireHash('agents v2\n'));
   assert.equal(receipt.files['README.md'].hash,requireHash('readme v3\n'));
+});
+
+test('an update killed at any step is recovered with its receipt, and the next update trusts only what it installs', t => {
+  // Steps: AGENTS.md, README.md, added.md, update/manifest.json, update/pristine.json, then the receipt.
+  for (const [at, next] of [['1','recover'],['3','update'],['6','recover'],['6','update']]) {
+    const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n' } });
+    const before = get(w.client, RECEIPT);
+    const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n', 'added.md':'added v2\n' });
+    const killed = w.update(v2, { ORION_UPDATE_CRASH_AFTER:at });
+    assert.notEqual(killed.status,0,`killed after step ${at}`);
+    // A killed process leaves its lock behind; a person clears it once it has stopped.
+    rmSync(join(w.client,'status/.radio-lock'),{recursive:true});
+    if (next === 'recover') {
+      const recovered = w.recover(); assert.equal(recovered.status,0,recovered.stdout+recovered.stderr);
+      assert.equal(JSON.parse(recovered.stdout).recovered.length,1);
+      assert.equal(get(w.client,'AGENTS.md'),'agents v1\n',`after step ${at}`);
+      assert.equal(get(w.client,'README.md'),'readme v1\n');
+      assert.equal(existsSync(join(w.client,'added.md')),false);
+      assert.equal(get(w.client,RECEIPT),before,`the receipt is back as it was, after step ${at}`);
+      assert.equal(JSON.parse(get(w.client,'status/status.json')).template_version,'1.0.0');
+      // The client edits a file the interrupted update had touched; the retry keeps that edit.
+      put(w.client,'README.md','readme v1 with our notes\n');
+    }
+    // Otherwise the retry recovers the pending journal itself before updating.
+    const retried = w.update(v2); assert.equal(retried.status,0,retried.stdout+retried.stderr);
+    assert.equal(get(w.client,'AGENTS.md'),'agents v2\n');
+    const receipt = receiptOf(w.client);
+    if (next === 'recover') {
+      assert.equal(get(w.client,'README.md'),'readme v1 with our notes\n',`after step ${at}`);
+      assert.equal(receipt.files['README.md'].hash,requireHash('readme v1\n'),'the edit is not trusted as installed');
+    } else {
+      assert.equal(get(w.client,'README.md'),'readme v2\n');
+      assert.equal(receipt.files['README.md'].hash,requireHash('readme v2\n'));
+      assert.equal(readdirSync(join(w.client,'.update-backup')).length,2,'the killed update and the retry');
+    }
+    assert.equal(receipt.files['AGENTS.md'].hash,requireHash('agents v2\n'));
+    assert.equal(receipt.files['added.md'].hash,requireHash('added v2\n'));
+  }
+});
+
+test('restore keeps later edits, restores the rest with their baselines, and the next update uses them', t => {
+  const old = '.agents/skills/old/SKILL.md';
+  const w = receiptWorld(t, {
+    installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n', 'status/a.mjs':'console.log("a v1")\n', [old]:'old v1\n' },
+    keys: { [old]:'skills/old/SKILL.md' },
+    retired: [{ source:'skills/old/SKILL.md', destinations:{'claude-code':'.claude/skills/old/SKILL.md',codex:old}, fingerprint_key:'skills/old/SKILL.md' }],
+  });
+  const before = receiptOf(w.client);
+  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n', 'status/a.mjs':'console.log("a v2")\n', 'added.md':'added v2\n', 'dropped.md':'dropped v2\n' });
+  const updated = w.update(v2); assert.equal(updated.status,0,updated.stderr);
+  const { backup } = JSON.parse(updated.stdout);
+
+  // After the update the client edits one replaced file, deletes an added one and writes
+  // their own file where a retired one was.
+  put(w.client,'README.md','readme v2 with our notes\n');
+  rmSync(join(w.client,'dropped.md'));
+  put(w.client,old,'our own skill now\n');
+  const restore = w.restore(backup);
+  assert.equal(restore.status,0,restore.stdout+restore.stderr);
+  const restored = JSON.parse(restore.stdout);
+  assert.equal(get(w.client,'AGENTS.md'),'agents v1\n');
+  assert.equal(get(w.client,'status/a.mjs'),'console.log("a v1")\n');
+  assert.equal(existsSync(join(w.client,'added.md')),false);
+  assert.equal(get(w.client,'README.md'),'readme v2 with our notes\n','a later edit is kept');
+  assert.equal(get(w.client,old),'our own skill now\n','a later file where a retired one was is never overwritten');
+  assert.ok(restored.kept.includes('README.md')); assert.ok(restored.kept.includes(old));
+
+  let receipt = receiptOf(w.client);
+  assert.equal(receipt.template_version,'1.0.0');
+  assert.deepEqual(receipt.files['AGENTS.md'],before.files['AGENTS.md'],'a restored file takes back its prior baseline');
+  assert.deepEqual(receipt.files['status/a.mjs'],before.files['status/a.mjs']);
+  assert.equal(receipt.files['README.md'].hash,requireHash('readme v2\n'),'a kept file keeps the baseline the update installed');
+  assert.equal(receipt.files['added.md'],undefined);
+  assert.equal(receipt.files['dropped.md'],undefined,'a file that is gone is not claimed');
+  assert.equal(receipt.files[old],undefined,'the client\'s file is not adopted');
+
+  const v3 = w.publish('3.0.0', { 'AGENTS.md':'agents v3\n', 'README.md':'readme v3\n', 'status/a.mjs':'console.log("a v3")\n', 'added.md':'added v3\n', 'dropped.md':'dropped v3\n' });
+  const next = w.update(v3); assert.equal(next.status,0,next.stdout+next.stderr);
+  const report = JSON.parse(next.stdout);
+  assert.equal(get(w.client,'AGENTS.md'),'agents v3\n');
+  assert.equal(get(w.client,'status/a.mjs'),'console.log("a v3")\n');
+  assert.equal(get(w.client,'added.md'),'added v3\n');
+  assert.equal(get(w.client,'dropped.md'),'dropped v3\n');
+  assert.equal(get(w.client,'README.md'),'readme v2 with our notes\n');
+  assert.ok(report.kept.includes('README.md'));
+  assert.ok(report.unknown.includes(old)); assert.equal(get(w.client,old),'our own skill now\n');
+  receipt = receiptOf(w.client);
+  assert.equal(receipt.files['README.md'].hash,requireHash('readme v2\n'));
+  for (const path of ['AGENTS.md','status/a.mjs','added.md','dropped.md']) assert.equal(receipt.files[path].hash,requireHash(get(w.client,path)),path);
+});
+
+/**
+ * An update that wrote the harness's first receipt (a migration from before receipts) records
+ * that there was none: its journal's receipt has `prior: null` and the backup holds no copy.
+ * Made here from a completed update's backup, as a crash would leave it.
+ */
+function firstReceiptUpdate(t, state) {
+  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n' } });
+  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n', 'added.md':'added v2\n' });
+  const updated = w.update(v2); assert.equal(updated.status,0,updated.stderr);
+  const { backup } = JSON.parse(updated.stdout), path = join(w.client, backup, 'journal.json');
+  const journal = JSON.parse(get(w.client, `${backup}/journal.json`));
+  assert.equal(journal.receipt.prior_hash, lf(get(join(w.client, backup), journal.receipt.prior)), 'the journal names the receipt copy it backed up');
+  rmSync(join(w.client, backup, 'receipt'), { recursive:true });
+  writeFileSync(path, JSON.stringify({ ...journal, state, receipt:{ ...journal.receipt, prior:null, prior_hash:null } }));
+  return { ...w, backup, v2 };
+}
+
+test('recovering an update that wrote the first receipt leaves no receipt, as before', t => {
+  const w = firstReceiptUpdate(t, 'pending');
+  const recovered = w.recover(); assert.equal(recovered.status,0,recovered.stdout+recovered.stderr);
+  assert.equal(get(w.client,'AGENTS.md'),'agents v1\n');
+  assert.equal(existsSync(join(w.client,'added.md')),false);
+  assert.equal(existsSync(join(w.client,RECEIPT)),false,'receipt absence is restored with the files');
+});
+
+test('restoring an update that wrote the first receipt removes it, unless the receipt changed since', t => {
+  const w = firstReceiptUpdate(t, 'complete');
+  const restored = w.restore(w.backup); assert.equal(restored.status,0,restored.stdout+restored.stderr);
+  assert.equal(get(w.client,'AGENTS.md'),'agents v1\n');
+  assert.equal(existsSync(join(w.client,RECEIPT)),false);
+
+  // A receipt written after the update (say, by a later one) holds evidence the restore does not
+  // undo: restored files lose their claims, since the backup recorded no baseline for them.
+  const later = firstReceiptUpdate(t, 'complete');
+  const receipt = receiptOf(later.client);
+  put(later.client, RECEIPT, JSON.stringify({ ...receipt, recorded_at:'2026-11-20T00:00:00.000Z' }, null, 2));
+  put(later.client, 'README.md', 'readme v2 with our notes\n');
+  const kept = later.restore(later.backup); assert.equal(kept.status,0,kept.stdout+kept.stderr);
+  assert.equal(get(later.client,'README.md'),'readme v2 with our notes\n');
+  const after = receiptOf(later.client);
+  assert.equal(after.files['README.md'].hash,requireHash('readme v2\n'),'the kept file keeps its baseline');
+  for (const path of ['AGENTS.md','added.md']) assert.equal(after.files[path],undefined,path);
+});
+
+test('restoring a backup from before receipts leaves a harness without one as it is', t => {
+  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n' }, pristine: { 'AGENTS.md':[requireHash('agents v1\n')] } });
+  rmSync(join(w.client, RECEIPT));
+  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n' });
+  const updated = w.update(v2); assert.equal(updated.status,0,updated.stderr);
+  const { backup } = JSON.parse(updated.stdout);
+  const restored = w.restore(backup); assert.equal(restored.status,0,restored.stdout+restored.stderr);
+  assert.equal(get(w.client,'AGENTS.md'),'agents v1\n');
+  assert.equal(existsSync(join(w.client,RECEIPT)),false);
+});
+
+test('restoring a migration after its receipt changed gives restored files the baselines the migration proved', t => {
+  const w = legacyWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'status/a.mjs':'console.log("a v1")\n' },
+    pristine: { 'AGENTS.md':[requireHash('agents v1\n')], 'status/a.mjs':[requireHash('console.log("a v1")\n')] } });
+  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'status/a.mjs':'console.log("a v2")\n' });
+  const updated = w.update(v2); assert.equal(updated.status,0,updated.stderr);
+  // Another Orion command rewrote the receipt after the update (a tool switch does).
+  put(w.client, RECEIPT, JSON.stringify({ ...receiptOf(w.client), recorded_by:'switch' }, null, 2));
+  const restored = w.restore(JSON.parse(updated.stdout).backup); assert.equal(restored.status,0,restored.stdout+restored.stderr);
+  assert.equal(get(w.client,'status/a.mjs'),'console.log("a v1")\n');
+  assert.equal(receiptOf(w.client).files['status/a.mjs'].hash,requireHash('console.log("a v1")\n'));
+  // So the restored runtime file is Orion's again, and the next update replaces it.
+  const again = w.update(v2); assert.equal(again.status,0,again.stdout+again.stderr);
+  assert.equal(get(w.client,'status/a.mjs'),'console.log("a v2")\n');
 });

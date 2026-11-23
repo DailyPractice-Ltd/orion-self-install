@@ -60,19 +60,22 @@ exact files Orion installed:
 - A receipt that cannot be read, is malformed or has an unsupported version stops the
   update before any change; never delete it to get past that.
 
-A folder installed before receipts has none: the helper then recognises Orion's files by
-the frozen fingerprints in `update/pristine.json`. The helper backs up replaced and
+A folder installed before receipts has none, and the update migrates it, from any older
+release straight to the pinned one (no intermediate release is needed, because the
+incoming release's own helper runs). A file whose bytes match a version Orion shipped,
+by the frozen fingerprints in `update/pristine.json`, counts as installed; anything else
+counts as unknown, with the same rules as above, so an unknown runtime or plugin file
+stops the update and an unknown ordinary file is kept and listed. The receipt the update
+writes holds only recognised files and files it installed. The helper backs up replaced and
 retired files and the receipt, retires listed files that are still as installed, checks
 the incoming scripts, and records the version and the new receipt after applying the
 update. On the same version it reports an up-to-date result when there is no work.
 
 ### The Orion plugin in an update
 
-The shipped package `plugins/orion/` is release-managed and replaced as a unit. With a
-receipt, an edited or added file in it stops the update first (above). The helper copies
-the complete previous package into the backup (`<backup>/package/plugins/orion/`); in a
-folder without a receipt, in-place edits go there too and are listed under
-`package.edits_backed_up`. Customizations belong in client skills under `.claude/skills/`
+The shipped package `plugins/orion/` is release-managed and replaced as a unit. An edited
+or added file in it stops the update first (above). The helper copies the complete
+previous package into the backup (`<backup>/package/plugins/orion/`). Customizations belong in client skills under `.claude/skills/`
 or `.agents/skills/`, which the update never touches. It also backs up the selected
 tool's catalog (`.claude-plugin/marketplace.json` or `.agents/plugins/marketplace.json`),
 which keeps the same catalog identity, and this folder's own registration entries for
@@ -101,7 +104,9 @@ Marketplace auto-updates never replace the pinned release: the Claude Code catal
 local folder read in place, and Orion never runs `codex plugin marketplace upgrade`.
 
 An interrupted update is rolled back from its journal with
-`node update/apply.mjs recover --root .`. Recovery restores only what the update wrote.
+`node update/apply.mjs recover --root .`. Recovery restores only what the update wrote,
+and puts the receipt back as it was (or removes it, for a folder that had none), so a retry
+never trusts a replacement that did not finish. The next update also recovers first.
 If a path changed since, it stops, overwrites nothing and names the paths and the step to take.
 
 Updates never start or renew the connection allowance. Before resuming Orion work, run
@@ -146,7 +151,10 @@ node update/apply.mjs restore --root . --backup .update-backup/VERSION-TIMESTAMP
 ```
 
 For an update, restore puts prior released files back and removes newly installed
-files. A file changed after update is kept and reported. It restores the prior
+files. A file changed after update, or a file written where the update retired one, is
+kept and reported. The receipt follows: restored files take back their earlier
+baselines, kept files keep the update's, so the next update still recognises the edit
+as the client's; files no longer there are no longer claimed. It restores the prior
 version and retired checklist keys without replacing the client's live status
 wholesale. It also puts back the previous plugin package, catalog and this folder's
 own registration entries, leaving other settings as they are now. If the package

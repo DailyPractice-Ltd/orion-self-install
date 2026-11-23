@@ -27,6 +27,17 @@ Write each section for the client who will read it there.
   plugin skills and the update would replace it, the update now stops before changing
   anything and names the files, instead of overwriting them. A damaged receipt also
   stops the update. A failed update puts the receipt back with the files.
+- Recovery and restore keep the receipt in step with the files. An interrupted update,
+  recovered with `recover` or by the next update, puts the receipt back exactly (or
+  removes it again for a folder that had none). A restore keeps files you changed after
+  the update, and now also keeps a file you wrote where the update retired one instead
+  of overwriting it; the receipt gives restored files their earlier baselines and keeps
+  your later edits recognised as yours on the next update.
+- Folders installed before receipts update straight to the latest release, with no
+  intermediate release. Files matching a version Orion shipped update as before and
+  enter the new receipt; files no release shipped are kept, listed, and never claimed
+  as Orion's. A changed script or plugin skill in such a folder now stops the update
+  too, instead of being overwritten.
 
 ### For maintainers
 

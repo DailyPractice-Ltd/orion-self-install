@@ -47,7 +47,11 @@ function fakeNative(base) {
 const ok = result => assert.equal(result.status, 0, result.stdout + result.stderr);
 const status = root => JSON.parse(read(root, 'status/status.json'));
 
-function journey(t, tool, { beforeInstall } = {}) {
+/**
+ * A release checkout of this working tree, committed, and a client installed from it, or
+ * with `installAt`, by the installer of that earlier commit.
+ */
+function journey(t, tool, { beforeInstall, installAt } = {}) {
   const base = mkdtempSync(join(tmpdir(), 'orion-deployed-'));
   t.after(() => rmSync(base, { recursive: true, force: true }));
   const release = join(base, 'release');
@@ -66,8 +70,22 @@ function journey(t, tool, { beforeInstall } = {}) {
     git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'working release');
   }
   beforeInstall?.(release);
-  ok(run(release, 'install.mjs', '--tool', tool, '--target', client, '--local-only'));
+  let installer = release;
+  if (installAt) {
+    installer = join(base, 'old-release');
+    git(base, 'clone', '-q', release, installer);
+    git(installer, 'checkout', '-q', installAt);
+  }
+  ok(run(installer, 'install.mjs', '--tool', tool, '--target', client, '--local-only'));
   return { release, client };
+}
+
+/** Commit `files` to the release checkout as its next release; returns the full commit. */
+function publish(release, files) {
+  for (const [path, text] of Object.entries(files)) put(release, path, text);
+  git(release, 'add', '-A');
+  git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'next release');
+  return git(release, 'rev-parse', 'HEAD');
 }
 
 const lfHash = bytes => createHash('sha256').update(bytes.toString('utf8').replace(/\r\n/g, '\n')).digest('hex');
@@ -170,6 +188,17 @@ for (const tool of ['claude-code', 'codex']) {
     put(client, `${pkg}/prospecting/SKILL.md`, installedSkill.replace(/\n/g, '\r\n'));
     put(client, 'status/guard.mjs', installedGuard);
     put(client, 'AGENTS.md', original.replace(/\n/g, '\r\n'));
+    // An update killed partway (the package is already replaced) is recovered with its receipt.
+    const killed = spawnSync(process.execPath, [join(client, 'update/apply.mjs'), 'update', '--root', client, '--release-repo', release, '--commit', pinned],
+      { cwd: client, encoding: 'utf8', env: plainEnv({ ORION_UPDATE_CRASH_AFTER: '2' }) });
+    assert.notEqual(killed.status, 0);
+    rmSync(join(client, 'status/.radio-lock'), { recursive: true });
+    ok(run(client, 'update/apply.mjs', 'recover', '--root', client));
+    assert.equal(read(client, 'status/installed-files.json'), receiptBefore);
+    assert.equal(read(client, `${pkg}/prospecting/SKILL.md`), installedSkill.replace(/\n/g, '\r\n'));
+    assert.equal(read(client, 'AGENTS.md'), original.replace(/\n/g, '\r\n'));
+    assert.equal(existsSync(join(client, `${pkg}/new-release/SKILL.md`)), false);
+    assert.equal(status(client).template_version, prior.template_version);
     const result = update();
     ok(result);
     const report = JSON.parse(result.stdout);
@@ -210,7 +239,14 @@ for (const tool of ['claude-code', 'codex']) {
     for (const forbidden of ['skills', tool === 'codex' ? '.claude' : '.agents', ...(tool === 'codex' ? [] : ['agents'])]) {
       assert.equal(existsSync(join(client, forbidden)), false, `${forbidden} after update`);
     }
-    ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
+    // A runtime edit made after the update is the client's: restore keeps it.
+    const updatedGuard = read(client, 'status/guard.mjs');
+    const laterGuard = updatedGuard + '\n// Client edit after the update.\n';
+    put(client, 'status/guard.mjs', laterGuard);
+    const restore = run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup);
+    ok(restore);
+    assert.ok(JSON.parse(restore.stdout).kept.includes('status/guard.mjs'));
+    assert.equal(read(client, 'status/guard.mjs'), laterGuard);
     assert.equal(read(client, retiredMeetingPackage), oldMeetingPackage);
     assert.equal(read(client, 'AGENTS.md'), original.replace(/\n/g, '\r\n'));
     assert.equal(read(client, `${skill(tool)}/hire-agent/SKILL.md`), 'Custom legacy instructions\n');
@@ -221,8 +257,23 @@ for (const tool of ['claude-code', 'codex']) {
     // The receipt follows the restored files: it no longer claims the update's files.
     const restoredReceipt = JSON.parse(read(client, 'status/installed-files.json'));
     assert.equal(restoredReceipt.files[`${pkg}/new-release/SKILL.md`], undefined);
+    assert.equal(restoredReceipt.files['status/guard.mjs'].hash, lfHash(Buffer.from(updatedGuard)), 'the kept edit keeps the update\'s baseline');
     for (const [path, entry] of Object.entries(restoredReceipt.files)) {
-      if (path !== 'README.md' && existsSync(join(client, path))) assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} after restore`);
+      if (!['README.md', 'status/guard.mjs'].includes(path) && existsSync(join(client, path))) assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} after restore`);
+    }
+
+    // Updating again uses those baselines: the restored files update, both edits stay.
+    const again = update();
+    ok(again);
+    const second = JSON.parse(again.stdout);
+    assert.ok(second.kept.includes('status/guard.mjs') && second.kept.includes('README.md'));
+    assert.equal(read(client, 'status/guard.mjs'), laterGuard);
+    assert.match(read(client, 'AGENTS.md'), /Release update\./);
+    assert.equal(read(client, `${pkg}/new-release/SKILL.md`), '# New release skill\n');
+    const finalReceipt = JSON.parse(read(client, 'status/installed-files.json'));
+    assert.equal(finalReceipt.files['status/guard.mjs'].hash, lfHash(Buffer.from(updatedGuard)));
+    for (const [path, entry] of Object.entries(finalReceipt.files)) {
+      if (!['README.md', 'status/guard.mjs'].includes(path)) assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} after the second update`);
     }
   });
 
@@ -300,5 +351,85 @@ for (const tool of ['claude-code', 'codex']) {
     ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
     assert.ok(existsSync(join(client, oldSkill)));
     assert.ok(existsSync(join(client, '.specify/scripts/bash/setup-tasks.sh')));
+  });
+}
+
+// The last 2.0.0 release before installed-file receipts.
+const BEFORE_RECEIPTS = '55d0e65ce1f521f6b2a072ebf60d6274a2c1a351';
+
+for (const tool of ['claude-code', 'codex']) for (const skip of [false, true]) {
+  test(`${tool} harness from before receipts ${skip ? 'skips the release that introduced them' : 'updates to receipts'} through the incoming updater, then updates again`, t => {
+    const { release, client } = journey(t, tool, { installAt: BEFORE_RECEIPTS });
+    assert.equal(existsSync(join(client, 'status/installed-files.json')), false, 'installed without a receipt');
+    const installedReadme = read(client, 'README.md');
+    const installedGuard = read(client, 'status/guard.mjs');
+    const installedAgents = read(client, 'AGENTS.md');
+    put(client, 'README.md', `${installedReadme}\nOur own notes.\n`);
+    put(client, `${skill(tool)}/personal/SKILL.md`, '# Personal skill\n');
+    put(client, 'status/guard.mjs', `${installedGuard}\n// Client runtime edit.\n`);
+    const pinned = skip
+      ? publish(release, { 'AGENTS.md': `${read(release, 'AGENTS.md')}\nA later release.\n`, [`${pkg}/prospecting/SKILL.md`]: `${read(release, `${pkg}/prospecting/SKILL.md`)}\nA later release.\n` })
+      : git(release, 'rev-parse', 'HEAD');
+    // agent/updating.md: the incoming release's own updater, from its checkout, runs against the harness.
+    const incoming = () => run(release, 'update/apply.mjs', 'update', '--root', client, '--commit', pinned);
+
+    // Bytes no release shipped, in a runtime file the update replaces, stop it before any change.
+    const blocked = incoming();
+    assert.equal(blocked.status, 2, blocked.stdout + blocked.stderr);
+    assert.deepEqual(JSON.parse(blocked.stdout).conflicts, [{ path: 'status/guard.mjs', reason: 'unknown' }]);
+    assert.equal(read(client, 'AGENTS.md'), installedAgents);
+    assert.equal(existsSync(join(client, 'status/installed-files.json')), false);
+    assert.equal(existsSync(join(client, '.update-backup')), false);
+
+    put(client, 'status/guard.mjs', installedGuard.replace(/\n/g, '\r\n'));
+    const migrated = incoming();
+    ok(migrated);
+    const report = JSON.parse(migrated.stdout);
+    for (const path of ['AGENTS.md', 'status/guard.mjs', 'update/apply.mjs', 'update/receipt.mjs', `${pkg}/prospecting/SKILL.md`]) {
+      assert.equal(lfHash(readFileSync(join(client, path))), lfHash(readFileSync(join(release, path))), `${path} is the pinned release's`);
+    }
+    assert.equal(read(client, 'README.md'), `${installedReadme}\nOur own notes.\n`, 'an edit no release shipped is kept');
+    assert.ok(report.unknown.includes('README.md'));
+    assert.equal(read(client, `${skill(tool)}/personal/SKILL.md`), '# Personal skill\n');
+    const receipt = JSON.parse(read(client, 'status/installed-files.json'));
+    assert.equal(receipt.ai_assistant, tool);
+    assert.equal(receipt.files['README.md'], undefined, 'unknown bytes are never adopted');
+    assert.equal(receipt.files[`${skill(tool)}/personal/SKILL.md`], undefined);
+    assert.ok(receipt.files['status/guard.mjs'] && receipt.files['update/receipt.mjs'] && receipt.files[`${pkg}/prospecting/SKILL.md`]);
+    for (const [path, entry] of Object.entries(receipt.files)) assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} is recorded as installed`);
+
+    // The migrated baselines carry the next update, run by the harness's own updater.
+    put(client, 'AGENTS.md', 'Our own agent instructions.\n');
+    const next = publish(release, {
+      'AGENTS.md': `${read(release, 'AGENTS.md')}\nThe release after.\n`,
+      'README.md': `${installedReadme}\nThe release after.\n`,
+      'status/guard.mjs': `${read(release, 'status/guard.mjs')}\n// The release after.\n`,
+    });
+    const again = run(client, 'update/apply.mjs', 'update', '--root', client, '--release-repo', release, '--commit', next);
+    ok(again);
+    const second = JSON.parse(again.stdout);
+    assert.match(read(client, 'status/guard.mjs'), /The release after/);
+    assert.equal(read(client, 'AGENTS.md'), 'Our own agent instructions.\n');
+    assert.ok(second.kept.includes('AGENTS.md'), 'an edit after migration is the client\'s');
+    assert.equal(read(client, 'README.md'), `${installedReadme}\nOur own notes.\n`);
+    assert.ok(second.unknown.includes('README.md'));
+    const after = JSON.parse(read(client, 'status/installed-files.json'));
+    assert.equal(after.files['AGENTS.md'].hash, receipt.files['AGENTS.md'].hash, 'the edited file keeps its migrated baseline');
+    assert.equal(after.files['status/guard.mjs'].hash, lfHash(readFileSync(join(client, 'status/guard.mjs'))));
+  });
+}
+
+for (const tool of ['claude-code', 'codex']) {
+  test(`${tool} harness with a damaged receipt never falls back to the frozen fingerprints`, t => {
+    const { release, client } = journey(t, tool, { installAt: BEFORE_RECEIPTS });
+    // The files are all shipped bytes the registry recognises; only the damaged receipt stands in the way.
+    put(client, 'status/installed-files.json', '{"schema":"orion-installed-files",');
+    const before = Object.fromEntries(['AGENTS.md', 'status/guard.mjs', `${pkg}/prospecting/SKILL.md`, 'status/status.json'].map(path => [path, read(client, path)]));
+    const result = run(release, 'update/apply.mjs', 'update', '--root', client, '--commit', git(release, 'rev-parse', 'HEAD'));
+    assert.equal(result.status, 2, result.stdout + result.stderr);
+    assert.match(result.stderr, /installed-file receipt[\s\S]*nothing was changed/);
+    for (const [path, text] of Object.entries(before)) assert.equal(read(client, path), text, path);
+    assert.equal(existsSync(join(client, 'update/receipt.mjs')), false);
+    assert.equal(existsSync(join(client, '.update-backup')), false);
   });
 }

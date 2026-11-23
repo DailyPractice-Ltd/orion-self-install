@@ -152,6 +152,10 @@ export async function withStatusLock(root, action, { wait = LOCK_WAIT_MS } = {})
       async writeReceiptText(text) {
         await atomicText(join(directory, 'installed-files.json'), String(text));
       },
+      /** Removes the receipt: only to put back a harness that had none, as a rollback or restore does. */
+      async removeReceipt() {
+        await unlink(join(directory, 'installed-files.json')).catch(error => { if (error.code !== 'ENOENT') throw error; });
+      },
       async removeKey() {
         await unlink(keyPath(root)).catch(error => { if (error.code !== 'ENOENT') throw error; });
       },

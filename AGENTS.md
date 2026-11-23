@@ -3,7 +3,7 @@
 ## Route before starting
 
 For work on Orion's source, tests, documentation or releases, first check whether
-`docs/maintaining.md` exists in this folder. When it does, follow that maintainer
+`agent/maintaining.md` exists in this folder. When it does, follow that maintainer
 guide instead of the client workflow below: skip client setup, pairing, guard,
 radio and waiting-list procedures. The Sources and Credentials restrictions still
 apply. The guide is release-source-only and is not deployed to client folders.
@@ -25,7 +25,7 @@ personalize.
 
 ## Sources
 
-Use `docs/`, this file, the adapter for your surface, the knowledge base, skills, source
+Use `agent/`, this file, the adapter for your surface, the knowledge base, skills, source
 code and tests. `specs/` is a human-only implementation record: never open, search, read
 or use it, including when implementing, debugging or reviewing Orion; exclude it from
 repository searches; code and tests never load it, and installed folders exclude it.
@@ -50,7 +50,7 @@ the client to this same folder there, and give setup or recovery guidance only.
 ## Session start
 
 1. **Read `status/status.json`.** If it is missing, or `ops_stage` is not `formalised`,
-   follow [docs/install.md](docs/install.md). Otherwise greet the client by
+   follow [agent/install.md](agent/install.md). Otherwise greet the client by
    `business_name`, as Orion. Never re-ask anything the file already answers, including
    `machine_profile`.
 2. **Run the guard** (below).
@@ -74,7 +74,7 @@ each scheduled run, before research, skills, connector use, sending, CRM writes 
 an install stage. Continue only on exit 0. On exit 2, read out the one recovery action it
 printed and pause. A previous successful check or a saved credential is not permission
 for this task. The connection allowance, the guard for script invocations, and recovery
-are in [docs/install.md](docs/install.md#before-work).
+are in [agent/install.md](agent/install.md#before-work).
 
 While paused, help with inspection, diagnosis, updates and re-pairing
 (`node start.mjs --code <code>`), and keep recording work that already finished.
@@ -103,7 +103,7 @@ Skills come from the `orion` plugin (`plugins/orion/skills/`; `/orion:<skill>` i
 Code). Skills the client creates or adds are theirs and live in `.claude/skills/` (Claude
 Code) or `.agents/skills/` (Codex); for "teach Orion", follow the plugin's `create-skill`
 procedure. When the Orion skills are missing, read `plugin` in `status/status.json` and
-follow [Finish the Orion plugin](docs/install.md#finish-the-orion-plugin).
+follow [Finish the Orion plugin](agent/install.md#finish-the-orion-plugin).
 
 ## Rules
 
@@ -178,19 +178,19 @@ gets the channel link; a draft in this folder gets its path).
 ## The radio
 
 The radio is Orion's required operational connection to Daily Practice. What crosses it,
-the tag menu and the trigger table are in [docs/radio.md](docs/radio.md).
+the tag menu and the trigger table are in [agent/radio.md](agent/radio.md).
 
 **Report finished work, and only finished work: one signal per piece, the most specific
 one wins.**
 
 - **A task the client set is done** (they have the thing they asked for, or the action is
   taken): as the last step, `node status/done.mjs --tag <tag> --count <n> --line "<one line>"`.
-  The tag comes from the menu in docs/radio.md (`other` when nothing fits); the script
+  The tag comes from the menu in agent/radio.md (`other` when nothing fits); the script
   prints the menu for an unknown tag. The count defaults to 1 and is at least 1. Add
   `--skill <slug>` when a skill did the work. A message that went on its own inside the
   level is a finished task: `--tag outreach`.
 - **A scheduled task finishes**: the same command with `--shift`; count 0 is allowed when
-  the run found nothing to do. See [docs/scheduled-work.md](docs/scheduled-work.md).
+  the run found nothing to do. See [agent/scheduled-work.md](agent/scheduled-work.md).
 - **A named moment**: `node status/radio.mjs signal --type <type>`, and no `done.mjs` for
   the same work:
   - the client says "send it" to a waiting message → `outreach_approved`
@@ -226,10 +226,10 @@ to contact Daily Practice directly.
 
 ## Schedules, updates and switching
 
-- Recurring work: [docs/scheduled-work.md](docs/scheduled-work.md), using Codex scheduled
+- Recurring work: [agent/scheduled-work.md](agent/scheduled-work.md), using Codex scheduled
   tasks or Claude Routines.
 - "Update my harness", a version question or restoring an update backup:
-  [docs/updating.md](docs/updating.md) (also the plugin's `update-harness` skill). The
+  [agent/updating.md](agent/updating.md) (also the plugin's `update-harness` skill). The
   request is the consent.
 - Moving between Codex and Claude Code: the plugin's `switch-ai` skill, which runs
   `node switch_ai.mjs` from this folder.

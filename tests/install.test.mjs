@@ -109,7 +109,7 @@ for (const [name, files] of [
     const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', 'claude-code', '--target', target, '--local-only'], { encoding: 'utf8', env: noNative });
     assert.notEqual(run.status, 0);
     assert.match(run.stderr, /Orion 1\.x/);
-    assert.match(run.stderr, /docs\/reinstall-from-1\.x\.md/);
+    assert.match(run.stderr, /agent\/reinstall-from-1\.x\.md/);
     for (const [path, text] of Object.entries(files)) assert.equal(readFileSync(join(target, path), 'utf8'), text, `${path} left alone`);
   });
 }
@@ -147,7 +147,7 @@ test('install CLI refuses --migrate-from and points at the reinstall guide', t =
   writeFileSync(join(legacy,'agent-definition.md'),'old\n');
   const result=spawnSync(process.execPath,[join(release,'install.mjs'),'--tool','claude-code','--target',target,'--migrate-from',legacy,'--local-only'],{encoding:'utf8',env:noNative});
   assert.equal(result.status,2,result.stdout+result.stderr);
-  assert.match(result.stderr,/docs\/reinstall-from-1\.x\.md/);
+  assert.match(result.stderr,/agent\/reinstall-from-1\.x\.md/);
   assert.equal(existsSync(target),false);
   assert.equal(readFileSync(join(legacy,'agent-definition.md'),'utf8'),'old\n');
 });

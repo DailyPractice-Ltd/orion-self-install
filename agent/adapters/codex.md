@@ -1,7 +1,7 @@
 # Adapter — Codex
 
 Surface mechanics only. Behaviour is in [AGENTS.md](../../AGENTS.md); install, pairing
-and recovery are in [docs/install.md](../../docs/install.md). What
+and recovery are in [agent/install.md](../install.md). What
 [the Claude Code adapter](claude-code.md) says you do directly (status and knowledge-base
 edits, CRM apply scripts, Node checks, connector sign-in) applies here too.
 
@@ -31,7 +31,7 @@ network policy.
 
 ## Scheduling
 
-Use Codex scheduled tasks for recurring work; see [Schedule Orion](../../docs/scheduled-work.md).
+Use Codex scheduled tasks for recurring work; see [Schedule Orion](../scheduled-work.md).
 When a send tool is missing or needs interactive approval, leave the message waiting.
 
 ## Waiting for you, on this surface

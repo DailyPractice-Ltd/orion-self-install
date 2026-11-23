@@ -30,7 +30,7 @@ test('deployed docs place shipped skills in the orion plugin, not the client ski
 });
 
 test('the manual plugin validation checklist stays release-only', () => {
-  assert.ok(existsSync(join(root, 'docs/plugin-validation.md')));
-  assert.ok(!deployedDocs.includes('docs/plugin-validation.md'));
-  assert.ok(manifest.deployment.release_only.includes('docs/plugin-validation.md'));
+  assert.ok(existsSync(join(root, 'agent/plugin-validation.md')));
+  assert.ok(!deployedDocs.includes('agent/plugin-validation.md'));
+  assert.ok(manifest.deployment.release_only.includes('agent/plugin-validation.md'));
 });

@@ -666,7 +666,7 @@ async function migrate(rest) {
   const { flags, problems } = parseFlags(rest, { values: ['backup'] });
   if (problems.length > 0) return refuse(problems);
   const files = keptFiles();
-  // The update's own backup folder is .update-backup/{version}-{date}/ (docs/updating.md step 3)
+  // The update's own backup folder is .update-backup/{version}-{date}/ (agent/updating.md step 3)
   // and this runs before step 6 bumps the version, so the two land in one place.
   const beforeStatus = peekStatus();
   const backupDir = flags.backup ? join(FOLDER, flags.backup) : join(FOLDER, '.update-backup', `${beforeStatus?.template_version || 'send-risk'}-${stamp().slice(0, 10)}`);

@@ -1,6 +1,6 @@
 {
-  "_read_first": "Follow docs/updating.md with the manifest and update/pristine.json pinned to main. The deployment map uses the tool recorded in status. The request is consent: never stop to ask, and never replace a file the client has changed outside the documented runtime-script exception.",
-  "_what": "deployment is the source-to-destination and ownership contract for separate client repositories; select exactly one recorded tool. 2.0.0 is a reinstall release: this manifest updates 2.0.0 and later only (docs/reinstall-from-1.x.md). Contract: docs/updating.md and deployment._contract.",
+  "_read_first": "Follow agent/updating.md with the manifest and update/pristine.json pinned to main. The deployment map uses the tool recorded in status. The request is consent: never stop to ask, and never replace a file the client has changed outside the documented runtime-script exception.",
+  "_what": "deployment is the source-to-destination and ownership contract for separate client repositories; select exactly one recorded tool. 2.0.0 is a reinstall release: this manifest updates 2.0.0 and later only (agent/reinstall-from-1.x.md). Contract: agent/updating.md and deployment._contract.",
   "_regenerate": "Map every file under plugins/orion/ in deployment.entries, once each, with no per-tool destinations: the package ships at its own path for every tool. Run node tests/helpers/pristine.mjs --write after release edits.",
   "template_version": "2.0.0",
   "never_touch": {
@@ -50,11 +50,11 @@
       "crm/hubspot/apply-hubspot-template.mjs",
       "crm/hubspot/hubspot-template.json",
       "crm/other-crm-manual-setup.md",
-      "docs/radio.md",
-      "docs/scheduled-work.md",
-      "docs/self-serve-learnings.md",
-      "docs/simulated-dry-run-example.md",
-      "docs/updating.md",
+      "agent/radio.md",
+      "agent/scheduled-work.md",
+      "agent/self-serve-learnings.md",
+      "agent/simulated-dry-run-example.md",
+      "agent/updating.md",
       "start.mjs",
       "status/done.mjs",
       "status/emit-status.mjs",
@@ -78,8 +78,8 @@
       "status/guard.mjs",
       "status/store.mjs",
       "status/report.mjs",
-      "docs/install.md",
-      "docs/reinstall-from-1.x.md"
+      "agent/install.md",
+      "agent/reinstall-from-1.x.md"
     ],
     "retired": [
       {
@@ -722,7 +722,9 @@
       "specs/",
       "tests/",
       "CLAUDE.md",
-      "docs/plugin-validation.md"
+      "agent/plugin-validation.md",
+      "agent/maintaining.md",
+      "img/"
     ],
     "ownership": {
       "release": "Install only into an absent destination. On update replace only when the destination fingerprint is a known shipped copy for this fingerprint_key; preserve and report edits and collisions. Back up before replacement or retirement.",

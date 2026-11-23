@@ -1,7 +1,7 @@
 # Adapter — Claude Code
 
 Surface mechanics only. Behaviour is in [AGENTS.md](../../AGENTS.md); install, pairing
-and recovery are in [docs/install.md](../../docs/install.md).
+and recovery are in [agent/install.md](../install.md).
 
 ## Loading the instructions
 
@@ -32,7 +32,7 @@ updates never touch them. Claude Code loads the package in place, so a fresh ses
 
 ## Scheduling
 
-Use Claude Routines for recurring work; see [Schedule Orion](../../docs/scheduled-work.md).
+Use Claude Routines for recurring work; see [Schedule Orion](../scheduled-work.md).
 A Claude desktop scheduled task sends only once its send tool is allowed in that task's
 "always allowed" panel; otherwise the run stalls. When a send tool is missing or needs
 interactive approval, leave the message waiting.

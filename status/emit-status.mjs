@@ -2,7 +2,7 @@
 /**
  * Update status/status.json locally, and — only when the radio is on (the welcome-pack
  * fields are set and sharing.status_signal_enabled is true) — emit an install_checkpoint
- * signal through the authenticated bridge (docs/radio.md). The radio is the only outbound path; the unauthenticated 001-era
+ * signal through the authenticated bridge (agent/radio.md). The radio is the only outbound path; the unauthenticated 001-era
  * webhook was removed in the 002a reconciliation.
  *
  *   node status/emit-status.mjs --ops_stage day1_encode --harness_status configured

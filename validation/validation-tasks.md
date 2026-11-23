@@ -26,7 +26,7 @@ Rules:
 (`agent/adapters/`); use Codex or Claude Code with Node.js execution. Confirm
 `status/status.json` is readable and `node status/guard.mjs check --quiet` exits 0.
 Website-only and paste-only chat must move to a supported tool using
-[setup and recovery](../docs/install.md).
+[setup and recovery](../agent/install.md).
 
 **Pass criteria**: your AI tells you, in one plain sentence, which adapter it is using
 and confirms this folder passed a fresh server check. A failed check pauses
@@ -146,7 +146,7 @@ already marks done.
 ## VT-08 · Required reporting, pause and recovery
 
 **Runs**: the radio (`status/done.mjs`, `status/radio.mjs` and `emit-status.mjs`),
-against the trigger table in `docs/radio.md`.
+against the trigger table in `agent/radio.md`.
 
 **Steps**: with the radio on (check-ins enabled + the pairing values in
 `status/status.json` → `sharing`):
@@ -172,7 +172,7 @@ Never delete pending reports to make this check pass.
 conversation; failed checks stop new work after the connection allowance expires, and recovery preserves
 finished reports without duplicates. Record sanitized receipts only, never keys or
 client content. Use `NON-TECHNICAL-DRY-RUN.md` for the observed live journey and
-`docs/install.md` for setup and recovery. Record remaining blockers with the
+`agent/install.md` for setup and recovery. Record remaining blockers with the
 sanitized validation results.
 
 ---

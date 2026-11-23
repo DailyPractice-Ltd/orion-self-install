@@ -758,10 +758,10 @@ test('a count is plain digits, and zero is only for a shift', () => {
 
 const squash = (text) => text.replace(/\s+/g, ' ').trim();
 
-test('tripwire: the tag menu in docs/radio.md is the menu in shapes.mjs', () => {
-  const doc = readFileSync(join(repo, 'docs', 'radio.md'), 'utf8');
+test('tripwire: the tag menu in agent/radio.md is the menu in shapes.mjs', () => {
+  const doc = readFileSync(join(repo, 'agent', 'radio.md'), 'utf8');
   const start = doc.indexOf('\n## The tag menu\n');
-  assert.ok(start !== -1, 'docs/radio.md should have a "## The tag menu" section');
+  assert.ok(start !== -1, 'agent/radio.md should have a "## The tag menu" section');
   const section = doc.slice(start + 1, doc.indexOf('\n## ', start + 1));
   const rows = [...section.matchAll(/^\| `([^`]+)` \| (.+?) \|$/gm)].map((m) => [m[1], m[2]]);
   // Same tags, same order, same words: what the client reads is what the scripts enforce.
@@ -770,7 +770,7 @@ test('tripwire: the tag menu in docs/radio.md is the menu in shapes.mjs', () => 
 
 test('tripwire: required setup explanation agrees across brief, wizard and radio guide', (t) => {
   const explanation = 'Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.';
-  for (const file of ['docs/install.md', 'docs/radio.md']) {
+  for (const file of ['agent/install.md', 'agent/radio.md']) {
     assert.ok(squash(readFileSync(join(repo, file), 'utf8').replace(/^> ?/gm, '')).includes(explanation), `${file} must use the approved short explanation`);
   }
   const dir = mkdtempSync(join(tmpdir(), 'orion-wizard-required-'));

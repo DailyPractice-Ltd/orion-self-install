@@ -74,6 +74,6 @@ hand. 2.0.0 was cut by hand. For later releases:
 
 Release notes come from `CHANGELOG.md` on `main`, while validation runs on the
 candidate commit. Ensure the intended notes are on `main` before publication.
-Client updates also read `main` through `docs/updating.md`; review that exposure
+Client updates also read `main` through `agent/updating.md`; review that exposure
 when merging release changes. Report local commit/tag state separately from
 confirmed remote publication.

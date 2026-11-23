@@ -46,7 +46,7 @@ never rename them.
 | `ops_stage` | What happens | Detail |
 |---|---|---|
 | `booked` | Say hello, set expectations, confirm a fresh start or a resume; pair Orion | this file |
-| `day1_encode` | Capture the knowledge base (business, ICP, offer, tone, objections, commitments) | [knowledge base guide](../agent/knowledge-base/README.md), [Capture notes](#capture-notes) |
+| `day1_encode` | Capture the knowledge base (business, ICP, offer, tone, objections, commitments) | [knowledge base guide](knowledge-base/README.md), [Capture notes](#capture-notes) |
 | `day2_wire_and_run` | CRM choice and setup, connector sign-in (CRM, email, calendar), first real task | [CRM](../crm/README.md), [connectors](../connectors/connector-checklist.md) |
 | `validated` | Run the validation tasks against the client's real accounts | [validation tasks](../validation/validation-tasks.md) |
 | `seven_day_checkin` | The client drives Orion solo; you are on standby for questions | [AGENTS.md](../AGENTS.md) |
@@ -64,7 +64,7 @@ never rename them.
 - **Send level.** At the end of the install, tell the client once, in these words: "Your
   harness sends on its own at low: replies and logistics. Say 'set my risk to medium' to
   change it, or 'pause sending' to stop it." The matrix in plain words is
-  [risk-matrix.md](../agent/risk-matrix.md).
+  [risk-matrix.md](risk-matrix.md).
 
 ## Pair Orion
 
@@ -194,7 +194,7 @@ the guard blocks.
   `node start.mjs --code YOUR-CODE` in this folder.
 - **The service cannot be reached:** restore the network, then rerun the guard. If the
   assistant's sandbox blocked it, approve the network command in that tool (see the
-  [Codex adapter](../agent/adapters/codex.md)). On a company network, ask IT to allow
+  [Codex adapter](adapters/codex.md)). On a company network, ask IT to allow
   HTTPS to `www.dailypractice.world`.
 - **Server error:** retry the guard once service is restored. Keep the saved state.
 - **Pending reports:** rerun the guard after recovery. It replays their original event

@@ -11,7 +11,7 @@
  * ends. Chat alone is not work: a greeting, a question, an answer, a plan, or a
  * draft still waiting on a yes runs nothing.
  *
- *   --tag     The kind of work, from the menu in status/shapes.mjs (docs/radio.md
+ *   --tag     The kind of work, from the menu in status/shapes.mjs (agent/radio.md
  *             lists it in plain words). Required.
  *   --count   How many things were done. A whole number; leave it out and it
  *             is 1. A finished task is at least 1. Only a shift may report 0:

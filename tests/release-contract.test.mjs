@@ -25,14 +25,16 @@ test('release contract plans one selected runtime from portable sources', (t) =>
     assert.equal(run.status, 0, run.stderr);
     const plan = JSON.parse(run.stdout);
     const destinations = plan.entries.map((entry) => entry.destination);
-    for (const path of ['status/guard.mjs', 'status/store.mjs', 'status/report.mjs', 'docs/install.md', 'docs/reinstall-from-1.x.md']) {
+    for (const path of ['status/guard.mjs', 'status/store.mjs', 'status/report.mjs', 'agent/install.md', 'agent/reinstall-from-1.x.md']) {
       assert.ok(destinations.includes(path), `${path} must reach an installed ${tool} folder`);
     }
     for (const path of ['agent/agent-definition.md', 'docs/setup.md', 'agent/adapters/claude.md']) {
       assert.ok(!destinations.includes(path), `${path} was retired in 2.0.0`);
     }
     assert.ok(!destinations.some(path => path.startsWith('.specify/')), 'maintainer governance stays in the release');
-    assert.ok(!destinations.includes('docs/maintaining.md'), 'the maintainer route stays out of client folders');
+    assert.ok(!destinations.includes('agent/maintaining.md'), 'the maintainer route stays out of client folders');
+    assert.ok(!destinations.some(path => path.startsWith('docs/')), 'fresh installs use agent/ for guidance');
+    assert.ok(!destinations.some(path => path.startsWith('img/')), 'screenshots stay repository-only');
     assert.ok(!plan.entries.some(entry => [entry.source, entry.destination].some(path => path.split('/').includes('specs'))), 'human-only records stay out of every deployment');
     const skills = 'plugins/orion/skills';
     for (const name of ['prospecting', 'call-planner', 'friday-report']) {
@@ -125,7 +127,7 @@ test('supported instructions route website chat to an executable paired folder',
     const text = readFileSync(join(repo, file), 'utf8');
     assert.match(text, /Codex.*Claude Code|Claude Code.*Codex/s, `${file} names the supported tools`);
     assert.match(text, /website|paste-only/i, `${file} explains the unsupported surface`);
-    assert.match(text, /docs\/install\.md|install\.md/, `${file} points at executable setup and recovery`);
+    assert.match(text, /agent\/install\.md|install\.md/, `${file} points at executable setup and recovery`);
     assert.doesNotMatch(text, /always works|works just as well|nothing else about your install is affected|your work is unaffected|You can switch this off\. Keep check-ins on/);
   }
 });

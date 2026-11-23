@@ -2,6 +2,10 @@
 
 ## Unreleased — one instruction file, reinstall from 1.x
 
+- Operational and maintenance guides move from `docs/` directly into `agent/`.
+  Screenshots move to root `img/` and remain repository-only. Fresh installs and
+  current instructions use the new paths; no legacy path migration is added.
+
 - Source maintenance routes before client setup to release-only `docs/maintaining.md`,
   covering version selection, checks, commits and tags without client pairing or radio.
   Installed folders retain the client workflow.

@@ -19,7 +19,7 @@ Connectors live **in your AI assistant itself** — Claude, ChatGPT, or Copilot 
 their own "connectors" or "integrations" settings, and that is where these sign-ins
 happen and where the credentials stay. No credential is ever stored in this folder or
 sent to Daily Practice (the optional check-in radio sends only labels and counts —
-`docs/radio.md` is that whole story). The safety is not the tool: it is your agent's own
+`agent/radio.md` is that whole story). The safety is not the tool: it is your agent's own
 non-negotiable rules. Every message is scored and goes only inside the risk level you
 set; the rest waits for your yes (`AGENTS.md`, rule 1; constitution
 Article III). Your level is the gate, and you move it.

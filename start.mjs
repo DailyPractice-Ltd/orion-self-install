@@ -433,7 +433,7 @@ async function main() {
   } else {
     say("  • I didn't find an AI app installed here.");
     say('    Install Codex or Claude Code, then open this folder there.');
-    say('    See docs/install.md for the supported installation route.');
+    say('    See agent/install.md for the supported installation route.');
   }
 
   status.machine_profile = {
@@ -624,7 +624,7 @@ function printHandoff(surface) {
       box(prompt);
       break;
     default:
-      say('Open this installed folder in Codex or Claude Code. See docs/install.md.');
+      say('Open this installed folder in Codex or Claude Code. See agent/install.md.');
   }
   say('');
   say('(That prompt also lives in README.md, so you can copy it later without');

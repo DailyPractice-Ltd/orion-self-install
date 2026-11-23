@@ -2,6 +2,11 @@
 
 ## Unreleased — one instruction file, reinstall from 1.x
 
+- Recommend Matt Pocock's full skills plugin as an optional, resumable step in
+  new Codex and Claude Code installations, with saved choices and verified
+  completion. Declining or deferring never blocks Orion setup; existing harness
+  updates do not prompt for it. Installation commands come from the upstream guide.
+
 - Simplify test maintenance by removing duplicate package checks and brittle prose
   snapshots. Keep behavioral regressions and shared policy consistency checks.
   Test fixtures copy release resources without inheriting local operational state.

@@ -45,7 +45,7 @@ never rename them.
 
 | `ops_stage` | What happens | Detail |
 |---|---|---|
-| `booked` | Say hello, set expectations, confirm a fresh start or a resume; pair Orion | this file |
+| `booked` | Say hello, set expectations, confirm a fresh start or a resume; pair Orion, finish its plugin, offer the optional Matt Pocock plugin | this file |
 | `day1_encode` | Capture the knowledge base (business, ICP, offer, tone, objections, commitments) | [knowledge base guide](knowledge-base/README.md), [Capture notes](#capture-notes) |
 | `day2_wire_and_run` | CRM choice and setup, connector sign-in (CRM, email, calendar), first real task | [CRM](../crm/README.md), [connectors](../connectors/connector-checklist.md) |
 | `validated` | Run the validation tasks against the client's real accounts | [validation tasks](../validation/validation-tasks.md) |
@@ -154,6 +154,35 @@ node update/plugin-setup.mjs resume
 `node update/plugin-setup.mjs verify` inspects without changing anything, and
 `node update/plugin-setup.mjs status` prints where setup stands. Report "plugin setup
 complete" only when the command says so.
+
+## Optional: Matt Pocock's skills
+
+**New installs only, Codex and Claude Code:** run this step after Orion's plugin is
+ready, before moving from `booked` to `day1_encode`. Updates, restores, tool switches
+and normal work skip it. Every outcome allows Orion setup to continue; track this
+choice in `notes`, independently of Orion's `plugin.setup_state`.
+
+1. **Resume.** Read the saved choice: `declined` or `installed (<tool>)` finishes
+   this step; `accepted, pending` resumes at step 3. With no saved choice, inspect
+   the selected tool: an enabled plugin whose skills are available earns
+   `installed (<tool>)`; otherwise proceed to the offer.
+2. **Offer once.** Recommend the full `mattpocock-skills` plugin for planning,
+   reviewing and improving work with the AI assistant. Explain that it is optional,
+   comes from a third party and may make skills available in other projects. Ask
+   whether to install it. Save `declined` or `accepted, pending` before continuing.
+3. **Install on acceptance.** Read
+   [Matt Pocock's installation guide](https://github.com/mattpocock/skills#installation-30-second-setup)
+   and follow its native plugin route for the selected tool. If editable copies
+   already exist, resolve the client's choice of route first so each skill has one
+   installation. On failure or deferral, save the remaining action alongside
+   `accepted, pending` and continue Orion setup.
+4. **Verify.** Record `installed (<tool>)` only when the native plugin list shows
+   it installed and enabled and a session exposes its skills; start a fresh session
+   if needed. Then offer `/setup-matt-pocock-skills` as separate optional onboarding.
+
+Persist each choice as `Matt Pocock plugin: <choice>` in `status/status.json`'s
+`notes`, using `changeStatus` from `status/store.mjs`. Update that entry while
+preserving unrelated notes.
 
 ## Before work
 

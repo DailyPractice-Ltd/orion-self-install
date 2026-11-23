@@ -8,6 +8,10 @@
   command, and complete user-wide enablement correction before starting a fresh chat.
 - Probe destination permissions, including `.agents` and `.codex`, before replacing
   release files and report all blocked paths together.
+- Recommend Matt Pocock's full skills plugin as an optional, resumable step in
+  new Codex and Claude Code installations, with saved choices and verified
+  completion. Declining or deferring never blocks Orion setup; existing harness
+  updates do not prompt for it. Installation commands come from the upstream guide.
 
 - Simplify test maintenance by removing duplicate package checks and brittle prose
   snapshots. Keep behavioral regressions and shared policy consistency checks.

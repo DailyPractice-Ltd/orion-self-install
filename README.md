@@ -61,6 +61,11 @@ node start.mjs
 The wizard checks your computer, saves your answers, and requires verified pairing
 before it gives you the prompt to start working with your AI assistant.
 
+During new setup, your assistant also recommends Matt Pocock's optional
+`mattpocock-skills` plugin for Codex or Claude Code and helps you install it if you
+choose. You can decline and finish Orion setup as usual. See the
+[optional plugin step](agent/install.md#optional-matt-pococks-skills).
+
 Pair Orion with Daily Practice to finish setup. This lets us support your harness, deliver updates, and see when it is running. Sign in to Daily Practice to get your one-time code.
 
 Get your code at [Daily Practice](https://www.dailypractice.world/home/pair).

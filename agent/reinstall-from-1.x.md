@@ -40,7 +40,8 @@ From the 1.x folder into the new one, copy, at the same paths:
 - `status/send-log.md`, `status/work-log.md` and `status/shift-log.md`: the client's own
   history, when they exist.
 - The client's own skills: `.claude/skills/` (Claude Code) or `.agents/skills/` (Codex).
-  Leave out any skill whose name matches one shipped in `plugins/orion/skills/`.
+  Leave out any skill whose name matches one shipped in `plugins/orion/skills/`, the speckit skills 
+  and hire-agent skills
 - A hired team in `.claude/agents/`: copy it to `legacy/claude-agents/` in the new folder,
   for reference. 2.0.0 does not load it.
 

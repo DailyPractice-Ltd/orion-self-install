@@ -7,12 +7,13 @@ import {pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {checkWork} from '../status/guard.mjs';
 import {plainEnv} from './helpers/env.mjs';
+import { copyStatusResources } from './helpers/status.mjs';
 const time='2026-11-18T12:00:00.000Z';
 const deadline='2026-11-20T12:00:00.000Z';
 const id='11111111-1111-1111-1111-111111111111';
 for(const entry of ['done','signal','report']) test(`${entry}-first failure queues labels without creating an allowance`,async t=>{
  const root=mkdtempSync(join(tmpdir(),'report-first-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
- cpSync(new URL('../status/',import.meta.url),join(root,'status'),{recursive:true});
+ copyStatusResources(root);
  cpSync(new URL('../update/',import.meta.url),join(root,'update'),{recursive:true});
  writeFileSync(join(root,'status/status.json'),JSON.stringify({ops_stage:'formalised',harness_status:'running',template_version:'2.0.0',agent_name:'Orion',sharing:{status_signal_enabled:true,bridge_url:'https://example.com/api/bridge',harness_id:id,install_token:'orion_'+'test'.repeat(6)}}));
  const preload=join(root,'offline.mjs');writeFileSync(preload,`const RealDate=Date;globalThis.Date=class extends RealDate{constructor(...args){super(...(args.length?args:[${JSON.stringify(time)}]));}static now(){return ${Date.parse(time)};}};globalThis.fetch=async()=>{throw Error('offline');};`);

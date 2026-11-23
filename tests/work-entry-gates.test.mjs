@@ -5,11 +5,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { plainEnv } from './helpers/env.mjs';
+import { copyStatusResources } from './helpers/status.mjs';
 const source = new URL('../', import.meta.url);
 const identity = '11111111-1111-1111-1111-111111111111';
 function harness(t, outcome='accepted', pending=false) {
  const root=mkdtempSync(join(tmpdir(),'orion-work-gate-')); t.after(()=>rmSync(root,{recursive:true,force:true}));
- for(const path of ['status','update','crm','plugins/orion/skills/call-planner']) cpSync(new URL(path,source),join(root,path),{recursive:true});
+ copyStatusResources(root);
+ for(const path of ['update','crm','plugins/orion/skills/call-planner']) cpSync(new URL(path,source),join(root,path),{recursive:true});
  const status=JSON.parse(readFileSync(new URL('status/status.schema-template.json',source),'utf8'));
  status.ai_assistant='codex'; status.scopes.send_risk='low'; status.sharing={...status.sharing,status_signal_enabled:true,bridge_url:'https://bridge.test/api/bridge',harness_id:identity,install_token:'orion_'+'test'.repeat(6)};
  writeFileSync(join(root,'status/status.json'),JSON.stringify(status));

@@ -295,7 +295,7 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(read(client, '.specify/memory/constitution.md'), '# Client constitution\n');
     assert.ok(report.retired.includes(oldSkill));
     assert.ok(report.retired.includes('.specify/scripts/bash/setup-tasks.sh'));
-    assert.ok(report.kept.includes(editedSkill));
+    assert.ok(report.unknown.includes(editedSkill), 'no shipped version matches the edit');
     assert.equal(existsSync(join(client, 'update/scaffold')), false);
     ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
     assert.ok(existsSync(join(client, oldSkill)));

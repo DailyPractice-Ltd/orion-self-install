@@ -23,6 +23,11 @@ test('pinned selected update preserves collisions and restores additions and ret
   git(source,'init','-q'); git(source,'add','.'); git(source,'-c','user.email=test@example.com','-c','user.name=Test','commit','-qm','release'); const commit=git(source,'rev-parse','HEAD'); put(source,'AGENTS.md','uncommitted instructions\n');
   put(client,'status/status.json',JSON.stringify({template_version:'1.0.0',ai_assistant:'codex',notes:'before',sharing:{pairing:{version:2,state:'verified',verified_at:'2026-11-18T12:00:00.000Z',last_check:'unreachable',last_connected_at:'2026-11-18T12:00:00.000Z'}},checklist:{n8n_wf01_imported:true,connector_crm_live:true}}));
   put(client,'AGENTS.md','old instructions\r\n'); put(client,'status/a.mjs','client edited script\n'); put(client,'status/b.mjs','old b\n'); put(client,'.agents/skills/foo/SKILL.md','client edit\n'); put(client,'.agents/skills/old/SKILL.md','old retired\n'); put(client,'agents/README.md','personalized roster\n'); put(client,'.claude/skills/foo/SKILL.md','other tool content\n');
+  // Without a receipt, an edited runtime script is unknown to Orion and stops the update before any change.
+  const blocked=run('update','--root',client,'--release-repo',source,'--commit',commit); assert.equal(blocked.status,2,blocked.stdout+blocked.stderr);
+  assert.deepEqual(JSON.parse(blocked.stdout).conflicts,[{path:'status/a.mjs',reason:'unknown'}]);
+  assert.equal(get(client,'AGENTS.md'),'old instructions\r\n'); assert.equal(existsSync(join(client,'status/installed-files.json')),false); assert.equal(existsSync(join(client,'.update-backup')),false);
+  put(client,'status/a.mjs','old a\n');
   const updated=run('update','--root',client,'--release-repo',source,'--commit',commit); assert.equal(updated.status,0,updated.stderr); const report=JSON.parse(updated.stdout);
   assert.equal(report.ai_assistant, 'codex');
   const updatedStatus = JSON.parse(get(client, 'status/status.json'));
@@ -30,8 +35,8 @@ test('pinned selected update preserves collisions and restores additions and ret
   assert.deepEqual(updatedStatus.sharing.pairing,{version:2,state:'verified',verified_at:'2026-11-18T12:00:00.000Z',last_check:'unreachable',last_connected_at:'2026-11-18T12:00:00.000Z'});
   assert.deepEqual(updatedStatus.checklist, { connector_crm_live: true });
   put(client, 'status/status.json', JSON.stringify({ ...updatedStatus, agent_name: 'Orion' }));
-  assert.equal(get(client,'AGENTS.md'),'new instructions\n'); assert.equal(get(client,'status/a.mjs'),'console.log("new a")\n'); assert.equal(get(client,'status/b.mjs'),'console.log("new b")\n'); assert.equal(get(client,'.agents/skills/foo/SKILL.md'),'client edit\n'); assert.equal(get(client,'agents/README.md'),'personalized roster\n'); assert.equal(get(client,'.claude/skills/foo/SKILL.md'),'other tool content\n'); assert.equal(existsSync(join(client,'.agents/skills/old/SKILL.md')),false); assert.ok(report.kept.includes('.agents/skills/foo/SKILL.md')); assert.ok(report.replaced_edited_scripts.includes('status/a.mjs')); assert.ok(report.collisions.includes('agents/README.md'));
-  const restored=run('restore','--root',client,'--backup',report.backup); assert.equal(restored.status,0,restored.stderr); assert.equal(get(client,'AGENTS.md'),'old instructions\r\n'); assert.equal(get(client,'status/a.mjs'),'client edited script\n'); assert.equal(get(client,'.agents/skills/old/SKILL.md'),'old retired\n'); assert.equal(existsSync(join(client,'update/manifest.json')),false); assert.equal(get(client,'.agents/skills/foo/SKILL.md'),'client edit\n'); assert.equal(JSON.parse(get(client,'status/status.json')).template_version,'1.0.0');
+  assert.equal(get(client,'AGENTS.md'),'new instructions\n'); assert.equal(get(client,'status/a.mjs'),'console.log("new a")\n'); assert.equal(get(client,'status/b.mjs'),'console.log("new b")\n'); assert.equal(get(client,'.agents/skills/foo/SKILL.md'),'client edit\n'); assert.equal(get(client,'agents/README.md'),'personalized roster\n'); assert.equal(get(client,'.claude/skills/foo/SKILL.md'),'other tool content\n'); assert.equal(existsSync(join(client,'.agents/skills/old/SKILL.md')),false); assert.ok(report.unknown.includes('.agents/skills/foo/SKILL.md')); assert.ok(report.collisions.includes('agents/README.md'));
+  const restored=run('restore','--root',client,'--backup',report.backup); assert.equal(restored.status,0,restored.stderr); assert.equal(get(client,'AGENTS.md'),'old instructions\r\n'); assert.equal(get(client,'status/a.mjs'),'old a\n'); assert.equal(get(client,'.agents/skills/old/SKILL.md'),'old retired\n'); assert.equal(existsSync(join(client,'update/manifest.json')),false); assert.equal(get(client,'.agents/skills/foo/SKILL.md'),'client edit\n'); assert.equal(JSON.parse(get(client,'status/status.json')).template_version,'1.0.0');
   const restoredStatus = JSON.parse(get(client, 'status/status.json'));
   assert.equal(restoredStatus.ai_assistant, 'codex');
   assert.equal(restoredStatus.agent_name, 'Orion');
@@ -71,6 +76,7 @@ test('failed update rolls back writes from the predeclared transaction',t=>{
   assert.equal(result.status,2);assert.match(result.stderr,/Injected update interruption/);
   assert.equal(get(client,'AGENTS.md'),'old agents\n');assert.equal(get(client,'README.md'),'old readme\n');
   assert.equal(JSON.parse(get(client,'status/status.json')).template_version,'1.0.0');
+  assert.equal(existsSync(join(client,'status/installed-files.json')),false,'a receipt-free harness stays receipt-free');
   const recovery=run('recover','--root',client);assert.equal(recovery.status,0,recovery.stderr);
 });
 
@@ -99,13 +105,13 @@ const lf = text => requireHash(text.replace(/\r\n/g, '\n'));
  * 1.0.0 with the receipt install wrote: `installed` maps each installed destination to its
  * text, `keys` gives a destination's source identity when it differs from its path.
  */
-function receiptWorld(t, { installed, keys = {}, retired = [], pristine = {} }) {
+function receiptWorld(t, { installed, keys = {}, retired = [], pristine = {}, aliases }) {
   const base=mkdtempSync(join(tmpdir(),'orion-receipt-update-')); t.after(()=>rmSync(base,{recursive:true,force:true}));
   const source=join(base,'release'), client=join(base,'client'); mkdirSync(source); mkdirSync(client);
   git(source,'init','-q');
   const publish = (version, files) => {
     for (const path of git(source,'ls-files').split('\n').filter(Boolean)) rmSync(join(source,path));
-    const manifest = { template_version:version, deployment:{ tools:['claude-code','codex'], common_sources:[...Object.keys(files),'update/manifest.json','update/pristine.json'], entries:[], retired } };
+    const manifest = { template_version:version, deployment:{ tools:['claude-code','codex'], common_sources:[...Object.keys(files),'update/manifest.json','update/pristine.json'], entries:[], retired, ...(aliases && { fingerprints:{ legacy_aliases:aliases } }) } };
     for (const [path, body] of Object.entries(files)) put(source, path, body);
     put(source,'update/manifest.json',JSON.stringify(manifest)); put(source,'update/pristine.json',JSON.stringify({files:pristine}));
     git(source,'add','-A'); git(source,'-c','user.email=test@example.com','-c','user.name=Test','commit','-qm',version);
@@ -199,7 +205,7 @@ const damagedReceipts = {
   'wrong-schema': text => JSON.stringify({ ...JSON.parse(text), schema: 'something-else' }),
 };
 for (const [name, damage] of Object.entries(damagedReceipts)) test(`a ${name} receipt stops the update before any change`, t => {
-  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n' } });
+  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n' }, pristine: { 'AGENTS.md':[requireHash('agents v1\n')] } }); // the registry would recognise it
   put(w.client, RECEIPT, damage(get(w.client, RECEIPT)));
   const before = get(w.client, RECEIPT);
   const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n' });
@@ -213,7 +219,7 @@ for (const [name, damage] of Object.entries(damagedReceipts)) test(`a ${name} re
 });
 
 test('an unreadable receipt stops the update before any change', t => {
-  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n' } });
+  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n' }, pristine: { 'AGENTS.md':[requireHash('agents v1\n')] } });
   rmSync(join(w.client, RECEIPT)); mkdirSync(join(w.client, RECEIPT));
   const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n' });
   const result = w.update(v2);
@@ -242,4 +248,57 @@ test('a failed receipt update puts back files and receipt together, and a held l
 
   const applied = w.update(v2); assert.equal(applied.status,0,applied.stderr);
   assert.equal(receiptOf(w.client).files['README.md'].hash,requireHash('readme v2\n'));
+});
+
+// ── Harnesses from before receipts ─────────────────────────────────────────
+/** A receipt-free Codex client at 1.0.0: what every harness installed before receipts looks like. */
+function legacyWorld(t, options) {
+  const w = receiptWorld(t, options);
+  rmSync(join(w.client, RECEIPT));
+  return w;
+}
+
+test('a harness without a receipt migrates: shipped files update, unknown ones are kept and reported, and the new baselines hold on the next update', t => {
+  const w = legacyWorld(t, {
+    installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n', 'guide.md':'guide v1\n', 'status/a.mjs':'console.log("a v1")\n',
+      '.agents/skills/old/SKILL.md':'old v1\n', '.agents/skills/hire/SKILL.md':'hire v0\n', 'update/pristine.json':'{"files":{' },
+    retired: [
+      { source:'skills/old/SKILL.md', destinations:{'claude-code':'.claude/skills/old/SKILL.md',codex:'.agents/skills/old/SKILL.md'}, fingerprint_key:'skills/old/SKILL.md' },
+      { source:'skills/hire/SKILL.md', destinations:{'claude-code':'.claude/skills/hire/SKILL.md',codex:'.agents/skills/hire/SKILL.md'}, fingerprint_key:'skills/hire/SKILL.md' },
+    ],
+    // The frozen registry: shipped versions by source identity, and an alias for a file that once shipped under another path.
+    pristine: { 'AGENTS.md':[requireHash('agents v1\n')], 'README.md':[requireHash('readme v0\n'), requireHash('readme v1\n')], 'guide.md':[requireHash('guide v1\n')],
+      'status/a.mjs':[requireHash('console.log("a v1")\n')], 'skills/old/SKILL.md':[requireHash('old v1\n')], '.claude/skills/hire/SKILL.md':[requireHash('hire v0\n')] },
+    aliases: { 'skills/hire/SKILL.md':'.claude/skills/hire/SKILL.md' },
+  });
+  put(w.client,'AGENTS.md','agents v1\r\n');            // shipped; only the line endings differ
+  put(w.client,'README.md','readme v0\n');              // an older shipped version: still Orion's
+  put(w.client,'guide.md','client guide\n');            // edited: no shipped version matches
+  put(w.client,'notes.md','client notes\n');            // never shipped at all
+  const files = { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n', 'guide.md':'guide v2\n', 'status/a.mjs':'console.log("a v2")\n', 'notes.md':'notes v2\n', 'added.md':'added v2\n' };
+  const v2 = w.publish('2.0.0', files);
+  const first = w.update(v2); assert.equal(first.status,0,first.stdout+first.stderr); const report = JSON.parse(first.stdout);
+  for (const path of ['AGENTS.md','README.md','status/a.mjs','added.md']) assert.equal(get(w.client,path),files[path],path);
+  assert.equal(get(w.client,'guide.md'),'client guide\n');
+  assert.equal(get(w.client,'notes.md'),'client notes\n');
+  for (const path of ['.agents/skills/old/SKILL.md','.agents/skills/hire/SKILL.md']) assert.equal(existsSync(join(w.client,path)),false,`${path} retired`);
+  assert.deepEqual([...report.unknown].sort(),['guide.md','notes.md']);
+  let receipt = receiptOf(w.client);
+  assert.equal(receipt.template_version,'2.0.0');
+  for (const path of ['AGENTS.md','README.md','status/a.mjs','added.md']) assert.equal(receipt.files[path].hash,requireHash(files[path]),path);
+  for (const path of ['guide.md','notes.md','.agents/skills/old/SKILL.md','.agents/skills/hire/SKILL.md']) assert.equal(receipt.files[path],undefined,`${path} is not claimed`);
+  assert.equal(receipt.files['update/pristine.json'].hash,lf(get(w.client,'update/pristine.json')));
+
+  // The migrated receipt is the baseline now: a later edit is the client's, and untouched files keep updating.
+  put(w.client,'AGENTS.md','client agents\n');
+  const v3 = w.publish('3.0.0', { ...files, 'AGENTS.md':'agents v3\n', 'README.md':'readme v3\n', 'guide.md':'guide v3\n' });
+  const second = w.update(v3); assert.equal(second.status,0,second.stdout+second.stderr); const next = JSON.parse(second.stdout);
+  assert.equal(get(w.client,'AGENTS.md'),'client agents\n');
+  assert.equal(get(w.client,'README.md'),'readme v3\n');
+  assert.equal(get(w.client,'guide.md'),'client guide\n');
+  assert.deepEqual(next.kept,['AGENTS.md']);
+  assert.deepEqual([...next.unknown].sort(),['guide.md','notes.md']);
+  receipt = receiptOf(w.client);
+  assert.equal(receipt.files['AGENTS.md'].hash,requireHash('agents v2\n'));
+  assert.equal(receipt.files['README.md'].hash,requireHash('readme v3\n'));
 });

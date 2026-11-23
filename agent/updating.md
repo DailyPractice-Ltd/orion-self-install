@@ -1,7 +1,8 @@
 # Updating Orion
 
 Say **"update my harness"** inside your deployed Orion folder. The request is the consent.
-Orion updates from Daily Practice's current `main` commit. The version is
+Orion updates from Daily Practice's current `main` commit, unless the request names a
+full commit (see [Pin a selected commit](#pin-a-selected-commit)). The version is
 `template_version` in the deployed folder's `status/status.json`.
 For a version inquiry, report that value. To check whether it is current, compare it
 with the pinned manifest without applying an update. Updates work with the radio off.
@@ -23,6 +24,24 @@ Read the pinned `agent/updating.md` and follow its apply instructions. If the
 source version is older than the installed version, report both versions and
 stop. If the fetch fails in Codex, see the [network instructions](adapters/codex.md).
 
+### Pin a selected commit
+
+When the request names a full commit hash (for example a maintainer delivering or
+testing a candidate), update to that commit instead of `main`'s. It need not be on
+`main` or carry a release tag. A short hash or a branch name is not enough: ask for the
+full commit. After the clone above, fetch and check out exactly that commit:
+
+```sh
+commit=<the full commit hash>
+git -C "$scratch/source" fetch --quiet --depth 1 origin "$commit"
+git -C "$scratch/source" checkout --quiet --detach "$commit"
+git -C "$scratch/source" show "$commit:update/manifest.json"
+```
+
+Then continue exactly as for `main`: read that checkout's `agent/updating.md` and run
+its helper. The selected commit's committed files are installed (never uncommitted
+edits in the checkout), under the same receipt, conflict, backup and recovery rules.
+
 ## Orion 1.x: reinstall instead
 
 This procedure updates 2.0.0 and later. When the deployed `template_version` is below
@@ -33,8 +52,8 @@ that 2.0.0 is installed fresh, then follow
 
 ## Apply the pinned update
 
-Use the pinned source's file helper to apply its manifest and fingerprints
-to the AI assistant recorded in the deployed status file.
+Use the pinned source's file helper to apply its manifest to the AI assistant recorded
+in the deployed status file.
 
 ```sh
 node "$scratch/source/update/apply.mjs" update --root "$harness" --commit "$commit"
@@ -113,8 +132,8 @@ If a path changed since, it stops, overwrites nothing and names the paths and th
 
 Updates never start or renew the connection allowance. Before resuming Orion work, run
 `node status/guard.mjs check --quiet` (see [Install Orion](install.md#before-work)).
-Report the version, changed files, preserved edits,
-any replaced edited runtime scripts and the backup path. Remove the temporary
+Report the version, changed files, kept and unknown files,
+any conflicts and the backup path. Remove the temporary
 source checkout after the operation.
 
 ## Switch AI assistants

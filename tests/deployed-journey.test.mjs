@@ -9,7 +9,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { plainEnv } from './helpers/env.mjs';
 import { TOOL_LAYOUT, planForTool } from '../update/destination-resolver.mjs';
-import { MANIFEST_PATHS, catalogName, pluginManifests } from '../update/plugin-package.mjs';
+import { MANIFEST_PATHS, catalogName, pluginManifests, validateCatalog, validatePackage } from '../update/plugin-package.mjs';
 
 const checkout = join(dirname(fileURLToPath(import.meta.url)), '..');
 const other = tool => tool === 'codex' ? 'claude-code' : 'codex';
@@ -495,6 +495,110 @@ for (const tool of ['claude-code', 'codex']) {
     ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
     assert.ok(existsSync(join(client, oldSkill)));
     assert.ok(existsSync(join(client, '.specify/scripts/bash/setup-tasks.sh')));
+  });
+}
+
+for (const tool of ['claude-code', 'codex']) {
+  test(`${tool} deployed journey: a full commit outside main, fetched into a shallow clone, installs its committed contents under the same rules`, t => {
+    const { release, client } = journey(t, tool);
+    git(release, 'checkout', '-q', '-B', 'main');
+    const installedAgents = read(client, 'AGENTS.md');
+    const installedReadme = read(client, 'README.md');
+    const installedGuard = read(client, 'status/guard.mjs');
+    const skillPath = `${pkg}/prospecting/SKILL.md`;
+    const installedSkill = read(client, skillPath);
+
+    // A candidate on a side branch: never merged, never tagged. Main moves on without it.
+    git(release, 'checkout', '-q', '-b', 'candidate');
+    const manifest = JSON.parse(read(release, 'update/manifest.json'));
+    manifest.deployment.entries.push({ source: `${pkg}/candidate-only/SKILL.md`, ownership: 'release', fingerprint_key: `${pkg}/candidate-only/SKILL.md` });
+    const pinned = publish(release, {
+      'update/manifest.json': JSON.stringify(manifest, null, 2) + '\n',
+      [`${pkg}/candidate-only/SKILL.md`]: '# Candidate skill\n',
+      'AGENTS.md': `${installedAgents}\nCandidate line.\n`,
+      'README.md': `${installedReadme}\nCandidate readme.\n`,
+      'status/guard.mjs': `${installedGuard}\n// Candidate runtime change.\n`,
+      'update/receipt.mjs': `${read(release, 'update/receipt.mjs')}\n// Candidate updater change.\n`,
+      [skillPath]: `${installedSkill}\nCandidate skill change.\n`,
+    });
+    git(release, 'checkout', '-q', 'main');
+    publish(release, { 'AGENTS.md': `${installedAgents}\nMain-only line.\n` });
+    assert.notEqual(spawnSync('git', ['merge-base', '--is-ancestor', pinned, 'main'], { cwd: release }).status, 0, 'the candidate is not on main');
+    assert.equal(git(release, 'tag', '--points-at', pinned), '', 'the candidate is not tagged');
+
+    // agent/updating.md: a shallow clone of main, then the selected commit fetched and checked out.
+    const source = join(dirname(client), 'scratch', 'source');
+    git(dirname(client), 'clone', '-q', '--depth', '1', '--branch', 'main', `file://${release}`, source);
+    git(source, 'fetch', '-q', '--depth', '1', 'origin', pinned);
+    git(source, 'checkout', '-q', '--detach', pinned);
+    assert.equal(git(source, 'rev-parse', '--is-shallow-repository'), 'true', 'no full history is present');
+    put(source, 'AGENTS.md', 'Uncommitted poison.\n');
+    // The selected commit's own updater runs, as for main.
+    const incoming = (...args) => spawnSync(process.execPath, [join(source, 'update/apply.mjs'), ...args, '--root', client],
+      { cwd: client, encoding: 'utf8', env: plainEnv() });
+    const update = (env = {}) => spawnSync(process.execPath, [join(source, 'update/apply.mjs'), 'update', '--root', client, '--commit', pinned],
+      { cwd: client, encoding: 'utf8', env: plainEnv(env) });
+
+    // Client edits: an ordinary file, a runtime script and a plugin skill the candidate changes.
+    put(client, 'README.md', `${installedReadme}\nOur own notes.\n`);
+    put(client, 'status/guard.mjs', `${installedGuard}\n// Client runtime edit.\n`);
+    put(client, skillPath, `${installedSkill}\nClient note.\n`);
+    const receiptBefore = read(client, 'status/installed-files.json');
+
+    // Runtime and plugin edits stop it before any release file changes, ordinary ones included.
+    const blocked = update();
+    assert.equal(blocked.status, 2, blocked.stdout + blocked.stderr);
+    assert.deepEqual(JSON.parse(blocked.stdout).conflicts, [{ path: 'status/guard.mjs', reason: 'modified' }, { path: skillPath, reason: 'modified' }]);
+    assert.equal(read(client, 'AGENTS.md'), installedAgents);
+    assert.equal(existsSync(join(client, `${pkg}/candidate-only/SKILL.md`)), false);
+    assert.equal(read(client, 'status/installed-files.json'), receiptBefore);
+    assert.equal(existsSync(join(client, '.update-backup')), false);
+
+    // The client moves the edits out; an update killed partway is recovered with its receipt.
+    put(client, 'status/guard.mjs', installedGuard);
+    put(client, skillPath, installedSkill);
+    assert.notEqual(update({ ORION_UPDATE_CRASH_AFTER: '2' }).status, 0);
+    rmSync(join(client, 'status/.radio-lock'), { recursive: true });
+    ok(incoming('recover'));
+    assert.equal(read(client, 'status/installed-files.json'), receiptBefore);
+    assert.equal(read(client, 'AGENTS.md'), installedAgents);
+    assert.equal(read(client, skillPath), installedSkill);
+    assert.equal(existsSync(join(client, `${pkg}/candidate-only/SKILL.md`)), false);
+
+    const applied = update();
+    ok(applied);
+    const report = JSON.parse(applied.stdout);
+    assert.ok(report.kept.includes('README.md'));
+    assert.equal(read(client, 'README.md'), `${installedReadme}\nOur own notes.\n`);
+    // Every other claimed release file holds the selected commit's committed bytes, exactly.
+    const receipt = JSON.parse(read(client, 'status/installed-files.json'));
+    assert.equal(receipt.files['README.md'].hash, lfHash(Buffer.from(installedReadme)), 'the edit keeps its installed baseline');
+    for (const [path, entry] of Object.entries(receipt.files)) {
+      if (path === 'README.md') continue;
+      assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} is recorded as installed`);
+      if (entry.origin === 'release') {
+        assert.deepEqual(readFileSync(join(client, path)), execFileSync('git', ['show', `${pinned}:${entry.key}`], { cwd: release }), `${path} is the candidate's`);
+      }
+    }
+    assert.match(read(client, 'AGENTS.md'), /Candidate line\./);
+    assert.doesNotMatch(read(client, 'AGENTS.md'), /Main-only line|Uncommitted poison/);
+    assert.match(read(client, 'update/receipt.mjs'), /Candidate updater change/);
+    assert.equal(read(client, `${pkg}/candidate-only/SKILL.md`), '# Candidate skill\n');
+    // The package ships whole and valid for this tool only, with its catalog.
+    assert.deepEqual(validatePackage(client, { tool, version: manifest.template_version }), []);
+    assert.equal(existsSync(join(client, MANIFEST_PATHS[other(tool)])), false);
+    const catalog = JSON.parse(read(client, TOOL_LAYOUT[tool].catalogPath));
+    assert.deepEqual(validateCatalog(tool, catalog, { root: client, identity: status(client).plugin.catalog_identity }), []);
+
+    // Restore puts the installed release back, and the receipt with it.
+    ok(incoming('restore', '--backup', report.backup));
+    assert.equal(read(client, 'AGENTS.md'), installedAgents);
+    assert.equal(read(client, skillPath), installedSkill);
+    assert.equal(existsSync(join(client, `${pkg}/candidate-only/SKILL.md`)), false);
+    assert.equal(read(client, 'README.md'), `${installedReadme}\nOur own notes.\n`);
+    for (const [path, entry] of Object.entries(JSON.parse(read(client, 'status/installed-files.json')).files)) {
+      if (path !== 'README.md') assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} after restore`);
+    }
   });
 }
 

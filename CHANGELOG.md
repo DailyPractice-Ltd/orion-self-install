@@ -15,52 +15,61 @@ Write each section for the client who will read it there.
 
 ## Unreleased — Installed-file receipts
 
-- A fresh install now records which Orion files it installed, and their exact
-  contents, in `status/installed-files.json`. This includes installs from a branch
-  or a locally edited release checkout, and the generated plugin catalog for the
-  chosen tool. Business records, credentials and your own skills are never listed.
-  The receipt travels with your folder's private home and is never replaced by an
-  update.
-- Updates now use the receipt. Files still as Orion installed them are updated; files
-  you changed are kept exactly, and stay recognised as yours on later updates; files
-  Orion never installed are kept and listed. If you changed one of Orion's scripts or
-  plugin skills and the update would replace it, the update now stops before changing
-  anything and names the files, instead of overwriting them. A damaged receipt also
-  stops the update. A failed update puts the receipt back with the files.
-- Recovery and restore keep the receipt in step with the files. An interrupted update,
-  recovered with `recover` or by the next update, puts the receipt back exactly (or
-  removes it again for a folder that had none). A restore keeps files you changed after
-  the update, and now also keeps a file you wrote where the update retired one instead
-  of overwriting it; the receipt gives restored files their earlier baselines and keeps
-  your later edits recognised as yours on the next update.
-- Switching between Codex and Claude Code keeps the receipt accurate. A finished
-  switch records the new assistant's plugin manifest and catalog, and drops the old
-  assistant's only once they are removed; your edits keep their installed baselines.
-  A failed, waiting or cancelled switch leaves the receipt unchanged, and a damaged
-  receipt stops the switch before anything changes.
-- Plugin activation and the receipt stay in step. While activation is pending, the
+**Updates now know exactly which files Orion installed in your folder, so they replace
+only those and never overwrite your changes.**
+
+- **The receipt.** A fresh install records each Orion file it installed, with its
+  exact contents, in `status/installed-files.json`, including installs from a branch
+  or a locally edited release checkout, and the plugin catalog generated for your
+  tool. Business records, credentials, the tool's own registration settings and your
+  own skills are never listed. The receipt travels with your folder's private home
+  and is never replaced by an update.
+- **Updates follow the receipt.** Files still as Orion installed them are updated
+  (line endings aside). Files you changed are kept exactly and stay recognised as
+  yours on later updates. Files Orion never installed are kept and listed as
+  `unknown`. If you changed one of Orion's scripts or plugin skills and the update
+  would replace it, the update now stops before changing anything and names the
+  files, instead of overwriting them. A damaged receipt also stops the update, with
+  nothing changed.
+- **Folders installed before receipts** update straight to the latest release, with
+  no intermediate release. Files matching a version Orion shipped update as before
+  and enter the new receipt; files no release shipped are kept, listed and never
+  claimed as Orion's. A changed script or plugin skill in such a folder stops the
+  update too.
+- **Recovery and restore keep the receipt in step with the files.** A failed update,
+  an interrupted one recovered with `recover` (or by the next update), and a plugin
+  activation failure that rolls back (exit 3) all put the receipt back exactly, or
+  remove it again for a folder that had none. A restore keeps files you changed
+  after the update, and now also keeps a file you wrote where the update retired one
+  instead of overwriting it; restored files take back their earlier baselines and
+  your later edits stay recognised as yours. While plugin activation is pending, the
   receipt describes the files already applied, and finishing activation (`resume`,
-  `verify --discovered`) never moves a baseline. When the tool confirms a failure and
-  the update is rolled back (exit 3), the receipt goes back with the files. The plugin
-  catalog is tracked; the tool's own registration settings never are.
-- Folders installed before receipts update straight to the latest release, with no
-  intermediate release. Files matching a version Orion shipped update as before and
-  enter the new receipt; files no release shipped are kept, listed, and never claimed
-  as Orion's. A changed script or plugin skill in such a folder now stops the update
-  too, instead of being overwritten.
+  `verify --discovered`) never moves a baseline.
+- **Switching between Codex and Claude Code** keeps the receipt accurate. A finished
+  switch records the new assistant's plugin manifest and catalog, and drops the old
+  assistant's only once they are removed; your edits keep their baselines. A failed,
+  waiting or cancelled switch leaves the receipt unchanged, and a damaged receipt
+  stops the switch before anything changes.
+- **Updates still follow `main` by default.** An update can also be pinned to a
+  full commit that is not on `main` or tagged (for example a candidate Daily
+  Practice asks you to try); it installs exactly that commit's files under the same
+  rules. `agent/updating.md` gives the commands.
 
 ### For maintainers
 
-- `update/pristine.json` is now frozen compatibility data for harnesses installed
-  before receipts. It is no longer regenerated from Git history, so merges,
-  squashes, shallow clones and working-tree edits never require a registry
-  rewrite. `tests/helpers/pristine.mjs` is gone.
+- `update/pristine.json` is now frozen compatibility data, read only to migrate
+  folders installed before receipts. It is no longer regenerated from Git history,
+  so merges, squashes, shallow clones and working-tree edits never require a
+  registry rewrite. `tests/helpers/pristine.mjs` is gone.
 - The release contract and `node update/bump.mjs` validate the registry instead:
   readable JSON, SHA-256 fingerprints, and every retirement identity and legacy
-  alias present. The bump no longer touches `update/pristine.json`.
+  alias present. The bump no longer touches `update/pristine.json`, and neither the
+  contract nor the updater needs full Git history.
 - The registry's malformed JSON from the 2.0.0 merge is repaired, and the two
   committed 2.0.0-line versions it had lost (`agent/install.md` as shipped and an
   earlier `CHANGELOG.md`) are recognised again.
+- A candidate can be tried on a deployed harness by pinning its full commit; no
+  merge or tag is needed (`agent/maintaining.md`).
 
 ## 2.0.0 — 2026-11-23
 

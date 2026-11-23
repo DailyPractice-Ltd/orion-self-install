@@ -37,6 +37,12 @@ maintenance. Leave client status, credentials and business records alone.
 
 A completed change does not itself select a new version or create a release tag.
 
+To try or deliver a candidate on a deployed harness before it reaches `main`, push its
+commit and update the harness to that full commit ([Pin a selected
+commit](updating.md#pin-a-selected-commit)). No merge or tag is needed. The harness's
+installed-file receipt, not the commit's ancestry, decides what the update may replace,
+so the same conflict, backup and recovery rules apply as for `main`.
+
 ## Select and validate a release
 
 Choose the version from the highest-impact change since the previous release:

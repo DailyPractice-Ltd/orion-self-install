@@ -6,6 +6,9 @@
  *   node update/apply.mjs restore --root <harness> --backup .update-backup/<name>
  *   node update/apply.mjs recover --root <harness>
  *
+ * --commit is any full commit in the release repo (default: the checkout this script is in),
+ * on main or not, tagged or not; only its committed files are installed.
+ *
  * Ownership comes from the harness's installed-file receipt (update/receipt.mjs): files still
  * as installed are updated, edited and unknown ones are kept, and an edited or unknown
  * runtime or plugin file the update would replace stops it before any change (state

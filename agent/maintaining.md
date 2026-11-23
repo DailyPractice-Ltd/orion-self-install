@@ -5,6 +5,8 @@ to change or inspect Orion select this path before the client session starts.
 It stays outside the deployment map in `update/manifest.json`; installed client
 folders continue to use the client instructions in `AGENTS.md`.
 
+randome
+
 The same maintenance workflow applies in Codex and Claude Code.
 
 Use the source, tests and permitted documentation in this checkout. The Sources

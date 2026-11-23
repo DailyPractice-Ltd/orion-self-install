@@ -43,18 +43,35 @@ node "$scratch/source/update/apply.mjs" update --root "$harness" --commit "$comm
 The helper excludes human-only implementation records from its source snapshot
 and rejects deployment paths into them. Agents use `agent/` for update guidance.
 
-The helper uses the deployment allowlist for your AI assistant. A file the client has changed is kept
-and reported. The runtime scripts under `status/` are refreshed together, and
-`update/pristine.json` is refreshed with the source fingerprints. The helper backs up
-replaced and retired files, retires listed files that match shipped fingerprints,
-checks the incoming scripts and records the version after applying the update.
-On the same version it reports an up-to-date result when there is no work.
+The helper uses the deployment allowlist for your AI assistant. It decides what is Orion's
+from the folder's installed-file receipt, `status/installed-files.json`, which records the
+exact files Orion installed:
+
+- A file still as installed is updated (line endings aside); a removed one comes back.
+- A file the client has changed is kept byte for byte and listed under `kept`; it keeps
+  its installed baseline, so the next update still recognises the change.
+- A file Orion never installed is kept and listed under `unknown`; its bytes are never
+  adopted as Orion's.
+- A changed or unknown runtime file (the `.mjs` scripts, `update/`, the status template)
+  or plugin file that the update would replace stops the update before any file changes:
+  the report says `"state": "conflict"`, lists `conflicts` (path and `modified`,
+  `unknown` or `not-a-file`) and gives the `remaining_action`. Read those paths out, ask
+  the client to move their changes out, then rerun the same pinned update.
+- A receipt that cannot be read, is malformed or has an unsupported version stops the
+  update before any change; never delete it to get past that.
+
+A folder installed before receipts has none: the helper then recognises Orion's files by
+the frozen fingerprints in `update/pristine.json`. The helper backs up replaced and
+retired files and the receipt, retires listed files that are still as installed, checks
+the incoming scripts, and records the version and the new receipt after applying the
+update. On the same version it reports an up-to-date result when there is no work.
 
 ### The Orion plugin in an update
 
-The shipped package `plugins/orion/` is release-managed and replaced as a unit. The
-helper first copies the complete previous package, in-place edits included, into the
-backup (`<backup>/package/plugins/orion/`) and lists edited files under
+The shipped package `plugins/orion/` is release-managed and replaced as a unit. With a
+receipt, an edited or added file in it stops the update first (above). The helper copies
+the complete previous package into the backup (`<backup>/package/plugins/orion/`); in a
+folder without a receipt, in-place edits go there too and are listed under
 `package.edits_backed_up`. Customizations belong in client skills under `.claude/skills/`
 or `.agents/skills/`, which the update never touches. It also backs up the selected
 tool's catalog (`.claude-plugin/marketplace.json` or `.agents/plugins/marketplace.json`),

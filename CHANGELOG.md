@@ -21,6 +21,12 @@ Write each section for the client who will read it there.
   chosen tool. Business records, credentials and your own skills are never listed.
   The receipt travels with your folder's private home and is never replaced by an
   update.
+- Updates now use the receipt. Files still as Orion installed them are updated; files
+  you changed are kept exactly, and stay recognised as yours on later updates; files
+  Orion never installed are kept and listed. If you changed one of Orion's scripts or
+  plugin skills and the update would replace it, the update now stops before changing
+  anything and names the files, instead of overwriting them. A damaged receipt also
+  stops the update. A failed update puts the receipt back with the files.
 
 ### For maintainers
 

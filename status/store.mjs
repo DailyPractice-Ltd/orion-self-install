@@ -1,5 +1,6 @@
 /**
- * The one owner of status/status.json, status/radio.key and the radio outbox.
+ * The one owner of status/status.json, status/radio.key and the radio outbox, and
+ * the only writer of an existing harness's installed-file receipt (update/receipt.mjs).
  *
  * Every Orion command that changes these files goes through here, so no two
  * commands can overwrite each other's changes: each change reads the file fresh

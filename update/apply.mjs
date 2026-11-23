@@ -6,8 +6,15 @@
  *   node update/apply.mjs restore --root <harness> --backup .update-backup/<name>
  *   node update/apply.mjs recover --root <harness>
  *
+ * Ownership comes from the harness's installed-file receipt (update/receipt.mjs): files still
+ * as installed are updated, edited and unknown ones are kept, and an edited or unknown
+ * runtime or plugin file the update would replace stops it before any change (state
+ * "conflict"). An unreadable or invalid receipt stops it too. Without a receipt (a harness
+ * from before receipts) the frozen fingerprints in update/pristine.json decide instead.
+ * The receipt is backed up, journaled, written last under the lock and rolled back with the files.
+ *
  * The Orion plugin package (plugins/orion) is release-managed and replaced as a unit; the
- * complete prior package, in-place edits included, goes into the backup first. The
+ * complete prior package goes into the backup first. The
  * selected tool's catalog file and this harness's own entries in that tool's settings
  * (update/plugin-registration.mjs) are backed up as registration state. After the files, the
  * selected tool is refreshed through its own CLI (update/plugin-native.mjs):
@@ -470,6 +477,12 @@ async function restore(store,root,backupRel) {
     throw new Error(`Restore collision: ${PACKAGE_ROOT} changed after the update, and putting the backup back would overwrite those changes, so Orion stopped. Nothing was restored. Move your changes out of ${PACKAGE_ROOT} (keep them as a client skill under ${TOOL_LAYOUT[journal.ai_assistant]?.skillRoot || '.claude/skills or .agents/skills'}), put back the release's files or delete ${PACKAGE_ROOT}, then run "node update/apply.mjs restore --root . --backup ${backupRel}" again.`);
   }
   const status=await store.readStatus(), old=json(join(backup,'status/status.json'));
+  // Read before any file moves, so a receipt that cannot be trusted stops the restore first.
+  let receiptNow=null;
+  if (journal.receipt) {
+    try { receiptNow=readReceipt(root); }
+    catch (error) { throw new Error(`${error.message}. Nothing was restored. ${RECEIPT_ACTION.replace('the same update','the same restore')}`); }
+  }
   const restored=[],kept=[];
   for(const a of [...journal.actions].reverse()) {
     const dest=safe(root,a.destination), prior=join(backup,'files',a.destination);
@@ -497,6 +510,20 @@ async function restore(store,root,backupRel) {
     }
   }
   if (journal.registration) { restoreRegistration(root,json(join(backup,journal.registration))); restored.push('registration'); }
+  if (journal.receipt) {
+    // Restored files take back their prior baselines; kept ones keep the update's, so a
+    // later edit to them is still recognised as the client's.
+    const prior=json(join(backup,journal.receipt.prior)), files={...(receiptNow||prior).files};
+    const back = path => { if (prior.files[path]) files[path]=prior.files[path]; else delete files[path]; };
+    for (const path of restored) {
+      if (path===PACKAGE_ROOT) {
+        for (const key of Object.keys(files)) if (isPackagePath(key)) delete files[key];
+        for (const key of Object.keys(prior.files)) if (isPackagePath(key)) files[key]=prior.files[key];
+      } else if (path!=='registration') back(path);
+    }
+    const sorted=Object.fromEntries(Object.keys(files).sort().map(path=>[path,files[path]]));
+    await store.writeReceiptText(receiptText({...(receiptNow||prior),template_version:old.template_version,recorded_by:'restore',recorded_at:new Date().toISOString(),files:sorted}));
+  }
   for(const key of journal.remove_status_checklist_keys) if(Object.hasOwn(old.checklist||{},key)) {status.checklist ||= {};status.checklist[key]=old.checklist[key];}
   status.template_version=old.template_version;
   const result={restored,kept,backup:backupRel};

@@ -112,8 +112,11 @@ for (const tool of ['claude-code', 'codex']) {
     put(client, shiftRecord, shiftHistory);
 
     const original = read(client, 'AGENTS.md');
-    const edited = read(client, `${pkg}/prospecting/SKILL.md`) + '\nClient note.\n';
+    const installedSkill = read(client, `${pkg}/prospecting/SKILL.md`);
+    const edited = installedSkill + '\nClient note.\n';
     put(client, `${pkg}/prospecting/SKILL.md`, edited);
+    const installedReadme = read(client, 'README.md');
+    put(client, 'README.md', installedReadme + '\nOur own notes.\n');
     put(client, `${skill(tool)}/hire-agent/SKILL.md`, 'Custom legacy instructions\n');
     put(client, `${skill(tool)}/personal/SKILL.md`, '# Personal skill\n');
     const retiredPage = 'library/workflows/prospect-research-outreach/PACKAGE.md';
@@ -138,33 +141,65 @@ for (const tool of ['claude-code', 'codex']) {
     put(release, 'update/manifest.json', JSON.stringify(manifest, null, 2));
     put(release, `${pkg}/new-release/SKILL.md`, '# New release skill\n');
     put(release, 'AGENTS.md', original + '\nRelease update.\n');
+    put(release, 'README.md', installedReadme + '\nRelease readme.\n');
+    put(release, `${pkg}/prospecting/SKILL.md`, installedSkill + '\nRelease skill change.\n');
+    const installedGuard = read(client, 'status/guard.mjs');
+    put(release, 'status/guard.mjs', installedGuard + '\n// Release runtime change.\n');
+    put(client, 'status/guard.mjs', installedGuard + '\n// Client runtime edit.\n');
     git(release, 'add', '.');
     git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'next release');
     const pinned = git(release, 'rev-parse', 'HEAD');
     put(release, 'AGENTS.md', 'Uncommitted poison.\n');
-    const result = run(client, 'update/apply.mjs', 'update', '--root', client, '--release-repo', release, '--commit', pinned);
+    const update = () => run(client, 'update/apply.mjs', 'update', '--root', client, '--release-repo', release, '--commit', pinned);
+    const receiptBefore = read(client, 'status/installed-files.json');
+
+    // The plugin edit stops the update before any release file changes, ordinary ones included.
+    const blocked = update();
+    assert.equal(blocked.status, 2, blocked.stdout + blocked.stderr);
+    const conflict = JSON.parse(blocked.stdout);
+    assert.equal(conflict.state, 'conflict');
+    assert.deepEqual(conflict.conflicts, [{ path: 'status/guard.mjs', reason: 'modified' }, { path: `${pkg}/prospecting/SKILL.md`, reason: 'modified' }]);
+    assert.equal(read(client, 'AGENTS.md'), original);
+    assert.equal(read(client, `${pkg}/prospecting/SKILL.md`), edited);
+    assert.equal(existsSync(join(client, `${pkg}/new-release/SKILL.md`)), false);
+    assert.equal(read(client, 'status/installed-files.json'), receiptBefore);
+    assert.equal(existsSync(join(client, '.update-backup')), false);
+    assert.equal(status(client).template_version, prior.template_version);
+
+    // The client moves the edit out. Installed files with Windows line endings still count as untouched.
+    put(client, `${pkg}/prospecting/SKILL.md`, installedSkill.replace(/\n/g, '\r\n'));
+    put(client, 'status/guard.mjs', installedGuard);
+    put(client, 'AGENTS.md', original.replace(/\n/g, '\r\n'));
+    const result = update();
     ok(result);
     const report = JSON.parse(result.stdout);
+    assert.match(read(client, 'status/guard.mjs'), /Release runtime change/);
     assert.match(read(client, 'AGENTS.md'), /Release update\./);
     assert.doesNotMatch(read(client, 'AGENTS.md'), /Uncommitted poison/);
-    // The package is replaced as a unit; the in-place edit is in the backup, not kept in place.
     assert.equal(read(client, `${pkg}/prospecting/SKILL.md`), read(release, `${pkg}/prospecting/SKILL.md`));
-    assert.equal(read(client, `${report.backup}/package/${pkg}/prospecting/SKILL.md`), edited);
-    assert.ok(report.package.edits_backed_up.includes(`${pkg}/prospecting/SKILL.md`));
+    assert.deepEqual(report.package.edits_backed_up, []);
     assert.equal(report.active, false, 'the target is not announced as active before discovery');
     assert.equal(status(client).plugin.pending_version, manifest.template_version);
     assert.equal(read(client, `${skill(tool)}/personal/SKILL.md`), '# Personal skill\n');
     assert.equal(read(client, `${pkg}/new-release/SKILL.md`), '# New release skill\n');
-    assert.ok(report.retired.includes(retiredPage));
-    assert.equal(read(client, shiftRecord), shiftHistory);
-    assert.ok(report.retired.includes(retiredMeetingPackage));
-    assert.equal(existsSync(join(client, 'library/skills')), false);
-    assert.equal(read(client, `${report.backup}/files/${retiredMeetingPackage}`), oldMeetingPackage);
-    assert.ok(report.kept.includes(editedPage));
-    assert.equal(existsSync(join(client, retiredPage)), false);
+    // An edited ordinary file is kept byte for byte, with the baseline it was installed with.
+    assert.ok(report.kept.includes('README.md'));
+    assert.equal(read(client, 'README.md'), installedReadme + '\nOur own notes.\n');
+    // Shipped bytes from an older release, at paths this install never wrote, are not Orion's to remove.
+    for (const path of [retiredPage, retiredMeetingPackage, editedPage]) assert.ok(report.unknown.includes(path), path);
+    assert.equal(read(client, retiredPage), oldPage);
+    assert.equal(read(client, retiredMeetingPackage), oldMeetingPackage);
     assert.equal(read(client, editedPage), '# Client debrief instructions\n');
-    assert.equal(read(client, `${report.backup}/files/${retiredPage}`), oldPage);
+    assert.equal(read(client, shiftRecord), shiftHistory);
     assert.deepEqual(status(client).packages, packageHistory);
+    const receipt = JSON.parse(read(client, 'status/installed-files.json'));
+    assert.equal(receipt.template_version, manifest.template_version);
+    assert.equal(receipt.files['README.md'].hash, lfHash(Buffer.from(installedReadme)));
+    assert.equal(receipt.files[`${pkg}/new-release/SKILL.md`].hash, lfHash(Buffer.from('# New release skill\n')));
+    for (const path of [retiredPage, retiredMeetingPackage, editedPage, `${skill(tool)}/personal/SKILL.md`, 'legacy/hire-agent/SKILL.md']) assert.equal(receipt.files[path], undefined, path);
+    for (const [path, entry] of Object.entries(receipt.files)) {
+      if (path !== 'README.md') assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} is recorded as it was installed`);
+    }
     for (const slug of ['prospect-research-outreach', 'post-call-debrief']) {
       assert.ok(existsSync(join(client, pkg, slug, 'SKILL.md')), slug);
     }
@@ -177,12 +212,18 @@ for (const tool of ['claude-code', 'codex']) {
     }
     ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
     assert.equal(read(client, retiredMeetingPackage), oldMeetingPackage);
-    assert.equal(read(client, 'AGENTS.md'), original);
+    assert.equal(read(client, 'AGENTS.md'), original.replace(/\n/g, '\r\n'));
     assert.equal(read(client, `${skill(tool)}/hire-agent/SKILL.md`), 'Custom legacy instructions\n');
     assert.equal(existsSync(join(client, `${pkg}/new-release/SKILL.md`)), false);
-    assert.equal(read(client, `${pkg}/prospecting/SKILL.md`), edited);
+    assert.equal(read(client, `${pkg}/prospecting/SKILL.md`), installedSkill.replace(/\n/g, '\r\n'));
     assert.equal(existsSync(join(client, pkg, 'post-call-debrief', 'SKILL.md')), false, 'the prior package comes back exactly');
     assert.equal(status(client).plugin.setup_state, 'pending', 'recovery waits for a fresh check');
+    // The receipt follows the restored files: it no longer claims the update's files.
+    const restoredReceipt = JSON.parse(read(client, 'status/installed-files.json'));
+    assert.equal(restoredReceipt.files[`${pkg}/new-release/SKILL.md`], undefined);
+    for (const [path, entry] of Object.entries(restoredReceipt.files)) {
+      if (path !== 'README.md' && existsSync(join(client, path))) assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} after restore`);
+    }
   });
 
   test(`${tool} deployed journey: local skill and interrupted tool switch`, t => {
@@ -234,6 +275,8 @@ for (const tool of ['claude-code', 'codex']) {
 for (const tool of ['claude-code', 'codex']) {
   test(`${tool} update retires shipped Spec Kit files and keeps client edits`, t => {
     const { release, client } = journey(t, tool);
+    // Spec Kit files only exist in harnesses from before receipts: such a harness has none.
+    rmSync(join(client, 'status/installed-files.json'));
     const oldSkill = `${skill(tool)}/speckit-tasks/SKILL.md`;
     const editedSkill = `${skill(tool)}/speckit-plan/SKILL.md`;
     const historical = '77f8a99356ae52f5e9c71b00f78c7a29c1986461';

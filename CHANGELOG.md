@@ -38,6 +38,11 @@ Write each section for the client who will read it there.
   assistant's only once they are removed; your edits keep their installed baselines.
   A failed, waiting or cancelled switch leaves the receipt unchanged, and a damaged
   receipt stops the switch before anything changes.
+- Plugin activation and the receipt stay in step. While activation is pending, the
+  receipt describes the files already applied, and finishing activation (`resume`,
+  `verify --discovered`) never moves a baseline. When the tool confirms a failure and
+  the update is rolled back (exit 3), the receipt goes back with the files. The plugin
+  catalog is tracked; the tool's own registration settings never are.
 - Folders installed before receipts update straight to the latest release, with no
   intermediate release. Files matching a version Orion shipped update as before and
   enter the new receipt; files no release shipped are kept, listed, and never claimed

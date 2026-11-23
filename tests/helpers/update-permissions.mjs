@@ -6,7 +6,9 @@ fs.writeFileSync = function(path, ...args) {
   const name = String(path).replaceAll('\\', '/');
   const protectedProbe = process.env.TEST_DENY_PREFLIGHT && /\/(\.agents|\.codex)\/.*\.orion-preflight-/.test(name);
   const lateSetup = process.env.TEST_DENY_SETUP && name.endsWith('/.codex/config.toml');
-  if (protectedProbe || lateSetup) throw Object.assign(new Error(`EPERM: write ${name}`), { code: 'EPERM', path: name });
+  // The catalog the activation writes in place; the update's own staged copy is in its backup.
+  const activationCatalog = process.env.TEST_DENY_CATALOG && /\/(\.claude-plugin|\.agents\/plugins)\/marketplace\.json$/.test(name) && !name.includes('/.update-backup/');
+  if (protectedProbe || lateSetup || activationCatalog) throw Object.assign(new Error(`EPERM: write ${name}`), { code: 'EPERM', path: name });
   return original.call(this, path, ...args);
 };
 syncBuiltinESMExports();

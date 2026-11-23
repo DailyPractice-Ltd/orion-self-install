@@ -85,7 +85,7 @@ else in those files is recorded or put back. It then refreshes the selected tool
 `node update/plugin-setup.mjs resume` logic:
 
 - **Failed** (a check or native command failed): the previous package, catalog,
-  registration entries, files and version are put back, the report says
+  registration entries, files, receipt and version are put back, the report says
   `"state": "rolled_back"` and the helper
   exits 3. Recovery is not claimed until a fresh session confirms it: follow the
   report's `remaining_action`.
@@ -98,7 +98,9 @@ else in those files is recorded or put back. It then refreshes the selected tool
   then start a fresh chat. Then run `node update/plugin-setup.mjs verify --discovered`;
   that clears `pending_version`. Until then `plugin.update_backup` names the update's
   backup: if a later `resume` or `verify` fails, `remaining_action` gives the exact
-  restore command that puts the previous release back.
+  restore command that puts the previous release back. The receipt already describes
+  the applied files; `resume` and `verify` never change it (the catalog `resume` writes
+  is the one the receipt records).
 
 Marketplace auto-updates never replace the pinned release: the Claude Code catalog is a
 local folder read in place, and Orion never runs `codex plugin marketplace upgrade`.
@@ -181,7 +183,12 @@ is pending, the current manifest and selected tool stay in place. Cancellation o
 restores the target metadata's prior contents or absence. On success, the previous tool
 is retired and its manifest and catalog are removed. Client-owned skills move to the
 selected tool's skill folder; business state, release version and catalog identity stay.
-The switch backup includes manifests and the prior target metadata journal.
+The switch backup includes manifests, the prior target metadata journal and the receipt.
+The receipt changes only when the switch commits: it then names the new tool and records
+the generated target manifest and catalog, and it drops the previous tool's manifest and
+catalog once they are removed. Every other baseline, including those of your edits, stays.
+A failed commit puts the receipt back; a pending, cancelled or failed switch never
+changes it, and a receipt that cannot be read stops the switch before anything changes.
 
 Before replacing files, the updater probes write access to its destinations, including
 Codex's `.agents` catalog and `.codex` project configuration. A `preflight_failed`

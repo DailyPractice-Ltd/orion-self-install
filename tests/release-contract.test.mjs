@@ -33,6 +33,7 @@ test('release contract plans one selected runtime from portable sources', (t) =>
     }
     assert.ok(!destinations.some(path => path.startsWith('.specify/')), 'maintainer governance stays in the release');
     assert.ok(!destinations.includes('agent/maintaining.md'), 'the maintainer route stays out of client folders');
+    assert.ok(!destinations.includes('agent/plugin-validation.md'), 'the manual validation checklist stays release-only');
     assert.ok(!destinations.some(path => path.startsWith('docs/')), 'fresh installs use agent/ for guidance');
     assert.ok(!destinations.some(path => path.startsWith('img/')), 'screenshots stay repository-only');
     assert.ok(!plan.entries.some(entry => [entry.source, entry.destination].some(path => path.split('/').includes('specs'))), 'human-only records stay out of every deployment');
@@ -94,6 +95,9 @@ test('release contract ships shared package files and only the selected manifest
       assert.deepEqual(plan.entries.filter(entry => entry.source === source).map(entry => entry.destination), source === omitted ? [] : [source], `package file: ${source}`);
     }
     assert.ok(!plan.entries.some(entry => /^\.(claude|agents)\/skills\//.test(entry.destination)), 'client skill folders hold no shipped files');
+    for (const path of ['.agents/plugins/marketplace.json', '.claude-plugin/marketplace.json']) {
+      assert.ok(!plan.entries.some(entry => entry.destination === path), `${path} is per harness, never a release artifact`);
+    }
   }
 });
 

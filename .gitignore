@@ -11,3 +11,4 @@ status/radio-outbox.json.*.tmp
 .claude/
 .specify/*
 .specify
+.env

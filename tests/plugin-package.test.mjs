@@ -6,9 +6,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { plainEnv } from './helpers/env.mjs';
+import { copyStatusResources } from './helpers/status.mjs';
 import { copyReleaseManifest } from './helpers/manifest.mjs';
 import { MANIFEST_PATHS, catalogIdentity, catalogName, catalogNameErrors, defaultPluginRegion, pluginManifests, validateCatalog, validatePackage, validatePluginManifest, writeCatalog } from '../update/plugin-package.mjs';
-import { planForTool } from '../update/destination-resolver.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const release = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
@@ -26,16 +26,6 @@ test('both committed plugin manifests are the generator output for this release'
     assert.equal(manifest.name, 'orion');
     assert.equal(manifest.version, release.template_version);
     assert.equal(manifest.description, readJson(MANIFEST_PATHS.codex).description, 'one static product description');
-  }
-});
-
-test('the release retains both manifests but deploys only the selected tool metadata', () => {
-  for (const tool of release.deployment.tools) {
-    const destinations = planForTool(release.deployment, tool, { releaseRoot: repo }).map(entry => entry.destination);
-    for (const [selected, path] of Object.entries(MANIFEST_PATHS)) assert.equal(destinations.includes(path), selected === tool, `${path} deployment to ${tool}`);
-    for (const path of ['.agents/plugins/marketplace.json', '.claude-plugin/marketplace.json']) {
-      assert.ok(!destinations.includes(path), `${path} is per harness, never a release artifact`);
-    }
   }
 });
 
@@ -154,7 +144,7 @@ test('the status template and the setup wizard carry the plugin region, keeping 
   ]) {
     const root = mkdtempSync(join(tmpdir(), 'orion-plugin-migrate-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
-    cpSync(join(repo, 'status'), join(root, 'status'), { recursive: true, filter: (path) => !/(status|radio-outbox)\.json$|radio\.key$|-log\.md$/.test(path) });
+    copyStatusResources(root);
     copyFileSync(join(repo, 'start.mjs'), join(root, 'start.mjs'));
     copyReleaseManifest(root);
     const status = { ...structuredClone(template), ai_assistant: 'codex' };

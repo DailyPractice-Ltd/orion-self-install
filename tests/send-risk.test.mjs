@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { WAITING_SENTENCE, RISK_MATRIX, FACTOR_WORDS, SEND_THRESHOLDS, SEND_CEILING, HISTORY_DAYS, LEVEL_SENDS } from '../status/shapes.mjs';
-import { RULE_ONE, RETIRED, retiredRe } from '../status/send.mjs';
+import { RULE_ONE } from '../status/send.mjs';
 import { pathToFileURL } from 'node:url';
 import { plainEnv } from './helpers/env.mjs';
 import { copyReleaseManifest } from './helpers/manifest.mjs';
@@ -390,6 +390,8 @@ test('tripwire: rule 1 in AGENTS.md carries the score command, the waiting sente
   assert.ok(rules.includes(squash('node status/send.mjs score --agent orion --to <address> --channel <email|linkedin|slack|dm|whatsapp|sms> \\ --relationship <reply|follow-up|known|cold> --content <logistics|information|claim|money> [--customer] [--replied]')));
   assert.ok(rules.includes(WAITING_SENTENCE));
   assert.match(rules, /CRM writes need no yes/);
+  assert.match(rules, /never covered by\s+the scope/, 'destructive CRM changes still need approval');
+  assert.equal(JSON.parse(read('status/status.schema-template.json')).scopes.crm_write, true);
   assert.doesNotMatch(rules, /\{\{[A-Z_]+\}\}/, 'no placeholders');
 });
 
@@ -429,26 +431,6 @@ test('migrate rewrites a 1.x agent definition built inline: the old rule 1 becom
   assert.equal(readFileSync(join(dir, 'agent', 'agent-definition.md'), 'utf8'), def);
 });
 
-test('tripwire: every template carries the words migrate writes into a kept file, so a migrated folder reads like a fresh one', () => {
-  for (const [where, oldWords, newWords] of RETIRED) {
-    if (where.endsWith('*.md') || !existsSync(join(ROOT, where)) ||
-        ['AGENTS.md', 'agent/adapters/claude-code.md', 'agent/adapters/codex.md', 'agent/adapters/claude.md', 'agent/adapters/chatgpt.md', 'agent/adapters/copilot.md'].includes(where)) continue;
-    // Migration still patches older customized prompts in place. Fresh prompts
-    // route these task bodies to skills that apply the shared rule at run time.
-    if (where === 'agent/agent-definition.md' &&
-        /^(Label the draft clearly|\(b\) CRM Update|\(c\) Follow-up Draft)/.test(oldWords)) continue;
-    const shipped = spawnSync('git', ['show', `v1.4.1:${where}`], { cwd: ROOT, encoding: 'utf8' });
-    if (shipped.status !== 0) continue;
-    if (!retiredRe(oldWords).test(shipped.stdout)) continue; // an older wording, already gone from the template
-    assert.ok(squash(read(where)).includes(squash(newWords)), `${where} should carry: ${newWords.slice(0, 60)}`);
-  }
-  const definition = read('AGENTS.md');
-  for (const slug of ['prospect-research-outreach', 'post-call-debrief']) {
-    assert.ok(definition.includes(`\`${slug}\` skill`));
-    assert.match(read(`plugins/orion/skills/${slug}/SKILL.md`), /rule 1/);
-  }
-});
-
 test('the status template and wizard default to low, and the update prompts call the migration', (t) => {
   const template = JSON.parse(read('status/status.schema-template.json'));
   assert.equal(template.scopes.send_risk, 'low');
@@ -457,6 +439,7 @@ test('the status template and wizard default to low, and the update prompts call
   const never = Object.keys(manifest.never_touch).join(' ');
   assert.match(never, /status\/send-log\.md/);
   assert.match(never, /status\/no-contact\.md/);
+  assert.match(never, /status\/waiting\.md/);
 
   // A fresh install: the wizard writes low, by the install, today.
   const dir = mkdtempSync(join(tmpdir(), 'orion-wizard-level-'));
@@ -500,21 +483,4 @@ test('tripwire: on a fresh folder migrate has nothing to change and finds no res
   const set = run('set-level', 'medium');
   assert.equal(set.status, 0, set.stdout + set.stderr);
   assert.match(set.stdout, /^Set to medium\./m);
-});
-
-test('tripwire: the "waiting for you" words and the route sentences are in AGENTS.md, word for word', () => {
-  const def = squash(read('AGENTS.md'));
-  for (const words of [
-    "Waiting for you: 3 messages. Say 'send it' and the number, 'send all', or 'no' and the number. Or open a draft, change it and send it yourself; that counts as a yes.",
-    '1. Priya at Northwind, email, follow-up with the proposal price, score 55 against low, waiting 2 days, would send at high. Open the draft: <link>',
-    'Your Gmail connection can read and draft but not send. Re-authorise Gmail with send permission and the level will take effect.',
-    'This assistant cannot send on its own. Every message waits for you here.',
-    'status/waiting.md',
-    '--cap-email',
-  ]) assert.ok(def.includes(words), `AGENTS.md should carry: ${words}`);
-  assert.ok(!def.includes('Nothing is waiting for you.'), 'an empty list is not read out');
-  assert.match(read('agent/risk-matrix.md'), /your own team[^\n]*`reply`/, 'a message to the client\'s own team is a reply: relationship 0, logged like any other');
-  for (const a of ['claude-code', 'codex']) assert.match(read(`agent/adapters/${a}.md`), /status\/waiting\.md/, `${a} says where the waiting list lives`);
-  const manifest = JSON.parse(read('update/manifest.json'));
-  assert.ok(Object.keys(manifest.never_touch).some((k) => k.includes('status/waiting.md')));
 });

@@ -2,6 +2,10 @@
 
 ## Unreleased — one instruction file, reinstall from 1.x
 
+- Simplify test maintenance by removing duplicate package checks and brittle prose
+  snapshots. Keep behavioral regressions and shared policy consistency checks.
+  Test fixtures copy release resources without inheriting local operational state.
+
 - Operational and maintenance guides move from `docs/` directly into `agent/`.
   Screenshots move to root `img/` and remain repository-only. Fresh installs and
   current instructions use the new paths; no legacy path migration is added.

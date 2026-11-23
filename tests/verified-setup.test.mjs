@@ -1,17 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, cpSync, copyFileSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, copyFileSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { plainEnv } from './helpers/env.mjs';
+import { copyStatusResources } from './helpers/status.mjs';
 import { copyReleaseManifest } from './helpers/manifest.mjs';
 import { statusTemplate } from '../status/store.mjs';
 const source = new URL('../', import.meta.url);
 function harness(t, initial = {}) {
  const root = mkdtempSync(join(tmpdir(), 'orion-setup-')); t.after(() => rmSync(root,{recursive:true,force:true}));
- cpSync(new URL('status/',source), join(root,'status'), {recursive:true}); copyFileSync(new URL('start.mjs',source),join(root,'start.mjs'));
+ copyStatusResources(root); copyFileSync(new URL('start.mjs',source),join(root,'start.mjs'));
  copyReleaseManifest(root);
  const status = {...statusTemplate(root), ai_assistant:'codex', ...initial};
  writeFileSync(join(root,'status/status.json'),JSON.stringify(status));

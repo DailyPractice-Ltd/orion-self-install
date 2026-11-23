@@ -38,6 +38,11 @@ Write each section for the client who will read it there.
   assistant's only once they are removed; your edits keep their installed baselines.
   A failed, waiting or cancelled switch leaves the receipt unchanged, and a damaged
   receipt stops the switch before anything changes.
+- Folders installed before receipts update straight to the latest release, with no
+  intermediate release. Files matching a version Orion shipped update as before and
+  enter the new receipt; files no release shipped are kept, listed, and never claimed
+  as Orion's. A changed script or plugin skill in such a folder now stops the update
+  too, instead of being overwritten.
 
 ### For maintainers
 

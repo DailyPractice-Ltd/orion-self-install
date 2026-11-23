@@ -27,7 +27,7 @@ jobs:
       - run: git config --global core.autocrlf false
       - uses: actions/checkout@v5
         with:
-          # update/pristine.json is checked against everything ever shipped.
+          # Journey tests replay files from historical release commits.
           fetch-depth: 0
       - uses: actions/setup-node@v5
         with:

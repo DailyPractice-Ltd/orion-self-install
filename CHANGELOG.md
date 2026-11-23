@@ -13,6 +13,21 @@ Write each section for the client who will read it there.
 
 ---
 
+## Unreleased — installed-file receipts
+
+### For maintainers
+
+- `update/pristine.json` is now frozen compatibility data for harnesses installed
+  before receipts. It is no longer regenerated from Git history, so merges,
+  squashes, shallow clones and working-tree edits never require a registry
+  rewrite. `tests/helpers/pristine.mjs` is gone.
+- The release contract and `node update/bump.mjs` validate the registry instead:
+  readable JSON, SHA-256 fingerprints, and every retirement identity and legacy
+  alias present. The bump no longer touches `update/pristine.json`.
+- The registry's malformed JSON from the 2.0.0 merge is repaired, and the two
+  committed 2.0.0-line versions it had lost (`agent/install.md` as shipped and an
+  earlier `CHANGELOG.md`) are recognised again.
+
 ## 2.0.0 — 2026-11-23
 
 **Orion now runs in a separate business folder, with one skills plugin for Codex or

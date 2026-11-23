@@ -20,9 +20,14 @@ maintenance. Leave client status, credentials and business records alone.
    Use only this checkout.
 2. Make the change and record user-visible behavior in the current Unreleased
    changelog section. Keep ordinary changes unreleased unless a release is requested.
-3. Regenerate ownership fingerprints after editing deployed files:
-   `node tests/helpers/pristine.mjs --write`. Keep this as the last file-generation
-   step so `update/pristine.json` includes the final deployed contents.
+3. Leave `update/pristine.json` alone. It is frozen compatibility data: the
+   fingerprints of files shipped before installed-file receipts, kept so older
+   harnesses stay recognisable. It is never rebuilt from Git history, and an edit
+   to a deployed file needs no fingerprint change; merges, squashes and shallow
+   clones do not affect it. The release contract validates it (well-formed JSON,
+   SHA-256 fingerprints, every retirement identity and legacy alias in
+   `update/manifest.json` present). Remove a key only together with the retirement
+   or alias that needs it.
 4. Run checks appropriate to the change and review `git diff --check` and the diff.
    For deployment or package changes, also run the release contract below for both
    supported tools, regardless of which assistant is running. Resolve failures
@@ -48,10 +53,10 @@ hand. 2.0.0 was cut by hand. For later releases:
 
 1. Consolidate pending notes into one first `## Unreleased — <title>` section in
    `CHANGELOG.md`. Select an explicit `X.Y.Z` greater than the current version.
-2. Run `node update/bump.mjs X.Y.Z`. It dates the changelog, updates the version,
-   generates plugin manifests and refreshes pristine fingerprints together. It
-   does not commit, tag or push. If any further deployed files change, regenerate
-   fingerprints again before validation.
+2. Run `node update/bump.mjs X.Y.Z`. It validates the frozen compatibility
+   fingerprints, then dates the changelog, updates the version and generates
+   plugin manifests together. It leaves `update/pristine.json` unchanged, needs no
+   Git history, and does not commit, tag or push.
 3. Review the generated diff, then run:
 
    ```bash

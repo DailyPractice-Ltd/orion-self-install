@@ -74,6 +74,39 @@ export function destinationState(root, entry, pristine) {
   return known.includes(fingerprint(readFileSync(target))) ? 'owned' : 'preserve';
 }
 
+/**
+ * update/pristine.json is frozen compatibility data: the fingerprints of files
+ * shipped before installed-file receipts, kept so older harnesses stay
+ * recognisable. It is never rebuilt from git history, so its validity depends
+ * only on its own content and the manifest: well-formed, every fingerprint a
+ * lowercase SHA-256, and every retirement identity and legacy alias that
+ * deployed harnesses may still carry present with at least one fingerprint.
+ * Returns the problems, empty when valid.
+ */
+export function compatibilityErrors(releaseRoot, deployment) {
+  const name = deployment.fingerprints?.registry || 'update/pristine.json';
+  let registry;
+  try { registry = JSON.parse(readFileSync(join(releaseRoot, name), 'utf8')); }
+  catch (error) { return [`${name} is not readable JSON: ${error.message}`]; }
+  const files = registry?.files;
+  if (!files || typeof files !== 'object' || Array.isArray(files)) return [`${name} has no "files" map of fingerprints`];
+  const errors = [];
+  for (const [key, prints] of Object.entries(files)) {
+    if (!Array.isArray(prints) || prints.some(print => typeof print !== 'string' || !/^[0-9a-f]{64}$/.test(print))) {
+      errors.push(`${name}: ${key} must list lowercase SHA-256 fingerprints`);
+    }
+  }
+  const aliases = deployment.fingerprints?.legacy_aliases || {};
+  const required = new Set([
+    ...(deployment.retired || []).flatMap(entry => [entry.fingerprint_key || entry.source, ...Object.values(entry.sources || {})]),
+    ...Object.keys(aliases), ...Object.values(aliases),
+  ]);
+  for (const key of [...required].sort()) {
+    if (!files[key]?.length) errors.push(`${name} lost the compatibility fingerprints for ${key}, which deployed harnesses may still carry`);
+  }
+  return errors;
+}
+
 /** The sole source-to-destination mapper for release and deployed harnesses. */
 export function planForTool(deployment, ai_assistant, { releaseRoot = RELEASE_ROOT, root, includeOtherMetadata = false } = {}) {
   if (!deployment.tools.includes(ai_assistant)) throw new Error(`Unsupported AI assistant: ${ai_assistant || '(missing)'}`);

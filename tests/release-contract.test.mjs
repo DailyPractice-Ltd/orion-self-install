@@ -4,9 +4,8 @@ import { mkdtempSync, mkdirSync, copyFileSync, existsSync, readFileSync, readdir
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { planForTool, safePath } from '../update/destination-resolver.mjs';
-import { computePristine, hasFullHistory, serialise, PRISTINE_PATH } from './helpers/pristine.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -117,12 +116,60 @@ test('relative links in the package resolve to package files, never escape to th
   }
 });
 
-test('update/pristine.json is up to date with everything this release ships', (t) => {
-  if (!hasFullHistory()) return t.skip('shallow clone: the shipped history is not here to check against');
-  assert.equal(
-    readFileSync(join(repo, PRISTINE_PATH), 'utf8'), serialise(computePristine()),
-    'update/pristine.json is stale: run node tests/helpers/pristine.mjs --write as the last edit of the release',
-  );
+test('release contract validates the frozen compatibility registry without any git history', (t) => {
+  const { release } = candidate(t);
+  assert.equal(existsSync(join(release, '.git')), false, 'the candidate has no repository at all');
+  for (const tool of ['codex', 'claude-code']) assert.equal(contract(release, '--tool', tool).status, 0, tool);
+
+  const registry = join(release, 'update/pristine.json');
+  const frozen = readFileSync(registry, 'utf8');
+  const refuses = (why, text, says) => {
+    writeFileSync(registry, text);
+    for (const tool of ['codex', 'claude-code']) {
+      const run = contract(release, '--tool', tool);
+      assert.notEqual(run.status, 0, `${tool}: ${why}`);
+      assert.match(run.stderr, /update\/pristine\.json/, `${tool}: ${why} names the registry`);
+      assert.match(run.stderr, says, `${tool}: ${why}`);
+    }
+    writeFileSync(registry, frozen);
+  };
+  // The merge that dropped a comma between two hashes.
+  refuses('malformed JSON', frozen.replace(/",\n(\s+")/, '"\n$1'), /JSON/i);
+  const data = JSON.parse(frozen);
+  const without = (key) => JSON.stringify({ ...data, files: Object.fromEntries(Object.entries(data.files).filter(([k]) => k !== key)) });
+  // A retirement identity and a legacy alias deployed harnesses still carry.
+  refuses('a retired source lost', without('library/README.md'), /library\/README\.md/);
+  refuses('a legacy alias lost', without('.claude/skills/hire-agent/SKILL.md'), /\.claude\/skills\/hire-agent\/SKILL\.md/);
+  refuses('a hash that is not a fingerprint', JSON.stringify({ ...data, files: { ...data.files, 'AGENTS.md': ['not-a-hash'] } }), /AGENTS\.md/);
+  refuses('no files map', JSON.stringify({ ...data, files: [] }), /files/);
+});
+
+test('history, merges and working-tree edits alone never require a registry rewrite', (t) => {
+  const { release } = candidate(t);
+  const registry = readFileSync(join(release, 'update/pristine.json'));
+  const git = (...args) => execFileSync('git', ['-c', 'commit.gpgsign=false', ...args], { cwd: release, stdio: 'ignore', env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' } });
+  const passes = (when) => {
+    for (const tool of ['codex', 'claude-code']) {
+      const run = contract(release, '--tool', tool);
+      assert.equal(run.status, 0, `${tool} ${when}: ${run.stderr}`);
+    }
+    assert.deepEqual(readFileSync(join(release, 'update/pristine.json')), registry, `${when}: registry untouched`);
+  };
+  // One squashed commit: none of the shipped history is reachable.
+  git('init', '-q', '-b', 'main'); git('add', '-A'); git('commit', '-q', '-m', 'squashed');
+  passes('after a squash');
+  // A side branch with a new deployed-file version, merged with a merge commit.
+  git('checkout', '-q', '-b', 'side');
+  writeFileSync(join(release, 'agent/install.md'), `${readFileSync(join(release, 'agent/install.md'), 'utf8')}\nA side-branch line.\n`);
+  git('commit', '-q', '-am', 'side edit');
+  git('checkout', '-q', 'main');
+  writeFileSync(join(release, 'README.md'), `${readFileSync(join(release, 'README.md'), 'utf8')}\nA main line.\n`);
+  git('commit', '-q', '-am', 'main edit');
+  git('merge', '-q', '--no-ff', '-m', 'merge side', 'side');
+  passes('after a merge');
+  // An uncommitted edit to a deployed file.
+  writeFileSync(join(release, 'CHANGELOG.md'), `${readFileSync(join(release, 'CHANGELOG.md'), 'utf8')}\n- uncommitted\n`);
+  passes('with an uncommitted edit');
 });
 
 

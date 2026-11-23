@@ -1,7 +1,7 @@
 {
   "_read_first": "Follow agent/updating.md with the manifest and update/pristine.json pinned to main. The deployment map uses the tool recorded in status. The request is consent: never stop to ask, and never replace a file the client has changed outside the documented runtime-script exception.",
   "_what": "deployment is the source-to-destination and ownership contract for separate client repositories; select exactly one recorded tool. 2.0.0 is a reinstall release: this manifest updates 2.0.0 and later only (agent/reinstall-from-1.x.md). Contract: agent/updating.md and deployment._contract.",
-  "_regenerate": "Map every file under plugins/orion/ in deployment.entries, once each, with no per-tool destinations: the package ships at its own path for every tool. Run node tests/helpers/pristine.mjs --write after release edits.",
+  "_regenerate": "Map every file under plugins/orion/ in deployment.entries, once each, with no per-tool destinations: the package ships at its own path for every tool. update/pristine.json is frozen compatibility data: never regenerate it; the release contract validates it.",
   "template_version": "2.0.0",
   "never_touch": {
     "status/status.json": "The client's own record: preserve pairing, setup checkpoint, stages, packages and choices. An update edits template_version and appends one notes line. node status/send.mjs migrate may add the default send level. The shared guard updates sharing.pairing at runtime; it never resets a recorded clock. Setup may persist its own checkpoint. These runtime state changes do not authorize replacing the client's status file.",

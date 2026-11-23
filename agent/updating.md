@@ -71,8 +71,9 @@ exact files Orion installed:
   its installed baseline, so the next update still recognises the change.
 - A file Orion never installed is kept and listed under `unknown`; its bytes are never
   adopted as Orion's.
-- A changed or unknown runtime file (the `.mjs` scripts, `update/`, the status template)
-  or plugin file that the update would replace stops the update before any file changes:
+- A changed or unknown runtime file (the `.mjs` scripts, `update/` except
+  `update/pristine.json`, the status template), plugin file or plugin catalog that the
+  update would replace stops the update before any file changes:
   the report says `"state": "conflict"`, lists `conflicts` (path and `modified`,
   `unknown` or `not-a-file`) and gives the `remaining_action`. Read those paths out, ask
   the client to move their changes out, then rerun the same pinned update.
@@ -82,7 +83,8 @@ exact files Orion installed:
 A folder installed before receipts has none, and the update migrates it, from any older
 release straight to the pinned one (no intermediate release is needed, because the
 incoming release's own helper runs). A file whose bytes match a version Orion shipped,
-by the frozen fingerprints in `update/pristine.json`, counts as installed; anything else
+by the frozen fingerprints in `update/pristine.json` (which also lists that file's own
+shipped versions, so an old copy of it is replaced), counts as installed; anything else
 counts as unknown, with the same rules as above, so an unknown runtime or plugin file
 stops the update and an unknown ordinary file is kept and listed. The receipt the update
 writes holds only recognised files and files it installed. The helper backs up replaced and
@@ -93,7 +95,8 @@ update. On the same version it reports an up-to-date result when there is no wor
 ### The Orion plugin in an update
 
 The shipped package `plugins/orion/` is release-managed and replaced as a unit. An edited
-or added file in it stops the update first (above). The helper copies the complete
+or added file in it stops the update first (above), and so does a catalog that is neither
+as Orion generated it nor the incoming one. The helper copies the complete
 previous package into the backup (`<backup>/package/plugins/orion/`). Customizations belong in client skills under `.claude/skills/`
 or `.agents/skills/`, which the update never touches. It also backs up the selected
 tool's catalog (`.claude-plugin/marketplace.json` or `.agents/plugins/marketplace.json`),
@@ -175,7 +178,9 @@ For an update, restore puts prior released files back and removes newly installe
 files. A file changed after update, or a file written where the update retired one, is
 kept and reported. The receipt follows: restored files take back their earlier
 baselines, kept files keep the update's, so the next update still recognises the edit
-as the client's; files no longer there are no longer claimed. It restores the prior
+as the client's; files no longer there are no longer claimed. Restoring the update that
+gave a folder its first receipt removes the receipt again only when every file went back;
+if an edit was kept, the receipt stays so that edit is still recognised. It restores the prior
 version and retired checklist keys without replacing the client's live status
 wholesale. It also puts back the previous plugin package, catalog and this folder's
 own registration entries, leaving other settings as they are now. If the package
@@ -188,7 +193,7 @@ telling the client the previous version is running again. Keep the backup for au
 
 `update/pristine.json` is frozen compatibility data for harnesses installed before
 installed-file receipts. Never regenerate it from Git history or add the bytes of a
-release edit to it; `node update/release-contract.mjs` validates its structure.
+release edit to it (its own key lists the versions of itself committed before receipts); `node update/release-contract.mjs` validates its structure.
 
 ### Tool-specific metadata
 

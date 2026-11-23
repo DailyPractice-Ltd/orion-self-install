@@ -18,9 +18,10 @@
  * The receipt is backed up, journaled, written last under the lock and rolled back with the files.
  *
  * The Orion plugin package (plugins/orion) is release-managed and replaced as a unit; the
- * complete prior package goes into the backup first. The
- * selected tool's catalog file and this harness's own entries in that tool's settings
- * (update/plugin-registration.mjs) are backed up as registration state. After the files, the
+ * complete prior package goes into the backup first. An edited catalog stops the update
+ * like an edited package file. The selected tool's catalog file and this harness's own
+ * entries in that tool's settings (update/plugin-registration.mjs) are backed up as
+ * registration state. After the files, the
  * selected tool is refreshed through its own CLI (update/plugin-native.mjs):
  *   failed             a confirmed failure: the previous coordinated state is restored (exit 3)
  *   pending/registered the update stays pending in status.json `plugin.pending_version`
@@ -34,13 +35,13 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, exis
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PACKAGE_ROOT, TOOL_LAYOUT, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
+import { PACKAGE_ROOT, REGISTRY_PATH, TOOL_LAYOUT, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
 import { MANIFEST_PATHS, catalogName, catalogText, ensurePluginRegion } from './plugin-package.mjs';
 import { lowerFirst } from './plugin-native.mjs';
 import { captureRegistration, restoreRegistration, CODEX_PROJECT_CONFIG, CLAUDE_LOCAL_SETTINGS } from './plugin-registration.mjs';
 import { RESUME_COMMAND, VERIFY_COMMAND, runPluginSetup } from './plugin-setup.mjs';
 import { preflightDestinations } from './preflight.mjs';
-import { RECEIPT_PATH, isRuntimeDestination, legacyReceipt, readReceipt, receiptState, receiptText } from './receipt.mjs';
+import { RECEIPT_PATH, isRuntimeDestination, legacyReceipt, readReceipt, receiptAction, receiptEntry, receiptState, receiptText, restoredReceipt, updatedReceipt } from './receipt.mjs';
 import { withStatusLock } from '../status/store.mjs';
 
 const arg = name => { const i=process.argv.indexOf(name); return i<0 ? undefined : process.argv[i+1]; };
@@ -110,6 +111,25 @@ function pruneParents(root, paths) {
   }
 }
 
+/**
+ * One plan entry against the receipt: an action to take, a `verified` entry (the file
+ * already holds the incoming bytes), a conflict that stops the update, or a kept or
+ * unknown file the update leaves alone.
+ */
+function classifyWithReceipt(e, { root, snapshot, receipt, actions, verified, conflicts, report }) {
+  const dest=safe(root,e.destination), src=safe(snapshot,e.source), incoming=fingerprint(readFileSync(src));
+  const {state,current,baseline}=receiptState(root,e.destination,receipt);
+  if (e.ownership==='client-template') { if (state!=='absent') report.collisions.push(e.destination); else actions.push({kind:'add',e,src,dest}); return; }
+  if (e.destination.endsWith('.mjs')) { const check=spawnSync(process.execPath,['--check',src],{encoding:'utf8'}); if(check.status!==0) throw new Error(`Invalid script ${e.source}: ${check.stderr}`); }
+  if (state==='absent') { actions.push({kind:'add',e,src,dest,track:true}); return; }
+  if (current===incoming) { verified[e.destination]=receiptEntry(e.fingerprint_key,incoming); return; }
+  if (state==='installed') { actions.push({kind:'replace',e,src,dest,track:true}); return; }
+  // A client's change, or bytes Orion never installed. Ordinary files are kept with
+  // their baseline; runtime the update would replace stops it instead.
+  if (isRuntimeDestination(e.destination) && !(state==='modified' && baseline===incoming)) { conflicts.push({path:e.destination,reason:state}); return; }
+  report[state==='unknown'?'unknown':'kept'].push(e.destination);
+}
+
 const freshCheck = tool => `Start a fresh ${product(tool)} session in this folder${tool==='claude-code'?' (or run /reload-plugins)':''}, then ask your assistant to confirm it sees the Orion skills (it runs "${VERIFY_COMMAND}").`;
 
 async function update(store,root,repo,commit) {
@@ -117,7 +137,8 @@ async function update(store,root,repo,commit) {
   const snapshot=sourceSnapshot(repo,commit);
   try {
     const manifest=json(join(snapshot,'update/manifest.json'));
-    const pristine=json(join(snapshot,'update/pristine.json'));
+    // The registry is always the incoming release's copy, never the harness's.
+    const pristine=json(join(snapshot,manifest.deployment.fingerprints?.registry||REGISTRY_PATH));
     const statusPath=safe(root,'status/status.json'), status=await store.readStatus();
     // 2.0.0 is a reinstall release: a 1.x folder is never updated in place.
     const legacyMarker=['agent/agent-definition.md','agent/adapters/claude.md'].find(path=>existsSync(join(root,path)));
@@ -127,7 +148,7 @@ async function update(store,root,repo,commit) {
     // receipts, which migrates below; one that cannot be trusted stops the update before anything changes.
     let receipt;
     try { receipt=readReceipt(root); }
-    catch (error) { throw new Error(`${error.message}. Orion cannot tell your changes from its own files without it, so it stopped; nothing was changed. ${RECEIPT_ACTION}`); }
+    catch (error) { throw new Error(`${error.message}. Orion cannot tell your changes from its own files without it, so it stopped; nothing was changed. ${receiptAction('update')}`); }
     if (newer(status.template_version,manifest.template_version)) throw new Error('Refusing to roll back the harness version');
     if (status.plugin?.pending_switch) throw new Error(`A switch to ${product(status.plugin.pending_switch.to)} has started but is not finished, and an update now could leave the two tools on different releases. Finish the switch first (run "node switch_ai.mjs" again) or cancel it (run "node switch_ai.mjs --to ${ai_assistant}"), then update`);
     const withPlugin=hasPackage(manifest.deployment);
@@ -156,24 +177,11 @@ async function update(store,root,repo,commit) {
     const actions=[], report={from:status.template_version,to:manifest.template_version,commit,ai_assistant,refreshed:[],added:[],retired:[],kept:[],unknown:[],collisions:[]};
     // Conflicts stop the update; `verified` files already hold the incoming
     // bytes and `forgotten` receipt entries name retired files that are gone.
-    const conflicts=[], verified=new Map(), forgotten=[];
+    const conflicts=[], verified={}, forgotten=[];
     for (const e of plan) {
       // The package is replaced as a unit below, never file by file.
       if (withPlugin && isPackagePath(e.destination)) continue;
-      classifyWithReceipt(e);
-    }
-    function classifyWithReceipt(e) {
-      const dest=safe(root,e.destination), src=safe(snapshot,e.source), incoming=fingerprint(readFileSync(src));
-      const {state,current,baseline}=receiptState(root,e.destination,receipt);
-      if (e.ownership==='client-template') { if (state!=='absent') report.collisions.push(e.destination); else actions.push({kind:'add',e,src,dest}); return; }
-      if (e.destination.endsWith('.mjs')) { const check=spawnSync(process.execPath,['--check',src],{encoding:'utf8'}); if(check.status!==0) throw new Error(`Invalid script ${e.source}: ${check.stderr}`); }
-      if (state==='absent') { actions.push({kind:'add',e,src,dest,track:true}); return; }
-      if (current===incoming) { verified.set(e.destination,{key:e.fingerprint_key,hash:incoming,origin:'release'}); return; }
-      if (state==='installed') { actions.push({kind:'replace',e,src,dest,track:true}); return; }
-      // A client's change, or bytes Orion never installed. Ordinary files are kept with
-      // their baseline; runtime the update would replace stops it instead.
-      if (isRuntimeDestination(e.destination) && !(state==='modified' && baseline===incoming)) { conflicts.push({path:e.destination,reason:state}); return; }
-      report[state==='unknown'?'unknown':'kept'].push(e.destination);
+      classifyWithReceipt(e,{root,snapshot,receipt,actions,verified,conflicts,report});
     }
     const archiveLegacy = (oldPath, archive) => {
       const src = safe(root, oldPath), dest = safe(root, archive);
@@ -222,10 +230,15 @@ async function update(store,root,repo,commit) {
           const incoming=fileHash(join(snapshot,rel)), baseline=receipt.files[rel]?.hash;
           if (hash!==incoming && hash!==baseline) conflicts.push({path:rel,reason:baseline?'modified':'unknown'});
         }
-        pkg={prior_hash,installed_hash,edits_backed_up:[]};
+        pkg={prior_hash,installed_hash};
       }
       const path=TOOL_LAYOUT[ai_assistant].catalogPath, text=catalogText(ai_assistant,identity);
-      const current=fileHash(safe(root,path));
+      const {state,current}=receiptState(root,path,receipt);
+      // Plugin metadata: a catalog that is neither as generated (its receipt baseline) nor the
+      // incoming bytes is the client's change and stops the update, like a package edit. Every
+      // Orion release generated the same bytes for a tool and identity, so a migrating
+      // harness's catalog is either the incoming one or not Orion's.
+      if (state==='not-a-file' || ((state==='modified' || state==='unknown') && current!==fingerprint(text))) conflicts.push({path,reason:state});
       // Always backed up: the catalog is this harness's registration state for the tool.
       catalog={path,text,prior_hash:current,installed_hash:fingerprint(text),changed:current!==fingerprint(text)};
     }
@@ -264,23 +277,14 @@ async function update(store,root,repo,commit) {
     mkdirSync(backup,{recursive:true}); copyTo(statusPath,join(backup,'status/status.json'));
     // The receipt this update leaves when every action succeeds. It is written after the
     // files, so a failure before then leaves the prior one, and a rollback puts that back.
-    const installedReceipt = receiptText(nextReceipt());
-    function nextReceipt() {
-      const files={...receipt.files};
-      for (const [path,entry] of verified) files[path]=entry;
-      for (const path of forgotten) delete files[path];
-      for (const a of actions.filter(a=>a.track)) {
-        if (a.kind==='retire') delete files[a.e.destination];
-        else files[a.e.destination]={key:a.e.fingerprint_key,hash:fingerprint(readFileSync(a.src)),origin:'release'};
-      }
-      if (pkg) {
-        for (const path of Object.keys(files)) if (isPackagePath(path)) delete files[path];
-        for (const e of plan) if (isPackagePath(e.destination) && existsSync(safe(snapshot,e.source))) files[e.destination]={key:e.fingerprint_key,hash:fileHash(safe(snapshot,e.source)),origin:'release'};
-      }
-      if (catalog && (catalog.changed || catalog.prior_hash===catalog.installed_hash)) files[catalog.path]={key:catalog.path,hash:catalog.installed_hash,origin:'generated'};
-      const sorted=Object.fromEntries(Object.keys(files).sort().map(path=>[path,files[path]]));
-      return {...receipt,ai_assistant,template_version:manifest.template_version,recorded_by:'update',recorded_at:new Date().toISOString(),files:sorted};
-    }
+    const tracked=actions.filter(a=>a.track);
+    const installedReceipt = receiptText(updatedReceipt(receipt,{
+      verified, forgotten,
+      written:Object.fromEntries(tracked.filter(a=>a.kind!=='retire').map(a=>[a.e.destination,receiptEntry(a.e.fingerprint_key,fingerprint(readFileSync(a.src)))])),
+      retired:tracked.filter(a=>a.kind==='retire').map(a=>a.e.destination),
+      pkg:pkg && Object.fromEntries(plan.filter(e=>isPackagePath(e.destination) && existsSync(safe(snapshot,e.source))).map(e=>[e.destination,receiptEntry(e.fingerprint_key,fileHash(safe(snapshot,e.source)))])),
+      catalog:catalog && (catalog.changed || catalog.prior_hash===catalog.installed_hash) ? {path:catalog.path,entry:receiptEntry(catalog.path,catalog.installed_hash,'generated')} : null,
+    },{ai_assistant,template_version:manifest.template_version}));
     // Whenever this update writes a receipt, the journal says what to put back: the backed-up
     // copy, or (`prior: null`) no receipt at all for a harness that had none.
     // A migrating harness also keeps the receipt it proved (`migrated`): the baselines its
@@ -338,7 +342,7 @@ async function update(store,root,repo,commit) {
         rmSync(safe(root,PACKAGE_ROOT),{recursive:true,force:true});
         mkdirSync(dirname(safe(root,PACKAGE_ROOT)),{recursive:true});
         renameSync(join(backup,'stage',PACKAGE_ROOT),safe(root,PACKAGE_ROOT));
-        report.package={replaced:true,edits_backed_up:pkg.edits_backed_up,backup:`${backupRel}/package/${PACKAGE_ROOT}`};
+        report.package={replaced:true,backup:`${backupRel}/package/${PACKAGE_ROOT}`};
         step();
       }
       if (catalog?.changed) {
@@ -397,7 +401,6 @@ async function update(store,root,repo,commit) {
 
 const pluginReport = plugin => ({setup_state:plugin?.setup_state,pending_version:plugin?.pending_version??null,verified_version:plugin?.verified_version??null,remaining_action:plugin?.remaining_action??null});
 
-const RECEIPT_ACTION = `Put back ${RECEIPT_PATH} as it was (your folder's home repository or an earlier copy of the folder has it), then run the same update again. If you cannot, ask Daily Practice for help.`;
 const CONFLICT_ACTION = `These Orion runtime or plugin files changed in this folder, and the update would replace them, so Orion stopped before changing any file. Move your changes somewhere outside this folder (edits to Orion's own skills belong in a client skill under .claude/skills or .agents/skills), put back the files Orion installed or delete them, then run the same update again.`;
 const RECOVERY_ACTION = (backup,command,kind='update') => `These files changed after the ${kind}, and putting the backup back would overwrite those changes, so Orion stopped. Nothing was overwritten. Move your changes to those paths somewhere outside this folder (keep them: edits to Orion's own skills belong in a client skill under .claude/skills or .agents/skills), put the paths back as the backup in ${backup} has them or delete them, then run "${command}" again.`;
 
@@ -486,7 +489,7 @@ async function restore(store,root,backupRel) {
   // Read before any file moves, so a receipt that cannot be trusted stops the restore first.
   let receiptNow;
   try { receiptNow=readReceipt(root); }
-  catch (error) { throw new Error(`${error.message}. Nothing was restored. ${RECEIPT_ACTION.replace('the same update','the same restore')}`); }
+  catch (error) { throw new Error(`${error.message}. Nothing was restored. ${receiptAction('restore')}`); }
   const receiptHashNow=receiptNow && fileHash(safe(root,RECEIPT_PATH));
   // `gone`: files the update added that the client has since deleted; nothing to restore,
   // but the receipt must stop claiming them.
@@ -525,23 +528,15 @@ async function restore(store,root,backupRel) {
   // edit to them is still recognised as the client's. Files the update added and the client
   // deleted are no longer claimed.
   const prior=journal.receipt?.prior ? json(join(backup,journal.receipt.prior)) : null;
-  if (!prior && receiptNow && journal.receipt && receiptHashNow===journal.receipt.installed_hash) {
-    // The update wrote the harness's first receipt and nothing changed it since: none again.
+  if (!prior && receiptNow && journal.receipt && receiptHashNow===journal.receipt.installed_hash && !kept.length) {
+    // The update wrote the harness's first receipt, nothing changed it since and every file
+    // went back: none again loses nothing. A kept edit needs the receipt to stay the client's.
     await store.removeReceipt();
   } else if (prior || receiptNow) {
     // A migrated harness had no receipt; its restored files take the baselines it proved then.
     const migrated=!prior && journal.receipt?.migrated ? json(join(backup,journal.receipt.migrated)) : null;
-    const base=receiptNow||prior, files={...base.files}, priorFiles=(prior||migrated)?.files||{};
-    const back = path => { if (priorFiles[path]) files[path]=priorFiles[path]; else delete files[path]; };
-    for (const path of gone) delete files[path];
-    for (const path of restored) {
-      if (path===PACKAGE_ROOT) {
-        for (const key of Object.keys(files)) if (isPackagePath(key)) delete files[key];
-        for (const key of Object.keys(priorFiles)) if (isPackagePath(key)) files[key]=priorFiles[key];
-      } else if (path!=='registration') back(path);
-    }
-    const sorted=Object.fromEntries(Object.keys(files).sort().map(path=>[path,files[path]]));
-    await store.writeReceiptText(receiptText({...base,template_version:old.template_version,recorded_by:'restore',recorded_at:new Date().toISOString(),files:sorted}));
+    const files=restored.filter(path=>path!=='registration');
+    await store.writeReceiptText(receiptText(restoredReceipt(receiptNow||prior,{prior:(prior||migrated)?.files,restored:files,gone},{template_version:old.template_version})));
   }
   for(const key of journal.remove_status_checklist_keys) if(Object.hasOwn(old.checklist||{},key)) {status.checklist ||= {};status.checklist[key]=old.checklist[key];}
   status.template_version=old.template_version;

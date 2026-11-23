@@ -225,7 +225,7 @@ for (const tool of ['claude-code', 'codex']) {
     assert.match(read(client, 'AGENTS.md'), /Release update\./);
     assert.doesNotMatch(read(client, 'AGENTS.md'), /Uncommitted poison/);
     assert.equal(read(client, `${pkg}/prospecting/SKILL.md`), read(release, `${pkg}/prospecting/SKILL.md`));
-    assert.deepEqual(report.package.edits_backed_up, []);
+    assert.equal(report.package.replaced, true);
     assert.equal(report.active, false, 'the target is not announced as active before discovery');
     assert.equal(status(client).plugin.pending_version, manifest.template_version);
     assert.equal(read(client, `${skill(tool)}/personal/SKILL.md`), '# Personal skill\n');
@@ -612,6 +612,7 @@ for (const tool of ['claude-code', 'codex']) for (const skip of [false, true]) {
     const installedReadme = read(client, 'README.md');
     const installedGuard = read(client, 'status/guard.mjs');
     const installedAgents = read(client, 'AGENTS.md');
+    assert.throws(() => JSON.parse(read(client, 'update/pristine.json')), 'this release shipped a malformed registry copy');
     put(client, 'README.md', `${installedReadme}\nOur own notes.\n`);
     put(client, `${skill(tool)}/personal/SKILL.md`, '# Personal skill\n');
     put(client, 'status/guard.mjs', `${installedGuard}\n// Client runtime edit.\n`);
@@ -633,9 +634,10 @@ for (const tool of ['claude-code', 'codex']) for (const skip of [false, true]) {
     const migrated = incoming();
     ok(migrated);
     const report = JSON.parse(migrated.stdout);
-    for (const path of ['AGENTS.md', 'status/guard.mjs', 'update/apply.mjs', 'update/receipt.mjs', `${pkg}/prospecting/SKILL.md`]) {
+    for (const path of ['AGENTS.md', 'status/guard.mjs', 'update/apply.mjs', 'update/receipt.mjs', 'update/pristine.json', `${pkg}/prospecting/SKILL.md`]) {
       assert.equal(lfHash(readFileSync(join(client, path))), lfHash(readFileSync(join(release, path))), `${path} is the pinned release's`);
     }
+    assert.ok(!report.unknown.includes('update/pristine.json'), 'the shipped malformed registry copy is recognised');
     assert.equal(read(client, 'README.md'), `${installedReadme}\nOur own notes.\n`, 'an edit no release shipped is kept');
     assert.ok(report.unknown.includes('README.md'));
     assert.equal(read(client, `${skill(tool)}/personal/SKILL.md`), '# Personal skill\n');

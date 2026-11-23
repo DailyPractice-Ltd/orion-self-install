@@ -210,20 +210,22 @@ function remoteWorld(t, local) {
   return { base, bare, url, env, target: join(base, 'client') };
 }
 
-test('a fresh install with a home commits the receipt with the harness, recording the release .gitignore', (t) => {
-  const w = remoteWorld(t, true);
-  const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', 'codex', '--target', w.target, '--remote', w.url], { encoding: 'utf8', env: w.env });
-  assert.equal(run.status, 0, run.stdout + run.stderr);
-  const pushed = spawnSync('git', ['--git-dir', w.bare, 'show', 'main:status/installed-files.json'], { encoding: 'utf8' });
-  assert.equal(pushed.status, 0, pushed.stderr);
-  assert.equal(pushed.stdout, readFileSync(join(w.target, 'status/installed-files.json'), 'utf8'));
-  const receipt = JSON.parse(pushed.stdout);
-  // Home preparation edits .gitignore for the client's home; the receipt keeps Orion's shipped bytes,
-  // so that edit stays the client's and is never replaced by an update.
-  assert.equal(receipt.files['.gitignore'].hash, lfHash(readFileSync(join(release, '.gitignore'))));
-  assert.notEqual(lfHash(readFileSync(join(w.target, '.gitignore'))), receipt.files['.gitignore'].hash);
-  assert.equal('.gitattributes' in receipt.files, false, 'home metadata is not Orion-managed');
-});
+for (const tool of ['claude-code', 'codex']) {
+  test(`a fresh ${tool} install with a home commits the receipt with the harness, recording the .gitignore it installed`, (t) => {
+    const w = remoteWorld(t, true);
+    const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', w.target, '--remote', w.url], { encoding: 'utf8', env: w.env });
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    const pushed = spawnSync('git', ['--git-dir', w.bare, 'show', 'main:status/installed-files.json'], { encoding: 'utf8' });
+    assert.equal(pushed.status, 0, pushed.stderr);
+    assert.equal(pushed.stdout, readFileSync(join(w.target, 'status/installed-files.json'), 'utf8'));
+    const receipt = JSON.parse(pushed.stdout);
+    // Home preparation rewrites .gitignore as part of the install: the receipt records the bytes
+    // the harness actually has, so an update recognises them as Orion's.
+    assert.notEqual(lfHash(readFileSync(join(release, '.gitignore'))), lfHash(readFileSync(join(w.target, '.gitignore'))), 'home preparation changed .gitignore');
+    for (const [destination, entry] of Object.entries(receipt.files)) assert.equal(entry.hash, lfHash(readFileSync(join(w.target, destination))), destination);
+    assert.equal('.gitattributes' in receipt.files, false, 'home metadata is not Orion-managed');
+  });
+}
 
 test('a fresh install that fails after recording its receipt publishes nothing', (t) => {
   const w = remoteWorld(t, false);

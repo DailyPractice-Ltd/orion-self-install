@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { planForTool, safePath } from '../update/destination-resolver.mjs';
+import { fingerprint, planForTool, safePath } from '../update/destination-resolver.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -140,6 +140,9 @@ test('release contract validates the frozen compatibility registry without any g
   // A retirement identity and a legacy alias deployed harnesses still carry.
   refuses('a retired source lost', without('library/README.md'), /library\/README\.md/);
   refuses('a legacy alias lost', without('.claude/skills/hire-agent/SKILL.md'), /\.claude\/skills\/hire-agent\/SKILL\.md/);
+  // Its own shipped versions, which older harnesses carry (the malformed 2.0.0 copy among them).
+  refuses('its own versions lost', without('update/pristine.json'), /compatibility fingerprints for update\/pristine\.json/);
+  assert.ok(data.files['update/pristine.json'].includes(fingerprint(execFileSync('git', ['show', '55d0e65ce1f521f6b2a072ebf60d6274a2c1a351:update/pristine.json'], { cwd: repo }))), 'the malformed 2.0.0 copy is recognised');
   refuses('a hash that is not a fingerprint', JSON.stringify({ ...data, files: { ...data.files, 'AGENTS.md': ['not-a-hash'] } }), /AGENTS\.md/);
   refuses('no files map', JSON.stringify({ ...data, files: [] }), /files/);
 });

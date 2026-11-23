@@ -29,6 +29,9 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 
+/** The installed-file receipt's path in a harness; update/receipt.mjs owns its format. */
+export const RECEIPT_PATH = 'status/installed-files.json';
+
 /**
  * How long a command waits for the lock. The guard holds it through a network
  * check of up to 10 seconds plus up to 10 seconds per queued report, so this is
@@ -150,11 +153,11 @@ export async function withStatusLock(root, action, { wait = LOCK_WAIT_MS } = {})
        * so a concurrent Orion command can neither interleave with nor overwrite it.
        */
       async writeReceiptText(text) {
-        await atomicText(join(directory, 'installed-files.json'), String(text));
+        await atomicText(join(root, RECEIPT_PATH), String(text));
       },
       /** Removes the receipt: only to put back a harness that had none, as a rollback or restore does. */
       async removeReceipt() {
-        await unlink(join(directory, 'installed-files.json')).catch(error => { if (error.code !== 'ENOENT') throw error; });
+        await unlink(join(root, RECEIPT_PATH)).catch(error => { if (error.code !== 'ENOENT') throw error; });
       },
       async removeKey() {
         await unlink(keyPath(root)).catch(error => { if (error.code !== 'ENOENT') throw error; });

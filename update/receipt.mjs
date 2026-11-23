@@ -6,20 +6,32 @@
  */
 import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { TOOL_LAYOUT, fingerprint, safePath } from './destination-resolver.mjs';
+import { PACKAGE_ROOT, REGISTRY_PATH, SHA256_HEX, TOOL_LAYOUT, fingerprint, safePath } from './destination-resolver.mjs';
+import { RECEIPT_PATH } from '../status/store.mjs';
 
-export const RECEIPT_PATH = 'status/installed-files.json';
+export { RECEIPT_PATH };
 export const RECEIPT_SCHEMA = 'orion-installed-files';
 export const RECEIPT_VERSION = 1;
 export const RECEIPT_ALGORITHM = 'sha256-utf8-lf';
 const ORIGINS = ['release', 'generated'];
-const HASH = /^[0-9a-f]{64}$/;
 
-/** One entry per managed destination: its stable identity and the installed bytes' fingerprint. */
-function entryFor(root, destination, key, origin) {
+/** One receipt entry: a destination's stable identity, its installed bytes' fingerprint and where they came from. */
+export const receiptEntry = (key, hash, origin = 'release') => ({ key, hash, origin });
+
+/** A receipt's `files` in its canonical order: by destination. */
+export const sortedFiles = files => Object.fromEntries(Object.keys(files).sort().map(path => [path, files[path]]));
+
+/** The same receipt with new `files` (and any other changed fields), recorded now. */
+export const revisedReceipt = (receipt, files, fields = {}) => ({ ...receipt, ...fields, recorded_at: new Date().toISOString(), files: sortedFiles(files) });
+
+/** What to do when the receipt cannot be trusted, for the command that stopped. */
+export const receiptAction = command => `Put back ${RECEIPT_PATH} as it was (your folder's home repository or an earlier copy of the folder has it), then run the same ${command} again. If you cannot, ask Daily Practice for help.`;
+
+/** The entry for a destination as it is on disk now. */
+export function entryFromDisk(root, destination, key, origin) {
   const target = safePath(root, destination);
   if (!lstatSync(target).isFile()) throw new Error(`Cannot record ${destination}: not a regular file`);
-  return { key, hash: fingerprint(readFileSync(target)), origin };
+  return receiptEntry(key, fingerprint(readFileSync(target)), origin);
 }
 
 /**
@@ -32,12 +44,11 @@ export function buildReceipt(root, plan, { ai_assistant, template_version, recor
   for (const entry of plan) {
     if (entry.ownership !== 'release') continue;
     if (entry.destination === RECEIPT_PATH) throw new Error(`${RECEIPT_PATH} cannot be a managed file`);
-    files[entry.destination] = entryFor(root, entry.destination, entry.fingerprint_key, 'release');
+    files[entry.destination] = entryFromDisk(root, entry.destination, entry.fingerprint_key, 'release');
   }
   const catalog = TOOL_LAYOUT[ai_assistant].catalogPath;
-  files[catalog] = entryFor(root, catalog, catalog, 'generated');
-  const sorted = Object.fromEntries(Object.keys(files).sort().map(path => [path, files[path]]));
-  return validateReceipt({ schema: RECEIPT_SCHEMA, version: RECEIPT_VERSION, algorithm: RECEIPT_ALGORITHM, ai_assistant, template_version, recorded_by, recorded_at, files: sorted });
+  files[catalog] = entryFromDisk(root, catalog, catalog, 'generated');
+  return validateReceipt({ schema: RECEIPT_SCHEMA, version: RECEIPT_VERSION, algorithm: RECEIPT_ALGORITHM, ai_assistant, template_version, recorded_by, recorded_at, files: sortedFiles(files) });
 }
 
 /** The receipt itself, or an error naming what is wrong with it. */
@@ -60,7 +71,7 @@ export function validateReceipt(value) {
     if (destination === RECEIPT_PATH || destination === 'status/status.json') fail(`${destination} is not a managed file`);
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) fail(`${destination}: entry is not an object`);
     if (typeof entry.key !== 'string' || !entry.key) fail(`${destination}: key is missing`);
-    if (typeof entry.hash !== 'string' || !HASH.test(entry.hash)) fail(`${destination}: hash is not a sha256 hex digest`);
+    if (typeof entry.hash !== 'string' || !SHA256_HEX.test(entry.hash)) fail(`${destination}: hash is not a sha256 hex digest`);
     if (!ORIGINS.includes(entry.origin)) fail(`${destination}: origin must be one of ${ORIGINS.join(', ')}`);
   }
   return value;
@@ -88,9 +99,13 @@ function isDanglingLink(path) {
 /**
  * Managed runtime: code the harness runs, and the data that code reads. A client edit
  * here that an update would replace stops the update, so the folder never runs a
- * mixture of releases. Plugin package files are protected the same way by the updater.
+ * mixture of releases. Plugin package files and the catalog are protected the same way
+ * by the updater. The compatibility registry is ordinary data: updates read the
+ * incoming release's copy, never the harness's, so an unrecognised copy is kept and
+ * reported like any other unknown file instead of stopping the update.
  */
 export function isRuntimeDestination(destination) {
+  if (destination === REGISTRY_PATH) return false;
   return destination.endsWith('.mjs') || destination.startsWith('update/') || destination === 'status/status.schema-template.json';
 }
 
@@ -124,21 +139,67 @@ export function receiptState(root, destination, receipt) {
  * registry (update/pristine.json): one entry for each candidate `{destination, key}` whose
  * current bytes are a version Orion shipped under that source identity or its legacy
  * alias. Anything else gets no entry, so its bytes are never adopted as Orion's. The
- * registry cannot list its own bytes; a harness's copy of it was always Orion's to replace.
+ * registry's own copy is no exception: it is recognised by the shipped versions of itself
+ * that the registry lists under its own path, and otherwise left alone as unknown.
  */
-export function legacyReceipt(root, candidates, { registry, aliases = {}, registryPath = 'update/pristine.json', ai_assistant, template_version }) {
-  const empty = { schema: RECEIPT_SCHEMA, version: RECEIPT_VERSION, algorithm: RECEIPT_ALGORITHM, ai_assistant, template_version, recorded_by: 'migration', recorded_at: new Date().toISOString(), files: {} };
+export function legacyReceipt(root, candidates, { registry, aliases = {}, ai_assistant, template_version }) {
+  const proved = { schema: RECEIPT_SCHEMA, version: RECEIPT_VERSION, algorithm: RECEIPT_ALGORITHM, ai_assistant, template_version, recorded_by: 'migration', recorded_at: new Date().toISOString(), files: {} };
   const reverse = Object.fromEntries(Object.entries(aliases).map(([key, alias]) => [alias, key]));
   const shipped = key => [key, aliases[key], reverse[key]].filter(Boolean).flatMap(name => registry?.files?.[name] || []);
   for (const { destination, key } of candidates) {
-    if (empty.files[destination]) continue;
-    const { state, current } = receiptState(root, destination, empty);
-    if (state !== 'unknown') continue;
-    if (destination === registryPath || shipped(key).includes(current)) empty.files[destination] = { key, hash: current, origin: 'release' };
+    if (proved.files[destination]) continue;
+    const { state, current } = receiptState(root, destination, proved);
+    if (state === 'unknown' && shipped(key).includes(current)) proved.files[destination] = receiptEntry(key, current);
   }
-  const sorted = Object.fromEntries(Object.keys(empty.files).sort().map(path => [path, empty.files[path]]));
-  return validateReceipt({ ...empty, files: sorted });
+  return validateReceipt({ ...proved, files: sortedFiles(proved.files) });
 }
+
+/**
+ * The receipt an update leaves when every action succeeds: `verified` destinations already
+ * held the incoming bytes, `forgotten` ones were retired before and are gone, `written`
+ * maps each destination the update adds or replaces to its new entry, `retired` lists those
+ * it removes. With `pkg` (the incoming package's entries) the whole package claim is
+ * replaced; `catalog` is the generated catalog's entry, when the update leaves it as generated.
+ */
+export function updatedReceipt(receipt, { verified = {}, forgotten = [], written = {}, retired = [], pkg = null, catalog = null }, fields) {
+  const files = { ...receipt.files, ...verified };
+  for (const path of [...forgotten, ...retired]) delete files[path];
+  Object.assign(files, written);
+  if (pkg) {
+    for (const path of Object.keys(files)) if (isPackagePath(path)) delete files[path];
+    Object.assign(files, pkg);
+  }
+  if (catalog) files[catalog.path] = catalog.entry;
+  return revisedReceipt(receipt, files, { ...fields, recorded_by: 'update' });
+}
+
+/**
+ * The receipt after a restore: restored destinations go back to their `prior` entries (or
+ * lose them), a restored package takes back the whole prior package claim, and `gone`
+ * destinations (added by the update, deleted since) are no longer claimed. Everything
+ * else, kept edits included, keeps the baseline in `base`.
+ */
+export function restoredReceipt(base, { prior = {}, restored = [], gone = [] }, fields) {
+  const files = { ...base.files };
+  for (const path of gone) delete files[path];
+  for (const path of restored) {
+    if (path === PACKAGE_ROOT) {
+      for (const key of Object.keys(files)) if (isPackagePath(key)) delete files[key];
+      for (const key of Object.keys(prior)) if (isPackagePath(key)) files[key] = prior[key];
+    } else if (prior[path]) files[path] = prior[path];
+    else delete files[path];
+  }
+  return revisedReceipt(base, files, { ...fields, recorded_by: 'restore' });
+}
+
+/** The receipt without the claims for those paths that are now gone from the folder. */
+export function withoutAbsent(root, receipt, paths) {
+  const files = { ...receipt.files };
+  for (const path of paths) if (!existsSync(join(root, path))) delete files[path];
+  return revisedReceipt(receipt, files);
+}
+
+const isPackagePath = path => path === PACKAGE_ROOT || path.startsWith(`${PACKAGE_ROOT}/`);
 
 /** The receipt's exact serialised form. */
 export function receiptText(receipt) {

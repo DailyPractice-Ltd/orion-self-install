@@ -26,8 +26,9 @@ maintenance. Leave client status, credentials and business records alone.
    to a deployed file needs no fingerprint change; merges, squashes and shallow
    clones do not affect it. The release contract validates it (well-formed JSON,
    SHA-256 fingerprints, every retirement identity and legacy alias in
-   `update/manifest.json` present). Remove a key only together with the retirement
-   or alias that needs it.
+   `update/manifest.json` present, and its own key listing the versions of itself
+   committed before receipts). Remove a key only together with the retirement or
+   alias that needs it.
 4. Run checks appropriate to the change and review `git diff --check` and the diff.
    For deployment or package changes, also run the release contract below for both
    supported tools, regardless of which assistant is running. Resolve failures

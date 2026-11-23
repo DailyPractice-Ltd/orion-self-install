@@ -271,7 +271,9 @@ test('a harness without a receipt migrates: shipped files update, unknown ones a
     ],
     // The frozen registry: shipped versions by source identity, and an alias for a file that once shipped under another path.
     pristine: { 'AGENTS.md':[requireHash('agents v1\n')], 'README.md':[requireHash('readme v0\n'), requireHash('readme v1\n')], 'guide.md':[requireHash('guide v1\n')],
-      'status/a.mjs':[requireHash('console.log("a v1")\n')], 'skills/old/SKILL.md':[requireHash('old v1\n')], '.claude/skills/hire/SKILL.md':[requireHash('hire v0\n')] },
+      'status/a.mjs':[requireHash('console.log("a v1")\n')], 'skills/old/SKILL.md':[requireHash('old v1\n')], '.claude/skills/hire/SKILL.md':[requireHash('hire v0\n')],
+      // The registry's own shipped versions, malformed ones included.
+      'update/pristine.json':[requireHash('{"files":{')] },
     aliases: { 'skills/hire/SKILL.md':'.claude/skills/hire/SKILL.md' },
   });
   put(w.client,'AGENTS.md','agents v1\r\n');            // shipped; only the line endings differ
@@ -291,6 +293,7 @@ test('a harness without a receipt migrates: shipped files update, unknown ones a
   for (const path of ['AGENTS.md','README.md','status/a.mjs','added.md']) assert.equal(receipt.files[path].hash,requireHash(files[path]),path);
   for (const path of ['guide.md','notes.md','.agents/skills/old/SKILL.md','.agents/skills/hire/SKILL.md']) assert.equal(receipt.files[path],undefined,`${path} is not claimed`);
   assert.equal(receipt.files['update/pristine.json'].hash,lf(get(w.client,'update/pristine.json')));
+  assert.notEqual(get(w.client,'update/pristine.json'),'{"files":{','a shipped registry copy is replaced');
 
   // The migrated receipt is the baseline now: a later edit is the client's, and untouched files keep updating.
   put(w.client,'AGENTS.md','client agents\n');
@@ -463,4 +466,38 @@ test('restoring a migration after its receipt changed gives restored files the b
   // So the restored runtime file is Orion's again, and the next update replaces it.
   const again = w.update(v2); assert.equal(again.status,0,again.stdout+again.stderr);
   assert.equal(get(w.client,'status/a.mjs'),'console.log("a v2")\n');
+});
+
+test('restoring a migration that kept a later edit keeps a receipt, so the edit is never adopted from an old shipped version', t => {
+  const w = legacyWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n' },
+    pristine: { 'AGENTS.md':[requireHash('agents v1\n')], 'README.md':[requireHash('readme v0\n'), requireHash('readme v1\n')] } });
+  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n' });
+  const updated = w.update(v2); assert.equal(updated.status,0,updated.stdout+updated.stderr);
+  // After the update the client writes README.md back to text an old release once shipped.
+  put(w.client,'README.md','readme v0\n');
+  const restored = w.restore(JSON.parse(updated.stdout).backup); assert.equal(restored.status,0,restored.stdout+restored.stderr);
+  assert.deepEqual(JSON.parse(restored.stdout).kept,['README.md']);
+  assert.equal(get(w.client,'AGENTS.md'),'agents v1\n');
+  const receipt = receiptOf(w.client);
+  assert.equal(receipt.template_version,'1.0.0');
+  assert.equal(receipt.files['AGENTS.md'].hash,requireHash('agents v1\n'),'the restored file takes the baseline the migration proved');
+  assert.equal(receipt.files['README.md'].hash,requireHash('readme v2\n'),'the kept edit keeps the update baseline');
+  // The next update keeps the client's README.md and still updates the rest.
+  const v3 = w.publish('3.0.0', { 'AGENTS.md':'agents v3\n', 'README.md':'readme v3\n' });
+  const next = w.update(v3); assert.equal(next.status,0,next.stdout+next.stderr);
+  assert.equal(get(w.client,'README.md'),'readme v0\n');
+  assert.deepEqual(JSON.parse(next.stdout).kept,['README.md']);
+  assert.equal(get(w.client,'AGENTS.md'),'agents v3\n');
+});
+
+test('a migrating harness never adopts a registry copy no release shipped: it is kept and reported, and the update goes on', t => {
+  const w = legacyWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'update/pristine.json':'{"files":{"mine":[]}}\n' },
+    pristine: { 'AGENTS.md':[requireHash('agents v1\n')], 'update/pristine.json':[requireHash('{"files":{')] } });
+  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n' });
+  const updated = w.update(v2); assert.equal(updated.status,0,updated.stdout+updated.stderr);
+  const report = JSON.parse(updated.stdout);
+  assert.equal(get(w.client,'AGENTS.md'),'agents v2\n');
+  assert.equal(get(w.client,'update/pristine.json'),'{"files":{"mine":[]}}\n');
+  assert.deepEqual(report.unknown,['update/pristine.json']);
+  assert.equal(receiptOf(w.client).files['update/pristine.json'],undefined);
 });

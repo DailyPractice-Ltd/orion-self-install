@@ -84,10 +84,6 @@ async function install() {
     writeFileSync(join(stage, 'status/status.json'), JSON.stringify(stagedStatus, null, 2) + '\n');
     const packageErrors = checkFolder(stage, { tool: ai_assistant, identity, version: manifest.template_version, write: true });
     if (packageErrors.length) throw new Error(`The Orion plugin package did not validate:\n  ${packageErrors.join('\n  ')}`);
-    // Every managed file now has its installed bytes: record them before the harness is
-    // published (and, with a home, before its first commit). Home preparation below edits
-    // .gitignore as client-home configuration, so that edit is the client's, not Orion's.
-    writeStagedReceipt(stage, buildReceipt(stage, plan, { ai_assistant, template_version: manifest.template_version, recorded_by: 'install' }));
     const init = spawnSync('git', ['-C', stage, 'init', '-q', '-b', 'main'], { encoding: 'utf8' });
     if (init.status !== 0) throw new Error(`Could not create client repository: ${init.stderr.trim()}`);
     if(!useLocal) {
@@ -100,6 +96,12 @@ async function install() {
       if(prepare.status!==0 || !JSON.parse(readFileSync(join(stage,'status/status.json'),'utf8')).home?.enabled) {
         throw new Error(`Could not prepare the private repository home: ${prepare.stderr.trim() || prepare.stdout.trim()}`);
       }
+    }
+    // Every managed file now has its installed bytes, .gitignore included as home preparation
+    // left it: record them before the harness is published and, with a home, before its first
+    // commit. A failure from here on removes the stage, receipt and all.
+    writeStagedReceipt(stage, buildReceipt(stage, plan, { ai_assistant, template_version: manifest.template_version, recorded_by: 'install' }));
+    if(!useLocal) {
       const add=spawnSync('git',['-C',stage,'add','.'],{encoding:'utf8'});
       if(add.status!==0) throw new Error(add.stderr.trim());
       const commit=spawnSync('git',['-C',stage,'-c','user.name=Orion installer','-c','user.email=installer@users.noreply.github.com','commit','-qm','Install Orion harness'],{encoding:'utf8'});

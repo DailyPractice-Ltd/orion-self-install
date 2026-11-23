@@ -16,33 +16,37 @@ Write each section for the client who will read it there.
 ## Unreleased — Installed-file receipts
 
 **Updates now know exactly which files Orion installed in your folder, so they replace
-only those and never overwrite your changes.**
+only those: a file you changed is kept, or the update stops before changing anything.**
 
 - **The receipt.** A fresh install records each Orion file it installed, with its
   exact contents, in `status/installed-files.json`, including installs from a branch
   or a locally edited release checkout, and the plugin catalog generated for your
-  tool. Business records, credentials, the tool's own registration settings and your
+  tool. With a private home, `.gitignore` is recorded as home setup leaves it.
+  Business records, credentials, the tool's own registration settings and your
   own skills are never listed. The receipt travels with your folder's private home
   and is never replaced by an update.
 - **Updates follow the receipt.** Files still as Orion installed them are updated
   (line endings aside). Files you changed are kept exactly and stay recognised as
   yours on later updates. Files Orion never installed are kept and listed as
-  `unknown`. If you changed one of Orion's scripts or plugin skills and the update
-  would replace it, the update now stops before changing anything and names the
-  files, instead of overwriting them. A damaged receipt also stops the update, with
+  `unknown`. If you changed one of Orion's scripts, plugin skills or the plugin
+  catalog and the update would replace it, the update now stops before changing
+  anything and names the files, instead of overwriting them. A damaged receipt also stops the update, with
   nothing changed.
 - **Folders installed before receipts** update straight to the latest release, with
   no intermediate release. Files matching a version Orion shipped update as before
   and enter the new receipt; files no release shipped are kept, listed and never
-  claimed as Orion's. A changed script or plugin skill in such a folder stops the
-  update too.
+  claimed as Orion's. A changed script, plugin skill or catalog in such a folder
+  stops the update too. The folder's old copy of `update/pristine.json` (including
+  the malformed one 2.0.0 shipped) is recognised and replaced; a copy no release
+  shipped is kept and listed, without stopping the update.
 - **Recovery and restore keep the receipt in step with the files.** A failed update,
   an interrupted one recovered with `recover` (or by the next update), and a plugin
   activation failure that rolls back (exit 3) all put the receipt back exactly, or
   remove it again for a folder that had none. A restore keeps files you changed
   after the update, and now also keeps a file you wrote where the update retired one
   instead of overwriting it; restored files take back their earlier baselines and
-  your later edits stay recognised as yours. While plugin activation is pending, the
+  your later edits stay recognised as yours, including after restoring the update
+  that first gave a folder its receipt. While plugin activation is pending, the
   receipt describes the files already applied, and finishing activation (`resume`,
   `verify --discovered`) never moves a baseline.
 - **Switching between Codex and Claude Code** keeps the receipt accurate. A finished
@@ -63,7 +67,9 @@ only those and never overwrite your changes.**
   registry rewrite. `tests/helpers/pristine.mjs` is gone.
 - The release contract and `node update/bump.mjs` validate the registry instead:
   readable JSON, SHA-256 fingerprints, and every retirement identity and legacy
-  alias present. The bump no longer touches `update/pristine.json`, and neither the
+  alias present, plus the registry's own committed versions under
+  `update/pristine.json` (all 89 from `main` and `release/2.0.0`, added once so
+  older harnesses' copies are recognised). The bump no longer touches `update/pristine.json`, and neither the
   contract nor the updater needs full Git history.
 - The registry's malformed JSON from the 2.0.0 merge is repaired, and the two
   committed 2.0.0-line versions it had lost (`agent/install.md` as shipped and an

@@ -9,6 +9,12 @@ const RELEASE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** The shipped Orion plugin package: same path in the release and in every harness. */
 export const PACKAGE_ROOT = 'plugins/orion';
 
+/** The frozen compatibility registry's default path (see compatibilityErrors). */
+export const REGISTRY_PATH = 'update/pristine.json';
+
+/** A fingerprint: lowercase SHA-256 hex. */
+export const SHA256_HEX = /^[0-9a-f]{64}$/;
+
 /** Per-tool harness paths that do not come from shipped files. */
 export const TOOL_LAYOUT = Object.freeze({
   'claude-code': Object.freeze({ product: 'Claude Code', skillRoot: '.claude/skills', catalogPath: '.claude-plugin/marketplace.json', rosterPath: '.claude/agents/README.md' }),
@@ -71,7 +77,7 @@ export function destinationState(root, entry, pristine) {
   if (entry.ownership === 'client-template') return 'client-owned';
   // Registry-only view (the resolver CLI): the registry cannot list its own bytes. Updates
   // use the receipt, or for a harness without one, receipt.mjs legacyReceipt.
-  if (entry.source === 'update/pristine.json' && entry.destination === entry.source) return 'owned';
+  if (entry.source === REGISTRY_PATH && entry.destination === entry.source) return 'owned';
   const known = pristine.files?.[entry.fingerprint_key] || [];
   return known.includes(fingerprint(readFileSync(target))) ? 'owned' : 'preserve';
 }
@@ -82,11 +88,13 @@ export function destinationState(root, entry, pristine) {
  * recognisable. It is never rebuilt from git history, so its validity depends
  * only on its own content and the manifest: well-formed, every fingerprint a
  * lowercase SHA-256, and every retirement identity and legacy alias that
- * deployed harnesses may still carry present with at least one fingerprint.
+ * deployed harnesses may still carry present with at least one fingerprint. The
+ * registry also keeps its own shipped versions (under its path), so a migrating
+ * harness's copy is recognised like any other shipped file.
  * Returns the problems, empty when valid.
  */
 export function compatibilityErrors(releaseRoot, deployment) {
-  const name = deployment.fingerprints?.registry || 'update/pristine.json';
+  const name = deployment.fingerprints?.registry || REGISTRY_PATH;
   let registry;
   try { registry = JSON.parse(readFileSync(join(releaseRoot, name), 'utf8')); }
   catch (error) { return [`${name} is not readable JSON: ${error.message}`]; }
@@ -94,14 +102,14 @@ export function compatibilityErrors(releaseRoot, deployment) {
   if (!files || typeof files !== 'object' || Array.isArray(files)) return [`${name} has no "files" map of fingerprints`];
   const errors = [];
   for (const [key, prints] of Object.entries(files)) {
-    if (!Array.isArray(prints) || prints.some(print => typeof print !== 'string' || !/^[0-9a-f]{64}$/.test(print))) {
+    if (!Array.isArray(prints) || prints.some(print => typeof print !== 'string' || !SHA256_HEX.test(print))) {
       errors.push(`${name}: ${key} must list lowercase SHA-256 fingerprints`);
     }
   }
   const aliases = deployment.fingerprints?.legacy_aliases || {};
   const required = new Set([
     ...(deployment.retired || []).flatMap(entry => [entry.fingerprint_key || entry.source, ...Object.values(entry.sources || {})]),
-    ...Object.keys(aliases), ...Object.values(aliases),
+    ...Object.keys(aliases), ...Object.values(aliases), name,
   ]);
   for (const key of [...required].sort()) {
     if (!files[key]?.length) errors.push(`${name} lost the compatibility fingerprints for ${key}, which deployed harnesses may still carry`);
@@ -150,7 +158,7 @@ export function planForTool(deployment, ai_assistant, { releaseRoot = RELEASE_RO
 export function resolveDestinations({ root, releaseRoot = RELEASE_ROOT, legacyTool } = {}) {
   if (!root) throw new Error('A deployed harness root is required');
   const manifest = readJson(join(releaseRoot, 'update/manifest.json'), 'release manifest');
-  const pristine = readJson(join(releaseRoot, 'update/pristine.json'), 'fingerprint registry');
+  const pristine = readJson(join(releaseRoot, manifest.deployment.fingerprints?.registry || REGISTRY_PATH), 'fingerprint registry');
   const status = readJson(join(root, 'status/status.json'), 'harness status');
   const ai_assistant = resolveAiAssistant(status, manifest.deployment, { legacyTool });
   const entries = planForTool(manifest.deployment, ai_assistant, { releaseRoot, root });

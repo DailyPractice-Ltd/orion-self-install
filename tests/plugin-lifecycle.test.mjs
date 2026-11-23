@@ -166,7 +166,7 @@ test('update replaces the package as a unit, keeps client skills and records the
   // ...and the complete prior package is in the backup.
   assert.equal(get(w.client, `${r.backup}/package/plugins/orion/skills/hello/SKILL.md`), 'hello v1\n');
   assert.equal(get(w.client, `${r.backup}/package/plugins/orion/skills/gone/SKILL.md`), 'gone v1\n');
-  assert.deepEqual(r.package.edits_backed_up, []);
+  assert.deepEqual(Object.keys(r.package).sort(), ['backup', 'replaced']);
 
   // Client-owned work and unrelated settings are untouched; the catalog keeps its identity.
   assert.equal(get(w.client, '.claude/skills/mine/SKILL.md'), 'my own skill\n');
@@ -570,5 +570,31 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v2\n');
     assert.equal(receiptOf(w).template_version, '2.0.0');
     aligned(w, tool);
+  });
+
+  test(`${tool}: an edited or unknown catalog stops the update before any change, like a package edit`, (t) => {
+    for (const receipt of [true, false]) {
+      const w = world(t, { tool, receipt });
+      const edited = get(w.client, CATALOG_PATH[tool]).replace('"plugins"', '"mine": true,\n  "plugins"');
+      put(w.client, CATALOG_PATH[tool], edited);
+      const receiptBefore = receipt ? get(w.client, RECEIPT_PATH) : null;
+      const blocked = w.update();
+      assert.equal(blocked.status, 2, out(blocked));
+      assert.equal(report(blocked).state, 'conflict');
+      assert.deepEqual(report(blocked).conflicts, [{ path: CATALOG_PATH[tool], reason: receipt ? 'modified' : 'unknown' }]);
+      assert.equal(get(w.client, CATALOG_PATH[tool]), edited, 'the catalog edit is untouched');
+      assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v1\n');
+      assert.equal(get(w.client, 'AGENTS.md'), 'agents v1\n');
+      assert.equal(has(w.client, '.update-backup'), false);
+      if (receipt) assert.equal(get(w.client, RECEIPT_PATH), receiptBefore);
+      else assert.equal(has(w.client, RECEIPT_PATH), false);
+
+      // Putting back the catalog Orion generated lets the same update through.
+      put(w.client, CATALOG_PATH[tool], json(buildCatalog(tool, ID)));
+      const run = w.update();
+      assert.equal(run.status, 0, out(run));
+      assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v2\n');
+      assert.equal(receiptOf(w).files[CATALOG_PATH[tool]].hash, hash(json(buildCatalog(tool, ID))));
+    }
   });
 }

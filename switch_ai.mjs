@@ -35,8 +35,8 @@ import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSy
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withStatusLock } from './status/store.mjs';
-import { TOOL_LAYOUT, fingerprint, safePath, toolEntries } from './update/destination-resolver.mjs';
-import { RECEIPT_PATH, readReceipt, receiptText } from './update/receipt.mjs';
+import { TOOL_LAYOUT, toolEntries } from './update/destination-resolver.mjs';
+import { RECEIPT_PATH, entryFromDisk, readReceipt, receiptAction, receiptText, revisedReceipt, withoutAbsent } from './update/receipt.mjs';
 
 const SKILLS = { codex: '.agents/skills', 'claude-code': '.claude/skills' };
 const TOP = { codex: '.agents', 'claude-code': '.claude' };
@@ -136,7 +136,7 @@ async function switchLocked(store, root, statusPath, to, kit) {
   }
   let receipt;
   try { receipt = readReceipt(root); }
-  catch (error) { throw new Error(`${error.message}. Orion cannot tell its own files from yours without it, so nothing was changed. Put back ${RECEIPT_PATH} as it was (your folder's home repository or an earlier copy of the folder has it), then run this again. If you cannot, ask Daily Practice for help.`); }
+  catch (error) { throw new Error(`${error.message}. Orion cannot tell its own files from yours without it, so nothing was changed. ${receiptAction('switch')}`); }
 
   // The plugin: set the target up from the same identity before anything else moves.
   let plugin = null;
@@ -256,7 +256,7 @@ async function switchLocked(store, root, statusPath, to, kit) {
       removeCatalog(root, plugin.oldCatalog, kit.catalogText(from, plugin.identity));
       rmSync(kit.safePath(root, kit.MANIFEST_PATHS[from]), { force: true });
       pruneParents(root, kit.MANIFEST_PATHS[from]);
-      if (receipt) await store.writeReceiptText(receiptText(withoutRemoved(root, receipt, [kit.MANIFEST_PATHS[from], plugin.oldCatalog])));
+      if (receipt) await store.writeReceiptText(receiptText(withoutAbsent(root, receipt, [kit.MANIFEST_PATHS[from], plugin.oldCatalog])));
     }
     else result.previous_tool_action = `Orion could not remove itself from ${NAME[from]} for this folder (${retired.details?.reason || 'its program was not reachable'}), so ${NAME[from]} may still offer the Orion skills here. Remove Orion there by hand; nothing else in ${NAME[from]} was changed, and ${plugin.oldCatalog} stays until then.`;
   }
@@ -276,20 +276,11 @@ function switchedReceipt(root, receipt, to, kit) {
     const deployment = existsSync(manifestFile) ? JSON.parse(readFileSync(manifestFile, 'utf8')).deployment : null;
     const mapped = deployment && toolEntries(deployment, to).find((entry) => entry.destination === manifestPath);
     for (const [path, key] of [[manifestPath, mapped?.fingerprint_key || manifestPath], [catalogPath, catalogPath]]) {
-      files[path] = { key, hash: fingerprint(readFileSync(safePath(root, path))), origin: 'generated' };
+      files[path] = entryFromDisk(root, path, key, 'generated');
     }
   }
-  return { ...receipt, ai_assistant: to, recorded_by: 'switch', recorded_at: new Date().toISOString(), files: sorted(files) };
+  return revisedReceipt(receipt, files, { ai_assistant: to, recorded_by: 'switch' });
 }
-
-/** The receipt without the claims for those paths that are now gone from the folder. */
-function withoutRemoved(root, receipt, paths) {
-  const files = { ...receipt.files };
-  for (const path of paths) if (!existsSync(join(root, path))) delete files[path];
-  return { ...receipt, recorded_at: new Date().toISOString(), files: sorted(files) };
-}
-
-const sorted = (files) => Object.fromEntries(Object.keys(files).sort().map((path) => [path, files[path]]));
 
 /** Remove this folder's Orion catalog for one assistant, only when it is exactly Orion's. */
 function removeCatalog(root, rel, text) {

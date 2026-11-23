@@ -381,3 +381,50 @@ for (const tool of ['codex', 'claude-code']) test(`update preserves the ${tool} 
   assert.equal(has(w.client, MANIFEST_PATHS[other]), false);
   assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'local edit\n');
 });
+
+test('setup EPERM after files commit reports activation pending and survives an update retry', t => {
+  const w = world(t, { tool: 'codex' });
+  // Force a registration write only after files have committed.
+  put(w.client, '.codex/config.toml', 'model = "mine"\n');
+  const result = w.update({ NODE_OPTIONS: `--import=${new URL('./helpers/update-permissions.mjs', import.meta.url).href}`, TEST_DENY_SETUP: '1' });
+  assert.equal(result.status, 0, out(result));
+  const r = report(result);
+  assert.equal(r.files_applied, true);
+  assert.equal(r.activation_pending, true);
+  assert.equal(r.state, 'pending_activation');
+  assert.equal(r.active, false);
+  assert.equal(r.reason, 'EPERM');
+  assert.ok(r.backup);
+  assert.equal(w.status().template_version, '2.0.0');
+  assert.equal(w.status().plugin.pending_version, '2.0.0');
+  assert.equal(w.status().plugin.update_backup, r.backup);
+  assert.equal(JSON.parse(get(w.client, `${r.backup}/journal.json`)).state, 'complete');
+  const retry = w.update();
+  assert.equal(retry.status, 0, out(retry));
+  const again = report(retry);
+  assert.equal(again.up_to_date, false);
+  assert.equal(again.files_up_to_date, true);
+  assert.equal(again.activation_pending, true);
+  assert.equal(again.backup, r.backup);
+  assert.match(again.plugin.remaining_action, /resume/);
+  assert.equal(w.restore(r.backup).status, 0);
+});
+
+test('preflight reports both protected destinations before replacing release files', t => {
+  const w = world(t, { tool: 'codex' });
+  rmSync(join(w.client, '.codex'), { recursive: true });
+  const before = get(w.client, 'status/status.json');
+  const result = w.update({ NODE_OPTIONS: `--import=${new URL('./helpers/update-permissions.mjs', import.meta.url).href}`, TEST_DENY_PREFLIGHT: '1' });
+  assert.equal(result.status, 2, out(result));
+  const r = report(result);
+  assert.equal(r.state, 'preflight_failed');
+  assert.equal(r.files_applied, false);
+  assert.ok(r.permissions.some(p => p.path.startsWith('.agents/')));
+  assert.ok(r.permissions.some(p => p.path.startsWith('.codex/')));
+  assert.equal(get(w.client, 'AGENTS.md'), 'agents v1\n');
+  assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v1\n');
+  assert.equal(get(w.client, 'status/status.json'), before);
+  assert.equal(has(w.client, '.update-backup'), false);
+  assert.equal(has(w.client, '.codex'), false, 'temporary preflight directories are cleaned up');
+  assert.equal(nativeCalls(w).length, 0);
+});

@@ -26,8 +26,9 @@ import { fileURLToPath } from 'node:url';
 import { PACKAGE_ROOT, TOOL_LAYOUT, destinationState, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
 import { MANIFEST_PATHS, catalogName, catalogText, ensurePluginRegion } from './plugin-package.mjs';
 import { lowerFirst } from './plugin-native.mjs';
-import { captureRegistration, restoreRegistration } from './plugin-registration.mjs';
+import { captureRegistration, restoreRegistration, CODEX_PROJECT_CONFIG, CLAUDE_LOCAL_SETTINGS } from './plugin-registration.mjs';
 import { RESUME_COMMAND, VERIFY_COMMAND, runPluginSetup } from './plugin-setup.mjs';
+import { preflightDestinations } from './preflight.mjs';
 import { withStatusLock } from '../status/store.mjs';
 
 const arg = name => { const i=process.argv.indexOf(name); return i<0 ? undefined : process.argv[i+1]; };
@@ -199,7 +200,25 @@ async function update(store,root,repo,commit) {
     const checklistKeys = manifest.remove_status_checklist_keys || [];
     const hasRetiredChecklistKeys = checklistKeys.some(key => Object.hasOwn(status.checklist || {}, key));
     if (status.template_version === manifest.template_version && !actions.length && !pkg && !catalog?.changed && !hasRetiredChecklistKeys) {
-      return { ...report, up_to_date: true, ...(withPlugin ? {plugin:pluginReport(status.plugin)} : {}) };
+      const activationPending = withPlugin && (status.plugin?.setup_state !== 'complete' || status.plugin?.pending_version != null || status.plugin?.verified_version !== manifest.template_version);
+      return { ...report, up_to_date: !activationPending, files_up_to_date: true,
+        ...(withPlugin ? { state: activationPending ? 'pending_activation' : 'complete', active: !activationPending, activation_pending: activationPending, plugin:pluginReport(status.plugin), backup:status.plugin?.update_backup ?? null } : {}) };
+    }
+    const destinations = actions.map(a => a.e.destination);
+    if (pkg) {
+      destinations.push(`${PACKAGE_ROOT}/.preflight`);
+      if (existsSync(safe(root, PACKAGE_ROOT))) {
+        for (const line of treeLines(safe(root, PACKAGE_ROOT))) destinations.push(`${PACKAGE_ROOT}/${line.slice(0, line.lastIndexOf(' '))}`);
+      }
+    }
+    if (catalog) destinations.push(catalog.path);
+    if (withPlugin) destinations.push(ai_assistant === 'codex' ? CODEX_PROJECT_CONFIG : CLAUDE_LOCAL_SETTINGS);
+    destinations.push('status/status.json', '.update-backup/.preflight');
+    const permissions = preflightDestinations(root, destinations);
+    if (permissions.length) {
+      process.exitCode = 2;
+      return { ...report, state:'preflight_failed', files_applied:false, active:false, permissions,
+        remaining_action:'Allow write access to all listed destinations, then rerun the same pinned update. No release files were replaced.' };
     }
     const stamp=new Date().toISOString().replace(/[:.]/g,'-');
     const backupRel=`.update-backup/${status.template_version}-${stamp}`;
@@ -273,7 +292,20 @@ async function update(store,root,repo,commit) {
     if (!withPlugin) return {...report,backup:backupRel};
 
     // Refresh the selected tool. Only a confirmed failure rolls the update back.
-    const refreshed=await runPluginSetup(root,{mode:'setup',store});
+    let refreshed;
+    try {
+      refreshed=await runPluginSetup(root,{mode:'setup',store});
+    } catch (error) {
+      // Files and status have committed. An exception is uncertain activation, not
+      // a confirmed native failure: retain the restorable file journal and backup.
+      const remaining_action=`Orion ${manifest.template_version} files were applied, but plugin activation is pending (${error.code || 'setup exception'}). Allow access if needed, then run "${RESUME_COMMAND}" from this folder. Backup: ${backupRel}.`;
+      const plugin=await editStatus(store,current=>{
+        const region=ensurePluginRegion(current);
+        Object.assign(region,{setup_state:'pending',pending_version:manifest.template_version,update_backup:backupRel,remaining_action});
+        return region;
+      });
+      return {...report,state:'pending_activation',files_applied:true,activation_pending:true,active:false,reason:error.code || 'plugin_setup_exception',errors:[error.message],plugin:pluginReport(plugin),remaining_action,backup:backupRel};
+    }
     if (refreshed.setup_state==='failed') {
       const plugin=await rollbackUpdate(store,root,backup,journal,restored=>{
         const region=ensurePluginRegion(restored);
@@ -287,7 +319,7 @@ async function update(store,root,repo,commit) {
       process.exitCode=3;
       return {...report,state:'rolled_back',active:false,reason:refreshed.reason,errors:refreshed.errors,remaining_action:plugin.remaining_action,reload_required:true,backup:backupRel};
     }
-    return {...report,state:refreshed.setup_state==='complete'?'complete':'pending_verification',active:refreshed.setup_state==='complete',plugin:{...pluginReport(refreshed),checked_with:refreshed.checked_with},backup:backupRel};
+    return {...report,files_applied:true,activation_pending:refreshed.setup_state!=='complete',state:refreshed.setup_state==='complete'?'complete':'pending_verification',active:refreshed.setup_state==='complete',plugin:{...pluginReport(refreshed),checked_with:refreshed.checked_with},backup:backupRel};
   } finally {rmSync(snapshot,{recursive:true,force:true});}
 }
 

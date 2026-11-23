@@ -2,6 +2,12 @@
 
 ## Unreleased — one instruction file, reinstall from 1.x
 
+- Report applied update files separately from pending plugin activation when setup
+  throws, retain the restore backup, and keep unfinished activation visible on retry.
+- Give Codex installation handoffs the exact harness catalog, supported `plugin add`
+  command, and complete user-wide enablement correction before starting a fresh chat.
+- Probe destination permissions, including `.agents` and `.codex`, before replacing
+  release files and report all blocked paths together.
 - Recommend Matt Pocock's full skills plugin as an optional, resumable step in
   new Codex and Claude Code installations, with saved choices and verified
   completion. Declining or deferring never blocks Orion setup; existing harness

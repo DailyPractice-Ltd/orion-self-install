@@ -1,7 +1,7 @@
 /** A client journey using a complete release checkout and only deployed commands. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -302,6 +302,68 @@ for (const tool of ['claude-code', 'codex']) {
     assert.equal(catalogName(status(client).plugin.catalog_identity), name, 'the catalog identity survives both switches');
     assert.match(read(client, `${skill(tool)}/meeting-sizing/SKILL.md`), /Size the meeting/);
     assert.equal(existsSync(join(client, `${skill(other(tool))}/meeting-sizing/SKILL.md`)), false);
+  });
+}
+
+for (const tool of ['claude-code', 'codex']) {
+  test(`${tool} deployed journey: plugin activation fails, then succeeds, then is restored, and the receipt follows the files`, t => {
+    const { release, client } = journey(t, tool);
+    const native = fakeNative(dirname(client));
+    const RECEIPT = 'status/installed-files.json';
+    const receipt = () => JSON.parse(read(client, RECEIPT));
+    // Every claim matches the disk, and activation's own settings are never claimed.
+    const matchesDisk = (when) => {
+      const { files } = receipt();
+      for (const [path, entry] of Object.entries(files)) assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} ${when}`);
+      for (const path of ['.claude/settings.local.json', '.codex/config.toml', 'status/status.json']) assert.equal(files[path], undefined, `${path} ${when}`);
+      return files;
+    };
+    const installed = matchesDisk('after install');
+    // The real path: plugin-setup.mjs runs only when invoked as itself (macOS temp folders are symlinked).
+    const node = (script, ...args) => spawnSync(process.execPath, [realpathSync(join(client, script)), ...args], { cwd: client, encoding: 'utf8', env: native.env });
+
+    put(release, 'AGENTS.md', read(release, 'AGENTS.md') + '\nRelease update.\n');
+    put(release, `${pkg}/prospecting/SKILL.md`, read(release, `${pkg}/prospecting/SKILL.md`) + '\nRelease skill change.\n');
+    git(release, 'add', '.');
+    git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'next release');
+    const pinned = git(release, 'rev-parse', 'HEAD');
+    const update = () => node('update/apply.mjs', 'update', '--root', client, '--release-repo', release, '--commit', pinned);
+
+    // A confirmed native failure puts back the files and, with them, the receipt.
+    const before = read(client, RECEIPT);
+    native.edit(state => { state.faults = tool === 'codex' ? { codexListFails: true } : { validate: true }; });
+    const failed = update();
+    assert.equal(failed.status, 3, failed.stdout + failed.stderr);
+    assert.equal(JSON.parse(failed.stdout).state, 'rolled_back');
+    assert.equal(read(client, RECEIPT), before);
+    assert.doesNotMatch(read(client, 'AGENTS.md'), /Release update\./);
+    matchesDisk('after the failed activation');
+
+    // The same update with a working tool applies; activation waits for a fresh session.
+    native.edit(state => { state.faults = {}; });
+    const applied = update();
+    ok(applied);
+    const report = JSON.parse(applied.stdout);
+    assert.equal(report.files_applied, true);
+    assert.equal(report.active, false);
+    assert.match(read(client, `${pkg}/prospecting/SKILL.md`), /Release skill change\./);
+    const files = matchesDisk('after the update');
+    assert.equal(files['AGENTS.md'].hash, lfHash(Buffer.from(read(release, 'AGENTS.md'))));
+    const appliedReceipt = read(client, RECEIPT);
+
+    // Resuming and confirming activation rewrites no baseline.
+    if (tool === 'codex') ok(native.humanInstall(client, catalogName(status(client).plugin.catalog_identity)));
+    const resumed = node('update/plugin-setup.mjs', 'resume');
+    ok(resumed);
+    assert.match(resumed.stdout, /registered|complete/);
+    ok(node('update/plugin-setup.mjs', 'verify', '--discovered'));
+    assert.equal(status(client).plugin.setup_state, 'complete', JSON.stringify(status(client).plugin));
+    assert.equal(read(client, RECEIPT), appliedReceipt);
+    matchesDisk('after activation');
+
+    // Restore brings back the installed files and their install baselines.
+    ok(node('update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
+    assert.deepEqual(matchesDisk('after restore'), installed);
   });
 }
 

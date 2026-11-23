@@ -33,6 +33,11 @@ Write each section for the client who will read it there.
   the update, and now also keeps a file you wrote where the update retired one instead
   of overwriting it; the receipt gives restored files their earlier baselines and keeps
   your later edits recognised as yours on the next update.
+- Plugin activation and the receipt stay in step. While activation is pending, the
+  receipt describes the files already applied, and finishing activation (`resume`,
+  `verify --discovered`) never moves a baseline. When the tool confirms a failure and
+  the update is rolled back (exit 3), the receipt goes back with the files. The plugin
+  catalog is tracked; the tool's own registration settings never are.
 
 ### For maintainers
 

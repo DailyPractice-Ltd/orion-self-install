@@ -82,7 +82,7 @@ else in those files is recorded or put back. It then refreshes the selected tool
 `node update/plugin-setup.mjs resume` logic:
 
 - **Failed** (a check or native command failed): the previous package, catalog,
-  registration entries, files and version are put back, the report says
+  registration entries, files, receipt and version are put back, the report says
   `"state": "rolled_back"` and the helper
   exits 3. Recovery is not claimed until a fresh session confirms it: follow the
   report's `remaining_action`.
@@ -95,7 +95,9 @@ else in those files is recorded or put back. It then refreshes the selected tool
   then start a fresh chat. Then run `node update/plugin-setup.mjs verify --discovered`;
   that clears `pending_version`. Until then `plugin.update_backup` names the update's
   backup: if a later `resume` or `verify` fails, `remaining_action` gives the exact
-  restore command that puts the previous release back.
+  restore command that puts the previous release back. The receipt already describes
+  the applied files; `resume` and `verify` never change it (the catalog `resume` writes
+  is the one the receipt records).
 
 Marketplace auto-updates never replace the pinned release: the Claude Code catalog is a
 local folder read in place, and Orion never runs `codex plugin marketplace upgrade`.

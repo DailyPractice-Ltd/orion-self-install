@@ -1,6 +1,9 @@
 # Orion self-install — Changelog
 
-## Unreleased — one instruction file, reinstall from 1.x
+## 2.0.1 — 2026-11-23 — installation and maintenance refinements
+
+- Remove stale deployment entries for the absent `closeout-spreadsheet` skill so
+  release packaging validates for both supported tools.
 
 - Simplify test maintenance by removing duplicate package checks and brittle prose
   snapshots. Keep behavioral regressions and shared policy consistency checks.
@@ -35,14 +38,14 @@
   that CHANGELOG.md's newest numbered section matches it, and `node update/bump.mjs
   X.Y.Z` cuts a release. AGENTS.md has a short Releasing note for maintainers.
 
-## Unreleased — Fixed Orion identity
+### Fixed Orion identity
 
 - Fresh installs record `agent_name: "Orion"` automatically. The installer and
   agent definition use Orion directly and ask only for business context, tone
   and working preferences. The status CLI no longer accepts name changes.
 - Existing clients reinstall from scratch. No agent-name migration is added.
 
-## Unreleased — revised required pairing
+### Revised required pairing
 
 Removed the learned-memory folder, synchronization, consolidation skill and agent
 habits. Fresh installs retain the knowledge base, setup state, permissions,
@@ -706,7 +709,7 @@ The radio goes both ways, and it can carry a skill.
   to a running harness too — and it is on the update list, so it can be corrected
   again, which it could not be before.
 
-## Unreleased — candidates
+## Historical candidates
 
 - No self-serve *client* has been through this repo yet (the founder's own 26 Jul
   walkthrough is logged as Vol. 0, not Vol. 1). The first real self-serve install is

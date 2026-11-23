@@ -205,6 +205,7 @@
    "c398db8d0bba9cc4f8cec0fc507d9ecb9f05a4259298d4df49c23d972d2c8a9d",
    "c553d29242e278396e19c284502b3120549006df83617fd4d8f299960e8651f3",
    "c810a1768e4ed30b8c5f6b08c081482d121abbbd6b57112530f1f8bf7ced5c65",
+   "c988b111ec34d9a43c3954467b1ca74f3e1fa6e9256e7c4b37f450c9a5aaf476",
    "cb4fbdd002f694862c827ad1b88c6e1eb46e3b770614ceb7cf5bec7ae4bb6fa8",
    "cbfa15ac76f5b76e946c78dc7946b0e80368ce6a61f1517b6dfb77083204e6bb",
    "d381223a3187f5509e4d212ca1ab705f9f95f3f7bf8b1fe2d47f3fe4fccc0db4",
@@ -556,10 +557,12 @@
    "b076979b103c4f0b77ba6635fed2f95e78823d8a7cb85e5b808a689479596b59"
   ],
   "plugins/orion/.claude-plugin/plugin.json": [
+   "3ff2a1cbae51fea8f569e572c96cc858816556e020af8f0858915c71003f68b3",
    "42e749b31034effecea451489d1537502d82878b2d82202800ad3d297655d44c"
   ],
   "plugins/orion/plugin.json": [
-   "0dd744db8917976888f4b3d5fee547e11eacc5614f759cd03b93f1e427a0b197"
+   "0dd744db8917976888f4b3d5fee547e11eacc5614f759cd03b93f1e427a0b197",
+   "c15614c5bff855933f156349af9abbca00da1cd60aacaf72a7c30b0e4c6d31a0"
   ],
   "plugins/orion/skills/apollo-enrich-phone/SKILL.md": [
    "0332cffc34bc04d08d0122358d0ccc4dbaa694ad44901784c50242030a451690"
@@ -607,12 +610,6 @@
   ],
   "plugins/orion/skills/call-planner/scripts/harness-root.mjs": [
    "3a38f3b09d48d21542fe1d1f9d243c562dfd07dc4c841ce5b88eac4b3db69382"
-  ],
-  "plugins/orion/skills/closeout-spreadsheet/SKILL.md": [
-   "38805ce211b7cee8ecc2c0bcca9f501552f91aa5084ec16f90a61be80ccbfed4"
-  ],
-  "plugins/orion/skills/closeout-spreadsheet/references/sheet-stage-evidence.md": [
-   "ef880af90e57916dbf7746981e52d757b6cf545950b54181fd63438c4e9a69cb"
   ],
   "plugins/orion/skills/create-skill/SKILL.md": [
    "512db52c0995ba0e3a99fbf1770008c566fc32a5a47c18bc1e0fba7ef846bd7c",
@@ -1091,6 +1088,7 @@
    "3d289a4464a86b7513d05ea403ebd96c50aed5a5e868cb49c7e1a0bafc6f99dd",
    "4118f295c8d6ec7a9046110cbeb0470890b6ce5c82cccdcd78775cfa313813c4",
    "41a6cd25796852c8e43bf14db8a10b4c4d46161e3071bd965c9fde34dfdde320",
+   "436355a597064199bf3b073f11ba1b18f8ac9a20568cf0436e19e5da1d57f97a",
    "48bca4756dcd0c7d89f7e5e1195c113b299f005cd8cff7d74406d554dd1ab553",
    "50ad99c177d469a0a5326fda71cd535f3a4e168bdf19acf67239b6ba3cc24d24",
    "5363410b6ecad09cc172764b798f4b6806dca5b8030dceef3cc7f66797b6c4ec",

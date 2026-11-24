@@ -75,8 +75,8 @@ export function destinationState(root, entry, pristine) {
   if (!existsSync(target)) return 'absent';
   if (!lstatSync(target).isFile()) return 'preserve';
   if (entry.ownership === 'client-template') return 'client-owned';
-  // Registry-only view (the resolver CLI): the registry cannot list its own bytes. Updates
-  // use the receipt, or for a harness without one, receipt.mjs legacyReceipt.
+  // The registry's own copy is Orion bookkeeping: always replaceable, and never listed in
+  // itself. Updates use the receipt, or for a harness without one, receipt.mjs legacyReceipt.
   if (entry.source === REGISTRY_PATH && entry.destination === entry.source) return 'owned';
   const known = pristine.files?.[entry.fingerprint_key] || [];
   return known.includes(fingerprint(readFileSync(target))) ? 'owned' : 'preserve';
@@ -88,9 +88,10 @@ export function destinationState(root, entry, pristine) {
  * recognisable. It is never rebuilt from git history, so its validity depends
  * only on its own content and the manifest: well-formed, every fingerprint a
  * lowercase SHA-256, and every retirement identity and legacy alias that
- * deployed harnesses may still carry present with at least one fingerprint. The
- * registry also keeps its own shipped versions (under its path), so a migrating
- * harness's copy is recognised like any other shipped file.
+ * deployed harnesses may still carry present with at least one fingerprint. It
+ * lists no versions of itself: a harness's copy is Orion bookkeeping, never read by
+ * an update, and a migrating harness claims it whatever its bytes (receipt.mjs
+ * legacyReceipt).
  * Returns the problems, empty when valid.
  */
 export function compatibilityErrors(releaseRoot, deployment) {
@@ -109,7 +110,7 @@ export function compatibilityErrors(releaseRoot, deployment) {
   const aliases = deployment.fingerprints?.legacy_aliases || {};
   const required = new Set([
     ...(deployment.retired || []).flatMap(entry => [entry.fingerprint_key || entry.source, ...Object.values(entry.sources || {})]),
-    ...Object.keys(aliases), ...Object.values(aliases), name,
+    ...Object.keys(aliases), ...Object.values(aliases),
   ]);
   for (const key of [...required].sort()) {
     if (!files[key]?.length) errors.push(`${name} lost the compatibility fingerprints for ${key}, which deployed harnesses may still carry`);

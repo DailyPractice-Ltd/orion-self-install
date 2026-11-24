@@ -100,9 +100,9 @@ function isDanglingLink(path) {
  * Managed runtime: code the harness runs, and the data that code reads. A client edit
  * here that an update would replace stops the update, so the folder never runs a
  * mixture of releases. Plugin package files and the catalog are protected the same way
- * by the updater. The compatibility registry is ordinary data: updates read the
- * incoming release's copy, never the harness's, so an unrecognised copy is kept and
- * reported like any other unknown file instead of stopping the update.
+ * by the updater. The compatibility registry is not runtime: updates read the
+ * incoming release's copy, never the harness's, so it is tracked like any other
+ * non-runtime file (see legacyReceipt for how a migrating harness claims it).
  */
 export function isRuntimeDestination(destination) {
   if (destination === REGISTRY_PATH) return false;
@@ -138,9 +138,12 @@ export function receiptState(root, destination, receipt) {
  * The receipt a harness from before receipts can prove, from the frozen compatibility
  * registry (update/pristine.json): one entry for each candidate `{destination, key}` whose
  * current bytes are a version Orion shipped under that source identity or its legacy
- * alias. Anything else gets no entry, so its bytes are never adopted as Orion's. The
- * registry's own copy is no exception: it is recognised by the shipped versions of itself
- * that the registry lists under its own path, and otherwise left alone as unknown.
+ * alias. Anything else gets no entry, so its bytes are never adopted as Orion's, with one
+ * deliberate exception: the registry's own copy (update/pristine.json). Updates read the
+ * incoming release's registry and never the harness's, so the harness copy is Orion's
+ * bookkeeping, not client content; no client work lives in it and nothing runs from it.
+ * It is seeded as owned whatever its bytes, so a malformed or stale shipped copy is
+ * always replaced and the registry never has to list versions of itself.
  */
 export function legacyReceipt(root, candidates, { registry, aliases = {}, ai_assistant, template_version }) {
   const proved = { schema: RECEIPT_SCHEMA, version: RECEIPT_VERSION, algorithm: RECEIPT_ALGORITHM, ai_assistant, template_version, recorded_by: 'migration', recorded_at: new Date().toISOString(), files: {} };
@@ -149,7 +152,7 @@ export function legacyReceipt(root, candidates, { registry, aliases = {}, ai_ass
   for (const { destination, key } of candidates) {
     if (proved.files[destination]) continue;
     const { state, current } = receiptState(root, destination, proved);
-    if (state === 'unknown' && shipped(key).includes(current)) proved.files[destination] = receiptEntry(key, current);
+    if (state === 'unknown' && (destination === REGISTRY_PATH || shipped(key).includes(current))) proved.files[destination] = receiptEntry(key, current);
   }
   return validateReceipt({ ...proved, files: sortedFiles(proved.files) });
 }

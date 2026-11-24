@@ -193,7 +193,8 @@ telling the client the previous version is running again. Keep the backup for au
 
 `update/pristine.json` is frozen compatibility data for harnesses installed before
 installed-file receipts. Never regenerate it from Git history or add the bytes of a
-release edit to it (its own key lists the versions of itself committed before receipts); `node update/release-contract.mjs` validates its structure.
+release edit to it. It lists no versions of itself: updates read only the incoming
+release's copy, so a harness's copy is bookkeeping and always replaced. `node update/release-contract.mjs` validates its structure.
 
 ### Tool-specific metadata
 

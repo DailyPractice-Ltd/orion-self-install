@@ -36,9 +36,9 @@ only those: a file you changed is kept, or the update stops before changing anyt
   no intermediate release. Files matching a version Orion shipped update as before
   and enter the new receipt; files no release shipped are kept, listed and never
   claimed as Orion's. A changed script, plugin skill or catalog in such a folder
-  stops the update too. The folder's old copy of `update/pristine.json` (including
-  the malformed one 2.0.0 shipped) is recognised and replaced; a copy no release
-  shipped is kept and listed, without stopping the update.
+  stops the update too. The folder's copy of `update/pristine.json` is Orion's own
+  bookkeeping (updates never read it), so it is always replaced, including the
+  malformed one 2.0.0 shipped.
 - **Recovery and restore keep the receipt in step with the files.** A failed update,
   an interrupted one recovered with `recover` (or by the next update), and a plugin
   activation failure that rolls back (exit 3) all put the receipt back exactly, or
@@ -67,10 +67,13 @@ only those: a file you changed is kept, or the update stops before changing anyt
   registry rewrite. `tests/helpers/pristine.mjs` is gone.
 - The release contract and `node update/bump.mjs` validate the registry instead:
   readable JSON, SHA-256 fingerprints, and every retirement identity and legacy
-  alias present, plus the registry's own committed versions under
-  `update/pristine.json` (all 89 from `main` and `release/2.0.0`, added once so
-  older harnesses' copies are recognised). The bump no longer touches `update/pristine.json`, and neither the
+  alias present. The bump no longer touches `update/pristine.json`, and neither the
   contract nor the updater needs full Git history.
+- The registry is pruned to versions a client could have installed: fingerprints of
+  files in some first-parent commit of `main` or `release/2.0.0` (1,011 hashes down
+  to 645). It no longer lists versions of itself: a harness's copy is bookkeeping,
+  tracked like any other non-runtime file and, when migrating, claimed and replaced
+  whatever its bytes.
 - The registry's malformed JSON from the 2.0.0 merge is repaired, and the two
   committed 2.0.0-line versions it had lost (`agent/install.md` as shipped and an
   earlier `CHANGELOG.md`) are recognised again.

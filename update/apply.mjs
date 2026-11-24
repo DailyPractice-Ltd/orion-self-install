@@ -14,7 +14,8 @@
  * runtime or plugin file the update would replace stops it before any change (state
  * "conflict"). An unreadable or invalid receipt stops it too. A harness from before receipts
  * has none and migrates: its receipt starts as the files whose bytes the frozen fingerprints
- * in update/pristine.json recognise (receipt.mjs legacyReceipt), and the same rules apply.
+ * in update/pristine.json recognise, plus its registry copy as bookkeeping (receipt.mjs
+ * legacyReceipt), and the same rules apply.
  * The receipt is backed up, journaled, written last under the lock and rolled back with the files.
  *
  * The Orion plugin package (plugins/orion) is release-managed and replaced as a unit; the

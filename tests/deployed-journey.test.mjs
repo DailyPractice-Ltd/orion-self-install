@@ -613,6 +613,7 @@ for (const tool of ['claude-code', 'codex']) for (const skip of [false, true]) {
     const installedGuard = read(client, 'status/guard.mjs');
     const installedAgents = read(client, 'AGENTS.md');
     assert.throws(() => JSON.parse(read(client, 'update/pristine.json')), 'this release shipped a malformed registry copy');
+    assert.equal(JSON.parse(read(release, 'update/pristine.json')).files['update/pristine.json'], undefined, 'the incoming registry lists no versions of itself');
     put(client, 'README.md', `${installedReadme}\nOur own notes.\n`);
     put(client, `${skill(tool)}/personal/SKILL.md`, '# Personal skill\n');
     put(client, 'status/guard.mjs', `${installedGuard}\n// Client runtime edit.\n`);
@@ -637,7 +638,7 @@ for (const tool of ['claude-code', 'codex']) for (const skip of [false, true]) {
     for (const path of ['AGENTS.md', 'status/guard.mjs', 'update/apply.mjs', 'update/receipt.mjs', 'update/pristine.json', `${pkg}/prospecting/SKILL.md`]) {
       assert.equal(lfHash(readFileSync(join(client, path))), lfHash(readFileSync(join(release, path))), `${path} is the pinned release's`);
     }
-    assert.ok(!report.unknown.includes('update/pristine.json'), 'the shipped malformed registry copy is recognised');
+    assert.ok(!report.unknown.includes('update/pristine.json'), 'the malformed registry copy is bookkeeping, replaced without being recognised');
     assert.equal(read(client, 'README.md'), `${installedReadme}\nOur own notes.\n`, 'an edit no release shipped is kept');
     assert.ok(report.unknown.includes('README.md'));
     assert.equal(read(client, `${skill(tool)}/personal/SKILL.md`), '# Personal skill\n');

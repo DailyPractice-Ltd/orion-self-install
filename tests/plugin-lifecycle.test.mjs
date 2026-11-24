@@ -396,7 +396,7 @@ for (const tool of ['codex', 'claude-code']) test(`update preserves the ${tool} 
   const w = world(t, { tool, at: '2.0.0', codexInstalled: '2.0.0' });
   const other = tool === 'codex' ? 'claude-code' : 'codex';
   rmSync(join(w.client, MANIFEST_PATHS[other]));
-  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1\n'); // an older shipped version
+  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1\n'); // the pre-receipt shipped version the registry recognises
   const result = w.update();
   assert.equal(result.status, 0, out(result));
   assert.equal(has(w.client, MANIFEST_PATHS[other]), false);

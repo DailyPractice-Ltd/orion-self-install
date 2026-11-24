@@ -20,15 +20,17 @@ maintenance. Leave client status, credentials and business records alone.
    Use only this checkout.
 2. Make the change and record user-visible behavior in the current Unreleased
    changelog section. Keep ordinary changes unreleased unless a release is requested.
-3. Leave `update/pristine.json` alone. It is frozen compatibility data: the
-   fingerprints of files shipped before installed-file receipts, kept so older
-   harnesses stay recognisable. It is never rebuilt from Git history, and an edit
-   to a deployed file needs no fingerprint change; merges, squashes and shallow
-   clones do not affect it. The release contract validates it (well-formed JSON,
-   SHA-256 fingerprints, every retirement identity and legacy alias in
+3. Leave `update/pristine.json` alone. It is frozen compatibility data: one
+   fingerprint per file, its last 2.0.0 version before installed-file receipts,
+   kept so a 2.0.0 harness installed before receipts stays recognisable (1.x
+   harnesses are reinstalled, never updated). It is never rebuilt from Git
+   history, and an edit to a deployed file needs no fingerprint change; merges,
+   squashes and shallow clones do not affect it. The release contract validates
+   it (well-formed JSON, SHA-256 fingerprints, every retirement identity in
    `update/manifest.json` present). It lists no versions of itself: a harness's
-   copy is bookkeeping that updates never read, so it is always replaced. Remove a
-   key only together with the retirement or alias that needs it.
+   copy is bookkeeping that updates never read, so it is always replaced. When a
+   release retires a file, keep its key; remove a key only when no retirement
+   needs it and no current deployment plans it.
 4. Run checks appropriate to the change and review `git diff --check` and the diff.
    For deployment or package changes, also run the release contract below for both
    supported tools, regardless of which assistant is running. Resolve failures

@@ -80,11 +80,11 @@ exact files Orion installed:
 - A receipt that cannot be read, is malformed or has an unsupported version stops the
   update before any change; never delete it to get past that.
 
-A folder installed before receipts has none, and the update migrates it, from any older
-release straight to the pinned one (no intermediate release is needed, because the
-incoming release's own helper runs). A file whose bytes match a version Orion shipped,
-by the frozen fingerprints in `update/pristine.json` (which also lists that file's own
-shipped versions, so an old copy of it is replaced), counts as installed; anything else
+A 2.0.0 folder installed before receipts has none, and the update migrates it straight
+to the pinned release (no intermediate release is needed, because the incoming
+release's own helper runs). A file whose bytes match its last 2.0.0 version before
+receipts, by the frozen fingerprints in `update/pristine.json`, counts as installed;
+the folder's own copy of that registry is bookkeeping and always replaced. Anything else
 counts as unknown, with the same rules as above, so an unknown runtime or plugin file
 stops the update and an unknown ordinary file is kept and listed. The receipt the update
 writes holds only recognised files and files it installed. The helper backs up replaced and
@@ -191,8 +191,10 @@ telling the client the previous version is running again. Keep the backup for au
 
 ## Maintainers
 
-`update/pristine.json` is frozen compatibility data for harnesses installed before
-installed-file receipts. Never regenerate it from Git history or add the bytes of a
+`update/pristine.json` is frozen compatibility data for 2.0.0 harnesses installed before
+installed-file receipts: one fingerprint per file, its last 2.0.0 version before
+receipts. 1.x harnesses are reinstalled (`agent/reinstall-from-1.x.md`), so it lists no
+older versions. Never regenerate it from Git history or add the bytes of a
 release edit to it. It lists no versions of itself: updates read only the incoming
 release's copy, so a harness's copy is bookkeeping and always replaced. `node update/release-contract.mjs` validates its structure.
 

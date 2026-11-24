@@ -64,15 +64,16 @@ test('release contract plans one selected runtime from portable sources', (t) =>
   assert.match(duplicate.stderr, /plugins\/orion\/ exactly once/i);
 });
 
-test('release contract rejects an unsupported tool and keeps historical ownership hashes', () => {
+test('release contract rejects an unsupported tool; the registry holds the last pre-receipt version of each file', () => {
   const run = spawnSync(process.execPath, [join(repo, 'update/release-contract.mjs'), '--tool', 'chatgpt'], { encoding: 'utf8' });
   assert.notEqual(run.status, 0);
   assert.match(run.stderr, /AI assistant/i);
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
   assert.deepEqual(manifest.deployment.tools, ['claude-code', 'codex']);
+  // 1.x harnesses are reinstalled, never updated: no aliases, and one version per file.
+  assert.equal(manifest.deployment.fingerprints.legacy_aliases, undefined);
   const pristine = JSON.parse(readFileSync(join(repo, 'update/pristine.json'), 'utf8'));
-  assert.ok(pristine.files['skills/hire-agent/SKILL.md'].length > 0);
-  assert.ok(pristine.files['agents/README.md'].length > 0);
+  for (const [key, prints] of Object.entries(pristine.files)) assert.equal(prints.length, 1, key);
 });
 
 test('release contract ships shared package files and only the selected manifest', () => {
@@ -133,13 +134,19 @@ test('release contract validates the frozen compatibility registry without any g
     }
     writeFileSync(registry, frozen);
   };
-  // The merge that dropped a comma between two hashes.
+  // A merge that drops a comma between two entries.
   refuses('malformed JSON', frozen.replace(/",\n(\s+")/, '"\n$1'), /JSON/i);
   const data = JSON.parse(frozen);
   const without = (key) => JSON.stringify({ ...data, files: Object.fromEntries(Object.entries(data.files).filter(([k]) => k !== key)) });
-  // A retirement identity and a legacy alias deployed harnesses still carry.
-  refuses('a retired source lost', without('library/README.md'), /library\/README\.md/);
-  refuses('a legacy alias lost', without('.claude/skills/hire-agent/SKILL.md'), /\.claude\/skills\/hire-agent\/SKILL\.md/);
+  // A later release retires a file a pre-receipt harness carries: the registry must keep its fingerprint.
+  const manifestPath = join(release, 'update/manifest.json');
+  const manifest = readFileSync(manifestPath, 'utf8');
+  const withRetired = JSON.parse(manifest);
+  withRetired.deployment.retired = [{ source: 'agent/install.md', destinations: { 'claude-code': 'agent/install.md', codex: 'agent/install.md' }, fingerprint_key: 'agent/install.md' }];
+  writeFileSync(manifestPath, JSON.stringify(withRetired, null, 2));
+  for (const tool of ['codex', 'claude-code']) assert.equal(contract(release, '--tool', tool).status, 0, `${tool}: a listed retirement`);
+  refuses('a retired source lost', without('agent/install.md'), /agent\/install\.md/);
+  writeFileSync(manifestPath, manifest);
   // The harness's own copy is bookkeeping, replaced whatever its bytes: the registry lists no versions of itself.
   assert.equal(data.files['update/pristine.json'], undefined, 'the registry does not fingerprint itself');
   refuses('a hash that is not a fingerprint', JSON.stringify({ ...data, files: { ...data.files, 'AGENTS.md': ['not-a-hash'] } }), /AGENTS\.md/);

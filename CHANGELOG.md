@@ -32,9 +32,9 @@ only those: a file you changed is kept, or the update stops before changing anyt
   catalog and the update would replace it, the update now stops before changing
   anything and names the files, instead of overwriting them. A damaged receipt also stops the update, with
   nothing changed.
-- **Folders installed before receipts** update straight to the latest release, with
-  no intermediate release. Files matching a version Orion shipped update as before
-  and enter the new receipt; files no release shipped are kept, listed and never
+- **2.0.0 folders installed before receipts** update straight to the latest release,
+  with no intermediate release. Files matching the 2.0.0 version Orion shipped update
+  as before and enter the new receipt; any other bytes are kept, listed and never
   claimed as Orion's. A changed script, plugin skill or catalog in such a folder
   stops the update too. The folder's copy of `update/pristine.json` is Orion's own
   bookkeeping (updates never read it), so it is always replaced, including the
@@ -66,17 +66,18 @@ only those: a file you changed is kept, or the update stops before changing anyt
   so merges, squashes, shallow clones and working-tree edits never require a
   registry rewrite. `tests/helpers/pristine.mjs` is gone.
 - The release contract and `node update/bump.mjs` validate the registry instead:
-  readable JSON, SHA-256 fingerprints, and every retirement identity and legacy
-  alias present. The bump no longer touches `update/pristine.json`, and neither the
+  readable JSON, SHA-256 fingerprints, and every retirement identity present. The bump no longer touches `update/pristine.json`, and neither the
   contract nor the updater needs full Git history.
-- The registry is pruned to versions a client could have installed: fingerprints of
-  files in some first-parent commit of `main` or `release/2.0.0` (1,011 hashes down
-  to 645). It no longer lists versions of itself: a harness's copy is bookkeeping,
-  tracked like any other non-runtime file and, when migrating, claimed and replaced
-  whatever its bytes.
-- The registry's malformed JSON from the 2.0.0 merge is repaired, and the two
-  committed 2.0.0-line versions it had lost (`agent/install.md` as shipped and an
-  earlier `CHANGELOG.md`) are recognised again.
+- The registry holds one fingerprint per file: its last 2.0.0 version before
+  receipts (commit `55d0e65`), 98 files (down from 150 keys and 645 hashes). 1.x
+  folders are reinstalled, never updated (`agent/reinstall-from-1.x.md`), so the
+  1.x-only data is gone: the 47 `deployment.retired` entries (`library/`, Spec Kit,
+  `.specify/`, `notion/` and the old `.claude` skills and roster) and
+  `fingerprints.legacy_aliases`, with the alias lookup in the migration. Retirement
+  itself still works for later releases. It no longer lists versions of itself: a
+  harness's copy is bookkeeping, tracked like any other non-runtime file and, when
+  migrating, claimed and replaced whatever its bytes.
+- The registry's malformed JSON from the 2.0.0 merge is gone with that rewrite.
 - A candidate can be tried on a deployed harness by pinning its full commit; no
   merge or tag is needed (`agent/maintaining.md`).
 

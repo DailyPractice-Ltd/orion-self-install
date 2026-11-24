@@ -105,13 +105,13 @@ const lf = text => requireHash(text.replace(/\r\n/g, '\n'));
  * 1.0.0 with the receipt install wrote: `installed` maps each installed destination to its
  * text, `keys` gives a destination's source identity when it differs from its path.
  */
-function receiptWorld(t, { installed, keys = {}, retired = [], pristine = {}, aliases }) {
+function receiptWorld(t, { installed, keys = {}, retired = [], pristine = {} }) {
   const base=mkdtempSync(join(tmpdir(),'orion-receipt-update-')); t.after(()=>rmSync(base,{recursive:true,force:true}));
   const source=join(base,'release'), client=join(base,'client'); mkdirSync(source); mkdirSync(client);
   git(source,'init','-q');
   const publish = (version, files) => {
     for (const path of git(source,'ls-files').split('\n').filter(Boolean)) rmSync(join(source,path));
-    const manifest = { template_version:version, deployment:{ tools:['claude-code','codex'], common_sources:[...Object.keys(files),'update/manifest.json','update/pristine.json'], entries:[], retired, ...(aliases && { fingerprints:{ legacy_aliases:aliases } }) } };
+    const manifest = { template_version:version, deployment:{ tools:['claude-code','codex'], common_sources:[...Object.keys(files),'update/manifest.json','update/pristine.json'], entries:[], retired } };
     for (const [path, body] of Object.entries(files)) put(source, path, body);
     put(source,'update/manifest.json',JSON.stringify(manifest)); put(source,'update/pristine.json',JSON.stringify({files:pristine}));
     git(source,'add','-A'); git(source,'-c','user.email=test@example.com','-c','user.name=Test','commit','-qm',version);
@@ -133,11 +133,11 @@ test('a receipt harness updates untouched files and keeps edited and unknown one
     installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n', 'guide.md':'guide v1\n', 'status/a.mjs':'console.log("a v1")\n', '.agents/skills/old/SKILL.md':'old v1\n' },
     keys: { '.agents/skills/old/SKILL.md':'skills/old/SKILL.md' },
     retired: [{ source:'skills/old/SKILL.md', destinations:{'claude-code':'.claude/skills/old/SKILL.md',codex:'.agents/skills/old/SKILL.md'}, fingerprint_key:'skills/old/SKILL.md' }],
-    // An older shipped README: matching it must not make a receipt-detected edit look untouched.
-    pristine: { 'README.md':[requireHash('readme v0\n'), requireHash('readme v1\n')], 'guide.md':[requireHash('guide v1\n')] },
+    // The registry's pre-receipt README: matching it must not make a receipt-detected edit look untouched.
+    pristine: { 'README.md':[requireHash('readme v0\n')], 'guide.md':[requireHash('guide v1\n')] },
   });
   put(w.client,'AGENTS.md','agents v1\r\n');            // untouched; only the line endings differ
-  put(w.client,'README.md','readme v0\n');              // edited to another shipped version
+  put(w.client,'README.md','readme v0\n');              // edited to the version the registry recognises
   put(w.client,'guide.md','client guide\n');            // edited
   put(w.client,'notes.md','client notes\n');            // unknown: not installed by Orion
   const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n', 'guide.md':'guide v2\n', 'status/a.mjs':'console.log("a v2")\n', 'notes.md':'notes v2\n', 'added.md':'added v2\n' });
@@ -264,18 +264,16 @@ function legacyWorld(t, options) {
 test('a harness without a receipt migrates: shipped files update, unknown ones are kept and reported, and the new baselines hold on the next update', t => {
   const w = legacyWorld(t, {
     installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n', 'guide.md':'guide v1\n', 'status/a.mjs':'console.log("a v1")\n',
-      '.agents/skills/old/SKILL.md':'old v1\n', '.agents/skills/hire/SKILL.md':'hire v0\n', 'update/pristine.json':'{"files":{' },
+      '.agents/skills/old/SKILL.md':'old v1\n', 'update/pristine.json':'{"files":{' },
+    // The incoming release retires a file the pre-receipt harness carries.
     retired: [
       { source:'skills/old/SKILL.md', destinations:{'claude-code':'.claude/skills/old/SKILL.md',codex:'.agents/skills/old/SKILL.md'}, fingerprint_key:'skills/old/SKILL.md' },
-      { source:'skills/hire/SKILL.md', destinations:{'claude-code':'.claude/skills/hire/SKILL.md',codex:'.agents/skills/hire/SKILL.md'}, fingerprint_key:'skills/hire/SKILL.md' },
     ],
-    // The frozen registry: shipped versions by source identity, and an alias for a file that once shipped under another path.
-    pristine: { 'AGENTS.md':[requireHash('agents v1\n')], 'README.md':[requireHash('readme v0\n'), requireHash('readme v1\n')], 'guide.md':[requireHash('guide v1\n')],
-      'status/a.mjs':[requireHash('console.log("a v1")\n')], 'skills/old/SKILL.md':[requireHash('old v1\n')], '.claude/skills/hire/SKILL.md':[requireHash('hire v0\n')] },
-    aliases: { 'skills/hire/SKILL.md':'.claude/skills/hire/SKILL.md' },
+    // The frozen registry: the last pre-receipt version of each file, by source identity.
+    pristine: { 'AGENTS.md':[requireHash('agents v1\n')], 'README.md':[requireHash('readme v1\n')], 'guide.md':[requireHash('guide v1\n')],
+      'status/a.mjs':[requireHash('console.log("a v1")\n')], 'skills/old/SKILL.md':[requireHash('old v1\n')] },
   });
   put(w.client,'AGENTS.md','agents v1\r\n');            // shipped; only the line endings differ
-  put(w.client,'README.md','readme v0\n');              // an older shipped version: still Orion's
   put(w.client,'guide.md','client guide\n');            // edited: no shipped version matches
   put(w.client,'notes.md','client notes\n');            // never shipped at all
   const files = { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n', 'guide.md':'guide v2\n', 'status/a.mjs':'console.log("a v2")\n', 'notes.md':'notes v2\n', 'added.md':'added v2\n' };
@@ -284,12 +282,12 @@ test('a harness without a receipt migrates: shipped files update, unknown ones a
   for (const path of ['AGENTS.md','README.md','status/a.mjs','added.md']) assert.equal(get(w.client,path),files[path],path);
   assert.equal(get(w.client,'guide.md'),'client guide\n');
   assert.equal(get(w.client,'notes.md'),'client notes\n');
-  for (const path of ['.agents/skills/old/SKILL.md','.agents/skills/hire/SKILL.md']) assert.equal(existsSync(join(w.client,path)),false,`${path} retired`);
+  assert.equal(existsSync(join(w.client,'.agents/skills/old/SKILL.md')),false,'retired');
   assert.deepEqual([...report.unknown].sort(),['guide.md','notes.md']);
   let receipt = receiptOf(w.client);
   assert.equal(receipt.template_version,'2.0.0');
   for (const path of ['AGENTS.md','README.md','status/a.mjs','added.md']) assert.equal(receipt.files[path].hash,requireHash(files[path]),path);
-  for (const path of ['guide.md','notes.md','.agents/skills/old/SKILL.md','.agents/skills/hire/SKILL.md']) assert.equal(receipt.files[path],undefined,`${path} is not claimed`);
+  for (const path of ['guide.md','notes.md','.agents/skills/old/SKILL.md']) assert.equal(receipt.files[path],undefined,`${path} is not claimed`);
   assert.equal(receipt.files['update/pristine.json'].hash,lf(get(w.client,'update/pristine.json')));
   assert.notEqual(get(w.client,'update/pristine.json'),'{"files":{','the registry copy is bookkeeping: replaced whatever its bytes');
 
@@ -466,13 +464,13 @@ test('restoring a migration after its receipt changed gives restored files the b
   assert.equal(get(w.client,'status/a.mjs'),'console.log("a v2")\n');
 });
 
-test('restoring a migration that kept a later edit keeps a receipt, so the edit is never adopted from an old shipped version', t => {
+test('restoring a migration that kept a later edit keeps a receipt, so the edit is never adopted from the registry', t => {
   const w = legacyWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n' },
-    pristine: { 'AGENTS.md':[requireHash('agents v1\n')], 'README.md':[requireHash('readme v0\n'), requireHash('readme v1\n')] } });
+    pristine: { 'AGENTS.md':[requireHash('agents v1\n')], 'README.md':[requireHash('readme v1\n')] } });
   const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n' });
   const updated = w.update(v2); assert.equal(updated.status,0,updated.stdout+updated.stderr);
-  // After the update the client writes README.md back to text an old release once shipped.
-  put(w.client,'README.md','readme v0\n');
+  // After the update the client writes README.md back to the text the registry recognises.
+  put(w.client,'README.md','readme v1\n');
   const restored = w.restore(JSON.parse(updated.stdout).backup); assert.equal(restored.status,0,restored.stdout+restored.stderr);
   assert.deepEqual(JSON.parse(restored.stdout).kept,['README.md']);
   assert.equal(get(w.client,'AGENTS.md'),'agents v1\n');
@@ -483,7 +481,7 @@ test('restoring a migration that kept a later edit keeps a receipt, so the edit 
   // The next update keeps the client's README.md and still updates the rest.
   const v3 = w.publish('3.0.0', { 'AGENTS.md':'agents v3\n', 'README.md':'readme v3\n' });
   const next = w.update(v3); assert.equal(next.status,0,next.stdout+next.stderr);
-  assert.equal(get(w.client,'README.md'),'readme v0\n');
+  assert.equal(get(w.client,'README.md'),'readme v1\n');
   assert.deepEqual(JSON.parse(next.stdout).kept,['README.md']);
   assert.equal(get(w.client,'AGENTS.md'),'agents v3\n');
 });

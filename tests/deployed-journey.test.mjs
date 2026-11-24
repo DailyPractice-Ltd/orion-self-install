@@ -156,14 +156,8 @@ for (const tool of ['claude-code', 'codex']) {
     put(client, 'README.md', installedReadme + '\nOur own notes.\n');
     put(client, `${skill(tool)}/hire-agent/SKILL.md`, 'Custom legacy instructions\n');
     put(client, `${skill(tool)}/personal/SKILL.md`, '# Personal skill\n');
-    const retiredPage = 'library/workflows/prospect-research-outreach/PACKAGE.md';
-    const editedPage = 'library/workflows/post-call-debrief/PACKAGE.md';
-    const oldPage = git(release, 'show', `c933b9ff05ce5825f09a2ec2adc2d6d8e38b1e7a:${retiredPage}`) + '\n';
-    put(client, retiredPage, oldPage);
-    put(client, editedPage, '# Client debrief instructions\n');
-    const retiredMeetingPackage = 'library/skills/meeting-sizing/PACKAGE.md';
-    const oldMeetingPackage = git(release, 'show', `c933b9ff05ce5825f09a2ec2adc2d6d8e38b1e7a:${retiredMeetingPackage}`) + '\n';
-    put(client, retiredMeetingPackage, oldMeetingPackage);
+    const clientPage = 'library/workflows/post-call-debrief/PACKAGE.md';
+    put(client, clientPage, '# Client debrief instructions\n');
     const prior = status(client);
     const packageHistory = { 'post-call-debrief': { kind: 'workflow', version: '2.0.0', smoke_test_passed: true } };
     put(client, 'status/status.json', JSON.stringify({ ...prior, packages: packageHistory, sharing: { ...prior.sharing} }));
@@ -233,18 +227,15 @@ for (const tool of ['claude-code', 'codex']) {
     // An edited ordinary file is kept byte for byte, with the baseline it was installed with.
     assert.ok(report.kept.includes('README.md'));
     assert.equal(read(client, 'README.md'), installedReadme + '\nOur own notes.\n');
-    // Shipped bytes from an older release, at paths this install never wrote, are not Orion's to remove.
-    for (const path of [retiredPage, retiredMeetingPackage, editedPage]) assert.ok(report.unknown.includes(path), path);
-    assert.equal(read(client, retiredPage), oldPage);
-    assert.equal(read(client, retiredMeetingPackage), oldMeetingPackage);
-    assert.equal(read(client, editedPage), '# Client debrief instructions\n');
+    // A client file outside the deployment map is never touched.
+    assert.equal(read(client, clientPage), '# Client debrief instructions\n');
     assert.equal(read(client, shiftRecord), shiftHistory);
     assert.deepEqual(status(client).packages, packageHistory);
     const receipt = JSON.parse(read(client, 'status/installed-files.json'));
     assert.equal(receipt.template_version, manifest.template_version);
     assert.equal(receipt.files['README.md'].hash, lfHash(Buffer.from(installedReadme)));
     assert.equal(receipt.files[`${pkg}/new-release/SKILL.md`].hash, lfHash(Buffer.from('# New release skill\n')));
-    for (const path of [retiredPage, retiredMeetingPackage, editedPage, `${skill(tool)}/personal/SKILL.md`, 'legacy/hire-agent/SKILL.md']) assert.equal(receipt.files[path], undefined, path);
+    for (const path of [clientPage, `${skill(tool)}/personal/SKILL.md`, 'legacy/hire-agent/SKILL.md']) assert.equal(receipt.files[path], undefined, path);
     for (const [path, entry] of Object.entries(receipt.files)) {
       if (path !== 'README.md') assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} is recorded as it was installed`);
     }
@@ -266,7 +257,7 @@ for (const tool of ['claude-code', 'codex']) {
     ok(restore);
     assert.ok(JSON.parse(restore.stdout).kept.includes('status/guard.mjs'));
     assert.equal(read(client, 'status/guard.mjs'), laterGuard);
-    assert.equal(read(client, retiredMeetingPackage), oldMeetingPackage);
+    assert.equal(read(client, clientPage), '# Client debrief instructions\n');
     assert.equal(read(client, 'AGENTS.md'), original.replace(/\n/g, '\r\n'));
     assert.equal(read(client, `${skill(tool)}/hire-agent/SKILL.md`), 'Custom legacy instructions\n');
     assert.equal(existsSync(join(client, `${pkg}/new-release/SKILL.md`)), false);
@@ -464,37 +455,6 @@ for (const tool of ['claude-code', 'codex']) {
     // Restore brings back the installed files and their install baselines.
     ok(node('update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
     assert.deepEqual(matchesDisk('after restore'), installed);
-  });
-}
-
-for (const tool of ['claude-code', 'codex']) {
-  test(`${tool} update retires shipped Spec Kit files and keeps client edits`, t => {
-    const { release, client } = journey(t, tool);
-    // Spec Kit files only exist in harnesses from before receipts: such a harness has none.
-    rmSync(join(client, 'status/installed-files.json'));
-    const oldSkill = `${skill(tool)}/speckit-tasks/SKILL.md`;
-    const editedSkill = `${skill(tool)}/speckit-plan/SKILL.md`;
-    const historical = '77f8a99356ae52f5e9c71b00f78c7a29c1986461';
-    put(client, oldSkill, git(release, 'show', `${historical}:skills/speckit-tasks/SKILL.md`) + '\n');
-    put(client, '.specify/scripts/bash/setup-tasks.sh',
-      git(release, 'show', `${historical}:.specify/scripts/bash/setup-tasks.sh`) + '\n');
-    put(client, editedSkill, '# Client edited plan skill\n');
-    put(client, '.specify/memory/constitution.md', '# Client constitution\n');
-    const pinned = git(release, 'rev-parse', 'HEAD');
-    const result = run(client, 'update/apply.mjs', 'update', '--root', client, '--release-repo', release, '--commit', pinned);
-    ok(result);
-    const report = JSON.parse(result.stdout);
-    assert.equal(existsSync(join(client, oldSkill)), false);
-    assert.equal(existsSync(join(client, '.specify/scripts/bash/setup-tasks.sh')), false);
-    assert.equal(read(client, editedSkill), '# Client edited plan skill\n');
-    assert.equal(read(client, '.specify/memory/constitution.md'), '# Client constitution\n');
-    assert.ok(report.retired.includes(oldSkill));
-    assert.ok(report.retired.includes('.specify/scripts/bash/setup-tasks.sh'));
-    assert.ok(report.unknown.includes(editedSkill), 'no shipped version matches the edit');
-    assert.equal(existsSync(join(client, 'update/scaffold')), false);
-    ok(run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', report.backup));
-    assert.ok(existsSync(join(client, oldSkill)));
-    assert.ok(existsSync(join(client, '.specify/scripts/bash/setup-tasks.sh')));
   });
 }
 

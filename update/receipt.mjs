@@ -137,18 +137,17 @@ export function receiptState(root, destination, receipt) {
 /**
  * The receipt a harness from before receipts can prove, from the frozen compatibility
  * registry (update/pristine.json): one entry for each candidate `{destination, key}` whose
- * current bytes are a version Orion shipped under that source identity or its legacy
- * alias. Anything else gets no entry, so its bytes are never adopted as Orion's, with one
+ * current bytes are the last version Orion shipped under that source identity before
+ * receipts. Anything else gets no entry, so its bytes are never adopted as Orion's, with one
  * deliberate exception: the registry's own copy (update/pristine.json). Updates read the
  * incoming release's registry and never the harness's, so the harness copy is Orion's
  * bookkeeping, not client content; no client work lives in it and nothing runs from it.
  * It is seeded as owned whatever its bytes, so a malformed or stale shipped copy is
  * always replaced and the registry never has to list versions of itself.
  */
-export function legacyReceipt(root, candidates, { registry, aliases = {}, ai_assistant, template_version }) {
+export function legacyReceipt(root, candidates, { registry, ai_assistant, template_version }) {
   const proved = { schema: RECEIPT_SCHEMA, version: RECEIPT_VERSION, algorithm: RECEIPT_ALGORITHM, ai_assistant, template_version, recorded_by: 'migration', recorded_at: new Date().toISOString(), files: {} };
-  const reverse = Object.fromEntries(Object.entries(aliases).map(([key, alias]) => [alias, key]));
-  const shipped = key => [key, aliases[key], reverse[key]].filter(Boolean).flatMap(name => registry?.files?.[name] || []);
+  const shipped = key => registry?.files?.[key] || [];
   for (const { destination, key } of candidates) {
     if (proved.files[destination]) continue;
     const { state, current } = receiptState(root, destination, proved);

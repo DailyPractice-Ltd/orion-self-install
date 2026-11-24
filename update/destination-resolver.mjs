@@ -83,12 +83,13 @@ export function destinationState(root, entry, pristine) {
 }
 
 /**
- * update/pristine.json is frozen compatibility data: the fingerprints of files
- * shipped before installed-file receipts, kept so older harnesses stay
- * recognisable. It is never rebuilt from git history, so its validity depends
+ * update/pristine.json is frozen compatibility data: one fingerprint per file, its
+ * last 2.0.0 version before installed-file receipts, kept so a 2.0.0 harness
+ * installed before receipts stays recognisable (1.x harnesses are reinstalled,
+ * never updated). It is never rebuilt from git history, so its validity depends
  * only on its own content and the manifest: well-formed, every fingerprint a
- * lowercase SHA-256, and every retirement identity and legacy alias that
- * deployed harnesses may still carry present with at least one fingerprint. It
+ * lowercase SHA-256, and every retirement identity that deployed harnesses may
+ * still carry present with at least one fingerprint. It
  * lists no versions of itself: a harness's copy is Orion bookkeeping, never read by
  * an update, and a migrating harness claims it whatever its bytes (receipt.mjs
  * legacyReceipt).
@@ -107,11 +108,9 @@ export function compatibilityErrors(releaseRoot, deployment) {
       errors.push(`${name}: ${key} must list lowercase SHA-256 fingerprints`);
     }
   }
-  const aliases = deployment.fingerprints?.legacy_aliases || {};
-  const required = new Set([
-    ...(deployment.retired || []).flatMap(entry => [entry.fingerprint_key || entry.source, ...Object.values(entry.sources || {})]),
-    ...Object.keys(aliases), ...Object.values(aliases),
-  ]);
+  const required = new Set(
+    (deployment.retired || []).flatMap(entry => [entry.fingerprint_key || entry.source, ...Object.values(entry.sources || {})]),
+  );
   for (const key of [...required].sort()) {
     if (!files[key]?.length) errors.push(`${name} lost the compatibility fingerprints for ${key}, which deployed harnesses may still carry`);
   }

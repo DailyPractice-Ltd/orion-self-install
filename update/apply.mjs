@@ -13,9 +13,10 @@
  * as installed are updated, edited and unknown ones are kept, and an edited or unknown
  * runtime or plugin file the update would replace stops it before any change (state
  * "conflict"). An unreadable or invalid receipt stops it too. A harness from before receipts
- * has none and migrates: its receipt starts as the files whose bytes the frozen fingerprints
- * in update/pristine.json recognise, plus its registry copy as bookkeeping (receipt.mjs
- * legacyReceipt), and the same rules apply.
+ * has none and migrates: its receipt starts as the files whose bytes match the frozen
+ * fingerprints in update/pristine.json (the last 2.0.0 version of each file before
+ * receipts), plus its registry copy as bookkeeping (receipt.mjs legacyReceipt), and the
+ * same rules apply.
  * The receipt is backed up, journaled, written last under the lock and rolled back with the files.
  *
  * The Orion plugin package (plugins/orion) is release-managed and replaced as a unit; the
@@ -173,7 +174,7 @@ async function update(store,root,repo,commit) {
       const keyOf=new Map(plan.map(e=>[e.destination,e.fingerprint_key]));
       const candidates=[...plan.filter(e=>e.ownership==='release'),...retired,...commonRetired].map(e=>({destination:e.destination,key:e.fingerprint_key}))
         .concat(packageFiles.map(path=>({destination:path,key:keyOf.get(path)||path})));
-      receipt=legacyReceipt(root,candidates,{registry:pristine,aliases:manifest.deployment.fingerprints?.legacy_aliases,ai_assistant,template_version:status.template_version||'unknown'});
+      receipt=legacyReceipt(root,candidates,{registry:pristine,ai_assistant,template_version:status.template_version||'unknown'});
     }
     const actions=[], report={from:status.template_version,to:manifest.template_version,commit,ai_assistant,refreshed:[],added:[],retired:[],kept:[],unknown:[],collisions:[]};
     // Conflicts stop the update; `verified` files already hold the incoming

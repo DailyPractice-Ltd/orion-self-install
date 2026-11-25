@@ -4,12 +4,6 @@ Orion 2.0.0 is a reinstall release: a 1.x folder is not updated in place. Instal
 into a new folder, bring the client's business files across, and pair the new folder.
 The 1.x folder stays untouched until the client chooses to delete it.
 
-The same steps apply to a 2.0.0 folder with no installed-file receipt
-(`status/installed-files.json`), which was installed before Orion recorded the files it
-installs: updates and tool switches refuse it. Wherever this guide says "the 1.x
-folder", it means that folder. Install the current release, and never copy its
-`plugins/orion/` package: the fresh install brings its own.
-
 Say this to the client first, in one plain sentence: the new version is installed fresh
 next to the old one, their business answers and their own skills come with it, and they
 will pair it with a new one-time code.

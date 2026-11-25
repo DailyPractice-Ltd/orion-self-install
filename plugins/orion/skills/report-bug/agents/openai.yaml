@@ -1,0 +1,4 @@
+interface:
+  display_name: "Report Bug"
+  short_description: "Check duplicates and publish Orion bug reports"
+  default_prompt: "Use $report-bug to report this Orion bug, checking Trello for duplicates before creating a card."

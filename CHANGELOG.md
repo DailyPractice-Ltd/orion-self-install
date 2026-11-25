@@ -1,14 +1,11 @@
 # Orion self-install — Changelog
 
-Semantic versioning: a real self-serve install's corrections/learnings → minor; a change
-to the install sequence or repo structure → major; wording/clarity fixes → patch.
-
 This changelog tracks **this repo's own** version history — independent of
 `packages/harness/templates/install-kit/CHANGELOG.md` in `dailypractice-mono`, which tracks
 the coach-led kit this repo was adapted from. Cross-reference, don't duplicate: a change
 that applies to both gets made in both places, cited both ways.
 
-**Every heading below is a release.** `## X.Y.Z — date` is tagged `vX.Y.Z` on the commit
+**Dated headings are release records.** `## X.Y.Z — date` is tagged `vX.Y.Z` on the commit
 that shipped it, and pushing that tag publishes a GitHub Release whose notes are the
 heading's section (`.github/workflows/release.yml`). Clients compare their
 `status.json` `template_version` with the Releases page and say "update my harness".
@@ -16,6 +13,169 @@ Write each section for the client who will read it there.
 
 ---
 
+## Unreleased — Installed-file receipts
+
+**Updates now know exactly which files Orion installed in your folder, so they replace
+only those: a file you changed is kept, or the update stops before changing anything.**
+
+- **The receipt.** A fresh install records each Orion file it installed, with its
+  exact contents, in `status/installed-files.json`, including installs from a branch
+  or a locally edited release checkout, and the plugin catalog generated for your
+  tool. With a private home, `.gitignore` is recorded as home setup leaves it.
+  Business records, credentials, the tool's own registration settings and your
+  own skills are never listed. The receipt travels with your folder's private home
+  and is never replaced by an update.
+- **Updates follow the receipt.** Files still as Orion installed them are updated
+  (line endings aside). Files you changed are kept exactly and stay recognised as
+  yours on later updates. Files Orion never installed are kept and listed as
+  `unknown`. If you changed one of Orion's scripts, plugin skills or the plugin
+  catalog and the update would replace it, the update now stops before changing
+  anything and names the files, instead of overwriting them. A damaged receipt also stops the update, with
+  nothing changed.
+- **Folders without a receipt reinstall.** A 2.0.0 folder installed before receipts
+  cannot show which files are Orion's, so an update or a tool switch refuses it before
+  changing anything and names the reinstall guide
+  ([agent/reinstall-from-1.x.md](agent/reinstall-from-1.x.md)), the same route as a
+  1.x folder: install fresh, bring your business files and skills across, and pair
+  again.
+- **Recovery and restore keep the receipt in step with the files.** A failed update,
+  an interrupted one recovered with `recover` (or by the next update), and a plugin
+  activation failure that rolls back (exit 3) all put the receipt back exactly. A
+  restore keeps files you changed after the update, and now also keeps a file you
+  wrote where the update retired one instead of overwriting it; restored files take
+  back their earlier baselines and your later edits stay recognised as yours. While
+  plugin activation is pending, the receipt describes the files already applied, and
+  finishing activation (`resume`, `verify --discovered`) never moves a baseline.
+- **Switching between Codex and Claude Code** keeps the receipt accurate. A finished
+  switch records the new assistant's plugin manifest and catalog, and drops the old
+  assistant's only once they are removed; your edits keep their baselines. A failed,
+  waiting or cancelled switch leaves the receipt unchanged, and a damaged or missing
+  receipt stops the switch before anything changes.
+- **Updates still follow `main` by default.** An update can also be pinned to a
+  full commit that is not on `main` or tagged (for example a candidate Daily
+  Practice asks you to try); it installs exactly that commit's files under the same
+  rules. `agent/updating.md` gives the commands.
+
+### For maintainers
+
+- The fingerprint registry is gone: ownership comes only from each folder's receipt,
+  so no fingerprint data is regenerated, frozen or validated in the release, and
+  merges, squashes, shallow clones and working-tree edits never need a data rewrite.
+  `node update/bump.mjs` and the release contract no longer check one.
+  `tests/helpers/pristine.mjs` is gone.
+- Retirement still works: a file listed in `deployment.retired` or `remove` is removed
+  only where the receipt shows it untouched.
+- A candidate can be tried on a deployed harness by pinning its full commit; no
+  merge or tag is needed (`agent/maintaining.md`).
+
+## 2.0.0 — 2026-11-23
+
+**Orion now runs in a separate business folder, with one skills plugin for Codex or
+Claude Code. This is a reinstall release for everyone on 1.x.**
+
+### Installation and business records
+
+- Install into a new, empty folder outside the release checkout with
+  `node install.mjs --tool codex --target /path/to/my-orion` or
+  `--tool claude-code`. The installer creates a local Git repository by default;
+  `--github-repo OWNER/NAME` creates a private GitHub home, and `--remote` connects
+  an existing empty private repository. A private remote can also be added later.
+  Release sources, tests and implementation records stay out of the client folder.
+- **1.x folders cannot update in place.** Follow the
+  [reinstall guide](agent/reinstall-from-1.x.md) to bring business answers, personal
+  skills, the no-contact list and work history into a fresh folder. Pair it with a
+  new code and recreate schedules against the new folder. The old folder stays
+  untouched; credentials, status and queued reports are not copied.
+- Every assistant is named **Orion**. Setup asks for business context, tone and
+  working preferences, with no agent-naming step. Client specifics live in
+  `agent/knowledge-base/` and `status/status.json`.
+- New installations offer Matt Pocock's optional `mattpocock-skills` plugin for
+  either tool. The choice and progress are saved, so installation can resume.
+  Declining or deferring does not block Orion setup; updates do not prompt for it.
+
+### Skills, updates and switching tools
+
+- Shipped skills and their supporting resources come as the **`orion` plugin** in
+  `plugins/orion/`, versioned with Orion and registered for this folder only.
+  The package includes prospecting, prospect research and outreach, post-call
+  debriefs, call planning, task planning, prospect call lists, call closeout,
+  spreadsheet closeout, phone enrichment, lifecycle governance, Friday Reports,
+  skill creation, bug reporting, updates and tool switching.
+- Plugin setup is resumable and separate from pairing. It finishes only after a
+  fresh session confirms discovery of the shipped skills. Use
+  `node update/plugin-setup.mjs resume` to continue and
+  `node update/plugin-setup.mjs verify --discovered` to verify. Claude Code exposes
+  skills as `/orion:<skill>`; Codex installs Orion through its Plugins Directory
+  or `/plugins`. Fresh installations include only the selected tool's metadata.
+- Skills you create or add stay in `.agents/skills/` for Codex or `.claude/skills/`
+  for Claude Code. Package scripts resolve the active Orion folder explicitly,
+  including when Codex runs a cached plugin copy, and reject paths outside it.
+- Say **"update my harness"** to update 2.0.0 and later from one pinned `main`
+  commit. Updates preserve client-owned files and edited files outside the
+  documented runtime-script exception. The plugin is replaced as a unit, with
+  its prior contents, catalog and folder-specific registration backed up.
+  An update remains pending until the new plugin is verified; failed checks
+  restore the prior state, and interrupted updates have recovery and restore
+  commands. See [updates and recovery](agent/updating.md).
+- Switch assistants locally with `node switch_ai.mjs`, without downloading a
+  release or changing versions. It prepares the target tool first, waits for
+  discovery, then moves personal skills and records the selection before retiring
+  the old tool's Orion registration. Pending switches can be resumed or cancelled;
+  backups support recovery. `update/apply.mjs switch` is retired.
+
+### Pairing and reliable reporting
+
+- A signed-in Daily Practice account and verified pairing are required to finish
+  setup and begin normal work. The pre-work guard applies to interactive and
+  scheduled tasks; setup handoff requires an acknowledged install checkpoint.
+- After accepted verification and complete acknowledged report delivery, paired
+  folders can work through temporary connection failures for **48 elapsed hours**.
+  Only another complete verification-and-delivery cycle renews that allowance.
+  Revocation blocks immediately; expiry stops new tasks while admitted work can
+  finish and report. See [setup and connection recovery](agent/install.md).
+- Operational reports are saved locally before delivery and retried with their
+  original event identity, preventing duplicate counts. Missing or malformed
+  receipts leave reports queued. The radio still carries operational labels,
+  counts, times and version metadata; work content and prospect details stay local.
+- A shared, locked status store owns writes to `status/status.json` and
+  `status/radio.key`, preventing concurrent setup, send-level, update and reporting
+  operations from overwriting one another's changes.
+
+### Simpler instructions and workflows
+
+- `AGENTS.md` is the single behaviour file for both tools; the separate
+  `agent/agent-definition.md` is removed. Fresh installs omit `CLAUDE.md`.
+  Claude Code can load `AGENTS.md` through Anthropic's optional `agents-md` plugin;
+  setups that need it can use a `CLAUDE.md` containing only `@AGENTS.md`.
+- Installation, pairing, plugin setup and recovery live in `agent/install.md`.
+  Operational guides move from `docs/` into `agent/`, and repository screenshots
+  move to `img/`. The web adapter is renamed `claude-web.md` to avoid being loaded
+  as `CLAUDE.md` on case-insensitive disks. The waiting list is read out only when
+  it contains messages.
+- The hired-agent team and library workflows, learned-memory folder,
+  synchronization and consolidation, Intelligence Library sharing, Notion tracker
+  template and shipped Speckit scaffold are removed. Business knowledge, setup
+  state, permissions, approval queues and operational logs remain. Existing hired
+  teams can be kept as reference during reinstall but are not loaded by 2.0.0.
+- Recurring work uses **Codex scheduled tasks or Claude Routines**, with the same
+  pairing guard and finished-work reporting as interactive tasks. Recreate saved
+  schedules when reinstalling and review them when switching tools.
+
+### Release and maintenance checks
+
+- `template_version` in `update/manifest.json` is the single hand-edited version.
+  Plugin manifests are generated from it, new status records inherit it, and the
+  separate `schema_version` is removed. `node update/bump.mjs X.Y.Z` prepares later
+  releases by dating notes and updating versions and ownership fingerprints together.
+- Release validation checks that the changelog's newest numbered section matches
+  the manifest, validates packaging and fresh deployment for both tools, and runs
+  tests on Linux, macOS and Windows with Node 22. Native plugin installation has a
+  separate [manual validation checklist](agent/plugin-validation.md); automated
+  checks alone do not establish native compatibility.
+- Source maintenance follows the release-only `agent/maintaining.md` before any
+  client setup, pairing or radio procedure. Tests use isolated release fixtures,
+  excluding local credentials, queued reports, logs and locks; duplicate package
+  checks and brittle prose snapshots are removed.
 
 ## 1.5.0 — 2026-11-04
 
@@ -231,7 +391,7 @@ and Daily Practice never hears from it.
   scheduled task. In the Codex app it creates an automation. Where there is only a
   command line, it uses your computer's own scheduler.
 - **Your computer's scheduler is set up by one command, not by hand.**
-  `node status/schedule.mjs wire` writes a small wake-up file for the agent inside
+  The setup command writes a small wake-up file for the agent inside
   your Orion folder. Your assistant tells you what it will start and when, and
   switches it on only on your yes. Nothing outside the folder is changed before
   that, and one command switches it off again.
@@ -255,11 +415,6 @@ it starts correctly, sandbox and network included. Switching on through the Mac,
 Windows and Linux schedulers is tested against stand-ins and has not yet been run on
 a client's machine. That is why your assistant fires the schedule once and watches
 it land before it calls anything wired.
-
-For whoever maintains this: how each software is started lives in one place,
-`unattendedRunner` in `status/shapes.mjs`. `status/schedule.mjs` writes the files.
-`tests/unattended-runner.test.mjs` covers both and holds `library/HIRING.md` and the
-adapters to them.
 
 ## 1.1.4 — 2026-10-05
 
@@ -484,8 +639,7 @@ from what the notebook actually says.
   other agent.
 - **Private, like everything else.** The notebook's contents never ride the
   radio, and "update my harness" refreshes the notebook's binding — the scripts
-  and guides — never its pages. `docs/memory.md` is the whole contract in plain
-  words.
+  and guides — never its pages. The feature had its own documented contract.
 
 ## 0.6.6 — 2026-09-22
 
@@ -601,19 +755,6 @@ The radio goes both ways, and it can carry a skill.
   and never checked the radio. Messages sat unread on your machine. It now applies
   to a running harness too — and it is on the update list, so it can be corrected
   again, which it could not be before.
-
-## Unreleased — candidates
-
-- No self-serve *client* has been through this repo yet (the founder's own 26 Jul
-  walkthrough is logged as Vol. 0, not Vol. 1). The first real self-serve install is
-  this repo's "Vol. 1," the same way Sugar Free Sundays and Solo Community were for the
-  coach-led kit — and SC-006 stands: a real non-technical person, not the founder,
-  through `NON-TECHNICAL-DRY-RUN.md`, now covering Press Start + one Library install.
-- Daily Practice's own preferred Spec Kit starter template has not yet been supplied; this
-  repo currently vendors `dailypractice-mono`'s own `.specify/` setup as the seed (see
-  `specs/001-self-install/plan.md` §1). Swap-in, not a blocker.
-- ~~Repo visibility/license~~ — resolved 2026-07-26: **public + MIT**, live at
-  https://github.com/DailyPractice-Ltd/orion-self-install (Template Repository).
 
 ## 0.5.7 — 2026-08-26
 

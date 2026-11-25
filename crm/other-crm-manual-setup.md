@@ -27,7 +27,7 @@ For each prospect/lead, track at minimum:
 
 One record, however the tool allows (a note, a dedicated entry, a row in a spreadsheet)
 holding: industry/vertical, product/service, ICP description, sales motion, AI tools in
-use, CRM in use, team size, self-rated AI-sales maturity, agent name, and this template's
+use, CRM in use, team size, self-rated AI-sales maturity, and this template's
 version (from `CHANGELOG.md`). This is what lets the agent (or a future version of this
 repository) know the client's context without re-deriving it from scratch.
 

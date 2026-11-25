@@ -1,96 +1,337 @@
 {
-  "_read_first": "Read this before you use the lists below. The procedure that goes with this manifest is docs/updating.md at the same commit you fetched this manifest from. If you are following a copy of docs/updating.md that was already in the client's folder, it is older than this manifest: fetch docs/updating.md from that same commit now and continue from its step 2. Two rules in it replace anything older you have read. One: never stop to ask the client anything. Their request to update is the consent. There is no merge to approve and no difference to show. Two: never replace a file the client has changed. update/pristine.json at the same commit lists the fingerprint of every copy of each file Daily Practice has shipped. A local file whose fingerprint is not listed there is the client's now: keep it exactly as it is and name it in your final report.",
-  "_what": "The authoritative lists of Daily Practice's files in this folder. 'update my harness' refreshes exactly the refresh paths and prunes exactly the remove paths from the template's main branch, and touches nothing else. Contract: docs/updating.md.",
-  "_regenerate": "git ls-files, minus specs/, .specify/, tests/, .claude/skills/speckit*, docs/img/, .claude/agents/README.md, agent/knowledge-base/0*.md — then bump template_version here and in status/status.schema-template.json together. CLAUDE.md IS on the list: it is what the assistant auto-loads, so it is the file that decides whether a session reads AGENTS.md and checks the radio at all. It was excluded once, which meant an installed harness could never be taught to listen. Then run node tests/helpers/pristine.mjs --write, last, after every other edit of the release: update/pristine.json must hold the fingerprint of every file as it ships (node --test fails if it is stale).",
-  "template_version": "1.5.0",
-  "refresh": [
-    ".claude/skills/create-skill/SKILL.md",
-    ".claude/skills/hire-agent/SKILL.md",
-    ".claude/skills/update-harness/SKILL.md",
-    ".gitignore",
-    "AGENTS.md",
-    "CHANGELOG.md",
-    "CLAUDE.md",
-    "LICENSE",
-    "NON-TECHNICAL-DRY-RUN.md",
-    "README.md",
-    "SHOTLIST.md",
-    "agent/adapters/chatgpt.md",
-    "agent/adapters/claude-code.md",
-    "agent/adapters/claude.md",
-    "agent/adapters/codex.md",
-    "agent/adapters/copilot.md",
-    "agent/agent-definition.md",
-    "agent/knowledge-base/README.md",
-    "agent/risk-matrix.md",
-    "connectors/connector-checklist.md",
-    "crm/README.md",
-    "crm/attio/README.md",
-    "crm/attio/apply-attio-template.mjs",
-    "crm/attio/attio-template.json",
-    "crm/hubspot/README.md",
-    "crm/hubspot/apply-hubspot-template.mjs",
-    "crm/hubspot/hubspot-template.json",
-    "crm/other-crm-manual-setup.md",
-    "docs/intelligence-library-opt-in.md",
-    "docs/memory.md",
-    "docs/radio.md",
-    "docs/self-serve-learnings.md",
-    "docs/simulated-dry-run-example.md",
-    "docs/updating.md",
-    "library/HIRING.md",
-    "library/README.md",
-    "library/ROLES.md",
-    "library/agents/call-planner/PACKAGE.md",
-    "library/agents/call-planner/build-call-plan.mjs",
-    "library/agents/call-planner/call-data.template.json",
-    "library/agents/dream/PACKAGE.md",
-    "library/agents/friday-report/PACKAGE.md",
-    "library/agents/prospecting/PACKAGE.md",
-    "library/programs/revenue-operating-cadence/PACKAGE.md",
-    "library/skills/meeting-sizing/PACKAGE.md",
-    "library/workflows/post-call-debrief/PACKAGE.md",
-    "library/workflows/prospect-research-outreach/PACKAGE.md",
-    "memory/README.md",
-    "notion/project-tracker-template.md",
-    "start.mjs",
-    "status/done.mjs",
-    "status/emit-status.mjs",
-    "status/home.mjs",
-    "status/memory.mjs",
-    "status/radio.mjs",
-    "status/schedule.mjs",
-    "status/send.mjs",
-    "status/shapes.mjs",
-    "status/status-schema.md",
-    "status/status.schema-template.json",
-    "update/manifest.json",
-    "update/pristine.json",
-    "validation/validation-tasks.md"
-  ],
+  "_read_first": "Follow agent/updating.md with this manifest pinned to main's commit, or to the full commit the request names (on main or not, tagged or not). The deployment map uses the tool recorded in status; the harness's installed-file receipt (status/installed-files.json) decides which files are Orion's; a folder without one is refused and reinstalls (agent/reinstall-from-1.x.md). The request is consent: never stop to ask, and never replace a file the client has changed: a changed runtime or plugin file, or plugin catalog, stops the update instead.",
+  "_what": "deployment is the source-to-destination and ownership contract for separate client repositories; select exactly one recorded tool. 2.0.0 is a reinstall release: this manifest updates 2.0.0 and later only (agent/reinstall-from-1.x.md). Contract: agent/updating.md and deployment._contract.",
+  "_regenerate": "Map every file under plugins/orion/ in deployment.entries, once each, with no per-tool destinations: the package ships at its own path for every tool.",
+  "template_version": "2.0.0",
   "never_touch": {
-    "status/status.json": "the client's own record — pairing, stages, packages, choices. An update edits exactly three things in it by hand: template_version, one appended notes line, and deleting keys named in remove_status_checklist_keys — nothing else, ever. The one script an update runs, node status/send.mjs migrate (since 1.5.0), writes scopes.send_risk: low when no level is recorded and touches nothing else in it",
+    "status/status.json": "The client's own record: preserve pairing, setup checkpoint, stages, packages and choices. An update edits template_version and appends one notes line. node status/send.mjs migrate may add the default send level. The shared guard updates sharing.pairing at runtime; it never resets a recorded clock. Setup may persist its own checkpoint. These runtime state changes do not authorize replacing the client's status file.",
     "status/send-log.md": "the client's own record of every send decision and verdict, content-free (since 1.5.0)",
     "status/no-contact.md": "the client's own no-contact list, for good (since 1.5.0)",
     "status/waiting.md": "the client's list of messages waiting for them, rewritten by every run (since 1.5.0)",
     "status/shift-log.md": "the client's work history",
     "status/work-log.md": "the client's work history: one line per finished task they asked for (since 1.1.0)",
-    "status/shifts/": "the wake-up files written for this machine by status/schedule.mjs: full paths and schedules that only make sense here (since 1.2.0)",
-    "memory/ (everything but README.md)": "the client's own memory — facts, logs, lessons, the index; an update improves the notebook's binding, never its pages",
+    "status/shifts/": "legacy wake-up files and schedule records specific to the original computer and folder",
     "agent/knowledge-base/01..07*.md": "the client's business, captured in their words",
     ".claude/agents/ (everything but nothing — the whole directory)": "the client's hired team; the roster README carries their rows",
-    ".claude/skills/ (any skill not in the refresh list)": "skills the client taught",
+    ".claude/skills/ and .agents/skills/ (every skill there)": "skills the client taught or added; Orion’s shipped skills live in plugins/orion/",
     ".update-backup/": "prior updates' safety copies",
-    "anything not in the refresh or remove lists": "refresh may write its paths, remove may delete its paths — nothing else may be touched at all. The two lists are the whole permission"
+    "status/radio-outbox.json": "Client-owned durable labels-only pending reports; never replace, retire or discard on update.",
+    "status/.radio-lock/": "Client-owned cross-process runtime lock; recovery must establish that its owner has stopped before removal.",
+    "status/radio.key": "Machine-local credential; never print, refresh, retire, or save to the home repository.",
+    "status/installed-files.json": "This harness's installed-file receipt: the Orion-managed files actually installed and their fingerprints. Harness-owned ownership evidence, written by Orion's installer and updater only; never replaced from a release.",
+    "anything outside the deployment map": "an update writes only the destinations the deployment map plans for the recorded tool, and retires only listed retired entries; nothing else may be touched"
   },
-  "_remove": "Paths pruned on update, with the same backup-first safety as refresh (docs/updating.md steps 3 and 4b). A path lands here when a release retires it; it never returns to refresh. A directory the prune empties is deleted too.",
-  "remove": [
-    "n8n/README.md",
-    "n8n/wf-01-prospect-research-outreach.json",
-    "n8n/wf-02-post-call-debrief.json"
-  ],
-  "remove_status_checklist_keys": [
-    "n8n_wf01_imported",
-    "n8n_wf02_imported"
-  ]
+  "deployment": {
+    "_contract": "Shared files and all shipped skills deploy to either tool. Entries with tools deploy only to that tool. Both manifests remain in the release source; deployed harnesses retain the local generator for offline switching. Existing layouts are preserved on update.",
+    "tools": [
+      "claude-code",
+      "codex"
+    ],
+    "common_sources": [
+      ".gitignore",
+      "AGENTS.md",
+      "CHANGELOG.md",
+      "LICENSE",
+      "NON-TECHNICAL-DRY-RUN.md",
+      "README.md",
+      "SHOTLIST.md",
+      "agent/adapters/chatgpt.md",
+      "agent/adapters/claude-code.md",
+      "agent/adapters/claude-web.md",
+      "agent/adapters/codex.md",
+      "agent/adapters/copilot.md",
+      "agent/knowledge-base/README.md",
+      "agent/risk-matrix.md",
+      "connectors/connector-checklist.md",
+      "crm/README.md",
+      "crm/attio/README.md",
+      "crm/attio/apply-attio-template.mjs",
+      "crm/attio/attio-template.json",
+      "crm/hubspot/README.md",
+      "crm/hubspot/apply-hubspot-template.mjs",
+      "crm/hubspot/hubspot-template.json",
+      "crm/other-crm-manual-setup.md",
+      "agent/radio.md",
+      "agent/scheduled-work.md",
+      "agent/self-serve-learnings.md",
+      "agent/simulated-dry-run-example.md",
+      "agent/updating.md",
+      "start.mjs",
+      "status/done.mjs",
+      "status/emit-status.mjs",
+      "status/home.mjs",
+      "status/radio.mjs",
+      "status/send.mjs",
+      "status/shapes.mjs",
+      "status/status-schema.md",
+      "status/status.schema-template.json",
+      "switch_ai.mjs",
+      "update/apply.mjs",
+      "update/preflight.mjs",
+      "update/destination-resolver.mjs",
+      "update/manifest.json",
+      "update/plugin-native.mjs",
+      "update/plugin-registration.mjs",
+      "update/receipt.mjs",
+      "update/plugin-package.mjs",
+      "update/plugin-setup.mjs",
+      "update/release-contract.mjs",
+      "validation/validation-tasks.md",
+      "status/guard.mjs",
+      "status/store.mjs",
+      "status/report.mjs",
+      "agent/install.md",
+      "agent/reinstall-from-1.x.md"
+    ],
+    "retired": [],
+    "entries": [
+      {
+        "source": "plugins/orion/plugin.json",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/plugin.json",
+        "tools": [
+          "codex"
+        ]
+      },
+      {
+        "source": "plugins/orion/.claude-plugin/plugin.json",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/.claude-plugin/plugin.json",
+        "tools": [
+          "claude-code"
+        ]
+      },
+      {
+        "source": "plugins/orion/skills/create-skill/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/create-skill/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/update-harness/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/update-harness/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/switch-ai/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/switch-ai/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/call-planner/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/call-planner/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/call-planner/assets/call-data.template.json",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/call-planner/assets/call-data.template.json"
+      },
+      {
+        "source": "plugins/orion/skills/call-planner/scripts/build-call-plan.mjs",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/call-planner/scripts/build-call-plan.mjs"
+      },
+      {
+        "source": "plugins/orion/skills/call-planner/scripts/harness-root.mjs",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/call-planner/scripts/harness-root.mjs"
+      },
+      {
+        "source": "plugins/orion/skills/friday-report/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/friday-report/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/prospecting/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/prospecting/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/post-call-debrief/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/post-call-debrief/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/prospect-research-outreach/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/prospect-research-outreach/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/apollo-enrich-phone/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/apollo-enrich-phone/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/apollo-enrich-phone/agents/openai.yaml",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/apollo-enrich-phone/agents/openai.yaml"
+      },
+      {
+        "source": "plugins/orion/skills/apollo-enrich-phone/references/hubspot-mapping.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/apollo-enrich-phone/references/hubspot-mapping.md"
+      },
+      {
+        "source": "plugins/orion/skills/apollo-enrich-phone/references/za-phone-types.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/apollo-enrich-phone/references/za-phone-types.md"
+      },
+      {
+        "source": "plugins/orion/skills/call-planner-control-tower/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/call-planner-control-tower/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/call-planner-control-tower/agents/openai.yaml",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/call-planner-control-tower/agents/openai.yaml"
+      },
+      {
+        "source": "plugins/orion/skills/call-planner-control-tower/references/blue-collar-assessment.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/call-planner-control-tower/references/blue-collar-assessment.md"
+      },
+      {
+        "source": "plugins/orion/skills/call-planner-control-tower/references/contact-history-and-reentry.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/call-planner-control-tower/references/contact-history-and-reentry.md"
+      },
+      {
+        "source": "plugins/orion/skills/call-planner-control-tower/references/outcome-routing.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/call-planner-control-tower/references/outcome-routing.md"
+      },
+      {
+        "source": "plugins/orion/skills/call-planner-control-tower/references/queue-schema-and-call-ask.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/call-planner-control-tower/references/queue-schema-and-call-ask.md"
+      },
+      {
+        "source": "plugins/orion/skills/call-planner-control-tower/references/today-only-queue.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/call-planner-control-tower/references/today-only-queue.md"
+      },
+      {
+        "source": "plugins/orion/skills/closeout-spreadsheet/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/closeout-spreadsheet/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/closeout-spreadsheet/references/sheet-stage-evidence.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/closeout-spreadsheet/references/sheet-stage-evidence.md"
+      },
+      {
+        "source": "plugins/orion/skills/lifecycle-governance/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/lifecycle-governance/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/lifecycle-governance/agents/openai.yaml",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/lifecycle-governance/agents/openai.yaml"
+      },
+      {
+        "source": "plugins/orion/skills/lifecycle-governance/references/hubspot-model.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/lifecycle-governance/references/hubspot-model.md"
+      },
+      {
+        "source": "plugins/orion/skills/lifecycle-governance/references/hubspot-schema.json",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/lifecycle-governance/references/hubspot-schema.json"
+      },
+      {
+        "source": "plugins/orion/skills/lifecycle-governance/references/lifecycle-stage-policy.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/lifecycle-governance/references/lifecycle-stage-policy.md"
+      },
+      {
+        "source": "plugins/orion/skills/prospect-call-list/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/prospect-call-list/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/prospect-call-list/agents/openai.yaml",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/prospect-call-list/agents/openai.yaml"
+      },
+      {
+        "source": "plugins/orion/skills/prospect-call-list/references/crm-review.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/prospect-call-list/references/crm-review.md"
+      },
+      {
+        "source": "plugins/orion/skills/prospect-call-list/references/run-guide.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/prospect-call-list/references/run-guide.md"
+      },
+      {
+        "source": "plugins/orion/skills/prospect-call-list/references/target-brief.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/prospect-call-list/references/target-brief.md"
+      },
+      {
+        "source": "plugins/orion/skills/prospect-enrichment/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/prospect-enrichment/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/report-bug/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/report-bug/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/report-bug/agents/openai.yaml",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/report-bug/agents/openai.yaml"
+      },
+      {
+        "source": "plugins/orion/skills/report-bug/references/report-guide.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/report-bug/references/report-guide.md"
+      },
+      {
+        "source": "plugins/orion/skills/task-planner/SKILL.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/task-planner/SKILL.md"
+      },
+      {
+        "source": "plugins/orion/skills/task-planner/agents/openai.yaml",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/task-planner/agents/openai.yaml"
+      },
+      {
+        "source": "plugins/orion/skills/task-planner/references/call-ranking.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/task-planner/references/call-ranking.md"
+      },
+      {
+        "source": "plugins/orion/skills/task-planner/references/slack-opportunity-intake.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/task-planner/references/slack-opportunity-intake.md"
+      },
+      {
+        "source": "plugins/orion/skills/task-planner/references/webinar-follow-up.md",
+        "ownership": "release",
+        "fingerprint_key": "plugins/orion/skills/task-planner/references/webinar-follow-up.md"
+      }
+    ],
+    "_release_only": "Paths that stay in the release and never reach a harness. skills/ is no longer a source (the shipped skills live in plugins/orion/skills/), but it stays listed so an install with --migrate-from never copies an older folder's top-level skills/ into the new harness.",
+    "release_only": [
+      "skills/",
+      "agents/",
+      "specs/",
+      "tests/",
+      "CLAUDE.md",
+      "agent/plugin-validation.md",
+      "agent/maintaining.md",
+      "img/"
+    ],
+    "ownership": {
+      "release": "Install only into an absent destination. On update replace or retire only when the installed-file receipt shows the destination untouched; preserve and report edits and collisions. Back up before replacement or retirement.",
+      "client-template": "Install only into an absent destination. Thereafter the destination belongs to the client; never refresh or retire personalized roster rows or job sheets.",
+      "unlisted": "Any destination absent from the deployment plan for this AI assistant belongs to the client. Never write or retire it."
+    }
+  }
 }

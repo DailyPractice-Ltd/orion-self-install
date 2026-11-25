@@ -1,0 +1,6 @@
+interface:
+  display_name: "Prospect Call List"
+  short_description: "Review CRM coverage and fill a targeted calling list"
+  default_prompt: "Use $prospect-call-list to review CRM lifecycle and ownership, show target segments I can choose from, and fill my calling list against the agreed qualifiers and coverage goal."
+policy:
+  allow_implicit_invocation: true

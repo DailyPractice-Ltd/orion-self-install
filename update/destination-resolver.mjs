@@ -1,0 +1,129 @@
+/** Resolve a deployed harness's selected destinations; file ownership is the receipt's (update/receipt.mjs). */
+import { createHash } from 'node:crypto';
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const RELEASE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+/** The shipped Orion plugin package: same path in the release and in every harness. */
+export const PACKAGE_ROOT = 'plugins/orion';
+
+/** A fingerprint: lowercase SHA-256 hex. */
+export const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/** Per-tool harness paths that do not come from shipped files. */
+export const TOOL_LAYOUT = Object.freeze({
+  'claude-code': Object.freeze({ product: 'Claude Code', skillRoot: '.claude/skills', catalogPath: '.claude-plugin/marketplace.json', rosterPath: '.claude/agents/README.md' }),
+  codex: Object.freeze({ product: 'Codex', skillRoot: '.agents/skills', catalogPath: '.agents/plugins/marketplace.json', rosterPath: 'agents/README.md' }),
+});
+
+function readJson(path, name) {
+  try { return JSON.parse(readFileSync(path, 'utf8')); }
+  catch (error) { throw new Error(`Cannot read ${name} at ${path}: ${error.message}`); }
+}
+
+export function safePath(root, path) {
+  if (typeof path !== 'string' || !path || path === '.' || isAbsolute(path) || path.split(/[\\/]/).includes('..')) {
+    throw new Error(`Invalid deployment path: ${path}`);
+  }
+  if (path.split(/[\\/]/).includes('specs')) {
+    throw new Error(`Human-only specs are not an agent or code input: ${path}`);
+  }
+  const target = resolve(root, path);
+  if (target === resolve(root) || relative(root, target).startsWith(`..${sep}`)) {
+    throw new Error(`Deployment path escapes root: ${path}`);
+  }
+  let part = resolve(root);
+  for (const segment of path.split('/')) {
+    part = join(part, segment);
+    try { if (lstatSync(part).isSymbolicLink()) throw new Error(`Symlink collision: ${path}`); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  return target;
+}
+
+export function resolveAiAssistant(status, deployment, { legacyTool } = {}) {
+  const ai_assistant = status?.ai_assistant;
+  if (ai_assistant == null && legacyTool != null) {
+    if (legacyTool !== 'claude-code') throw new Error('Legacy migration requires explicit --legacy-tool claude-code');
+    return legacyTool;
+  }
+  if (ai_assistant == null) throw new Error('Missing status.ai_assistant; use --legacy-tool claude-code only for an explicit legacy migration');
+  if (!deployment.tools.includes(ai_assistant)) throw new Error(`Invalid status.ai_assistant: ${ai_assistant}`);
+  if (legacyTool != null) throw new Error('--legacy-tool applies only when the status has no recorded AI assistant');
+  return ai_assistant;
+}
+
+export function fingerprint(contents) {
+  return createHash('sha256').update(Buffer.from(contents).toString('utf8').replace(/\r\n/g, '\n')).digest('hex');
+}
+
+/**
+ * The tool mapping alone: each deployment entry's source, destination and identity for
+ * one tool, without checking a release tree. planForTool adds those checks; a switch
+ * uses this directly to name the files it generates in a harness.
+ */
+export function toolEntries(deployment, ai_assistant, { includeOtherMetadata = false } = {}) {
+  return [
+    ...deployment.common_sources.map((source) => ({ source, destination: source, ownership: 'release', fingerprint_key: source })),
+    ...deployment.entries.filter(entry => includeOtherMetadata || !entry.tools || entry.tools.includes(ai_assistant)).map((entry) => ({ source: entry.sources?.[ai_assistant] || entry.source, destination: entry.destinations ? entry.destinations[ai_assistant] : entry.source, ownership: entry.ownership, fingerprint_key: entry.sources?.[ai_assistant] || entry.fingerprint_key })),
+  ];
+}
+
+/** The sole source-to-destination mapper for release and deployed harnesses. */
+export function planForTool(deployment, ai_assistant, { releaseRoot = RELEASE_ROOT, root, includeOtherMetadata = false } = {}) {
+  if (!deployment.tools.includes(ai_assistant)) throw new Error(`Unsupported AI assistant: ${ai_assistant || '(missing)'}`);
+  const packageDir = join(releaseRoot, PACKAGE_ROOT);
+  const packageFiles = (existsSync(packageDir) ? readdirSync(packageDir, { recursive: true, withFileTypes: true }) : [])
+    .filter(item => item.isFile())
+    .map(item => relative(releaseRoot, join(item.parentPath, item.name)).split(sep).join('/')).sort();
+  const packageEntries = deployment.entries.filter(entry => entry.source.startsWith(`${PACKAGE_ROOT}/`));
+  if (JSON.stringify(packageFiles) !== JSON.stringify(packageEntries.map(entry => entry.source).sort())) {
+    throw new Error(`Deployment entries must cover every file under ${PACKAGE_ROOT}/ exactly once`);
+  }
+  for (const entry of packageEntries) {
+    if (entry.destinations || entry.sources) throw new Error(`Package file ships at its own path for every tool: ${entry.source}`);
+  }
+  const entries = toolEntries(deployment, ai_assistant, { includeOtherMetadata });
+  const destinations = new Set();
+  for (const entry of entries) {
+    safePath(releaseRoot, entry.source);
+    safePath(root || releaseRoot, entry.destination);
+    if (!existsSync(join(releaseRoot, entry.source))) throw new Error(`Missing release source: ${entry.source}`);
+    if (destinations.has(entry.destination)) throw new Error(`Duplicate destination: ${entry.destination}`);
+    destinations.add(entry.destination);
+  }
+  return entries;
+}
+
+export function resolveDestinations({ root, releaseRoot = RELEASE_ROOT, legacyTool } = {}) {
+  if (!root) throw new Error('A deployed harness root is required');
+  const manifest = readJson(join(releaseRoot, 'update/manifest.json'), 'release manifest');
+  const status = readJson(join(root, 'status/status.json'), 'harness status');
+  const ai_assistant = resolveAiAssistant(status, manifest.deployment, { legacyTool });
+  const entries = planForTool(manifest.deployment, ai_assistant, { releaseRoot, root });
+  return { ai_assistant, legacy_migration: status.ai_assistant == null, entries };
+}
+
+/** Paths used by a running client harness, from its recorded tool alone. */
+export function runtimeLayout(root, { legacyTool } = {}) {
+  const manifest = readJson(join(root, 'update/manifest.json'), 'deployment manifest');
+  const status = readJson(join(root, 'status/status.json'), 'harness status');
+  const ai_assistant = resolveAiAssistant(status, manifest.deployment, { legacyTool });
+  const tool = TOOL_LAYOUT[ai_assistant];
+  if (!tool) throw new Error(`Missing runtime layout for ${ai_assistant}`);
+  const { product, ...paths } = tool;
+  for (const path of [PACKAGE_ROOT, ...Object.values(paths)]) safePath(root, path);
+  return { ai_assistant, packageRoot: PACKAGE_ROOT, ...paths, jobRoot: dirname(tool.rosterPath) };
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  try {
+    const value = (flag) => { const at = process.argv.indexOf(flag); return at < 0 ? undefined : process.argv[at + 1]; };
+    console.log(JSON.stringify(resolveDestinations({ root: value('--root'), legacyTool: value('--legacy-tool') }), null, 2));
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 2;
+  }
+}

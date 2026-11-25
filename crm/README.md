@@ -5,9 +5,9 @@ spreadsheet the client uses to track who they're talking to and where each deal 
 
 **If you're the installing agent**: ask the client directly which CRM they use (or if they
 don't have one yet), then follow the matching path below. Explain to the client, in one
-sentence, that they'll generate something called an API key at this step — it's just a
-special password that lets two apps (their CRM and their new workflows) talk to each other
-automatically; each CRM path below shows exactly where to get it. Don't move on to
+sentence, that they'll generate an API key at this step. It's a password that lets
+the setup script create the pipeline and fields in their CRM. Each CRM path below
+shows exactly where to get it. Don't move on to
 connectors until `status/status.json`'s `crm_choice_made` and `crm_template_applied` are
 both `true`.
 
@@ -30,15 +30,15 @@ valid an outcome, it just takes longer to click through.
 
 Regardless of CRM, the goal is the same three things:
 
-1. A **pipeline** with stages the agent and workflows can read: roughly
+1. A **pipeline** with stages Orion can read: roughly
    `prospect → lead → MQL → SQL → deal → customer` (exact stage names vary by CRM — see
    each path for specifics).
 2. A place to record the client's own **assessment profile** (industry, ICP, offer,
    AI tools, team size) — so the agent has a durable home for context beyond the
    knowledge-base files.
-3. **API access** the client generates themselves (an API key or private-app token) — used
-   once to apply the template, then used by the client's own agent connectors for ongoing
-   use. It is never stored in this repository and never sent to Daily Practice.
+3. **API access** the client generates themselves (an API key or private-app token) to
+   apply the template. Orion uses the CRM connector for ongoing work. Keep the setup
+   key local and outside this repository.
 
 ## Why this doesn't block the rest of the install
 

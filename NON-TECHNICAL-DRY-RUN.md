@@ -39,6 +39,26 @@ because you already know what this repository is for. That's exactly why it's a 
 test than a genuine stranger, and why it should still happen even so — it will still
 catch more than another read-through will.
 
+## Required pairing candidate
+
+The candidate supports Codex and Claude Code installed folders. A website-only
+or paste-only participant must be routed to one of those tools. Node.js execution,
+a signed-in Daily Practice account and an available bridge are required; missing
+pairing or failed verification keeps setup unfinished with no work handoff.
+
+Observe the participant requesting and renewing their own code, resuming setup
+without repeated answers, and receiving a fresh successful pre-work check before
+validation. Observe silent temporary verification/reporting failures within the connection
+allowance (agent/install.md), blocking at exact expiry and immediate credential refusal.
+Observe admitted work finish after expiry and recovery replay pending reports
+without duplicate counts. All unpaired folders require pairing immediately.
+Record only sanitized outcomes, never credentials, screen codes or client content.
+
+No real-account run of this candidate has been completed. The maintainer deferred
+live testing. Follow this protocol and `validation/validation-tasks.md` for the
+real-account checks. A simulated walkthrough
+or automated fake bridge does not count as this protocol's real-world pass.
+
 ## Setup
 
 1. Give them **only** a way to get the files — the GitHub link once it exists, or the ZIP
@@ -72,7 +92,7 @@ catch more than another read-through will.
   answering a genuine business question (e.g. confirming a real price) doesn't count
   against this; explaining a click sequence does.
 - Whatever friction got written down, however small, gets logged as a real entry in
-  `docs/self-serve-learnings.md` Vol. 1 — this is what turns a single test into the same
+  `agent/self-serve-learnings.md` Vol. 1 — this is what turns a single test into the same
   kind of empirically-grounded revision cycle the coach-led kit's own Vol. 1 was built
   from, rather than a one-off.
 

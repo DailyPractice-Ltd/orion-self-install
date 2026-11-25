@@ -1,97 +1,40 @@
-# Adapter — Codex (OpenAI's coding agent)
+# Adapter — Codex
 
-**Thin by design**: mechanics only. Behaviour lives in
-[`agent-definition.md`](../agent-definition.md) — fix it there, not here. Everything
-[`claude-code.md`](claude-code.md) says about a code-capable surface applies here too —
-reading and writing `status/status.json`, running the CRM apply scripts, editing the
-knowledge base live, and reporting finished work over the radio. This file adds
-only what is Codex-specific. Work is reported from the code-capable adapters (this
-file and `claude-code.md`), because they are the surfaces that can run scripts.
+Surface mechanics only. Behaviour is in [AGENTS.md](../../AGENTS.md); install, pairing
+and recovery are in [agent/install.md](../install.md). What
+[the Claude Code adapter](claude-code.md) says you do directly (status and knowledge-base
+edits, CRM apply scripts, Node checks, connector sign-in) applies here too.
 
-Best fit when the client works in Codex — the CLI in a terminal, the IDE extension, or
-the desktop app. The wizard detects it (`codex` on PATH or `~/.codex` present) and hands
-off to exactly the same prompt as Claude Code.
+## Loading the instructions
 
-## The sandbox — why the radio needs one setting here
+Codex reads `AGENTS.md` natively at session start, in the CLI, the IDE extension and the
+desktop app. The wizard detects Codex (`codex` on PATH or `~/.codex` present).
 
-Codex runs commands inside a safety sandbox, and by default that sandbox **allows file
-edits in this folder but blocks the network**. Good default for safety; it also means
-the radio's calls quietly fail: `node status/radio.mjs check`, `… signal` and
-`node status/done.mjs` all print "The radio address didn't answer", even though
-nothing is wrong with the radio itself.
+## The Orion plugin
 
-One plain sentence for the client before the fix, per Article I: *the radio is how your
-harness checks in with Daily Practice, and Codex's safety sandbox needs to be told that
-this one kind of call is allowed.*
+Orion's shipped skills come from the `orion` plugin in `plugins/orion/`, offered through
+this folder's own catalog (`.agents/plugins/marketplace.json`), which this folder's
+`.codex/config.toml` registers and switches on for this folder only. Codex reads that
+file only once the client trusts the folder. Codex installs a cached copy: the client
+opens the Plugins Directory (desktop app) or `/plugins` (CLI), searches for "orion",
+installs it and starts a fresh chat, and repeats that after each update. Codex may need a
+restart. Setup counts as done only when Codex lists Orion here and its cached copy holds
+this release and every shipped skill. Skills the client creates or adds live in
+`.agents/skills/`; updates never touch them.
 
-**The fix, once, at install** — add to `~/.codex/config.toml`:
+## Network approval
 
-```toml
-[sandbox_workspace_write]
-network_access = true
-```
+When the sandbox blocks network access, explain that the connection check needs to reach
+Daily Practice, request approval for that command through Codex's permission flow, and
+retry. A restricted session may need approval again. On a managed machine, follow its
+network policy.
 
-Then prove it while everyone is watching: run `node status/radio.mjs check` and see
-"Radio quiet" (or a real message) instead of "didn't answer". A radio fix that isn't
-proven live is the wiring lesson all over again.
+## Scheduling
 
-**Who makes the edit**: you do, if you can reach `~/.codex/config.toml` — it lives
-outside this folder, so the write may need the client's one-time approval; say what you
-are changing and why before you touch it. If you can't reach it, read the three lines
-out and the client pastes them.
+Use Codex scheduled tasks for recurring work; see [Schedule Orion](../scheduled-work.md).
+When a send tool is missing or needs interactive approval, leave the message waiting.
 
-**Order on a first failure**: say the one-liner first, then offer the fix — never the
-other way round. The approval-and-retry-once move belongs inside applying the fix
-(**if the config can't be changed** — a locked-down machine, a shared config — request
-network approval for the radio command once and retry once). If it is still blocked,
-AGENTS.md's unreachable rule stands: one plain sentence, never silence, never a retry
-loop.
+## Waiting for you, on this surface
 
-## Scheduled work: how a hired agent's schedule fires here
-
-A hired agent can work on a schedule with nobody watching (`library/HIRING.md`, step 6,
-"Wire the schedule"). Two ways, in this order:
-
-- **The Codex app's automations (rung A).** When the client works in the Codex app,
-  create an automation there with the shift prompt HIRING.md gives you and the
-  schedule from the job sheet. Nothing else to install. An automation runs under
-  the same sandbox as a session, so make the one-time `~/.codex/config.toml` fix
-  above first, or its report cannot reach the radio.
-- **The computer's own scheduler (rung B)**, when there is only the command line.
-  `node status/schedule.mjs wire` writes the wake-up and
-  `node status/schedule.mjs on` switches it on. What it starts is:
-
-```
-codex exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_write.network_access=true "{prompt}"
-```
-
-- `codex exec` is the form of Codex that runs without a person.
-- `--skip-git-repo-check` lets it run in a folder that was downloaded, not cloned.
-- **`network_access=true` is not optional.** The sandbox blocks the network unless
-  told otherwise. Without it the shift still does its work and writes its line to
-  `status/shift-log.md`, but its report cannot reach the radio, so "(radio
-  unreachable)" lands under the line and Daily Practice never hears the shift ran.
-  Setting it on the command line works even if the config fix was never made.
-- An old Codex command can be refused by the service ("requires a newer version of
-  Codex"). The wake-up then starts and stops at once. Update Codex, and step 7's
-  wake-up check will show it working.
-
-The one source for the command is `unattendedRunner('codex')` in `status/shapes.mjs`.
-
-## Known quirks
-
-- Codex reads `AGENTS.md` natively at session start — that is why this repository's
-  instructions file carries that name. No pasting needed; the wizard's handoff prompt is
-  enough.
-- Approval modes vary by session. Diagnose before fixing: if `node status/radio.mjs
-  check` prints "This assistant's sandbox is blocking the network", the config fix was
-  not applied to this session, so ask for network approval for the radio commands up
-  front, before the first one, and run it again. It is not a one-time fix: a session
-  started in a restricted mode needs it again.
-- **Waiting for you, on this surface:** the truth is `status/waiting.md`, rewritten by
-  every run. Keep one thread the client names once and append to it with
-  `codex exec resume <name>`. Verified 4 November 2026; a Composio route for Gmail is its
-  own later research.
-- Sending follows the risk level (rule 1 of the agent definition). Codex's headless run
-  loads no mail, Slack or calendar tool, so on Codex every message waits for the client
-  with that reason; there is no tool gate here, only the prompt and the script.
+The truth is `status/waiting.md`, rewritten by every run. Keep one thread the client names
+once and append to it with `codex exec resume <name>`.

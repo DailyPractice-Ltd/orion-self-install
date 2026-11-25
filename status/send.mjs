@@ -26,8 +26,7 @@
  *              written anywhere.
  *   set-level  Writes the harness level (or, with --agent, the role's line on
  *              its job sheet), who set it and when; records the pacing caps
- *              once; re-renders every wired wake-up so the allowlist follows
- *              the level; and prints the one line the client hears.
+ *              once; and prints the one line the client hears.
  *   outcome    What happened after a decision: sent, failed, or left waiting.
  *   verdict    The client's yes or no on a waiting message: this is what the
  *              history factor reads.
@@ -37,22 +36,25 @@
  *              the per-agent files), backs up first, lists what it could not
  *              place, and writes the level when the status file has none.
  *
- * Dependency-free: node built-ins and status/shapes.mjs only.
+ * Uses Node built-ins and Orion's local modules.
  */
 import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync, copyFileSync, readdirSync, realpathSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   SEND_LEVELS, SEND_THRESHOLDS, SEND_CEILING, WAITING_SENTENCE, LEVEL_SENDS, LEVEL_WAITS, CONTENT_SHORT, HISTORY_DAYS,
-  RISK_MATRIX, SEND_TOOL, riskLabel, riskScore, lowestLevelFor, levelSends, labelProblem, countProblem,
+  RISK_MATRIX, riskLabel, riskScore, lowestLevelFor, levelSends, labelProblem, countProblem,
 } from './shapes.mjs';
-import { jobSheetSendRisk, jobSheetGoLive, jobSheetTools, rerender } from './schedule.mjs';
+import { runtimeLayout } from '../update/destination-resolver.mjs';
+import { changeStatus, readStatus, LOCKED_MESSAGE } from './store.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FOLDER = join(here, '..');
 const STATUS_PATH = join(here, 'status.json');
 const LOG_PATH = join(here, 'send-log.md');
 const NO_CONTACT_PATH = join(here, 'no-contact.md');
+const jobRoot = () => runtimeLayout(FOLDER).jobRoot;
+const jobRel = (name) => `${jobRoot()}/${name}.md`;
 
 const USAGE = [
   'Usage: node status/send.mjs score --agent <name> --to <address> --channel <c> --relationship <r> --content <l> [--customer] [--replied]',
@@ -70,14 +72,18 @@ function stamp(d = new Date()) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-function readStatus() {
+/** A read-only look at status.json; null when there is none or it cannot be read. Changes go through the store. */
+function peekStatus() {
   if (!existsSync(STATUS_PATH)) return null;
   try { return JSON.parse(readFileSync(STATUS_PATH, 'utf8')); } catch { return null; }
 }
 
-function writeStatus(status) {
-  status.updated_at = new Date().toISOString();
-  writeFileSync(STATUS_PATH, `${JSON.stringify(status, null, 2)}\n`);
+/** What a failed status change tells the client: the lock, or a file that needs recovery. Nothing was changed. */
+function statusTrouble(error) {
+  console.log(error?.code === 'STATUS_LOCKED'
+    ? `${LOCKED_MESSAGE} Nothing was changed.`
+    : 'status/status.json could not be read or saved, so nothing was changed. Run  node status/home.mjs check  and recover it before retrying.');
+  return 1;
 }
 
 /** The harness level as recorded: off, low, medium, high, or null when there is none yet. */
@@ -96,12 +102,20 @@ function frontValue(lines, key) {
   return line.slice(key.length + 1).replace(/\s+#.*$/, '').trim().replace(/^["']|["']$/g, '');
 }
 
-/** The role's own send line and go-live flag, read the way the scheduler reads them; a name with no sheet is the harness's own agent. */
+/** Apply the send restrictions on existing job sheets. Missing fields use the legacy defaults. */
 function roleOf(name) {
-  const path = join(FOLDER, '.claude', 'agents', `${name}.md`);
+  const path = join(FOLDER, jobRel(name));
   if (!existsSync(path)) return { sheet: null, sendRisk: 'harness', live: true };
   const text = readFileSync(path, 'utf8');
-  return { sheet: path, text, sendRisk: jobSheetSendRisk(text), live: jobSheetGoLive(text) };
+  const lines = frontmatter(text);
+  const sendRisk = frontValue(lines, 'send_risk')?.toLowerCase() ?? 'harness';
+  const goLive = frontValue(lines, 'go_live')?.toLowerCase() ?? 'true';
+  return {
+    sheet: path,
+    text,
+    sendRisk: ['harness', 'with the harness', 'on', 'true', 'yes'].includes(sendRisk) ? 'harness' : 'never',
+    live: ['true', 'yes', 'on'].includes(goLive),
+  };
 }
 
 function appendLog(line) {
@@ -182,7 +196,7 @@ function sentTodayOn(group, now = new Date()) {
   }).length;
 }
 
-function score(rest) {
+async function score(rest) {
   const { flags, problems } = parseFlags(rest, { values: ['agent', 'to', 'channel', 'relationship', 'content'], switches: ['customer', 'replied'] });
   for (const needed of ['agent', 'to', 'channel', 'relationship', 'content']) {
     if (flags[needed] === undefined || !String(flags[needed]).trim()) problems.push(`--${needed} is missing.`);
@@ -197,7 +211,11 @@ function score(rest) {
     console.log(USAGE);
     return 1;
   }
-  const status = readStatus();
+  const {checkWork} = await import('./guard.mjs');
+  const permission = await checkWork({root:FOLDER});
+  if (!permission.allow) console.log(permission.reason);
+  if (!permission.allow) return 2;
+  const status = peekStatus();
   if (!status) {
     console.log('No status/status.json yet, so there is no level to score against. Run  node start.mjs  first.');
     return 1;
@@ -340,33 +358,7 @@ function setSheetLine(text, key, value) {
   return `${front[1]}${lines.join(nl)}${front[3]}${text.slice(front[0].length)}`;
 }
 
-/** Every wired wake-up follows the level: re-render each one in place, so the next scheduled run follows with no re-wiring. */
-function rerenderShifts() {
-  const shifts = join(here, 'shifts');
-  if (!existsSync(shifts)) return [];
-  const done = [];
-  for (const f of readdirSync(shifts).filter((n) => n.endsWith('.json'))) {
-    const name = f.slice(0, -5);
-    const result = rerender({ folder: FOLDER, name });
-    if (result && result.written) done.push(name);
-    else if (result && result.problem) console.log(`The wake-up for ${name} was not re-rendered: ${result.problem}`);
-  }
-  return done;
-}
-
-/** A job sheet that allows all of Bash can send from the shell with nothing at the tool boundary: say so, once per sheet. */
-function bareShellWarnings() {
-  const agents = join(FOLDER, '.claude', 'agents');
-  if (!existsSync(agents)) return [];
-  const found = [];
-  for (const f of readdirSync(agents).filter((n) => n.endsWith('.md') && n !== 'README.md').sort()) {
-    const tools = jobSheetTools(readFileSync(join(agents, f), 'utf8')) || [];
-    if (tools.includes('Bash')) found.push(`${f.slice(0, -3)}'s job sheet allows all of Bash, which can send from the shell on its own: the level is the rule there, with nothing at the tool boundary.`);
-  }
-  return found;
-}
-
-function setLevel(rest) {
+async function setLevel(rest) {
   const [what, ...more] = rest;
   const { flags, problems } = parseFlags(more, { values: ['agent', 'cap-email', 'cap-dm', 'cap-sms', 'by'] });
   const word = String(what ?? '').trim().toLowerCase();
@@ -387,7 +379,8 @@ function setLevel(rest) {
     else caps[group] = Number(given);
   }
   if (problems.length > 0) return refuse(problems);
-  const status = readStatus();
+  let status;
+  try { status = await readStatus(FOLDER); } catch (error) { return statusTrouble(error); }
   if (!status) {
     console.log('No status/status.json yet. Run  node start.mjs  first.');
     return 1;
@@ -399,50 +392,48 @@ function setLevel(rest) {
     console.log('Run  node status/send.mjs migrate  first (it backs up, then replaces the kit\'s own old sentences), then set the level again.');
     return 1;
   }
-  status.scopes = status.scopes && typeof status.scopes === 'object' ? status.scopes : { crm_write: true };
-  const by = String(flags.by ?? status.client_name ?? 'the client');
-  const today = stamp().slice(0, 10);
-  const current = harnessLevel(status) ?? 'off';
-
   if (forRole) {
     const role = roleOf(flags.agent);
     if (!role.sheet) {
-      console.log(`There is no job sheet at .claude/agents/${flags.agent}.md, so there is no role to set. The harness level is set without --agent.`);
+      console.log(`There is no job sheet at ${jobRel(flags.agent)}, so there is no role to set. The harness level is set without --agent.`);
       return 1;
     }
     const rewritten = setSheetLine(role.text, 'send_risk', word);
     if (rewritten === null) {
-      console.log(`The job sheet .claude/agents/${flags.agent}.md has no frontmatter block to write the line into. Add one (library/HIRING.md gives the template), then set it again. Nothing was written.`);
+      console.log(`Add a frontmatter block to ${jobRel(flags.agent)}, then set its send level again.`);
       return 1;
     }
     writeFileSync(role.sheet, rewritten);
     const levelNow = harnessLevel(status) ?? 'off';
     if (word === 'never') console.log(`${flags.agent} never sends. The rest of the harness is still at ${levelNow}.`);
     else console.log(`${flags.agent} now sends with the harness, at ${levelNow}${LEVEL_SENDS[levelNow] ? `: ${LEVEL_SENDS[levelNow]}` : ''}.`);
-    const tools = jobSheetTools(role.text) || [];
-    if (word === 'harness' && !tools.some((t) => SEND_TOOL.test(t.split('(')[0]) || t === 'Bash')) {
-      console.log('Its job sheet names no tool that sends, so on a scheduled shift its messages wait for you until a promotion adds one. In a session: "This assistant cannot send on its own. Every message waits for you here."');
-    }
-    for (const w of bareShellWarnings()) console.log(w);
-    for (const name of rerenderShifts()) console.log(`Re-rendered the wake-up for ${name}, so the next scheduled run follows this.`);
     return 0;
   }
 
-  let level = word;
-  if (word === 'pause') level = 'off';
-  if (word === 'resume') {
-    level = SEND_LEVELS.includes(status.scopes.send_risk_resume) && status.scopes.send_risk_resume !== 'off' ? status.scopes.send_risk_resume : 'low';
-  }
-  if (level === 'off') {
-    if (current !== 'off') status.scopes.send_risk_resume = current;
-  } else {
-    delete status.scopes.send_risk_resume;
-  }
-  status.scopes.send_risk = level;
-  status.scopes.send_risk_set_by = by;
-  status.scopes.send_risk_set_on = today;
-  if (Object.keys(caps).length > 0) status.scopes.send_caps = { ...(status.scopes.send_caps || {}), ...caps };
-  writeStatus(status);
+  // Read fresh and saved under the status lock, so a guard or an update running
+  // at the same moment can neither lose this level nor have it lost.
+  let level;
+  try {
+    status = await changeStatus(FOLDER, (fresh) => {
+      fresh.scopes = fresh.scopes && typeof fresh.scopes === 'object' ? fresh.scopes : { crm_write: true };
+      const current = harnessLevel(fresh) ?? 'off';
+      level = word;
+      if (word === 'pause') level = 'off';
+      if (word === 'resume') {
+        level = SEND_LEVELS.includes(fresh.scopes.send_risk_resume) && fresh.scopes.send_risk_resume !== 'off' ? fresh.scopes.send_risk_resume : 'low';
+      }
+      if (level === 'off') {
+        if (current !== 'off') fresh.scopes.send_risk_resume = current;
+      } else {
+        delete fresh.scopes.send_risk_resume;
+      }
+      fresh.scopes.send_risk = level;
+      fresh.scopes.send_risk_set_by = String(flags.by ?? fresh.client_name ?? 'the client');
+      fresh.scopes.send_risk_set_on = stamp().slice(0, 10);
+      if (Object.keys(caps).length > 0) fresh.scopes.send_caps = { ...(fresh.scopes.send_caps || {}), ...caps };
+      return fresh;
+    });
+  } catch (error) { return statusTrouble(error); }
 
   if (level === 'off') {
     console.log(`Sending is paused. Everything waits for you.${status.scopes.send_risk_resume ? ` Say 'resume sending' to go back to ${status.scopes.send_risk_resume}.` : ''}`);
@@ -453,8 +444,6 @@ function setLevel(rest) {
   if (level !== 'off' && status.checklist && status.checklist.connector_email_live === false) {
     console.log('No email connector is live yet, so nothing can send until one is. When it is, grant reading, drafting and sending in one go; if the grant turns out to be read and draft only, the words are: "Your Gmail connection can read and draft but not send. Re-authorise Gmail with send permission and the level will take effect."');
   }
-  for (const w of bareShellWarnings()) console.log(w);
-  for (const name of rerenderShifts()) console.log(`Re-rendered the wake-up for ${name}, so the next scheduled run follows this.`);
   return 0;
 }
 
@@ -472,7 +461,7 @@ const NAME = '{{CLIENT_NAME}}';
 export const RULE_ONE = `1. SEND INSIDE ${NAME}'S RISK LEVEL, NEVER ABOVE IT. Every message to a person
    outside this folder (email, a calendar invite, LinkedIn, Slack, WhatsApp, SMS, any DM)
    is scored before it goes. Run
-   \`node status/send.mjs score --agent {{AGENT_NAME}} --to <address> --channel <email|linkedin|slack|dm|whatsapp|sms>
+   \`node status/send.mjs score --agent orion --to <address> --channel <email|linkedin|slack|dm|whatsapp|sms>
    --relationship <reply|follow-up|known|cold> --content <logistics|information|claim|money>
    [--customer] [--replied]\` and do what its decision says. "send": send it, record it
    (\`node status/send.mjs outcome sent ...\`) and report it in one line. "waiting": leave it
@@ -583,13 +572,13 @@ export const RETIRED = [
     '- **Go-live**: until your human flips `go_live`, an agent reads and drafts only, and\n  sends nothing. Once live, its messages go or wait by the harness\'s risk level (rule 1).'],
   ['agent/adapters/claude-code.md',
     "- Nothing sends without explicit approval — a code-capable surface makes it *easier* to\n  accidentally automate past that gate (e.g. by piping a script's output straight into a\n  send call). Don't. Every send/write path still stops for a yes.",
-    '- Sending follows the risk level, and here the allowlist is a real tool boundary: a\n  scheduled shift is given the send tools on its job sheet only while the level allows\n  (`status/schedule.mjs`), and in a session rule 1 of the agent definition is the gate.\n  Never pipe anything into a send tool without the score line that allows it.'],
+    '- Sending follows rule 1 in the agent definition. The scheduled environment\'s connector\n  permissions also apply. If a send tool is missing or requires interactive approval,\n  leave the message waiting for the user.'],
   ['agent/adapters/claude.md',
     "approval gate is the agent's own non-negotiable rules (drafts only, explicit yes;\n  Article III), not the tool: connectors read and stage drafts; **sending stays the\n  client's own act, from their own Drafts folder** — the agent never instructs a tool\n  to send (agent-definition rule 1).",
     "gate is rule 1 of the agent definition, not the tool: every message is scored, goes\n  inside the client's risk level, and waits for them above it (agent-definition rule 1)."],
   ['agent/adapters/codex.md',
     "- Everything outbound still stages for the client's yes. A code-capable surface makes it\n  easier to automate past that gate; don't. Same rule as `claude-code.md`.",
-    "- Sending follows the risk level (rule 1 of the agent definition). Codex's headless run\n  loads no mail, Slack or calendar tool, so on Codex every message waits for the client\n  with that reason; there is no tool gate here, only the prompt and the script."],
+    '- Sending follows rule 1 in the agent definition. The scheduled environment\'s connector\n  permissions also apply. If a send tool is missing or requires interactive approval,\n  leave the message waiting for the user.'],
   ['agent/adapters/chatgpt.md',
     "gate is the agent's own rules — drafts only; sending stays the client's own act,\n   from their own Drafts folder, never the agent instructing a tool\n   (agent-definition rule 1).",
     'gate is rule 1 of the agent definition: every message is scored; a custom GPT\n   cannot send on its own, so here every message waits for the client\n   (agent-definition rule 1).'],
@@ -626,9 +615,9 @@ export function retiredRe(oldWords) {
 
 function keptFiles() {
   const files = ['agent/agent-definition.md', 'AGENTS.md', 'agent/adapters/claude-code.md', 'agent/adapters/claude.md', 'agent/adapters/codex.md', 'agent/adapters/chatgpt.md', 'agent/adapters/copilot.md'];
-  const agents = join(FOLDER, '.claude', 'agents');
+  const agents = join(FOLDER, jobRoot());
   if (existsSync(agents)) {
-    for (const f of readdirSync(agents).filter((n) => n.endsWith('.md') && n !== 'README.md').sort()) files.push(`.claude/agents/${f}`);
+    for (const f of readdirSync(agents).filter((n) => n.endsWith('.md') && n !== 'README.md').sort()) files.push(`${jobRoot()}/${f}`);
   }
   return files.filter((rel) => existsSync(join(FOLDER, rel)));
 }
@@ -638,7 +627,7 @@ function migrateText(rel, text) {
   let out = text;
   let changed = 0;
   for (const [where, oldWords, newWords] of RETIRED) {
-    const applies = where.endsWith('*.md') ? rel.startsWith(where.slice(0, -4)) : rel === where;
+    const applies = where.endsWith('*.md') ? rel.startsWith(where.startsWith('.claude/agents/') ? `${jobRoot()}/` : where.slice(0, -4)) : rel === where;
     if (!applies) continue;
     out = out.replace(retiredRe(oldWords), (...m) => {
       changed++;
@@ -664,7 +653,7 @@ function residue(files = keptFiles()) {
 /** The client's own lines about sending on a hired agent's sheet: left alone, and named. */
 function ownSendLines(files) {
   const found = [];
-  for (const rel of files.filter((f) => f.startsWith('.claude/agents/'))) {
+  for (const rel of files.filter((f) => f.startsWith(`${jobRoot()}/`))) {
     const lines = readFileSync(join(FOLDER, rel), 'utf8').split(/\r?\n/);
     lines.forEach((line, i) => {
       if (/^\s*[-*]\s/.test(line) && /\bsend/i.test(line) && !/rule 1 of the agent definition/.test(line) && !RESIDUE_RE.test(line)) found.push({ file: rel, line: i + 1, text: line.trim() });
@@ -673,13 +662,13 @@ function ownSendLines(files) {
   return found;
 }
 
-function migrate(rest) {
+async function migrate(rest) {
   const { flags, problems } = parseFlags(rest, { values: ['backup'] });
   if (problems.length > 0) return refuse(problems);
   const files = keptFiles();
-  // The update's own backup folder is .update-backup/{version}-{date}/ (docs/updating.md step 3)
+  // The update's own backup folder is .update-backup/{version}-{date}/ (agent/updating.md step 3)
   // and this runs before step 6 bumps the version, so the two land in one place.
-  const beforeStatus = readStatus();
+  const beforeStatus = peekStatus();
   const backupDir = flags.backup ? join(FOLDER, flags.backup) : join(FOLDER, '.update-backup', `${beforeStatus?.template_version || 'send-risk'}-${stamp().slice(0, 10)}`);
   const replaced = [];
   for (const rel of files) {
@@ -687,7 +676,7 @@ function migrate(rest) {
     const before = readFileSync(path, 'utf8');
     let { text, changed } = migrateText(rel, before);
     if (rel === 'agent/agent-definition.md' && changed > 0) {
-      const agentName = (/^You are ([^,\n]+),/m.exec(before) || [])[1] || readStatus()?.agent_name || 'your-agent';
+      const agentName = (/^You are ([^,\n]+),/m.exec(before) || [])[1] || peekStatus()?.agent_name || 'your-agent';
       text = text.replaceAll('{{AGENT_NAME}}', agentName.trim());
     }
     if (changed === 0 || text === before) continue;
@@ -698,18 +687,25 @@ function migrate(rest) {
     replaced.push(rel);
   }
 
-  const status = readStatus();
+  let status = null;
   let levelWritten = false;
-  if (status) {
-    status.scopes = status.scopes && typeof status.scopes === 'object' ? status.scopes : { crm_write: true };
-    if (typeof status.scopes.crm_write !== 'boolean') status.scopes.crm_write = true;
-    if (harnessLevel(status) === null) {
-      status.scopes.send_risk = 'low';
-      status.scopes.send_risk_set_by = 'update';
-      status.scopes.send_risk_set_on = stamp().slice(0, 10);
-      writeStatus(status);
-      levelWritten = true;
+  try {
+    if (await readStatus(FOLDER) !== null) {
+      status = await changeStatus(FOLDER, (fresh) => {
+        if (harnessLevel(fresh) !== null) return fresh;
+        fresh.scopes = fresh.scopes && typeof fresh.scopes === 'object' ? fresh.scopes : { crm_write: true };
+        if (typeof fresh.scopes.crm_write !== 'boolean') fresh.scopes.crm_write = true;
+        fresh.scopes.send_risk = 'low';
+        fresh.scopes.send_risk_set_by = 'update';
+        fresh.scopes.send_risk_set_on = stamp().slice(0, 10);
+        levelWritten = true;
+        return fresh;
+      });
     }
+  } catch (error) {
+    if (replaced.length > 0) console.log(`Replaced the old rule in ${replaced.length} files: ${replaced.join(', ')}. Backup: ${relative(FOLDER, backupDir)}/`);
+    console.log('The send level was not recorded. Run  node status/send.mjs migrate  again.');
+    return statusTrouble(error);
   }
 
   if (replaced.length > 0) {
@@ -730,7 +726,6 @@ function migrate(rest) {
     console.log('Old rule still present, not a wording this script knows (left alone; set-level refuses until it is changed by hand):');
     for (const r of left) console.log(`  ${r.file}:${r.line}  ${r.text}`);
   }
-  for (const name of rerenderShifts()) console.log(`Re-rendered the wake-up for ${name}, so its next scheduled run follows the level with no re-wiring.`);
   return 0;
 }
 
@@ -738,7 +733,7 @@ function migrate(rest) {
 
 const COMMANDS = { score, outcome, verdict, 'no-contact': noContact, 'set-level': setLevel, migrate };
 
-function main(argv) {
+async function main(argv) {
   const [command, ...rest] = argv;
   if (!command || command === '--help' || command === '-h') {
     console.log(USAGE);
@@ -757,4 +752,4 @@ function runAsCommand() {
   if (!process.argv[1]) return false;
   try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
 }
-if (runAsCommand()) process.exit(main(process.argv.slice(2)));
+if (runAsCommand()) process.exit(await main(process.argv.slice(2)));

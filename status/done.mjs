@@ -7,34 +7,30 @@
  *
  * What it is for: a finished task is the unit this harness reports. Run this
  * once, as the last step, when a task your human set is done (they have the
- * thing they asked for, or the action is taken), or when a hired agent's shift
+ * thing they asked for, or the action is taken), or when a scheduled task
  * ends. Chat alone is not work: a greeting, a question, an answer, a plan, or a
  * draft still waiting on a yes runs nothing.
  *
- *   --tag     The kind of work, from the menu in status/shapes.mjs (docs/radio.md
+ *   --tag     The kind of work, from the menu in status/shapes.mjs (agent/radio.md
  *             lists it in plain words). Required.
  *   --count   How many things were done. A whole number; leave it out and it
  *             is 1. A finished task is at least 1. Only a shift may report 0:
  *             it ran and found nothing to do.
  *   --skill   The slug of the skill that did the work, when one did.
- *   --agent   The roster name of the hired agent that did the work, when one did.
- *   --shift   The work was a shift: a hired agent's schedule (a clock or a
- *             handoff) started it, not a person. Needs --agent.
+ *   --agent   Optional compatibility label for callers from older releases.
+ *   --shift   The work completed from a native scheduled task.
  *   --line    One line about what was done. It stays on this machine.
  *
  * It does three things, in this order.
  *
- * 1. The local record, when --line is given. It never skips: radio on or off,
- *    memory on or off. One dated line, appended to a plain file in status/.
+ * 1. The local record, when --line is given. It never skips: radio on or off.
+ *    One dated line, appended to a plain file in status/.
  *    A shift's line goes to status/shift-log.md as
  *      {YYYY-MM-DD HH:MM} | {agent} | count: {N} | auto: {line}
  *    This script writes the auto: marker itself, because that marker is what
  *    proves a schedule fired on its own. A task a person asked for goes to
  *    status/work-log.md as
  *      {YYYY-MM-DD HH:MM} | {who} | count: {N} | {tag} | {line}
- *    The same dated line is also written to the memory log,
- *    memory/agents/<who>/log.md, when memory is on. <who> is --agent, or else
- *    this harness's own agent_name. Memory trouble never blocks anything.
  *
  * 2. The radio half, only when the radio is on: one signal through
  *    status/radio.mjs, carrying labels only. The tag, the count, the time, and
@@ -56,7 +52,7 @@
  * script has no way to send any other outcome.
  *
  * Validation comes first. A tag that is not on the menu, a bad count, a name
- * that is not a label, --shift without --agent, a line longer than one short
+ * that is not a label, a line longer than one short
  * line, or a line that looks like a credential: one plain explanation, exit 1,
  * nothing written, nothing sent. After any valid report the exit code is 0,
  * even when the radio could not be reached: the local record is the half that
@@ -73,7 +69,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   isWorkTag, workTagMenu, labelProblem, countProblem, looksLikeCredential, LINE_MAX,
-  radioOn, readRadioKeyFile, memoryOn, homeOn,
+  radioOn, readRadioKeyFile, homeOn,
 } from './shapes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -151,9 +147,6 @@ for (const [flag, kind] of [['skill', 'skill'], ['agent', 'agent']]) {
   if (problem) problems.push(`--${flag}: ${problem}`);
 }
 
-if (shift && flags.agent === undefined) {
-  problems.push('--shift needs --agent <roster name>. A shift is a hired agent\'s scheduled work, so it has to say whose.');
-}
 
 // One line means one line: a line break would split the shift log's
 // one-line-per-shift shape, so any run of whitespace becomes a single space.
@@ -186,6 +179,7 @@ if (problems.length > 0 || tagProblem) {
 
 const tag = flags.tag;
 const skill = flags.skill;
+// Legacy callers can still supply an agent label for historical reports.
 const agent = flags.agent;
 
 // ── The harness ─────────────────────────────────────────────────────────────
@@ -202,10 +196,13 @@ try {
   // shift its local line.
 }
 
+const ownName = status && typeof status.agent_name === 'string' ? status.agent_name.trim() : '';
+const who = agent || ownName || 'assistant';
+
 // One line saying what this report was understood to be. It never mentions the
 // radio, so it reads the same whether check-ins are on or off.
 console.log(shift
-  ? `Shift finished: agent ${agent}, tag ${tag}, count ${count}${skill ? `, skill ${skill}` : ''}.`
+  ? `${agent ? `Shift finished: agent ${agent}` : `Scheduled task finished: ${who}`}, tag ${tag}, count ${count}${skill ? `, skill ${skill}` : ''}.`
   : `Task finished: tag ${tag}, count ${count}${skill ? `, skill ${skill}` : ''}${agent ? `, agent ${agent}` : ''}.`);
 
 // ── 1. The local record ─────────────────────────────────────────────────────
@@ -234,15 +231,9 @@ function runSibling(script, args, timeoutMs) {
   return { out: String(run.stdout || '').trim(), ok: run.status === 0 && !run.error };
 }
 
-// Who did the work, for the local line. A hired agent's roster name, or else
-// this harness's own agent. A status file that will not parse leaves only the
-// first of those, which is enough for a line.
-const ownName = status && typeof status.agent_name === 'string' ? status.agent_name.trim() : '';
-const who = agent || ownName || 'assistant';
-
 // What gets recorded locally: one dated line, in the shape of the log it joins.
 // A shift goes to the shift log. Work a person asked for goes to the work log.
-// Neither depends on the radio, and neither depends on memory.
+// Neither depends on the radio.
 const stamp = localStamp();
 const logPath = shift ? SHIFT_LOG_PATH : WORK_LOG_PATH;
 const logName = shift ? 'status/shift-log.md' : 'status/work-log.md';
@@ -253,7 +244,7 @@ if (line !== null) {
     // The marker is how a schedule is proven. If the caller already wrote one
     // (auto-test: for a wiring test a person kicked off), it is kept as given.
     const note = /^auto(-test)?:/i.test(line) ? line : `auto: ${line}`;
-    localLine = `${stamp} | ${agent} | count: ${count} | ${note}`;
+    localLine = `${stamp} | ${who} | count: ${count} | ${note}`;
   } else {
     localLine = `${stamp} | ${who} | count: ${count} | ${tag} | ${line}`;
   }
@@ -273,25 +264,17 @@ if (status === null) {
   process.exit(0);
 }
 
-// The same dated line, into the team's memory, when memory is on. The file
-// above is the record that never skips. This one is for the notebook.
-if (localLine !== null && memoryOn(status) && (agent || ownName)) {
-  // memory.mjs prints its own one line, whether it wrote the note or could not.
-  const note = runSibling('memory.mjs', ['note', '--to', `agents/${agent || ownName}/log.md`, '--line', localLine], 15000);
-  if (note.out) console.log(note.out);
-}
-
 // ── 2. The radio half: labels only ──────────────────────────────────────────
 // The line is never passed below. Off means off: nothing sent, nothing said.
 
-if (radioOn(status, { keyFile: readRadioKeyFile(__dirname, { readFileSync }) })) {
+{
   const args = [
     'signal',
     '--type', shift ? 'routine_completed' : 'task_completed',
     '--tag', tag,
     '--count', String(count),
   ];
-  if (agent) args.push('--routine', agent);
+  if (shift || agent) args.push('--routine', agent || skill || 'orion');
   // A skill named here ran. That is the only outcome this script can report.
   if (skill) {
     args.push('--asset', skill, '--asset-kind', 'skill', '--outcome', 'run_completed',
@@ -300,24 +283,24 @@ if (radioOn(status, { keyFile: readRadioKeyFile(__dirname, { readFileSync }) }))
   // Ask the radio to say what happened in one line a script can read, so this
   // never depends on the wording of the sentences it prints for people.
   args.push('--result-line', 'yes');
-  const radio = runSibling('radio.mjs', args, 30000);
+  const radio = runSibling('radio.mjs', args, 0);
   const lines = radio.out ? radio.out.split('\n') : [];
   const resultAt = lines.findIndex((l) => l.startsWith('[radio-result] '));
   const result = resultAt === -1 ? null : lines[resultAt].slice('[radio-result] '.length).trim();
   const forPeople = lines.filter((_, i) => i !== resultAt).join('\n').trim();
-  if (forPeople) console.log(forPeople);
+  if (forPeople && result !== 'off') console.log(forPeople);
   else if (result === null) console.log('The radio script could not finish, so nothing was sent. Nothing is lost locally.');
 
   // Anything but "sent" means Daily Practice did not get this piece of work. Say
   // so under the local line, as one more appended line. Never by rewriting the
   // log: two agents can finish at the same minute, and an append cannot lose the
   // other one's line.
-  if (logged && result !== 'sent') {
+  if (logged && result !== 'sent' && result !== 'off') {
     const why = result === null || result === 'unreachable'
       ? '(radio unreachable)'
       : `(radio ${result})`;
     try {
-      appendLog(logPath, `${stamp} | ${shift ? agent : who} | ${why} the line above was not reported`);
+      appendLog(logPath, `${stamp} | ${who} | ${why} the line above was not reported`);
     } catch {
       // The line itself is already written. The marker is best effort.
     }
@@ -332,7 +315,7 @@ if (radioOn(status, { keyFile: readRadioKeyFile(__dirname, { readFileSync }) }))
 
 if (homeOn(status)) {
   const what = shift
-    ? `shift: ${agent}, ${tag}, count ${count}`
+    ? `${agent ? 'shift' : 'scheduled task'}: ${who}, ${tag}, count ${count}`
     : `task: ${tag}, count ${count}`;
   const home = runSibling('home.mjs', ['sync', '--message', what], 420000);
   if (home.out) console.log(home.out);

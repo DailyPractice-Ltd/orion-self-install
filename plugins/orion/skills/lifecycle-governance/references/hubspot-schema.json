@@ -1,0 +1,469 @@
+{
+  "checked_at": "2026-10-11T09:30:16.072Z",
+  "portal_id": 26589447,
+  "owner_id": "37951461",
+  "definitions": {
+    "CONTACT": {
+      "results": [
+        {
+          "type": "enumeration",
+          "options": [
+            {
+              "value": "37951461",
+              "label": "Henri Terrasse"
+            },
+            {
+              "value": "1770013664",
+              "label": "Oliver Carter"
+            }
+          ],
+          "name": "hubspot_owner_id",
+          "label": "Contact owner",
+          "description": "The owner of a contact. This can be any HubSpot user or Salesforce integration user, and can be set manually or via Workflows."
+        },
+        {
+          "type": "string",
+          "options": [],
+          "name": "phone",
+          "label": "Phone Number",
+          "description": "A contact's primary phone number"
+        },
+        {
+          "type": "string",
+          "options": [],
+          "name": "mobilephone",
+          "label": "Mobile Phone Number",
+          "description": "A contact's mobile phone number"
+        },
+        {
+          "type": "enumeration",
+          "options": [
+            {
+              "value": "NEW",
+              "label": "New"
+            },
+            {
+              "value": "Cold",
+              "label": "Cold"
+            },
+            {
+              "value": "Approaching",
+              "label": "Approaching"
+            },
+            {
+              "value": "IN_PROGRESS",
+              "label": "Engaging"
+            },
+            {
+              "value": "CONNECTED",
+              "label": "Interested"
+            },
+            {
+              "value": "BAD_TIMING",
+              "label": "Bad Timing"
+            },
+            {
+              "value": "ATTEMPTED_TO_CONTACT",
+              "label": "Unresponsive"
+            },
+            {
+              "value": "Bad_Data",
+              "label": "Bad Data"
+            },
+            {
+              "value": "OPEN",
+              "label": "Open"
+            },
+            {
+              "value": "OPEN_DEAL",
+              "label": "Open Deal"
+            },
+            {
+              "value": "UNQUALIFIED",
+              "label": "Unqualified"
+            }
+          ],
+          "name": "hs_lead_status",
+          "label": "Lead Status",
+          "description": "The contact's sales, prospecting or outreach status"
+        },
+        {
+          "type": "enumeration",
+          "options": [
+            {
+              "value": "4692162800",
+              "label": "1. Prospect"
+            },
+            {
+              "value": "lead",
+              "label": "2. Lead"
+            },
+            {
+              "value": "marketingqualifiedlead",
+              "label": "3. MQL"
+            },
+            {
+              "value": "salesqualifiedlead",
+              "label": "4. SQL"
+            },
+            {
+              "value": "opportunity",
+              "label": "5. Deals (Opportunity)"
+            },
+            {
+              "value": "customer",
+              "label": "6. Customer"
+            },
+            {
+              "value": "evangelist",
+              "label": "7. Evangelist"
+            },
+            {
+              "value": "4692220128",
+              "label": "8. Closed/Lost"
+            },
+            {
+              "value": "subscriber",
+              "label": "9. Subscriber"
+            }
+          ],
+          "name": "lifecyclestage",
+          "label": "Lifecycle Stage",
+          "description": "The qualification of contacts to sales readiness. It can be set through imports, forms, workflows, and manually on a per contact basis."
+        }
+      ],
+      "propertiesNotFound": []
+    },
+    "COMPANY": {
+      "results": [
+        {
+          "type": "enumeration",
+          "options": [
+            {
+              "value": "37951461",
+              "label": "Henri Terrasse"
+            },
+            {
+              "value": "1770013664",
+              "label": "Oliver Carter"
+            }
+          ],
+          "name": "hubspot_owner_id",
+          "label": "Company owner",
+          "description": "The owner of the company"
+        },
+        {
+          "type": "string",
+          "options": [],
+          "name": "phone",
+          "label": "Phone Number",
+          "description": "Company primary phone number."
+        },
+        {
+          "type": "string",
+          "options": [],
+          "name": "domain",
+          "label": "Company Domain Name",
+          "description": "The domain name of the company or organization"
+        },
+        {
+          "type": "enumeration",
+          "options": [
+            {
+              "value": "4692162800",
+              "label": "1. Prospect"
+            },
+            {
+              "value": "lead",
+              "label": "2. Lead"
+            },
+            {
+              "value": "marketingqualifiedlead",
+              "label": "3. MQL"
+            },
+            {
+              "value": "salesqualifiedlead",
+              "label": "4. SQL"
+            },
+            {
+              "value": "opportunity",
+              "label": "5. Deals (Opportunity)"
+            },
+            {
+              "value": "customer",
+              "label": "6. Customer"
+            },
+            {
+              "value": "evangelist",
+              "label": "7. Evangelist"
+            },
+            {
+              "value": "4692220128",
+              "label": "8. Closed/Lost"
+            },
+            {
+              "value": "subscriber",
+              "label": "9. Subscriber"
+            }
+          ],
+          "name": "lifecyclestage",
+          "label": "Lifecycle Stage",
+          "description": "The qualification of companies to sales readiness throughout the buying journey"
+        }
+      ],
+      "propertiesNotFound": []
+    },
+    "DEAL": {
+      "results": [
+        {
+          "type": "enumeration",
+          "options": [
+            {
+              "value": "default",
+              "label": "Build Your Sales Harness"
+            }
+          ],
+          "name": "pipeline",
+          "label": "Pipeline",
+          "description": "The pipeline the deal is in. This determines which stages are options for the deal."
+        },
+        {
+          "type": "enumeration",
+          "options": [
+            {
+              "value": "appointmentscheduled",
+              "label": "1.Initial Offer 💰 (Qualified Buyer)"
+            },
+            {
+              "value": "presentationscheduled",
+              "label": "1.1. Nurturing 🪴 (Brainstorm)"
+            },
+            {
+              "value": "contractsent",
+              "label": "2.Strong YES 👌 (Closing Case) "
+            },
+            {
+              "value": "decisionmakerboughtin",
+              "label": "2.1. Decision Maker 🤝 Bought-In"
+            },
+            {
+              "value": "2657079510",
+              "label": "3.BANT ✅ (Qualified Closer)"
+            },
+            {
+              "value": "2657079511",
+              "label": "CS - Pilot"
+            },
+            {
+              "value": "closedwon",
+              "label": "Closed Won 🍾"
+            },
+            {
+              "value": "closedlost",
+              "label": "Closed Lost"
+            }
+          ],
+          "name": "dealstage",
+          "label": "Deal Stage",
+          "description": "The stage of the deal. Deal stages allow you to categorize and track the progress of the deals that you are working on."
+        }
+      ],
+      "propertiesNotFound": []
+    },
+    "TASK": {
+      "results": [
+        {
+          "type": "enumeration",
+          "options": [
+            {
+              "value": "CALL",
+              "label": "Call"
+            },
+            {
+              "value": "EMAIL",
+              "label": "Email"
+            },
+            {
+              "value": "LINKED_IN_CONNECT",
+              "label": "Sales Navigator - Connection Request"
+            },
+            {
+              "value": "LINKED_IN_MESSAGE",
+              "label": "Sales Navigator - InMail"
+            },
+            {
+              "value": "TODO",
+              "label": "To Do"
+            }
+          ],
+          "name": "hs_task_type",
+          "label": "Task Type",
+          "description": "The type of the task"
+        },
+        {
+          "type": "enumeration",
+          "options": [
+            {
+              "value": "37951461",
+              "label": "Henri Terrasse"
+            },
+            {
+              "value": "1770013664",
+              "label": "Oliver Carter"
+            }
+          ],
+          "name": "hubspot_owner_id",
+          "label": "Assigned to",
+          "description": "The user that the task is assigned to in HubSpot. This can be any HubSpot user or Salesforce integration user, and can be set manually or via Workflows."
+        },
+        {
+          "type": "datetime",
+          "options": [],
+          "name": "hs_timestamp",
+          "label": "Due date",
+          "description": "The due date of the task"
+        },
+        {
+          "type": "enumeration",
+          "options": [
+            {
+              "value": "COMPLETED",
+              "label": "Completed"
+            },
+            {
+              "value": "DEFERRED",
+              "label": "Deferred"
+            },
+            {
+              "value": "IN_PROGRESS",
+              "label": "In Progress"
+            },
+            {
+              "value": "NOT_STARTED",
+              "label": "Not Started"
+            },
+            {
+              "value": "WAITING",
+              "label": "Waiting"
+            }
+          ],
+          "name": "hs_task_status",
+          "label": "Task Status",
+          "description": "The status of the task"
+        }
+      ],
+      "propertiesNotFound": []
+    },
+    "CALL": {
+      "results": [
+        {
+          "type": "datetime",
+          "options": [],
+          "name": "hs_timestamp",
+          "label": "Activity date",
+          "description": "The date that an engagement occurred"
+        },
+        {
+          "type": "enumeration",
+          "options": [
+            {
+              "value": "9d9162e7-6cf3-4944-bf63-4dff82258764",
+              "label": "Busy"
+            },
+            {
+              "value": "f240bbac-87c9-4f6e-bf70-924b57d47db7",
+              "label": "Connected"
+            },
+            {
+              "value": "a4c4c377-d246-4b32-a13b-75a56a4cd0ff",
+              "label": "Left live message"
+            },
+            {
+              "value": "b2cf5968-551e-4856-9783-52b3da59a7d0",
+              "label": "Left voicemail"
+            },
+            {
+              "value": "2e7360c1-6b71-40e9-ab2b-30ae98a4678c",
+              "label": "Meeting booked"
+            },
+            {
+              "value": "73a0d17f-1163-4015-bdd5-ec830791da20",
+              "label": "No answer"
+            },
+            {
+              "value": "17b47fee-58de-441e-a44c-c6300d46f273",
+              "label": "Wrong number"
+            }
+          ],
+          "name": "hs_call_disposition",
+          "label": "Call outcome",
+          "description": "The outcome of the call"
+        },
+        {
+          "type": "string",
+          "options": [],
+          "name": "hs_call_body",
+          "label": "Call notes",
+          "description": "The body of the call"
+        },
+        {
+          "type": "enumeration",
+          "options": [
+            {
+              "value": "BUSY",
+              "label": "Busy"
+            },
+            {
+              "value": "CALLING_CRM_USER",
+              "label": "Calling CRM User"
+            },
+            {
+              "value": "CANCELED",
+              "label": "Canceled"
+            },
+            {
+              "value": "COMPLETED",
+              "label": "Completed"
+            },
+            {
+              "value": "CONNECTING",
+              "label": "Connecting"
+            },
+            {
+              "value": "FAILED",
+              "label": "Failed"
+            },
+            {
+              "value": "IN_PROGRESS",
+              "label": "In Progress"
+            },
+            {
+              "value": "MISSED",
+              "label": "Missed"
+            },
+            {
+              "value": "NO_ANSWER",
+              "label": "No Answer"
+            },
+            {
+              "value": "QUEUED",
+              "label": "Queued"
+            },
+            {
+              "value": "RINGING",
+              "label": "Ringing"
+            },
+            {
+              "value": "HOLD",
+              "label": "On Hold"
+            }
+          ],
+          "name": "hs_call_status",
+          "label": "Call status",
+          "description": "The status of the call"
+        }
+      ],
+      "propertiesNotFound": []
+    }
+  }
+}

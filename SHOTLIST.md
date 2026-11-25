@@ -1,10 +1,11 @@
 # Screenshot shot list
 
 **Status 2026-07-26**: the founder walked the real client journey, captured the shots,
-and six of the seven now live in `docs/img/` (the three flow shots were
+and six of the seven now live in `img/` (the three flow shots were
 redaction-processed first — every filename, session title, and business name that
 wasn't Orion's own was cropped or painted out before entering this public repo). Only
-the website-lane pair (06a/06b) is still pending. **Why humans capture these rather
+the website-lane pair (06a/06b) was never captured and is now retired; required
+pairing captures remain pending the live test. **Why humans capture these rather
 than an AI generating them**: most need a real logged-in account, and real accounts
 carry real business data — the rule is crop or blur anything that isn't Orion's own,
 every time, before a shot lands here.
@@ -16,7 +17,7 @@ appear the moment the files exist. No other change needed.
 
 ## Priority 1 — referenced directly in README.md
 
-### `docs/img/01-github-code-button.png` — ✅ landed 2026-07-26
+### `img/01-github-code-button.png` — ✅ landed 2026-07-26
 
 - **Screen**: the repository's GitHub page
   (https://github.com/DailyPractice-Ltd/orion-self-install).
@@ -26,15 +27,15 @@ appear the moment the files exist. No other change needed.
   view (Settings tab, "Use this template"); a logged-out/private-window capture would
   match a client's view exactly.
 
-### `docs/img/02-unzipped-folder-contents.png` — ✅ landed 2026-07-26
+### `img/02-unzipped-folder-contents.png` — ✅ landed 2026-07-26
 
 - **Screen**: the unzipped folder open in Finder — `README.md`, `AGENTS.md`,
-  `start.mjs`, and the `agent`, `crm`, `library` folders visible.
+  `start.mjs`, and the `agent`, `crm`, `skills` folders visible.
 - **Re-capture note (optional polish)**: current shot is a French-localised Finder
   ("Nom", "Dossier"); an English-UI capture would suit the global audience better. Not
   blocking — the shape of the window is the point.
 
-### `docs/img/03-move-to-its-home.png` — ✅ landed 2026-07-26 (redacted)
+### `img/03-move-to-its-home.png` — ✅ landed 2026-07-26 (redacted)
 
 - **Screen**: two file windows — Downloads on one side, the home folder with
   **Github → Projects** on the other — mid-drag of `orion-self-install-main`, arrow
@@ -42,14 +43,14 @@ appear the moment the files exist. No other change needed.
 - **Redaction applied**: every row that wasn't Github / Projects / the Orion folder
   painted out, both panes.
 
-### `docs/img/04-terminal-press-start.png` — ✅ landed 2026-07-26 (cropped)
+### `img/04-terminal-press-start.png` — ✅ landed 2026-07-26 (cropped)
 
 - **Screen**: Terminal showing `cd ` with the dragged-in folder path, annotated
   *Type CD → hit Spacebar → drag the folder → hit Enter*.
 - **Crop applied**: the Finder overlay (real project names) cropped out; the arrows
   pointing off-frame toward "your file window" are intentional.
 
-### `docs/img/05-desktop-agent-open-folder.png` — ✅ landed 2026-07-26 (redacted)
+### `img/05-desktop-agent-open-folder.png` — ✅ landed 2026-07-26 (redacted)
 
 - **Screen**: a desktop AI agent (the Claude app's **Code** tab) with its folder picker
   open at **Github → Projects → orion-self-install-main**, arrows to the Code tab, the
@@ -57,26 +58,16 @@ appear the moment the files exist. No other change needed.
 - **Redaction applied**: sidebar sessions, session cards, and every non-Orion folder
   name painted out.
 
-### `docs/img/06a-claude-project-create.png` — ⬜ pending
+### Required pairing and pause/recovery — pending candidate verification
 
-- **Screen**: claude.ai, logged in, the Projects area — the "Create project" button
-  and/or the naming screen right after.
-- **Highlight**: a box around "Create project."
-- **Caption** (already in README): "Example, in claude.ai: Projects → Create project →
-  name it 'My Orion'. Every AI website has an equivalent."
-- **Watch for**: recent chats/projects in the sidebar — collapse it or crop to the
-  Projects area before saving.
+The former website Project/upload pair (06a/06b) is retired: website-only and
+paste-only chat are unsupported. Capture the signed-in self-service code page,
+verified setup completion, and a failed guard with its recovery action in Codex or
+Claude Code. Codes, tokens, token suffixes, client names and other projects must
+be fully redacted. Use only observed UI; these images are pending the deferred
+live test, not generated evidence. Link new images from README only after capture.
 
-### `docs/img/06b-claude-project-upload-files.png` — ⬜ pending
-
-- **Screen**: inside a claude.ai Project, the add-files/knowledge area, ideally
-  mid-file-picker with `AGENTS.md` selected.
-- **Highlight**: a box around the add-files button.
-- **Caption** (already in README): "Then add one file from your Orion folder:
-  AGENTS.md."
-- **Watch for**: same sidebar rule as 06a.
-
-### `docs/img/07-use-orion-from-any-project.png` — ✅ landed 2026-07-26 (redacted)
+### `img/07-use-orion-from-any-project.png` — ✅ landed 2026-07-26 (redacted)
 
 - **Screen**: the desktop agent's folder picker at the **Github** folder level —
   arrows showing you can hop into Projects (or make a new folder), i.e. Orion is one

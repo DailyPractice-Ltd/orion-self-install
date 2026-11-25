@@ -1,10 +1,10 @@
-# Contract: the package shape (FR-005)
+# Historical contract: local package recipes
 
-Every Library entry is one directory — `library/<kind>/<slug>/` — whose front door is a
-`PACKAGE.md` following this exact shape. A package page that deviates from it is a
-defect, not a variation. `<kind>` is one of `agents`, `skills`, `workflows`, `programs`;
-`<slug>` is lowercase-kebab and stable forever (it keys `status.json`'s `packages` map
-and the Daily Practice shelf).
+Built-in skills link directly to `skills/<slug>/SKILL.md` and ship through the
+deployment manifest. Older releases shipped optional packages at
+`library/<kind>/<slug>/PACKAGE.md` using the structure below. `<kind>` was one
+of `agents`, `skills`, or `programs`. `<slug>` is lowercase-kebab and stable (it
+keys `status.json`'s `packages` map and the Daily Practice shelf).
 
 ## Required structure of `PACKAGE.md`, in order
 
@@ -17,7 +17,7 @@ and the Daily Practice shelf).
    | Field | Rule |
    |---|---|
    | `Name` | Human name |
-   | `Kind` | `agent` / `skill` / `workflow` / `program` |
+   | `Kind` | `agent` / `skill` / `program` |
    | `Version` | semver; starts `1.0.0` when the underlying behaviour is battle-tested (extracted from a live harness), `0.x` otherwise |
    | `Requires` | plain-words prerequisites (e.g. "a completed knowledge base", "your CRM connected", "another package by slug") — "nothing" is a valid value |
 
@@ -28,7 +28,8 @@ and the Daily Practice shelf).
    output; instruct it to run the smoke test; and instruct it to record the install in
    `status/status.json`'s `packages` map and — only if the radio is on — report it via
    `node status/radio.mjs report-install`. The prompt must work on both code-capable and
-   paste-only surfaces (FR-010).
+   supported executable Codex or Claude Code surfaces (FR-010). Website-only or
+   paste-only users follow docs/setup.md before work.
 
 4. **What it does / What it doesn't do** — honest scope, including anything the source
    harness achieved with paid external services that this package does not include.

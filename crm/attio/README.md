@@ -28,7 +28,7 @@ and numbers you copy once) is what matters, not the exact click path.
    Last touch, Commitment served, Objection open, Staged draft waiting.
 2. **`Harness Install` list** — exactly one entry: the assessment profile (industry,
    product, ICP, motion, AI tools, CRM, team size, maturity 1–5) plus install metadata
-   (agent name, template version, install date). This mirrors `status/status.json` so the
+   (template version, install date). This mirrors `status/status.json` so the
    same information is visible inside the client's own CRM, not just a local file.
 3. **Three views** (manual — see below): Daily Drive, Pipeline, Waiting on approval.
 
@@ -75,9 +75,8 @@ ATTIO_API_KEY=<the key you just generated> node apply-attio-template.mjs
 ```
 </details>
 
-Once it's validated and working (either way), delete the API key from wherever you pasted
-it — the ongoing workflows use their own separate credential (see
-`connectors/connector-checklist.md`).
+Once the setup works, delete the API key from wherever you pasted it. Orion uses the
+CRM connector for ongoing work. See `connectors/connector-checklist.md`.
 
 **Person vs company pipeline**: the template defaults to `"parent_object": "people"` —
 right for a founder or individual seller selling to individuals. For a B2B motion, change
@@ -97,7 +96,7 @@ UI on the `Sales Pipeline` list:
 ## After applying
 
 1. Create the single **Harness Install** entry and fill it in from your own knowledge
-   base — plus `Agent name`, `Template version` (from this repo's `CHANGELOG.md`), and
+   base — plus `Template version` (from this repo's `CHANGELOG.md`), and
    `Installed on`.
 2. Replace the placeholder options on **Commitment served** with your own commitment
    activities from knowledge base §7 (e.g. "IG DMs", "Blog posts", "Forum engagements").

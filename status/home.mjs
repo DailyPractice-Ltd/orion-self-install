@@ -25,8 +25,7 @@
  *                 status/radio.key, a file that is never saved to the home
  *               - sets the ignore rules: the key, this machine's wake-up files
  *                 and local settings stay behind, and status.json, now holding
- *                 no key, travels. A notebook kept in a plain folder travels
- *                 too. A notebook with a repository of its own stays out.
+ *                 no key, travels.
  *               - marks the logs as append-only, so two machines adding a
  *                 line each never clash
  *               - notes the home's address when --remote gives one
@@ -65,15 +64,21 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  homeBlock, homeOn, isHomeBranch, isCloudRun, memoryBlock, looksLikeKey, looksLikeCredential,
+  homeBlock, homeOn, isHomeBranch, isCloudRun, looksLikeKey, looksLikeCredential,
   INSTALL_TOKEN_RE, RADIO_KEY_FILE,
 } from './shapes.mjs';
+import { changeStatus, withStatusLock, LOCKED_MESSAGE } from './store.mjs';
 
 const STATUS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(STATUS_DIR, '..');
 const STATUS_PATH = path.join(STATUS_DIR, 'status.json');
-const KEY_PATH = path.join(STATUS_DIR, RADIO_KEY_FILE);
 const KEY_REL = `status/${RADIO_KEY_FILE}`;
+
+// A release checkout is not a client's home, even if it is itself a git repository.
+if (fs.existsSync(path.join(ROOT, 'install.mjs'))) {
+  console.error('This is the Orion release folder. Run node install.mjs --tool <codex|claude-code> --target <client-folder> first.');
+  process.exit(2);
+}
 
 /**
  * A git call that waits on a network is given a limit, so a shift never hangs
@@ -154,16 +159,13 @@ function repoState() {
   return { state: 'inside', where: git(['rev-parse', '--show-toplevel']).out.trim() };
 }
 
+/** A read-only look at status.json; null when it cannot be read. Every change goes through status/store.mjs. */
 function readStatus() {
   try {
     return JSON.parse(fs.readFileSync(STATUS_PATH, 'utf8'));
   } catch {
     return null;
   }
-}
-
-function writeStatus(status) {
-  fs.writeFileSync(STATUS_PATH, JSON.stringify(status, null, 2) + '\n');
 }
 
 // ── The key leaves status.json ──────────────────────────────────────────────
@@ -174,31 +176,25 @@ function keyInStatus(status) {
 }
 
 /**
- * Move the key from status.json to status/radio.key. The key file is written
- * and read back before the field is cleared, so a failure half-way leaves the
- * key where it was. Never prints the key.
+ * Take the key out of status.json, as one change under the status lock, read
+ * fresh. Normally it moves to status/radio.key: the key file is written (owner
+ * access only) and read back before the field is cleared, so a failure half-way
+ * leaves the key where it was. With keepFileKey, a different well-shaped key
+ * already in the file stays and the one in status.json is dropped. Returns
+ * 'none' (no key in status.json), 'moved' or 'second'. Never prints the key.
  */
-function moveKeyOut(status) {
-  const token = String(status.sharing.install_token).trim();
-  fs.writeFileSync(KEY_PATH, token + '\n', { mode: 0o600 });
-  // The mode above only counts when the file is new. One that was already there
-  // keeps whatever it had, so say it again.
-  try { fs.chmodSync(KEY_PATH, 0o600); } catch { /* a disk with no modes: nothing to tighten */ }
-  if (fs.readFileSync(KEY_PATH, 'utf8').trim() !== token) {
-    throw new Error('the key file did not read back as written');
-  }
-  status.sharing.install_token = null;
-  writeStatus(status);
-}
-
-/** The key already in status/radio.key, or '' when there is none or it is not shaped like one. */
-function keyInFile() {
-  try {
-    const text = fs.readFileSync(KEY_PATH, 'utf8').trim();
-    return INSTALL_TOKEN_RE.test(text) ? text : '';
-  } catch {
-    return '';
-  }
+async function moveKeyOut({ keepFileKey = false } = {}) {
+  return withStatusLock(ROOT, async (store) => {
+    const fresh = await store.readStatus();
+    if (!keyInStatus(fresh)) return 'none';
+    const token = String(fresh.sharing.install_token).trim();
+    const text = (await store.readKey()).trim();
+    const second = keepFileKey && INSTALL_TOKEN_RE.test(text) && text !== token;
+    if (!second) await store.writeKey(token);
+    fresh.sharing.install_token = null;
+    await store.writeStatus(fresh);
+    return second ? 'second' : 'moved';
+  });
 }
 
 // ── The ignore rules and the append-only logs ───────────────────────────────
@@ -214,13 +210,9 @@ const NEVER_SAVED = [
   '.claude/settings.local.json',    // one machine's own permissions
   '.claude/worktrees/',             // working copies an app made, each a repository of its own
 ];
-/** The template's own two notebook lines: everything in memory/ stays out, bar its README. */
-const NOTEBOOK_RULES = ['memory/*', '!memory/README.md'];
 const APPEND_ONLY = [
   'status/shift-log.md',
   'status/work-log.md',
-  'memory/**/log.md',
-  'memory/shared/inbox.md',
 ];
 
 const readLines = (file) => {
@@ -234,21 +226,11 @@ const sameRule = (a, b) => a.trim().replace(/^\//, '') === b;
 
 /**
  * What .gitignore should say once the folder has a home. The owner's own lines
- * are kept as they are. A notebook in a plain folder has nowhere else to be
- * saved, so it travels with the folder. A notebook with a repository of its
- * own is saved there, and stays out of this one.
+ * are kept as they are; credentials and machine-local files stay behind.
  */
-function wantedIgnore(status) {
-  const memory = memoryBlock(status);
-  const ownRepository = memory.enabled === true && memory.backend === 'git';
-  // The template's two notebook lines go either way. In a plain folder the
-  // notebook then travels. With a repository of its own it stays out whole,
-  // README included: that README belongs to the notebook's repository and a
-  // second copy here would only go stale. A `memory/` line the owner wrote
-  // themselves is theirs and is never removed.
-  const drop = ['status/status.json', ...NOTEBOOK_RULES];
-  const need = [...NEVER_SAVED, ...(ownRepository ? ['memory/'] : [])];
-
+function wantedIgnore() {
+  const drop = ['status/status.json'];
+  const need = NEVER_SAVED;
   const kept = readLines('.gitignore').filter((line) => !drop.some((rule) => sameRule(line, rule)));
   while (kept.length > 0 && kept[kept.length - 1].trim() === '') kept.pop();
   const missing = need.filter((rule) => !kept.some((line) => sameRule(line, rule)));
@@ -462,22 +444,14 @@ if (command === 'prepare') {
   if (keyInStatus(status)) {
     steps.push({
       what: `Move the radio key out of status/status.json and into ${KEY_REL}, which is never saved to the home.`,
-      run: () => moveKeyOut(status),
+      run: () => moveKeyOut(),
     });
   }
-  const ignore = wantedIgnore(status);
+  const ignore = wantedIgnore();
   if (ignore !== fileText('.gitignore')) {
     steps.push({
       what: `Set the ignore rules: ${KEY_REL} and this machine's own files stay behind, and status/status.json travels.`,
       run: () => fs.writeFileSync(path.join(ROOT, '.gitignore'), ignore),
-    });
-  }
-  const notebook = memoryBlock(status);
-  if (notebook.enabled === true && notebook.backend === 'git' && repo.state === 'own' &&
-      git(['ls-files', '--', 'memory']).out.trim() !== '') {
-    steps.push({
-      what: 'Stop following the files in memory/: that notebook has a repository of its own, and a second copy here would only go stale.',
-      run: () => { git(['rm', '-r', '--cached', '--quiet', '--', 'memory']); },
     });
   }
   const attributes = wantedAttributes();
@@ -501,11 +475,11 @@ if (command === 'prepare') {
   if (!homeOn(status)) {
     steps.push({
       what: 'Switch the home on in status/status.json (home.enabled).',
-      run() {
+      async run() {
         const here = repoState().state === 'own' ? git(['symbolic-ref', '--short', '-q', 'HEAD']).out.trim() : '';
-        const fresh = readStatus() || status;
-        fresh.home = { ...homeBlock(fresh), enabled: true, branch: isHomeBranch(here) ? here : 'main' };
-        writeStatus(fresh);
+        await changeStatus(ROOT, (fresh) => {
+          fresh.home = { ...homeBlock(fresh), enabled: true, branch: isHomeBranch(here) ? here : 'main' };
+        });
       },
     });
   }
@@ -520,10 +494,11 @@ if (command === 'prepare') {
   } else {
     for (const step of steps) {
       try {
-        step.run();
+        await step.run();
         say(`Done: ${step.what}`);
       } catch (err) {
-        say(`Could not: ${step.what} (${err?.code || err?.message || 'unknown'}). Stopped there. Nothing was sent.`);
+        if (err?.code === 'STATUS_LOCKED') say(`Could not: ${step.what} ${LOCKED_MESSAGE} Stopped there. Nothing was sent.`);
+        else say(`Could not: ${step.what} (${err?.code || err?.message || 'unknown'}). Stopped there. Nothing was sent.`);
         process.exit(0);
       }
     }
@@ -655,19 +630,17 @@ if (command === 'sync') {
 
   // A key that found its way back into status.json (a fresh pairing, say) is
   // moved out before anything is saved.
-  const already = keyInFile();
-  if (keyInStatus(status) && already && already !== String(status.sharing.install_token).trim()) {
-    // Two different keys, and no way to tell here which is the live one. The
-    // key file is where a folder with a home keeps its key, so that one stays.
-    status.sharing.install_token = null;
-    writeStatus(status);
-    say(`status/status.json held a second radio key. It was taken out, and the key in ${KEY_REL} was kept. If the radio answers "that key isn't valid", pair again: node start.mjs`);
-  } else if (keyInStatus(status)) {
+  // Two different keys means no way to tell here which is the live one. The
+  // key file is where a folder with a home keeps its key, so that one stays.
+  if (keyInStatus(status)) {
     try {
-      moveKeyOut(status);
-      say(`The radio key was inside status/status.json. It is now in ${KEY_REL}, which is never saved.`);
-    } catch {
-      say('The radio key is inside status/status.json and could not be moved out, so nothing was saved. Run: node status/home.mjs check');
+      const moved = await moveKeyOut({ keepFileKey: true });
+      if (moved === 'second') say(`status/status.json held a second radio key. It was taken out, and the key in ${KEY_REL} was kept. If the radio answers "that key isn't valid", pair again: node start.mjs`);
+      if (moved === 'moved') say(`The radio key was inside status/status.json. It is now in ${KEY_REL}, which is never saved.`);
+    } catch (err) {
+      say(err?.code === 'STATUS_LOCKED'
+        ? `The radio key is inside status/status.json and could not be moved out: ${LOCKED_MESSAGE} Nothing was saved.`
+        : 'The radio key is inside status/status.json and could not be moved out, so nothing was saved. Run: node status/home.mjs check');
       process.exit(0);
     }
   }

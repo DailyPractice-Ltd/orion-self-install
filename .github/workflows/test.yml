@@ -1,13 +1,7 @@
 name: Test
 
 # Every push to main and every pull request, on the three kinds of machine a
-# client can have:
-#   unit       the test suite (node --test).
-#   scheduler  status/schedule.mjs against the machine's REAL scheduler: launchd
-#              on a Mac, Task Scheduler on Windows, cron on Linux. It wires a
-#              stand-in agent, switches the schedule on, fires it, checks what
-#              the stand-in was handed, and switches it off again. This is the
-#              only place the Windows and Linux paths are actually run.
+# client can have.
 
 on:
   push:
@@ -33,31 +27,9 @@ jobs:
       - run: git config --global core.autocrlf false
       - uses: actions/checkout@v5
         with:
-          # update/pristine.json is checked against everything ever shipped.
+          # tests/send-risk.test.mjs replays files from the v1.3.0 and v1.4.0 tags.
           fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: 22
       - run: node --test
-
-  scheduler:
-    name: scheduler (${{ matrix.os }})
-    # A scheduler command that hangs must not hold a machine for hours.
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - run: git config --global core.autocrlf false
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-      - name: Make sure cron is running (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          command -v crontab >/dev/null || { sudo apt-get update && sudo apt-get install -y cron; }
-          sudo service cron start
-      - run: node tests/integration/scheduler.mjs

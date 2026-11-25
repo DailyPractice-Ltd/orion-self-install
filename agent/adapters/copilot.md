@@ -1,42 +1,23 @@
-# Adapter — Microsoft Copilot
+# Adapter — Microsoft Copilot web chat and declarative agents
 
-**Thin by design**: mechanics only. Behaviour lives in the
-[agent definition](../agent-definition.md) — fix it there, not here.
+This website-only or paste-only surface cannot execute Orion's pairing and fresh
+pre-work connection checks. It is no longer a supported installation or Orion work
+path. An uploaded knowledge base or pasted agent prompt does not satisfy the gate.
 
-Best fit when `{{CLIENT_AI_TOOL}}` = Copilot — typically a client inside a Microsoft 365
-organisation.
+## Continue in a supported tool
 
-## Install steps (Copilot agent — preferred, M365 Copilot licence)
+1. Explain that Orion needs a local assistant that can run the connection check.
+2. Open the client's existing installed Orion folder in **Codex or Claude Code**.
+   For the Claude desktop app use its Code environment, covered by
+   [the Claude Code adapter](claude-code.md). Keep their saved business files in
+   that folder rather than exporting credentials into chat.
+3. Follow [setup and recovery](../install.md): run `node start.mjs`, get the
+   signed-in account's one-time code, exchange and verify it. Resume saved answers.
+4. In the supported tool run `node status/guard.mjs check --quiet` before Orion
+   tasks, outbound messages or CRM writes, and stop on exit 2. Native scheduled
+   work follows [Schedule Orion](../scheduled-work.md).
 
-1. **Create an agent**: Microsoft 365 Copilot → *Create agent* (Copilot Studio agent
-   builder / declarative agent). Name it `{{AGENT_NAME}}`. Keep it private to the client.
-2. **Instructions**: paste the assembled system prompt from `agent-definition.md`
-   (placeholders filled). Copilot's instruction field is length-limited — same rule as
-   the ChatGPT adapter: rules and task list stay verbatim, business detail lives only in
-   the knowledge files.
-3. **Knowledge**: upload the seven knowledge-base files (or point the agent at a dedicated
-   SharePoint/OneDrive folder containing exactly those seven files).
-4. **Actions/plugins**: only the connectors the checklist names (CRM read-and-write, email read, draft and
-   send, calendar read). Verified 4 November 2026: the agent scores by hand from
-   `agent/risk-matrix.md`, says so, and the waiting list is `status/waiting.md`, handed
-   over and read out at the start of each conversation. The gate is rule 1 of the agent definition: every message is scored; a
-   Copilot agent cannot send on its own, so here every message waits for the
-   client (agent-definition rule 1). In
-   a work/organisation tenant, an admin may need to approve the agent — if the client
-   mentions this, tell them plainly it may take time and isn't something either of you can
-   speed up.
-5. **First-run check**: vocabulary check (one prospect-research task, read the draft back).
-
-## Fallback (no agent-creation rights in the tenant)
-
-Run in a standard Copilot chat pinned with the system prompt as the first message + the
-knowledge-base files attached per session. Weaker persistence — tell the client this
-plainly and log it as a known limitation.
-
-## Known quirks
-
-- Tenant data-loss-prevention policies can silently block file knowledge — check with a
-  retrieval question ("what does knowledge base §7 say?") right after setup, not later.
-- Copilot may ground answers in other tenant content (emails, documents) beyond the
-  knowledge base. Usually helpful; if drafts start pulling in the wrong context, ask the
-  client whether their tenant admin can restrict the agent's knowledge scope.
+On this unsupported surface, help only with setup and recovery guidance until the
+client moves to a supported tool. Never claim a check or signal happened here.
+Unpaired work is blocked immediately.
+See [the radio guide](../radio.md) for the operational-data disclosure.

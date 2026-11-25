@@ -1,5 +1,6 @@
 # Research: The Production Line
 
+
 **Phase 0 output** | **Date**: 2026-07-25 | **Spec**: [spec.md](spec.md)
 
 Seven decisions had to be made before design. Each is recorded as

@@ -1,6 +1,36 @@
 # Orion Self-Install Constitution
 
-**Version**: 1.4.0 | **Ratified**: 2026-07-12 | **Last Amended**: 2026-10-05
+**Version**: 2.1.0 | **Ratified**: 2026-07-12 | **Last Amended**: 2026-11-19
+
+**Sync Impact Report** (amendment 2.1.0, 2026-11-19):
+- Maintainer approval is recorded in spec 007's written constitution amendment.
+- All unpaired harnesses must pair immediately; historical migration data is inert.
+- Temporary verification or reporting failures permit silent work for 48 elapsed
+  hours after accepted verification and complete acknowledged report delivery.
+  Only that complete cycle renews the clock. Invalid/revoked credentials clear it;
+  disabled radio and unsafe state require recovery. Expiry gates the next task,
+  while admitted tasks finish and report. Setup still needs current acceptance
+  and acknowledged reporting. Payload tiers and recovery access are unchanged.
+- Earlier Sync Impact Reports preserve historical approval and superseded policy.
+
+**Sync Impact Report** (amendment 2.0.0, 2026-11-18):
+- Recovered the actual self-install constitution v1.4.0 from `feffff9^`; its removal
+  with the Spec Kit tooling did not replace it with the mono constitution. This is
+  maintainer governance source, excluded from installed client folders.
+- MAJOR: Article V now requires a disclosed operational connection for supported
+  use. Account linkage enables support, updates and honest running-system reports.
+  It is neither a payment gate nor tamper-proof licensing in a user-owned folder.
+- Written approval already recorded in `specs/007-required-pairing/constitution-amendment.md`
+  precedes this change; that evidence is preserved, not inferred from implementation.
+- Existing installations receive one durable 30-day transition from first updated run;
+  no reset on later runs/updates. Prior decline persists until explicit pairing.
+  After accepted verification migration is satisfied permanently; future failure
+  pauses work without renewed grace. New installs finish only after verification.
+- Recovery remains available when work pauses. Library participation stays optional;
+  client words/artifacts retain per-item consent. Payload tiers are unchanged.
+- Lockstep release references: 007 contract, schema, 001/002 specs, bridge contract,
+  installer, adapters, radio guide, README, scheduling and validation instructions.
+  Earlier Sync Impact Reports below describe historical policy, not current rules.
 
 **Sync Impact Report** (amendment 1.4.0, 2026-10-05):
 - Version change: 1.3.0 → 1.4.0 (MINOR: Article V channel 1, Tier 1(b) materially
@@ -181,7 +211,7 @@ is not one of the two channels named in Article V, disclosed in the same terms.
 
 ---
 
-**Article V — Explicit, Opt-In Data Sharing**
+**Article V — Disclosed Operational Connection and Optional Sharing**
 
 Two channels, and only two, carry information from a client's install back to Daily
 Practice. Both are disclosed in plain language inside this repository — never bundled into
@@ -192,11 +222,21 @@ a EULA, never implied.
    running system as running. It carries three tiers, distinguished by how consent is
    given:
 
-   **Tier 1 — ambient labels.** On by default, presented plainly at install with a
-   one-click decline, switchable off in `status/status.json` at any time. The switch
-   is the radio's master switch: declining or switching off silences the radio
-   entirely — all three tiers, outbound and inbound alike — and changes nothing else
-   about the install. Enumerated in
+   **Tier 1 — ambient labels.** Required and disclosed for supported Orion use.
+   Pair to a signed-in Daily Practice account and verify its credential with the
+   server before install completion and every supported session or scheduled shift.
+   New and existing unpaired harnesses must pair immediately. Temporary connection
+   or report-delivery failures allow work silently for 48 elapsed hours after the
+   last accepted verification and acknowledged delivery of all queued reports.
+   Only that complete cycle refreshes last_connected_at; failed or partial replay,
+   updates and restarts never do. At exactly 48 hours pause new tasks and shifts;
+   an admitted task may finish and report. Invalid/revoked credentials invalidate
+   the allowance immediately. Disabled radio and unsafe local state also block.
+   Diagnosis, updating, inspection, pairing and recording finished work remain
+   available. Show recovery guidance only when blocking new work. Preserve prior
+   decline until explicit pairing; legacy migration fields never authorize work.
+   Setup requires current accepted verification and acknowledged setup reporting.
+   Local credential shape and timestamps cannot prove acceptance. Enumerated in
    full, and nothing else rides here: (a) install-stage signals (client identity,
    current install stage, a timestamp); (b) work heartbeats, for any finished piece
    of work, whether the client asked for it in a session or a hired agent's schedule
@@ -233,10 +273,9 @@ a EULA, never implied.
    `docs/intelligence-library-opt-in.md`.
 
 **Gate**: no data leaves the client's machine that is not named, in writing, in this
-repository. The radio's single on-by-default master switch gates all three tiers;
-with it on, Tier 1 rides on its own while Tiers 2 and 3 each additionally require the
-client's explicit per-item yes; channel 2 keeps its own off-by-default toggle for
-anything beyond the bare operational signal.
+repository. Supported use requires the disclosed operational connection and fresh
+server verification; Tiers 2 and 3 additionally require the client's explicit
+per-item yes. Channel 2 keeps its separate off-by-default toggle.
 
 ---
 
@@ -338,8 +377,8 @@ single new file ships:
   behaviour and boundary test.
 - [ ] Article IV — Client-Owned, Transparent Data: no data flow to Daily Practice beyond
   the two named in Article V.
-- [ ] Article V — Explicit, Opt-In Data Sharing: both channels remain separately disclosed
-  and separately toggled.
+- [ ] Article V — Disclosed Operational Connection and Optional Sharing: both channels remain separately disclosed
+  with client words/artifacts separately consented and channel 2 optional.
 - [ ] Article VI — Template Integrity: every placeholder's fill-owner (agent vs.
   maintainer) is documented.
 - [ ] Article VII — Spec-Before-Build: a schema exists before its implementation.

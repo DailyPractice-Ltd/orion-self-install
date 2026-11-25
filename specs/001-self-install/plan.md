@@ -1,5 +1,6 @@
 # Implementation Plan: Orion Self-Install
 
+
 **Branch**: `001-self-install` | **Date**: 2026-07-12 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/001-self-install/spec.md`

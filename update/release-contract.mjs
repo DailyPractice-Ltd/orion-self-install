@@ -7,7 +7,8 @@
  * the plugin manifests are fresh from the candidate's template_version (and
  * equal `--version` when given), checks CHANGELOG.md exists and its newest
  * numbered section is that template_version (and, with `--version`, that it
- * opens with a section for that version), validates the package, then simulates a
+ * opens with a section for that version), validates the package, then
+ * simulates a
  * fresh deployment for the tool into a temporary folder: deployment plan plus
  * that tool's catalog under a synthetic catalog identity, validated against
  * the deployed package. Prints the deployment plan; exits 2 naming the tool on

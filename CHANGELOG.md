@@ -13,6 +13,61 @@ Write each section for the client who will read it there.
 
 ---
 
+## Unreleased — Installed-file receipts
+
+**Updates now know exactly which files Orion installed in your folder, so they replace
+only those: a file you changed is kept, or the update stops before changing anything.**
+
+- **The receipt.** A fresh install records each Orion file it installed, with its
+  exact contents, in `status/installed-files.json`, including installs from a branch
+  or a locally edited release checkout, and the plugin catalog generated for your
+  tool. With a private home, `.gitignore` is recorded as home setup leaves it.
+  Business records, credentials, the tool's own registration settings and your
+  own skills are never listed. The receipt travels with your folder's private home
+  and is never replaced by an update.
+- **Updates follow the receipt.** Files still as Orion installed them are updated
+  (line endings aside). Files you changed are kept exactly and stay recognised as
+  yours on later updates. Files Orion never installed are kept and listed as
+  `unknown`. If you changed one of Orion's scripts, plugin skills or the plugin
+  catalog and the update would replace it, the update now stops before changing
+  anything and names the files, instead of overwriting them. A damaged receipt also stops the update, with
+  nothing changed.
+- **Folders without a receipt reinstall.** A 2.0.0 folder installed before receipts
+  cannot show which files are Orion's, so an update or a tool switch refuses it before
+  changing anything and names the reinstall guide
+  ([agent/reinstall-from-1.x.md](agent/reinstall-from-1.x.md)), the same route as a
+  1.x folder: install fresh, bring your business files and skills across, and pair
+  again.
+- **Recovery and restore keep the receipt in step with the files.** A failed update,
+  an interrupted one recovered with `recover` (or by the next update), and a plugin
+  activation failure that rolls back (exit 3) all put the receipt back exactly. A
+  restore keeps files you changed after the update, and now also keeps a file you
+  wrote where the update retired one instead of overwriting it; restored files take
+  back their earlier baselines and your later edits stay recognised as yours. While
+  plugin activation is pending, the receipt describes the files already applied, and
+  finishing activation (`resume`, `verify --discovered`) never moves a baseline.
+- **Switching between Codex and Claude Code** keeps the receipt accurate. A finished
+  switch records the new assistant's plugin manifest and catalog, and drops the old
+  assistant's only once they are removed; your edits keep their baselines. A failed,
+  waiting or cancelled switch leaves the receipt unchanged, and a damaged or missing
+  receipt stops the switch before anything changes.
+- **Updates still follow `main` by default.** An update can also be pinned to a
+  full commit that is not on `main` or tagged (for example a candidate Daily
+  Practice asks you to try); it installs exactly that commit's files under the same
+  rules. `agent/updating.md` gives the commands.
+
+### For maintainers
+
+- The fingerprint registry is gone: ownership comes only from each folder's receipt,
+  so no fingerprint data is regenerated, frozen or validated in the release, and
+  merges, squashes, shallow clones and working-tree edits never need a data rewrite.
+  `node update/bump.mjs` and the release contract no longer check one.
+  `tests/helpers/pristine.mjs` is gone.
+- Retirement still works: a file listed in `deployment.retired` or `remove` is removed
+  only where the receipt shows it untouched.
+- A candidate can be tried on a deployed harness by pinning its full commit; no
+  merge or tag is needed (`agent/maintaining.md`).
+
 ## 2.0.0 — 2026-11-23
 
 **Orion now runs in a separate business folder, with one skills plugin for Codex or

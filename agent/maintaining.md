@@ -20,9 +20,13 @@ maintenance. Leave client status, credentials and business records alone.
    Use only this checkout.
 2. Make the change and record user-visible behavior in the current Unreleased
    changelog section. Keep ordinary changes unreleased unless a release is requested.
-3. Regenerate ownership fingerprints after editing deployed files:
-   `node tests/helpers/pristine.mjs --write`. Keep this as the last file-generation
-   step so `update/pristine.json` includes the final deployed contents.
+3. An edit to a deployed file needs nothing else: each harness's installed-file
+   receipt records what Orion installed there, so no fingerprint list is kept in
+   the release, and merges, squashes and shallow clones do not matter. A folder
+   without a receipt (1.x, or 2.0.0 installed before receipts) is never updated
+   or switched; it reinstalls (`agent/reinstall-from-1.x.md`). To retire a file,
+   list it in `update/manifest.json` (`deployment.retired`, or `remove`); an
+   update removes it only where the receipt shows it untouched.
 4. Run checks appropriate to the change and review `git diff --check` and the diff.
    For deployment or package changes, also run the release contract below for both
    supported tools, regardless of which assistant is running. Resolve failures
@@ -31,6 +35,12 @@ maintenance. Leave client status, credentials and business records alone.
    against the requested base when authorized. Report the commit, PR and validation.
 
 A completed change does not itself select a new version or create a release tag.
+
+To try or deliver a candidate on a deployed harness before it reaches `main`, push its
+commit and update the harness to that full commit ([Pin a selected
+commit](updating.md#pin-a-selected-commit)). No merge or tag is needed. The harness's
+installed-file receipt, not the commit's ancestry, decides what the update may replace,
+so the same conflict, backup and recovery rules apply as for `main`.
 
 ## Select and validate a release
 
@@ -48,10 +58,9 @@ hand. 2.0.0 was cut by hand. For later releases:
 
 1. Consolidate pending notes into one first `## Unreleased — <title>` section in
    `CHANGELOG.md`. Select an explicit `X.Y.Z` greater than the current version.
-2. Run `node update/bump.mjs X.Y.Z`. It dates the changelog, updates the version,
-   generates plugin manifests and refreshes pristine fingerprints together. It
-   does not commit, tag or push. If any further deployed files change, regenerate
-   fingerprints again before validation.
+2. Run `node update/bump.mjs X.Y.Z`. It dates the changelog, updates the version
+   and generates plugin manifests together. It needs no Git history, and does not
+   commit, tag or push.
 3. Review the generated diff, then run:
 
    ```bash

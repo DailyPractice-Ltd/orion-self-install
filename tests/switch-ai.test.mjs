@@ -1,11 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, realpathSync, rmSync, symlinkSync, copyFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, realpathSync, rmSync, symlinkSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { buildCatalog, catalogName, MANIFEST_PATHS, pluginManifests } from '../update/plugin-package.mjs';
 import { codexOwnedText } from '../update/plugin-registration.mjs';
+import { fingerprint } from '../update/destination-resolver.mjs';
+import { RECEIPT_ALGORITHM, RECEIPT_SCHEMA, RECEIPT_VERSION, receiptText } from '../update/receipt.mjs';
 import { plainEnv } from './helpers/env.mjs';
 
 const script = new URL('../switch_ai.mjs', import.meta.url).pathname;
@@ -17,6 +19,12 @@ const status = (root) => JSON.parse(get(root, 'status/status.json'));
 const skills = (tool) => tool === 'codex' ? '.agents/skills' : '.claude/skills';
 const other = (tool) => tool === 'codex' ? 'claude-code' : 'codex';
 
+/** The receipt every install writes; these folders' tests need none of its entries. */
+const installReceipt = (root, tool) => put(root, 'status/installed-files.json', receiptText({
+  schema: RECEIPT_SCHEMA, version: RECEIPT_VERSION, algorithm: RECEIPT_ALGORITHM, ai_assistant: tool,
+  template_version: '2.0.0', recorded_by: 'install', recorded_at: '2026-11-01T00:00:00.000Z', files: {},
+}));
+
 function folder(t, from) {
   const root = mkdtempSync(join(tmpdir(), 'orion-switch-ai-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -27,6 +35,7 @@ function folder(t, from) {
   put(root, `${skills(from)}/custom/references/notes.md`, 'my notes\n');
   put(root, `${skills(from)}/speckit-plan/SKILL.md`, 'maintainer only\n');
   put(root, 'status/shift-log.md', 'old log\n');
+  installReceipt(root, from);
   return root;
 }
 const run = (root, ...args) => spawnSync(process.execPath, [script, '--root', root, ...args], { encoding: 'utf8' });
@@ -105,8 +114,11 @@ test('a folder with no recorded assistant is read from its layout', (t) => {
 test('with no --root it switches the folder it sits in', (t) => {
   const root = folder(t, 'codex');
   copyFileSync(script, join(root, 'switch_ai.mjs'));
-  // A deployed folder carries the status store the script imports.
-  copyFileSync(new URL('../status/store.mjs', import.meta.url), join(root, 'status/store.mjs'));
+  // A deployed folder carries the status store and receipt modules the script imports.
+  for (const path of ['status/store.mjs', 'update/destination-resolver.mjs', 'update/receipt.mjs']) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    copyFileSync(new URL(`../${path}`, import.meta.url), join(root, path));
+  }
   const result = spawnSync(process.execPath, [join(root, 'switch_ai.mjs')], { encoding: 'utf8', cwd: tmpdir() });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(status(root).ai_assistant, 'claude-code');
@@ -160,6 +172,7 @@ function pluginWorld(t, { tool = 'claude-code', faults = {}, codexInstalled = tr
       native.codex.installed = [{ id: PLUGIN_ID, name: 'orion', marketplace: CATALOG, version: 'local', installed: true, enabled: true }];
     }
   }
+  installReceipt(client, tool);
   writeFileSync(statePath, JSON.stringify(native));
   const bin = join(base, 'bin'); mkdirSync(bin);
   const extra = { FAKE_NATIVE_STATE: statePath, HOME: home, CODEX_HOME: join(home, '.codex') };
@@ -387,4 +400,141 @@ test('cancelling restores pre-existing target manifest bytes and removes newly a
   assert.equal(report(w.switchTo('codex')).state, 'cancelled');
   assert.equal(get(w.client, manifest), original);
   assert.equal(has(w.client, '.claude/settings.local.json'), false);
+});
+
+// ── The installed-file receipt moves with the switch ────────────────────────
+
+const RECEIPT = 'status/installed-files.json';
+const lfHash = (root, path) => fingerprint(readFileSync(join(root, path)));
+const INSTALLED_AGENTS = 'You are Orion.\n';
+
+/** The receipt a fresh install for `tool` leaves: its plugin package, catalog and AGENTS.md. */
+function recordInstall(w, tool) {
+  rmSync(join(w.client, MANIFEST_PATHS[other(tool)]));
+  put(w.client, 'AGENTS.md', INSTALLED_AGENTS);
+  const files = {};
+  for (const path of [...Object.keys(PACKAGE), 'AGENTS.md']) {
+    if (has(w.client, path)) files[path] = { key: path, hash: lfHash(w.client, path), origin: 'release' };
+  }
+  files[CATALOG_PATH[tool]] = { key: CATALOG_PATH[tool], hash: lfHash(w.client, CATALOG_PATH[tool]), origin: 'generated' };
+  put(w.client, RECEIPT, receiptText({
+    schema: RECEIPT_SCHEMA, version: RECEIPT_VERSION, algorithm: RECEIPT_ALGORITHM, ai_assistant: tool,
+    template_version: '2.0.0', recorded_by: 'install', recorded_at: '2026-11-01T00:00:00.000Z', files,
+  }));
+  // A client edit after the install: the receipt keeps the installed baseline.
+  put(w.client, 'AGENTS.md', `${INSTALLED_AGENTS}Our own rule.\n`);
+  return get(w.client, RECEIPT);
+}
+/** Run the switch to `to`, finishing a waiting one with the human's native install. */
+function switchFully(w, to, more = {}) {
+  let result = w.switchTo(to, more);
+  if (result.status === 0 && report(result).state === 'pending_switch') {
+    assert.equal(w.humanInstall().status, 0);
+    result = w.switchTo(to, more);
+  }
+  return result;
+}
+
+for (const tool of ['codex', 'claude-code']) {
+  test(`a switch from ${tool} records the target's generated files and drops the retired ones from the receipt`, (t) => {
+    const w = pluginWorld(t, { tool });
+    const to = other(tool);
+    const before = JSON.parse(recordInstall(w, tool));
+    const result = switchFully(w, to);
+    assert.equal(report(result).state, 'switched', out(result));
+    const receipt = JSON.parse(get(w.client, RECEIPT));
+    assert.equal(receipt.ai_assistant, to);
+    assert.equal(receipt.template_version, '2.0.0');
+    assert.equal(receipt.recorded_by, 'switch');
+    assert.deepEqual(receipt.files[MANIFEST_PATHS[to]], { key: MANIFEST_PATHS[to], hash: lfHash(w.client, MANIFEST_PATHS[to]), origin: 'generated' });
+    assert.deepEqual(receipt.files[CATALOG_PATH[to]], { key: CATALOG_PATH[to], hash: lfHash(w.client, CATALOG_PATH[to]), origin: 'generated' });
+    for (const path of [MANIFEST_PATHS[tool], CATALOG_PATH[tool]]) {
+      assert.equal(has(w.client, path), false, path);
+      assert.equal(receipt.files[path], undefined, `${path} is no longer claimed`);
+    }
+    assert.deepEqual(receipt.files['AGENTS.md'], before.files['AGENTS.md'], 'the client edit keeps its installed baseline');
+    for (const path of Object.keys(PACKAGE).filter((path) => !Object.values(MANIFEST_PATHS).includes(path))) {
+      assert.deepEqual(receipt.files[path], before.files[path], path);
+    }
+    assert.equal(receipt.files[`${skills(to)}/mine/SKILL.md`], undefined, 'client skills are never claimed');
+    assert.deepEqual(Object.keys(receipt.files), Object.keys(receipt.files).sort());
+    assert.equal(get(w.client, `${report(result).backup}/${RECEIPT}`), JSON.stringify(before, null, 2) + '\n');
+  });
+
+  test(`a failed or cancelled switch from ${tool} leaves the receipt as it was`, (t) => {
+    const to = other(tool);
+    for (const more of [{ ORION_SWITCH_FAIL_BEFORE_COMMIT: '1' }, { ORION_SWITCH_FAIL_AFTER: '1' }]) {
+      const w = pluginWorld(t, { tool });
+      const before = recordInstall(w, tool);
+      const result = switchFully(w, to, more);
+      assert.equal(result.status, 2, out(result));
+      assert.equal(w.status().ai_assistant, tool);
+      assert.equal(get(w.client, RECEIPT), before, Object.keys(more)[0]);
+    }
+    const cancelled = pluginWorld(t, { tool, faults: tool === 'codex' ? { detailsSkills: ['hello'] } : {} });
+    const before = recordInstall(cancelled, tool);
+    assert.equal(report(cancelled.switchTo(to)).state, 'pending_switch');
+    assert.equal(get(cancelled.client, RECEIPT), before, 'a waiting switch claims nothing');
+    assert.equal(report(cancelled.switchTo(tool)).state, 'cancelled');
+    assert.equal(get(cancelled.client, RECEIPT), before);
+  });
+}
+
+test('a switch whose target setup fails leaves the receipt as it was', (t) => {
+  const w = pluginWorld(t, { tool: 'codex', faults: { validate: true } });
+  const before = recordInstall(w, 'codex');
+  const result = w.switchTo('claude-code');
+  assert.equal(result.status, 3, out(result));
+  assert.equal(get(w.client, RECEIPT), before);
+});
+
+test('when the previous tool cannot be retired, the receipt keeps claiming its manifest and catalog', (t) => {
+  const w = pluginWorld(t, { tool: 'codex' });
+  recordInstall(w, 'codex');
+  const result = w.switchTo('claude-code', { ORION_CODEX_BIN: join(w.client, 'no-such-codex') });
+  assert.equal(report(result).state, 'switched', out(result));
+  assert.ok(report(result).previous_tool_action);
+  const receipt = JSON.parse(get(w.client, RECEIPT));
+  assert.equal(receipt.ai_assistant, 'claude-code');
+  for (const path of [MANIFEST_PATHS.codex, CATALOG_PATH.codex, MANIFEST_PATHS['claude-code'], CATALOG_PATH['claude-code']]) {
+    assert.equal(receipt.files[path]?.hash, lfHash(w.client, path), path);
+  }
+});
+
+test('a receipt that cannot be trusted stops the switch before anything changes', (t) => {
+  const w = pluginWorld(t, { tool: 'claude-code' });
+  put(w.client, RECEIPT, '{"schema":"orion-installed-files","version":99}\n');
+  const statusBefore = get(w.client, 'status/status.json');
+  const result = w.switchTo('codex');
+  assert.equal(result.status, 2, out(result));
+  assert.match(result.stderr, /installed-file receipt[\s\S]*nothing was changed/);
+  assert.equal(get(w.client, 'status/status.json'), statusBefore);
+  assert.equal(has(w.client, CATALOG_PATH.codex), false);
+  assert.equal(get(w.client, '.claude/skills/mine/SKILL.md'), 'my own skill\n');
+  assert.equal(has(w.client, '.update-backup'), false);
+});
+
+/** Every path under root with its bytes (folders marked), to show that nothing changed. */
+function tree(root, prefix = '') {
+  const found = {};
+  for (const item of readdirSync(join(root, prefix), { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${item.name}` : item.name;
+    if (item.isDirectory()) Object.assign(found, { [`${rel}/`]: 'folder' }, tree(root, rel));
+    else found[rel] = readFileSync(join(root, rel)).toString('base64');
+  }
+  return found;
+}
+
+for (const tool of ['codex', 'claude-code']) test(`a switch from ${tool} refuses a folder without a receipt and points at reinstalling, with nothing changed`, (t) => {
+  const w = pluginWorld(t, { tool });
+  rmSync(join(w.client, RECEIPT)); // a 2.0.0 folder installed before receipts
+  const before = tree(w.client), nativeBefore = w.native();
+  const result = w.switchTo(other(tool));
+  assert.equal(result.status, 2, out(result));
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /no installed-file receipt \(status\/installed-files\.json\)/);
+  assert.match(result.stderr, /agent\/reinstall-from-1\.x\.md/);
+  assert.match(result.stderr, /Nothing was changed/);
+  assert.deepEqual(tree(w.client), before, 'no skill, status, catalog, backup or lock was written');
+  assert.deepEqual(w.native(), nativeBefore, 'neither tool was touched');
 });

@@ -1,28 +1,27 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { hasFullHistory } from './helpers/pristine.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * A candidate release: a full-history clone of HEAD (the pristine helper reads
- * git history), with this checkout's maintainer scripts laid over it so the
- * scripts under test are the ones in the working tree.
+ * A candidate release with no git history at all: this checkout's tracked files,
+ * as they are in the working tree. Nothing the bump or the release contract
+ * checks may depend on what history is reachable.
  */
 function candidate(t) {
   const release = mkdtempSync(join(tmpdir(), 'orion-bump-'));
   t.after(() => rmSync(release, { recursive: true, force: true }));
-  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
-  execFileSync('git', ['clone', '-q', '--no-checkout', repo, release], { stdio: 'ignore' });
-  execFileSync('git', ['checkout', '-q', head], { cwd: release, stdio: 'ignore' });
-  const overlay = [...readdirSync(join(repo, 'update')).filter(name => name.endsWith('.mjs')).map(name => `update/${name}`),
-    'tests/helpers/pristine.mjs'];
-  for (const path of overlay) copyFileSync(join(repo, path), join(release, path));
+  const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: repo, encoding: 'utf8' }).split('\0')
+    .filter(path => path && !path.split('/').includes('specs') && existsSync(join(repo, path)));
+  for (const path of tracked) {
+    mkdirSync(dirname(join(release, path)), { recursive: true });
+    copyFileSync(join(repo, path), join(release, path));
+  }
   return release;
 }
 
@@ -52,7 +51,7 @@ function nextPatch(version) {
   return `${major}.${minor}.${patch + 1}`;
 }
 
-test('bump releases the Unreleased section at a new version the release contract accepts', { skip: !hasFullHistory() && 'needs full git history' }, (t) => {
+test('bump releases the Unreleased section at a new version the release contract accepts', (t) => {
   const release = candidate(t);
   const current = templateVersion(release);
   const next = nextPatch(current);
@@ -68,11 +67,9 @@ test('bump releases the Unreleased section at a new version the release contract
   }
   const headings = readFileSync(join(release, 'CHANGELOG.md'), 'utf8').split('\n').filter(line => line.startsWith('## '));
   assert.deepEqual(headings, [`## ${next} — ${today()} — tidy the release`, `## ${current} — 2026-11-12`]);
-  const stale = spawnSync(process.execPath, [join(release, 'tests/helpers/pristine.mjs')], { cwd: release, encoding: 'utf8' });
-  assert.equal(stale.status, 0, `pristine fingerprints are fresh after the bump: ${stale.stdout}`);
 });
 
-test('bump refuses before writing anything', { skip: !hasFullHistory() && 'needs full git history' }, (t) => {
+test('bump refuses before writing anything', (t) => {
   const release = candidate(t);
   const current = templateVersion(release);
   const next = nextPatch(current);
@@ -99,17 +96,18 @@ test('bump refuses before writing anything', { skip: !hasFullHistory() && 'needs
   }
 });
 
-test('bump puts every file back when a late step fails', { skip: !hasFullHistory() && 'needs full git history' }, (t) => {
+test('bump puts every file back when a late step fails', { skip: process.getuid?.() === 0 && 'root ignores read-only files' }, (t) => {
   const release = candidate(t);
   const current = templateVersion(release);
   changelog(release, `## Unreleased — a\n\n- a note\n\n## ${current} — 2026-11-12\n\n- older\n`);
-  // The pristine step, run last, half-writes its file and then fails.
-  writeFileSync(join(release, 'tests/helpers/pristine.mjs'),
-    `import { writeFileSync } from 'node:fs';\nwriteFileSync('update/pristine.json', '{"half":');\nconsole.error('pristine exploded');\nprocess.exit(1);\n`);
+  // The last write, the Claude Code plugin manifest, fails after the others landed.
+  const last = join(release, 'plugins/orion/.claude-plugin/plugin.json');
+  chmodSync(last, 0o444);
+  t.after(() => { try { chmodSync(last, 0o644); } catch {} });
   const before = snapshot(release);
   const run = bump(release, nextPatch(current));
   assert.notEqual(run.status, 0);
-  assert.match(run.stderr, /pristine exploded/);
+  assert.match(run.stderr, /plugin\.json/);
   assert.match(run.stderr, /nothing was changed/i);
   assert.deepEqual(snapshot(release), before, 'every file byte-identical');
 });

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, existsSync, readdirSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -150,6 +150,90 @@ test('install CLI refuses --migrate-from and points at the reinstall guide', t =
   assert.match(result.stderr,/agent\/reinstall-from-1\.x\.md/);
   assert.equal(existsSync(target),false);
   assert.equal(readFileSync(join(legacy,'agent-definition.md'),'utf8'),'old\n');
+});
+
+/** Every file in a folder, as harness-relative paths, outside its Git metadata. */
+function filesIn(root) {
+  return readdirSync(root, { recursive: true, withFileTypes: true })
+    .filter(item => item.isFile())
+    .map(item => relative(root, join(item.parentPath, item.name)).split(sep).join('/'))
+    .filter(path => !path.startsWith('.git/'))
+    .sort();
+}
+const lfHash = bytes => createHash('sha256').update(bytes.toString('utf8').replace(/\r\n/g, '\n')).digest('hex');
+
+for (const tool of ['claude-code', 'codex']) {
+  test(`fresh ${tool} install records a receipt of exactly the managed files it installed`, (t) => {
+    const base = mkdtempSync(join(tmpdir(), 'orion-receipt-'));
+    t.after(() => rmSync(base, { recursive: true, force: true }));
+    const target = join(base, 'client');
+    const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', target, '--local-only'], { encoding: 'utf8', env: noNative });
+    assert.equal(run.status, 0, run.stderr);
+    const receipt = JSON.parse(readFileSync(join(target, 'status/installed-files.json'), 'utf8'));
+    assert.equal(receipt.schema, 'orion-installed-files');
+    assert.equal(receipt.version, 1);
+    assert.equal(receipt.algorithm, 'sha256-utf8-lf');
+    assert.equal(receipt.ai_assistant, tool);
+    assert.equal(receipt.template_version, JSON.parse(readFileSync(join(release, 'update/manifest.json'), 'utf8')).template_version);
+
+    // Client records and the receipt itself are never managed; everything else the installer
+    // put on disk is, and each entry matches the bytes actually installed.
+    const notManaged = ['status/status.json', 'status/installed-files.json'];
+    assert.deepEqual(Object.keys(receipt.files).sort(), filesIn(target).filter(path => !notManaged.includes(path)));
+    for (const [destination, entry] of Object.entries(receipt.files)) {
+      assert.equal(entry.hash, lfHash(readFileSync(join(target, destination))), destination);
+      assert.equal(typeof entry.key, 'string', destination);
+    }
+    const catalog = tool === 'codex' ? '.agents/plugins/marketplace.json' : '.claude-plugin/marketplace.json';
+    const manifest = tool === 'codex' ? 'plugins/orion/plugin.json' : 'plugins/orion/.claude-plugin/plugin.json';
+    assert.equal(receipt.files[catalog].origin, 'generated', 'the generated tool catalog is tracked');
+    assert.equal(receipt.files[manifest].origin, 'release');
+    assert.equal(receipt.files['AGENTS.md'].key, 'AGENTS.md');
+    assert.equal(receipt.files['plugins/orion/skills/post-call-debrief/SKILL.md'].origin, 'release');
+    for (const path of Object.keys(receipt.files)) {
+      assert.ok(path !== 'status/status.json' && !path.startsWith('.claude/skills/') && !path.startsWith('.agents/skills/') && path !== 'status/radio.key', `${path} is client-owned`);
+    }
+  });
+}
+
+/** A private-looking GitHub remote that git actually resolves to `local` (or nowhere). */
+function remoteWorld(t, local) {
+  const base = mkdtempSync(join(tmpdir(), 'orion-receipt-remote-'));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const bin = join(base, 'bin'); mkdirSync(bin);
+  writeFileSync(join(bin, 'gh'), '#!/bin/sh\nprintf "true\\n"\n');
+  chmodSync(join(bin, 'gh'), 0o755);
+  const url = 'https://github.com/owner/private.git';
+  const bare = join(base, 'home.git');
+  if (local) spawnSync('git', ['init', '-q', '--bare', '-b', 'main', bare]);
+  const env = { ...noNative, PATH: `${bin}:${process.env.PATH}`, GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: `url.${local ? bare : join(base, 'missing.git')}.insteadOf`, GIT_CONFIG_VALUE_0: url };
+  return { base, bare, url, env, target: join(base, 'client') };
+}
+
+for (const tool of ['claude-code', 'codex']) {
+  test(`a fresh ${tool} install with a home commits the receipt with the harness, recording the .gitignore it installed`, (t) => {
+    const w = remoteWorld(t, true);
+    const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', tool, '--target', w.target, '--remote', w.url], { encoding: 'utf8', env: w.env });
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    const pushed = spawnSync('git', ['--git-dir', w.bare, 'show', 'main:status/installed-files.json'], { encoding: 'utf8' });
+    assert.equal(pushed.status, 0, pushed.stderr);
+    assert.equal(pushed.stdout, readFileSync(join(w.target, 'status/installed-files.json'), 'utf8'));
+    const receipt = JSON.parse(pushed.stdout);
+    // Home preparation rewrites .gitignore as part of the install: the receipt records the bytes
+    // the harness actually has, so an update recognises them as Orion's.
+    assert.notEqual(lfHash(readFileSync(join(release, '.gitignore'))), lfHash(readFileSync(join(w.target, '.gitignore'))), 'home preparation changed .gitignore');
+    for (const [destination, entry] of Object.entries(receipt.files)) assert.equal(entry.hash, lfHash(readFileSync(join(w.target, destination))), destination);
+    assert.equal('.gitattributes' in receipt.files, false, 'home metadata is not Orion-managed');
+  });
+}
+
+test('a fresh install that fails after recording its receipt publishes nothing', (t) => {
+  const w = remoteWorld(t, false);
+  const run = spawnSync(process.execPath, [join(release, 'install.mjs'), '--tool', 'claude-code', '--target', w.target, '--remote', w.url], { encoding: 'utf8', env: w.env });
+  assert.equal(run.status, 2, run.stdout + run.stderr);
+  assert.match(run.stderr, /Could not push/);
+  assert.equal(existsSync(w.target), false, 'no harness was published');
+  assert.deepEqual(readdirSync(w.base).filter(name => name.startsWith('.client-install-')), [], 'the stage was removed');
 });
 
 test('remote setup rejects a repository that is not verified private',t=>{

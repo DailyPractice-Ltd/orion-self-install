@@ -1,4 +1,4 @@
-/** Resolve a deployed harness's selected destinations and file ownership. */
+/** Resolve a deployed harness's selected destinations; file ownership is the receipt's (update/receipt.mjs). */
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -8,6 +8,9 @@ const RELEASE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** The shipped Orion plugin package: same path in the release and in every harness. */
 export const PACKAGE_ROOT = 'plugins/orion';
+
+/** A fingerprint: lowercase SHA-256 hex. */
+export const SHA256_HEX = /^[0-9a-f]{64}$/;
 
 /** Per-tool harness paths that do not come from shipped files. */
 export const TOOL_LAYOUT = Object.freeze({
@@ -56,22 +59,16 @@ export function fingerprint(contents) {
   return createHash('sha256').update(Buffer.from(contents).toString('utf8').replace(/\r\n/g, '\n')).digest('hex');
 }
 
-export function destinationState(root, entry, pristine) {
-  const target = safePath(root, entry.destination);
-  // A symlink anywhere in a destination is a collision, even if its target
-  // happens to have the expected bytes. Never read through it for ownership.
-  let part = resolve(root);
-  for (const segment of entry.destination.split('/')) {
-    part = join(part, segment);
-    try { if (lstatSync(part).isSymbolicLink()) return 'preserve'; }
-    catch (error) { if (error.code !== 'ENOENT') throw error; }
-  }
-  if (!existsSync(target)) return 'absent';
-  if (!lstatSync(target).isFile()) return 'preserve';
-  if (entry.ownership === 'client-template') return 'client-owned';
-  if (entry.source === 'update/pristine.json' && entry.destination === entry.source) return 'owned';
-  const known = pristine.files?.[entry.fingerprint_key] || [];
-  return known.includes(fingerprint(readFileSync(target))) ? 'owned' : 'preserve';
+/**
+ * The tool mapping alone: each deployment entry's source, destination and identity for
+ * one tool, without checking a release tree. planForTool adds those checks; a switch
+ * uses this directly to name the files it generates in a harness.
+ */
+export function toolEntries(deployment, ai_assistant, { includeOtherMetadata = false } = {}) {
+  return [
+    ...deployment.common_sources.map((source) => ({ source, destination: source, ownership: 'release', fingerprint_key: source })),
+    ...deployment.entries.filter(entry => includeOtherMetadata || !entry.tools || entry.tools.includes(ai_assistant)).map((entry) => ({ source: entry.sources?.[ai_assistant] || entry.source, destination: entry.destinations ? entry.destinations[ai_assistant] : entry.source, ownership: entry.ownership, fingerprint_key: entry.sources?.[ai_assistant] || entry.fingerprint_key })),
+  ];
 }
 
 /** The sole source-to-destination mapper for release and deployed harnesses. */
@@ -88,10 +85,7 @@ export function planForTool(deployment, ai_assistant, { releaseRoot = RELEASE_RO
   for (const entry of packageEntries) {
     if (entry.destinations || entry.sources) throw new Error(`Package file ships at its own path for every tool: ${entry.source}`);
   }
-  const entries = [
-    ...deployment.common_sources.map((source) => ({ source, destination: source, ownership: 'release', fingerprint_key: source })),
-    ...deployment.entries.filter(entry => includeOtherMetadata || !entry.tools || entry.tools.includes(ai_assistant)).map((entry) => ({ source: entry.sources?.[ai_assistant] || entry.source, destination: entry.destinations ? entry.destinations[ai_assistant] : entry.source, ownership: entry.ownership, fingerprint_key: entry.sources?.[ai_assistant] || entry.fingerprint_key })),
-  ];
+  const entries = toolEntries(deployment, ai_assistant, { includeOtherMetadata });
   const destinations = new Set();
   for (const entry of entries) {
     safePath(releaseRoot, entry.source);
@@ -106,11 +100,10 @@ export function planForTool(deployment, ai_assistant, { releaseRoot = RELEASE_RO
 export function resolveDestinations({ root, releaseRoot = RELEASE_ROOT, legacyTool } = {}) {
   if (!root) throw new Error('A deployed harness root is required');
   const manifest = readJson(join(releaseRoot, 'update/manifest.json'), 'release manifest');
-  const pristine = readJson(join(releaseRoot, 'update/pristine.json'), 'fingerprint registry');
   const status = readJson(join(root, 'status/status.json'), 'harness status');
   const ai_assistant = resolveAiAssistant(status, manifest.deployment, { legacyTool });
   const entries = planForTool(manifest.deployment, ai_assistant, { releaseRoot, root });
-  return { ai_assistant, legacy_migration: status.ai_assistant == null, entries: entries.map((entry) => ({ ...entry, state: destinationState(root, entry, pristine) })) };
+  return { ai_assistant, legacy_migration: status.ai_assistant == null, entries };
 }
 
 /** Paths used by a running client harness, from its recorded tool alone. */

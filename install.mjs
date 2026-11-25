@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { planForTool } from './update/destination-resolver.mjs';
 import { ensurePluginRegion } from './update/plugin-package.mjs';
 import { statusTemplate } from './status/store.mjs';
+import { buildReceipt, writeStagedReceipt } from './update/receipt.mjs';
 import { checkFolder, describe, runPluginSetup, RESUME_COMMAND } from './update/plugin-setup.mjs';
 
 const release = dirname(fileURLToPath(import.meta.url));
@@ -95,6 +96,12 @@ async function install() {
       if(prepare.status!==0 || !JSON.parse(readFileSync(join(stage,'status/status.json'),'utf8')).home?.enabled) {
         throw new Error(`Could not prepare the private repository home: ${prepare.stderr.trim() || prepare.stdout.trim()}`);
       }
+    }
+    // Every managed file now has its installed bytes, .gitignore included as home preparation
+    // left it: record them before the harness is published and, with a home, before its first
+    // commit. A failure from here on removes the stage, receipt and all.
+    writeStagedReceipt(stage, buildReceipt(stage, plan, { ai_assistant, template_version: manifest.template_version, recorded_by: 'install' }));
+    if(!useLocal) {
       const add=spawnSync('git',['-C',stage,'add','.'],{encoding:'utf8'});
       if(add.status!==0) throw new Error(add.stderr.trim());
       const commit=spawnSync('git',['-C',stage,'-c','user.name=Orion installer','-c','user.email=installer@users.noreply.github.com','commit','-qm','Install Orion harness'],{encoding:'utf8'});

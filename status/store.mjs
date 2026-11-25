@@ -1,5 +1,6 @@
 /**
- * The one owner of status/status.json, status/radio.key and the radio outbox.
+ * The one owner of status/status.json, status/radio.key and the radio outbox, and
+ * the only writer of an existing harness's installed-file receipt (update/receipt.mjs).
  *
  * Every Orion command that changes these files goes through here, so no two
  * commands can overwrite each other's changes: each change reads the file fresh
@@ -27,6 +28,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
+
+/** The installed-file receipt's path in a harness; update/receipt.mjs owns its format. */
+export const RECEIPT_PATH = 'status/installed-files.json';
 
 /**
  * How long a command waits for the lock. The guard holds it through a network
@@ -143,6 +147,17 @@ export async function withStatusLock(root, action, { wait = LOCK_WAIT_MS } = {})
         const value = String(token).trim();
         await atomicText(keyPath(root), `${value}\n`);
         if ((await this.readKey()).trim() !== value) throw new Error('the key file did not read back as written');
+      },
+      /**
+       * Saves the installed-file receipt (update/receipt.mjs) exactly as given, atomically,
+       * so a concurrent Orion command can neither interleave with nor overwrite it.
+       */
+      async writeReceiptText(text) {
+        await atomicText(join(root, RECEIPT_PATH), String(text));
+      },
+      /** Removes the receipt: only to put back a harness that had none, as a rollback or restore does. */
+      async removeReceipt() {
+        await unlink(join(root, RECEIPT_PATH)).catch(error => { if (error.code !== 'ENOENT') throw error; });
       },
       async removeKey() {
         await unlink(keyPath(root)).catch(error => { if (error.code !== 'ENOENT') throw error; });

@@ -29,4 +29,7 @@ Use this when the client wants to move this Orion folder from Codex to Claude Co
      reason. The folder is exactly as it was.
    - If it refused because a file already exists, read the listed paths to the client and
      ask what to do with them. Nothing was changed.
+   - If it refused because the folder has no installed-file receipt, the folder was
+     installed before Orion recorded its files and is reinstalled, not switched: follow
+     `agent/reinstall-from-1.x.md` at the folder root. Nothing was changed.
 5. Once it has switched, tell them to open this folder in the new assistant to carry on.

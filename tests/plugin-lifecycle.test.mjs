@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { buildCatalog, catalogName, MANIFEST_PATHS, pluginManifests } from '../update/plugin-package.mjs';
 import { codexOwnedText } from '../update/plugin-registration.mjs';
 import { runPluginSetup } from '../update/plugin-setup.mjs';
+import { RECEIPT_PATH, receiptText } from '../update/receipt.mjs';
 import { plainEnv } from './helpers/env.mjs';
 
 // Coordinated update and restore for the Orion plugin (spec 008 acceptance #7); the tool
@@ -43,7 +44,7 @@ function manifestFor(version, files) {
     template_version: version,
     deployment: {
       tools: ['claude-code', 'codex'],
-      common_sources: ['AGENTS.md', 'update/manifest.json', 'update/pristine.json'],
+      common_sources: ['AGENTS.md', 'update/manifest.json'],
       entries: Object.keys(files).sort().map((source) => ({ source, ownership: 'release', fingerprint_key: source })),
     },
   };
@@ -59,9 +60,6 @@ function world(t, { tool = 'claude-code', at = '1.0.0', faults = {}, codexInstal
   for (const [path, body] of Object.entries(V2)) put(release, path, body);
   put(release, 'AGENTS.md', 'agents v2\n');
   put(release, 'update/manifest.json', json(manifest2));
-  const pristine = { files: { 'AGENTS.md': [hash('agents v1\n')] } };
-  for (const [path, body] of Object.entries(V1)) pristine.files[path] = [hash(body)];
-  put(release, 'update/pristine.json', json(pristine));
   execFileSync('git', ['init', '-q'], { cwd: release });
   execFileSync('git', ['add', '.'], { cwd: release });
   execFileSync('git', ['-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'release'], { cwd: release });
@@ -80,6 +78,12 @@ function world(t, { tool = 'claude-code', at = '1.0.0', faults = {}, codexInstal
     template_version: at, ai_assistant: tool, notes: 'before',
     plugin: { catalog_identity: ID, setup_state: 'complete', remaining_action: null, verified_version: at, verified_at: '2026-11-01T00:00:00.000Z', pending_version: null, pending_switch: null },
   }));
+
+  // The receipt an install leaves: every managed file it wrote and the generated catalog.
+  const files = {};
+  for (const path of ['AGENTS.md', 'update/manifest.json', ...Object.keys(pkg)].sort()) files[path] = { key: path, hash: hash(get(client, path)), origin: 'release' };
+  files[CATALOG_PATH[tool]] = { key: CATALOG_PATH[tool], hash: hash(get(client, CATALOG_PATH[tool])), origin: 'generated' };
+  put(client, RECEIPT_PATH, receiptText({ schema: 'orion-installed-files', version: 1, algorithm: 'sha256-utf8-lf', ai_assistant: tool, template_version: at, recorded_by: 'install', recorded_at: '2026-11-01T00:00:00.000Z', files }));
 
   // The native CLIs already know this harness for its tool, as a finished install left them.
   const statePath = join(base, 'native.json');
@@ -127,6 +131,21 @@ test('update replaces the package as a unit, keeps client skills and records the
   put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1 with my in-place edit\n');
   put(w.client, 'plugins/orion/skills/extra/SKILL.md', 'a file I dropped into the package\n');
   const catalogBefore = get(w.client, CATALOG_PATH['claude-code']);
+  const receiptBefore = get(w.client, RECEIPT_PATH);
+
+  // An edited or dropped-in package file stops the update before any change.
+  const blocked = w.update();
+  assert.equal(blocked.status, 2, out(blocked));
+  assert.deepEqual(report(blocked).conflicts, [
+    { path: 'plugins/orion/skills/extra/SKILL.md', reason: 'unknown' },
+    { path: 'plugins/orion/skills/hello/SKILL.md', reason: 'modified' },
+  ]);
+  assert.equal(get(w.client, 'AGENTS.md'), 'agents v1\n');
+  assert.equal(get(w.client, RECEIPT_PATH), receiptBefore);
+  assert.equal(has(w.client, '.update-backup'), false);
+  // The client moves the edit out: the shipped file goes back and the dropped-in one leaves.
+  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1\n');
+  rmSync(join(w.client, 'plugins/orion/skills/extra'), { recursive: true });
 
   const run = w.update();
   assert.equal(run.status, 0, out(run));
@@ -139,10 +158,10 @@ test('update replaces the package as a unit, keeps client skills and records the
   assert.equal(has(w.client, 'plugins/orion/skills/extra'), false);
   assert.equal(JSON.parse(get(w.client, 'plugins/orion/.claude-plugin/plugin.json')).version, '2.0.0');
   assert.equal(JSON.parse(get(w.client, 'plugins/orion/plugin.json')).version, '2.0.0', 'existing dual-manifest installations retain both');
-  // ...and the complete prior package, in-place edits included, is in the backup.
-  assert.equal(get(w.client, `${r.backup}/package/plugins/orion/skills/hello/SKILL.md`), 'hello v1 with my in-place edit\n');
-  assert.equal(get(w.client, `${r.backup}/package/plugins/orion/skills/extra/SKILL.md`), 'a file I dropped into the package\n');
-  assert.deepEqual(r.package.edits_backed_up.sort(), ['plugins/orion/skills/extra/SKILL.md', 'plugins/orion/skills/hello/SKILL.md']);
+  // ...and the complete prior package is in the backup.
+  assert.equal(get(w.client, `${r.backup}/package/plugins/orion/skills/hello/SKILL.md`), 'hello v1\n');
+  assert.equal(get(w.client, `${r.backup}/package/plugins/orion/skills/gone/SKILL.md`), 'gone v1\n');
+  assert.deepEqual(Object.keys(r.package).sort(), ['backup', 'replaced']);
 
   // Client-owned work and unrelated settings are untouched; the catalog keeps its identity.
   assert.equal(get(w.client, '.claude/skills/mine/SKILL.md'), 'my own skill\n');
@@ -189,12 +208,14 @@ test('Codex update counts a stale cached copy as pending, and never runs a marke
 
 test('a confirmed native failure restores the previous package, catalog and status, and asks for a fresh check', (t) => {
   const w = world(t, { faults: { validate: true } });
-  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1 with my in-place edit\n');
+  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1\r\n');
+  const receiptBefore = get(w.client, RECEIPT_PATH);
   const run = w.update();
   assert.equal(run.status, 3, out(run));
   const r = report(run);
   assert.equal(r.state, 'rolled_back');
-  assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v1 with my in-place edit\n');
+  assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v1\r\n');
+  assert.equal(get(w.client, RECEIPT_PATH), receiptBefore, 'the receipt goes back with the files');
   assert.equal(get(w.client, 'plugins/orion/skills/gone/SKILL.md'), 'gone v1\n');
   assert.equal(has(w.client, 'plugins/orion/skills/fresh'), false);
   assert.equal(get(w.client, 'AGENTS.md'), 'agents v1\n');
@@ -251,7 +272,7 @@ test('a crashed update journal is recovered from its backup, but never over a co
 
 test('restore puts the package and catalog back and says a fresh check is needed; a later package edit stops it', (t) => {
   const w = world(t);
-  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1 with my in-place edit\n');
+  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'hello v1\r\n');
   const run = w.update();
   assert.equal(run.status, 0, out(run));
   const { backup } = report(run);
@@ -272,7 +293,7 @@ test('restore puts the package and catalog back and says a fresh check is needed
   const restored = w.restore(backup);
   assert.equal(restored.status, 0, out(restored));
   const r = report(restored);
-  assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v1 with my in-place edit\n');
+  assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v1\r\n');
   assert.equal(has(w.client, 'plugins/orion/skills/fresh'), false);
   assert.equal(JSON.parse(get(w.client, CATALOG_PATH['claude-code'])).name, CATALOG);
   assert.equal(get(w.client, '.claude/skills/later/SKILL.md'), 'made after the update\n');
@@ -371,7 +392,7 @@ for (const tool of ['codex', 'claude-code']) test(`update preserves the ${tool} 
   const w = world(t, { tool, at: '2.0.0', codexInstalled: '2.0.0' });
   const other = tool === 'codex' ? 'claude-code' : 'codex';
   rmSync(join(w.client, MANIFEST_PATHS[other]));
-  put(w.client, 'plugins/orion/skills/hello/SKILL.md', 'local edit\n');
+  rmSync(join(w.client, 'plugins/orion/skills/hello'), { recursive: true }); // so the package has something to replace
   const result = w.update();
   assert.equal(result.status, 0, out(result));
   assert.equal(has(w.client, MANIFEST_PATHS[other]), false);
@@ -379,7 +400,7 @@ for (const tool of ['codex', 'claude-code']) test(`update preserves the ${tool} 
   assert.equal(w.status().plugin.setup_state, 'registered');
   assert.equal(w.restore(report(result).backup).status, 0);
   assert.equal(has(w.client, MANIFEST_PATHS[other]), false);
-  assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'local edit\n');
+  assert.equal(has(w.client, 'plugins/orion/skills/hello'), false, 'the package is back as it was');
 });
 
 test('setup EPERM after files commit reports activation pending and survives an update retry', t => {
@@ -428,3 +449,152 @@ test('preflight reports both protected destinations before replacing release fil
   assert.equal(has(w.client, '.codex'), false, 'temporary preflight directories are cleaned up');
   assert.equal(nativeCalls(w).length, 0);
 });
+
+// ── Plugin activation and the installed-file receipt ──────────────────────────
+// Whatever activation does, the receipt describes the files on disk: the applied ones
+// while activation waits or succeeds, the previous ones once a failure puts them back.
+const PERMISSIONS = new URL('./helpers/update-permissions.mjs', import.meta.url).href;
+const receiptOf = (w) => JSON.parse(get(w.client, RECEIPT_PATH));
+const CLIENT_OWNED = /^(status\/status\.json|knowledge-base\/|\.claude\/settings|\.codex\/|\.claude\/skills\/|\.agents\/skills\/|\.agents\/other\/)/;
+
+/** The receipt names `tool`, claims every package file and the catalog, and each claim matches the disk (`edited` paths aside). */
+function aligned(w, tool, { edited = [] } = {}) {
+  const receipt = receiptOf(w);
+  assert.equal(receipt.ai_assistant, tool);
+  for (const [path, entry] of Object.entries(receipt.files)) {
+    assert.doesNotMatch(path, CLIENT_OWNED, `${path} is the client's, never a managed file`);
+    if (edited.includes(path)) assert.notEqual(hash(get(w.client, path)), entry.hash, `${path} reads as edited`);
+    else assert.equal(hash(get(w.client, path)), entry.hash, `${path} is recorded as it is`);
+  }
+  const onDisk = (dir) => readdirSync(join(w.client, dir), { withFileTypes: true }).flatMap((e) => e.isDirectory() ? onDisk(`${dir}/${e.name}`) : [`${dir}/${e.name}`]);
+  for (const path of onDisk('plugins/orion')) assert.ok(receipt.files[path], `${path} is claimed`);
+  for (const path of Object.keys(receipt.files).filter((p) => p.startsWith('plugins/orion/'))) assert.ok(has(w.client, path), `${path} is on disk`);
+  assert.equal(receipt.files[CATALOG_PATH[tool]]?.origin, 'generated');
+  return receipt;
+}
+const clientFiles = (w, tool) => [`${SKILLS[tool]}/mine/SKILL.md`, '.claude/settings.json', '.agents/other/notes.md', 'knowledge-base/offer.md'].map((p) => get(w.client, p));
+
+for (const tool of ['claude-code', 'codex']) {
+  test(`${tool}: activation left pending keeps the applied receipt, resuming it advances nothing, and restore puts the prior baselines back`, async (t) => {
+    const w = world(t, { tool });
+    const installed = receiptOf(w), mine = clientFiles(w, tool);
+    // The sandbox refuses the catalog write the activation makes after the files committed.
+    const run = w.update({ NODE_OPTIONS: `--import=${PERMISSIONS}`, TEST_DENY_CATALOG: '1' });
+    assert.equal(run.status, 0, out(run));
+    const r = report(run);
+    assert.equal(r.state, 'pending_activation');
+    assert.equal(r.files_applied, true);
+    let receipt = aligned(w, tool);
+    assert.equal(receipt.template_version, '2.0.0');
+    assert.equal(receipt.files['plugins/orion/skills/fresh/SKILL.md'].hash, hash('fresh v2\n'));
+    assert.equal(receipt.files['plugins/orion/skills/gone/SKILL.md'], undefined);
+    assert.equal(receipt.files['AGENTS.md'].hash, hash('agents v2\n'));
+    const applied = get(w.client, RECEIPT_PATH);
+
+    // The client edits an ordinary file and finishes activation: no baseline moves.
+    put(w.client, 'AGENTS.md', 'agents v2 with my note\n');
+    rmSync(join(w.client, CATALOG_PATH[tool]));
+    const resumed = await runPluginSetup(w.client, { mode: 'setup', env: w.env, home: w.home });
+    assert.notEqual(resumed.setup_state, 'failed', JSON.stringify(resumed));
+    assert.equal(get(w.client, RECEIPT_PATH), applied, 'activation never rewrites the receipt');
+    aligned(w, tool, { edited: ['AGENTS.md'] });
+    const retry = w.update();
+    assert.equal(retry.status, 0, out(retry));
+    assert.equal(report(retry).files_up_to_date, true);
+    assert.equal(get(w.client, RECEIPT_PATH), applied);
+
+    // Restore: the restored files take back their install baselines; the kept edit keeps the update's.
+    const restored = w.restore(r.backup);
+    assert.equal(restored.status, 0, out(restored));
+    assert.ok(report(restored).kept.includes('AGENTS.md'));
+    assert.equal(get(w.client, 'AGENTS.md'), 'agents v2 with my note\n');
+    receipt = aligned(w, tool, { edited: ['AGENTS.md'] });
+    assert.equal(receipt.template_version, '1.0.0');
+    assert.equal(receipt.files['AGENTS.md'].hash, hash('agents v2\n'));
+    for (const [path, entry] of Object.entries(installed.files)) if (path !== 'AGENTS.md') assert.deepEqual(receipt.files[path], entry, path);
+    assert.equal(receipt.files['plugins/orion/skills/fresh/SKILL.md'], undefined);
+
+    // A later update finds the same evidence: the package updates, the edit stays.
+    const again = w.update();
+    assert.equal(again.status, 0, out(again));
+    assert.ok(report(again).kept.includes('AGENTS.md'));
+    assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v2\n');
+    aligned(w, tool, { edited: ['AGENTS.md'] });
+    assert.deepEqual(clientFiles(w, tool), mine);
+  });
+
+  test(`${tool}: successful activation leaves the receipt as the update wrote it, and a restore and later update stay aligned`, async (t) => {
+    const w = world(t, { tool });
+    const installed = receiptOf(w), mine = clientFiles(w, tool);
+    const run = w.update();
+    assert.equal(run.status, 0, out(run));
+    const r = report(run);
+    aligned(w, tool);
+    const applied = get(w.client, RECEIPT_PATH);
+    if (tool === 'codex') assert.equal(w.humanInstall().status, 0);
+    const resumed = await runPluginSetup(w.client, { mode: 'setup', env: w.env, home: w.home });
+    assert.equal(resumed.setup_state, 'registered', JSON.stringify(resumed));
+    const confirmed = await runPluginSetup(w.client, { mode: 'verify', discovered: true, env: w.env, home: w.home });
+    assert.equal(confirmed.setup_state, 'complete');
+    assert.equal(get(w.client, RECEIPT_PATH), applied, 'activation never rewrites the receipt');
+    aligned(w, tool);
+    assert.deepEqual(clientFiles(w, tool), mine);
+
+    const restored = w.restore(r.backup);
+    assert.equal(restored.status, 0, out(restored));
+    const receipt = aligned(w, tool);
+    assert.deepEqual(receipt.files, installed.files, 'every file came back, and so did every baseline');
+    const again = w.update();
+    assert.equal(again.status, 0, out(again));
+    assert.equal(receiptOf(w).template_version, '2.0.0');
+    aligned(w, tool);
+  });
+
+  test(`${tool}: a confirmed activation failure (exit 3) puts back the receipt with the files, and a later update is aligned`, (t) => {
+    const w = world(t, { tool, faults: tool === 'codex' ? { codexListFails: true } : { validate: true } });
+    const before = get(w.client, RECEIPT_PATH);
+    const run = w.update();
+    assert.equal(run.status, 3, out(run));
+    assert.equal(report(run).state, 'rolled_back');
+    assert.equal(get(w.client, RECEIPT_PATH), before, 'the receipt is the one from before the update');
+    assert.equal(get(w.client, 'plugins/orion/skills/gone/SKILL.md'), 'gone v1\n');
+    aligned(w, tool);
+
+    w.setNative((s) => { s.faults = {}; });
+    const again = w.update();
+    assert.equal(again.status, 0, out(again));
+    assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v2\n');
+    assert.equal(receiptOf(w).template_version, '2.0.0');
+    aligned(w, tool);
+  });
+
+  test(`${tool}: an edited or unknown catalog stops the update before any change, like a package edit`, (t) => {
+    // Edited: the receipt claims the catalog. Unknown: it does not.
+    for (const claimed of [true, false]) {
+      const w = world(t, { tool });
+      if (!claimed) {
+        const unclaimed = receiptOf(w); delete unclaimed.files[CATALOG_PATH[tool]];
+        put(w.client, RECEIPT_PATH, receiptText(unclaimed));
+      }
+      const edited = get(w.client, CATALOG_PATH[tool]).replace('"plugins"', '"mine": true,\n  "plugins"');
+      put(w.client, CATALOG_PATH[tool], edited);
+      const receiptBefore = get(w.client, RECEIPT_PATH);
+      const blocked = w.update();
+      assert.equal(blocked.status, 2, out(blocked));
+      assert.equal(report(blocked).state, 'conflict');
+      assert.deepEqual(report(blocked).conflicts, [{ path: CATALOG_PATH[tool], reason: claimed ? 'modified' : 'unknown' }]);
+      assert.equal(get(w.client, CATALOG_PATH[tool]), edited, 'the catalog edit is untouched');
+      assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v1\n');
+      assert.equal(get(w.client, 'AGENTS.md'), 'agents v1\n');
+      assert.equal(has(w.client, '.update-backup'), false);
+      assert.equal(get(w.client, RECEIPT_PATH), receiptBefore);
+
+      // Putting back the catalog Orion generated lets the same update through.
+      put(w.client, CATALOG_PATH[tool], json(buildCatalog(tool, ID)));
+      const run = w.update();
+      assert.equal(run.status, 0, out(run));
+      assert.equal(get(w.client, 'plugins/orion/skills/hello/SKILL.md'), 'hello v2\n');
+      assert.equal(receiptOf(w).files[CATALOG_PATH[tool]].hash, hash(json(buildCatalog(tool, ID))));
+    }
+  });
+}

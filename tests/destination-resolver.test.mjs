@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,15 +22,16 @@ function run(root, ...args) {
   return spawnSync(process.execPath, [command, '--root', root, ...args], { encoding: 'utf8' });
 }
 
-test('recorded tool selects only its destinations and classifies absent files', (t) => {
+test('recorded tool selects only its destinations', (t) => {
   const root = harness(t, { ai_assistant: 'codex', machine_profile: { chosen_surface: 'claude-code' } });
   const result = run(root);
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
   assert.equal(plan.ai_assistant, 'codex');
-  assert.ok(plan.entries.some((e) => e.destination === 'plugins/orion/skills/prospecting/SKILL.md' && e.state === 'absent'));
+  assert.ok(plan.entries.some((e) => e.destination === 'plugins/orion/skills/prospecting/SKILL.md'));
   assert.ok(!plan.entries.some((e) => e.destination === 'agents/README.md'));
   assert.ok(plan.entries.every((e) => !e.destination.startsWith('.claude/') && !e.destination.startsWith('.agents/')));
+  assert.ok(plan.entries.every((e) => !('state' in e)), 'ownership is the receipt\'s, never the plan\'s');
 });
 
 
@@ -45,19 +46,11 @@ test('missing and invalid recorded selections fail instead of inferring a tool',
   assert.match(result.stderr, /Invalid status\.ai_assistant: chatgpt/);
 });
 
-test('ownership keeps edited release files and excludes the retired roster', (t) => {
+test('the plan excludes the retired roster', (t) => {
   const root = harness(t, { ai_assistant: 'claude-code' });
-  for (const path of ['plugins/orion/skills/prospecting/SKILL.md', 'plugins/orion/skills/create-skill/SKILL.md']) {
-    mkdirSync(join(root, dirname(path)), { recursive: true });
-    copyFileSync(join(release, path), join(root, path));
-  }
-  writeFileSync(join(root, 'plugins/orion/skills/create-skill/SKILL.md'), 'Client changed this skill.\n');
   const result = run(root);
   assert.equal(result.status, 0, result.stderr);
-  const byDestination = Object.fromEntries(JSON.parse(result.stdout).entries.map((e) => [e.destination, e.state]));
-  assert.equal(byDestination['plugins/orion/skills/prospecting/SKILL.md'], 'owned');
-  assert.equal(byDestination['plugins/orion/skills/create-skill/SKILL.md'], 'preserve');
-  assert.equal(byDestination['.claude/agents/README.md'], undefined);
+  assert.ok(!JSON.parse(result.stdout).entries.some((e) => e.destination === '.claude/agents/README.md'));
 });
 
 test('legacy Claude layout requires an explicit migration choice', (t) => {

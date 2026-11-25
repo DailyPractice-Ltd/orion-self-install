@@ -6,7 +6,6 @@ import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { planForTool, safePath } from '../update/destination-resolver.mjs';
-import { computePristine, hasFullHistory, serialise, PRISTINE_PATH } from './helpers/pristine.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -65,15 +64,12 @@ test('release contract plans one selected runtime from portable sources', (t) =>
   assert.match(duplicate.stderr, /plugins\/orion\/ exactly once/i);
 });
 
-test('release contract rejects an unsupported tool and keeps historical ownership hashes', () => {
+test('release contract rejects an unsupported tool', () => {
   const run = spawnSync(process.execPath, [join(repo, 'update/release-contract.mjs'), '--tool', 'chatgpt'], { encoding: 'utf8' });
   assert.notEqual(run.status, 0);
   assert.match(run.stderr, /AI assistant/i);
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
   assert.deepEqual(manifest.deployment.tools, ['claude-code', 'codex']);
-  const pristine = JSON.parse(readFileSync(join(repo, 'update/pristine.json'), 'utf8'));
-  assert.ok(pristine.files['skills/hire-agent/SKILL.md'].length > 0);
-  assert.ok(pristine.files['agents/README.md'].length > 0);
 });
 
 test('release contract ships shared package files and only the selected manifest', () => {
@@ -117,12 +113,13 @@ test('relative links in the package resolve to package files, never escape to th
   }
 });
 
-test('update/pristine.json is up to date with everything this release ships', (t) => {
-  if (!hasFullHistory()) return t.skip('shallow clone: the shipped history is not here to check against');
-  assert.equal(
-    readFileSync(join(repo, PRISTINE_PATH), 'utf8'), serialise(computePristine()),
-    'update/pristine.json is stale: run node tests/helpers/pristine.mjs --write as the last edit of the release',
-  );
+test('release contract needs no git history', (t) => {
+  const { release } = candidate(t);
+  assert.equal(existsSync(join(release, '.git')), false, 'the candidate has no repository at all');
+  for (const tool of ['codex', 'claude-code']) {
+    const run = contract(release, '--tool', tool);
+    assert.equal(run.status, 0, `${tool}: ${run.stderr}`);
+  }
 });
 
 

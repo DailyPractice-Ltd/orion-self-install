@@ -42,11 +42,13 @@ Then continue exactly as for `main`: read that checkout's `agent/updating.md` an
 its helper. The selected commit's committed files are installed (never uncommitted
 edits in the checkout), under the same receipt, conflict, backup and recovery rules.
 
-## Orion 1.x: reinstall instead
+## Orion 1.x, or no receipt: reinstall instead
 
-This procedure updates 2.0.0 and later. When the deployed `template_version` is below
-2.0.0, or status has no recorded AI assistant, do not apply anything: tell the client
-that 2.0.0 is installed fresh, then follow
+This procedure updates 2.0.0 and later folders that have an installed-file receipt,
+`status/installed-files.json`. When the deployed `template_version` is below 2.0.0,
+status has no recorded AI assistant, or the folder has no receipt (a 2.0.0 folder
+installed before receipts), do not apply anything: tell the client that Orion is
+installed fresh, then follow
 [reinstall-from-1.x.md](reinstall-from-1.x.md) from the pinned source
 (`$scratch/source/agent/reinstall-from-1.x.md`). Remove the temporary checkout afterwards.
 
@@ -71,26 +73,21 @@ exact files Orion installed:
   its installed baseline, so the next update still recognises the change.
 - A file Orion never installed is kept and listed under `unknown`; its bytes are never
   adopted as Orion's.
-- A changed or unknown runtime file (the `.mjs` scripts, `update/` except
-  `update/pristine.json`, the status template), plugin file or plugin catalog that the
+- A changed or unknown runtime file (the `.mjs` scripts, `update/`, the status
+  template), plugin file or plugin catalog that the
   update would replace stops the update before any file changes:
   the report says `"state": "conflict"`, lists `conflicts` (path and `modified`,
   `unknown` or `not-a-file`) and gives the `remaining_action`. Read those paths out, ask
   the client to move their changes out, then rerun the same pinned update.
 - A receipt that cannot be read, is malformed or has an unsupported version stops the
   update before any change; never delete it to get past that.
+- A folder with no receipt at all is refused before anything changes (exit 2), with
+  the reinstall guide named: it was installed before receipts, so Orion cannot tell
+  the client's changes from its own files. Follow the section above.
 
-A 2.0.0 folder installed before receipts has none, and the update migrates it straight
-to the pinned release (no intermediate release is needed, because the incoming
-release's own helper runs). A file whose bytes match its last 2.0.0 version before
-receipts, by the frozen fingerprints in `update/pristine.json`, counts as installed;
-the folder's own copy of that registry is bookkeeping and always replaced. Anything else
-counts as unknown, with the same rules as above, so an unknown runtime or plugin file
-stops the update and an unknown ordinary file is kept and listed. The receipt the update
-writes holds only recognised files and files it installed. The helper backs up replaced and
-retired files and the receipt, retires listed files that are still as installed, checks
-the incoming scripts, and records the version and the new receipt after applying the
-update. On the same version it reports an up-to-date result when there is no work.
+The helper backs up replaced and retired files and the receipt, retires listed files
+that are still as installed, checks the incoming scripts, and records the version and
+the new receipt after applying the update. On the same version it reports an up-to-date result when there is no work.
 
 ### The Orion plugin in an update
 
@@ -129,7 +126,7 @@ local folder read in place, and Orion never runs `codex plugin marketplace upgra
 
 An interrupted update is rolled back from its journal with
 `node update/apply.mjs recover --root .`. Recovery restores only what the update wrote,
-and puts the receipt back as it was (or removes it, for a folder that had none), so a retry
+and puts the receipt back as it was, so a retry
 never trusts a replacement that did not finish. The next update also recovers first.
 If a path changed since, it stops, overwrites nothing and names the paths and the step to take.
 
@@ -178,9 +175,7 @@ For an update, restore puts prior released files back and removes newly installe
 files. A file changed after update, or a file written where the update retired one, is
 kept and reported. The receipt follows: restored files take back their earlier
 baselines, kept files keep the update's, so the next update still recognises the edit
-as the client's; files no longer there are no longer claimed. Restoring the update that
-gave a folder its first receipt removes the receipt again only when every file went back;
-if an edit was kept, the receipt stays so that edit is still recognised. It restores the prior
+as the client's; files no longer there are no longer claimed. It restores the prior
 version and retired checklist keys without replacing the client's live status
 wholesale. It also puts back the previous plugin package, catalog and this folder's
 own registration entries, leaving other settings as they are now. If the package
@@ -190,13 +185,6 @@ and confirm discovery with `node update/plugin-setup.mjs verify --discovered` be
 telling the client the previous version is running again. Keep the backup for audit.
 
 ## Maintainers
-
-`update/pristine.json` is frozen compatibility data for 2.0.0 harnesses installed before
-installed-file receipts: one fingerprint per file, its last 2.0.0 version before
-receipts. 1.x harnesses are reinstalled (`agent/reinstall-from-1.x.md`), so it lists no
-older versions. Never regenerate it from Git history or add the bytes of a
-release edit to it. It lists no versions of itself: updates read only the incoming
-release's copy, so a harness's copy is bookkeeping and always replaced. `node update/release-contract.mjs` validates its structure.
 
 ### Tool-specific metadata
 
@@ -216,6 +204,8 @@ the generated target manifest and catalog, and it drops the previous tool's mani
 catalog once they are removed. Every other baseline, including those of your edits, stays.
 A failed commit puts the receipt back; a pending, cancelled or failed switch never
 changes it, and a receipt that cannot be read stops the switch before anything changes.
+A folder without a receipt is refused before anything changes and reinstalls
+([reinstall-from-1.x.md](reinstall-from-1.x.md)), as for an update.
 
 Before replacing files, the updater probes write access to its destinations, including
 Codex's `.agents` catalog and `.codex` project configuration. A `preflight_failed`

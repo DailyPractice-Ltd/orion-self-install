@@ -28,15 +28,16 @@
  * new assistant, and the receipt drops the previous assistant's manifest and catalog only
  * once they are removed. Every other baseline stays as it was, and client skills are never
  * in it. The receipt is backed up with status.json and put back if the commit fails; a
- * waiting, cancelled or rolled-back switch never changes it. A folder without a receipt
- * gets none here, and one that cannot be trusted stops the switch before anything changes.
+ * waiting, cancelled or rolled-back switch never changes it. A receipt that cannot be
+ * trusted stops the switch before anything changes, and a folder without one (installed
+ * before receipts) is refused before the lock: it is reinstalled, like a 1.x folder.
  */
 import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withStatusLock } from './status/store.mjs';
 import { TOOL_LAYOUT, toolEntries } from './update/destination-resolver.mjs';
-import { RECEIPT_PATH, entryFromDisk, readReceipt, receiptAction, receiptText, revisedReceipt, withoutAbsent } from './update/receipt.mjs';
+import { NO_RECEIPT, RECEIPT_PATH, entryFromDisk, hasReceipt, readReceipt, receiptAction, receiptText, revisedReceipt, withoutAbsent } from './update/receipt.mjs';
 
 const SKILLS = { codex: '.agents/skills', 'claude-code': '.claude/skills' };
 const TOP = { codex: '.agents', 'claude-code': '.claude' };
@@ -106,6 +107,8 @@ async function pluginKit(root) {
 export async function switchAi(root, to) {
   const statusPath = join(root, 'status/status.json');
   if (!existsSync(statusPath)) throw new Error('No status/status.json here. Run this from inside your Orion folder.');
+  // A folder installed before receipts is reinstalled, never switched: refused before the lock.
+  if (!hasReceipt(root)) throw new Error(NO_RECEIPT);
   const kit = await pluginKit(root);
   return withStatusLock(root, (store) => switchLocked(store, root, statusPath, to, kit));
 }
@@ -137,6 +140,7 @@ async function switchLocked(store, root, statusPath, to, kit) {
   let receipt;
   try { receipt = readReceipt(root); }
   catch (error) { throw new Error(`${error.message}. Orion cannot tell its own files from yours without it, so nothing was changed. ${receiptAction('switch')}`); }
+  if (!receipt) throw new Error(NO_RECEIPT);
 
   // The plugin: set the target up from the same identity before anything else moves.
   let plugin = null;
@@ -189,7 +193,7 @@ async function switchLocked(store, root, statusPath, to, kit) {
   if (existsSync(backup)) throw new Error(`${backupRel} already exists. Wait a moment and run this again.`);
   for (const rel of files) copy(join(root, SKILLS[from], rel), join(backup, SKILLS[from], rel));
   copy(statusPath, join(backup, 'status/status.json'));
-  if (receipt) copy(join(root, RECEIPT_PATH), join(backup, RECEIPT_PATH));
+  copy(join(root, RECEIPT_PATH), join(backup, RECEIPT_PATH));
   if (plugin) {
     for (const path of Object.values(kit.MANIFEST_PATHS)) {
       if (existsSync(kit.safePath(root, path))) copy(join(root, path), join(backup, path));
@@ -212,10 +216,8 @@ async function switchLocked(store, root, statusPath, to, kit) {
     pruneEmpty(join(root, TOP[from]));
     // The receipt is written under the lock just before status.json, and the catch below
     // puts the backed-up copy back, so it names the new assistant only once the switch commits.
-    if (receipt) {
-      receipt = switchedReceipt(root, receipt, to, plugin && kit);
-      await store.writeReceiptText(receiptText(receipt));
-    }
+    receipt = switchedReceipt(root, receipt, to, plugin && kit);
+    await store.writeReceiptText(receiptText(receipt));
     injected('ORION_SWITCH_FAIL_BEFORE_COMMIT');
     status.ai_assistant = to;
     if (status.machine_profile && typeof status.machine_profile === 'object') status.machine_profile.chosen_surface = to;
@@ -236,7 +238,7 @@ async function switchLocked(store, root, statusPath, to, kit) {
       const source = join(root, SKILLS[from], rel);
       if (!existsSync(source)) copy(join(backup, SKILLS[from], rel), source);
     }
-    if (receipt) await store.writeReceiptText(readFileSync(join(backup, RECEIPT_PATH), 'utf8'));
+    await store.writeReceiptText(readFileSync(join(backup, RECEIPT_PATH), 'utf8'));
     const before = JSON.parse(readFileSync(join(backup, 'status/status.json'), 'utf8'));
     if (plugin) {
       // The previous assistant was never touched; only Orion's registration with the target goes.
@@ -256,7 +258,7 @@ async function switchLocked(store, root, statusPath, to, kit) {
       removeCatalog(root, plugin.oldCatalog, kit.catalogText(from, plugin.identity));
       rmSync(kit.safePath(root, kit.MANIFEST_PATHS[from]), { force: true });
       pruneParents(root, kit.MANIFEST_PATHS[from]);
-      if (receipt) await store.writeReceiptText(receiptText(withoutAbsent(root, receipt, [kit.MANIFEST_PATHS[from], plugin.oldCatalog])));
+      await store.writeReceiptText(receiptText(withoutAbsent(root, receipt, [kit.MANIFEST_PATHS[from], plugin.oldCatalog])));
     }
     else result.previous_tool_action = `Orion could not remove itself from ${NAME[from]} for this folder (${retired.details?.reason || 'its program was not reachable'}), so ${NAME[from]} may still offer the Orion skills here. Remove Orion there by hand; nothing else in ${NAME[from]} was changed, and ${plugin.oldCatalog} stays until then.`;
   }

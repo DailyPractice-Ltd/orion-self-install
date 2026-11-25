@@ -1,7 +1,7 @@
 /** A client journey using a complete release checkout and only deployed commands. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -48,10 +48,9 @@ const ok = result => assert.equal(result.status, 0, result.stdout + result.stder
 const status = root => JSON.parse(read(root, 'status/status.json'));
 
 /**
- * A release checkout of this working tree, committed, and a client installed from it, or
- * with `installAt`, by the installer of that earlier commit.
+ * A release checkout of this working tree, committed, and a client installed from it.
  */
-function journey(t, tool, { beforeInstall, installAt } = {}) {
+function journey(t, tool, { beforeInstall } = {}) {
   const base = mkdtempSync(join(tmpdir(), 'orion-deployed-'));
   t.after(() => rmSync(base, { recursive: true, force: true }));
   const release = join(base, 'release');
@@ -70,13 +69,7 @@ function journey(t, tool, { beforeInstall, installAt } = {}) {
     git(release, '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'working release');
   }
   beforeInstall?.(release);
-  let installer = release;
-  if (installAt) {
-    installer = join(base, 'old-release');
-    git(base, 'clone', '-q', release, installer);
-    git(installer, 'checkout', '-q', installAt);
-  }
-  ok(run(installer, 'install.mjs', '--tool', tool, '--target', client, '--local-only'));
+  ok(run(release, 'install.mjs', '--tool', tool, '--target', client, '--local-only'));
   return { release, client };
 }
 
@@ -562,117 +555,48 @@ for (const tool of ['claude-code', 'codex']) {
   });
 }
 
-// The last 2.0.0 release before installed-file receipts.
-const BEFORE_RECEIPTS = '55d0e65ce1f521f6b2a072ebf60d6274a2c1a351';
+/** Every path under root with its bytes (folders marked), to show that nothing changed. */
+function tree(root, prefix = '') {
+  const found = {};
+  for (const item of readdirSync(join(root, prefix), { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${item.name}` : item.name;
+    if (item.isDirectory()) Object.assign(found, { [`${rel}/`]: 'folder' }, tree(root, rel));
+    else found[rel] = readFileSync(join(root, rel)).toString('base64');
+  }
+  return found;
+}
 
-for (const tool of ['claude-code', 'codex']) for (const skip of [false, true]) {
-  test(`${tool} harness from before receipts ${skip ? 'skips the release that introduced them' : 'updates to receipts'} through the incoming updater, then updates again`, t => {
-    const { release, client } = journey(t, tool, { installAt: BEFORE_RECEIPTS });
-    assert.equal(existsSync(join(client, 'status/installed-files.json')), false, 'installed without a receipt');
-    const installedReadme = read(client, 'README.md');
-    const installedGuard = read(client, 'status/guard.mjs');
-    const installedAgents = read(client, 'AGENTS.md');
-    assert.throws(() => JSON.parse(read(client, 'update/pristine.json')), 'this release shipped a malformed registry copy');
-    assert.equal(JSON.parse(read(release, 'update/pristine.json')).files['update/pristine.json'], undefined, 'the incoming registry lists no versions of itself');
-    put(client, 'README.md', `${installedReadme}\nOur own notes.\n`);
+for (const tool of ['claude-code', 'codex']) {
+  test(`${tool} folder without a receipt is refused by the incoming updater and by its own switch, with nothing changed`, t => {
+    const { release, client } = journey(t, tool);
+    // A 2.0.0 folder installed before receipts: the same files, and no receipt.
+    rmSync(join(client, 'status/installed-files.json'));
     put(client, `${skill(tool)}/personal/SKILL.md`, '# Personal skill\n');
-    put(client, 'status/guard.mjs', `${installedGuard}\n// Client runtime edit.\n`);
-    const pinned = skip
-      ? publish(release, { 'AGENTS.md': `${read(release, 'AGENTS.md')}\nA later release.\n`, [`${pkg}/prospecting/SKILL.md`]: `${read(release, `${pkg}/prospecting/SKILL.md`)}\nA later release.\n` })
-      : git(release, 'rev-parse', 'HEAD');
-    // agent/updating.md: the incoming release's own updater, from its checkout, runs against the harness.
-    const incoming = () => run(release, 'update/apply.mjs', 'update', '--root', client, '--commit', pinned);
-
-    // Bytes no release shipped, in a runtime file the update replaces, stop it before any change.
-    const blocked = incoming();
-    assert.equal(blocked.status, 2, blocked.stdout + blocked.stderr);
-    assert.deepEqual(JSON.parse(blocked.stdout).conflicts, [{ path: 'status/guard.mjs', reason: 'unknown' }]);
-    assert.equal(read(client, 'AGENTS.md'), installedAgents);
-    assert.equal(existsSync(join(client, 'status/installed-files.json')), false);
-    assert.equal(existsSync(join(client, '.update-backup')), false);
-
-    put(client, 'status/guard.mjs', installedGuard.replace(/\n/g, '\r\n'));
-    const migrated = incoming();
-    ok(migrated);
-    const report = JSON.parse(migrated.stdout);
-    for (const path of ['AGENTS.md', 'status/guard.mjs', 'update/apply.mjs', 'update/receipt.mjs', 'update/pristine.json', `${pkg}/prospecting/SKILL.md`]) {
-      assert.equal(lfHash(readFileSync(join(client, path))), lfHash(readFileSync(join(release, path))), `${path} is the pinned release's`);
+    const before = tree(client);
+    const pinned = publish(release, { 'AGENTS.md': `${read(release, 'AGENTS.md')}\nA later release.\n` });
+    const refusals = {
+      // agent/updating.md: the incoming release's own updater, from its checkout, runs against the folder.
+      update: run(release, 'update/apply.mjs', 'update', '--root', client, '--commit', pinned),
+      switch: switcher(client).switchAi(),
+    };
+    for (const [name, result] of Object.entries(refusals)) {
+      assert.equal(result.status, 2, `${name}: ${result.stdout}${result.stderr}`);
+      assert.equal(result.stdout, '', name);
+      assert.match(result.stderr, /no installed-file receipt[\s\S]*agent\/reinstall-from-1\.x\.md[\s\S]*Nothing was changed/, name);
+      assert.deepEqual(tree(client), before, `${name} changed nothing`);
     }
-    assert.ok(!report.unknown.includes('update/pristine.json'), 'the malformed registry copy is bookkeeping, replaced without being recognised');
-    assert.equal(read(client, 'README.md'), `${installedReadme}\nOur own notes.\n`, 'an edit no release shipped is kept');
-    assert.ok(report.unknown.includes('README.md'));
-    assert.equal(read(client, `${skill(tool)}/personal/SKILL.md`), '# Personal skill\n');
-    const receipt = JSON.parse(read(client, 'status/installed-files.json'));
-    assert.equal(receipt.ai_assistant, tool);
-    assert.equal(receipt.files['README.md'], undefined, 'unknown bytes are never adopted');
-    assert.equal(receipt.files[`${skill(tool)}/personal/SKILL.md`], undefined);
-    assert.ok(receipt.files['status/guard.mjs'] && receipt.files['update/receipt.mjs'] && receipt.files[`${pkg}/prospecting/SKILL.md`]);
-    for (const [path, entry] of Object.entries(receipt.files)) assert.equal(entry.hash, lfHash(readFileSync(join(client, path))), `${path} is recorded as installed`);
-
-    // The migrated baselines carry the next update, run by the harness's own updater.
-    put(client, 'AGENTS.md', 'Our own agent instructions.\n');
-    const next = publish(release, {
-      'AGENTS.md': `${read(release, 'AGENTS.md')}\nThe release after.\n`,
-      'README.md': `${installedReadme}\nThe release after.\n`,
-      'status/guard.mjs': `${read(release, 'status/guard.mjs')}\n// The release after.\n`,
-    });
-    const again = run(client, 'update/apply.mjs', 'update', '--root', client, '--release-repo', release, '--commit', next);
-    ok(again);
-    const second = JSON.parse(again.stdout);
-    assert.match(read(client, 'status/guard.mjs'), /The release after/);
-    assert.equal(read(client, 'AGENTS.md'), 'Our own agent instructions.\n');
-    assert.ok(second.kept.includes('AGENTS.md'), 'an edit after migration is the client\'s');
-    assert.equal(read(client, 'README.md'), `${installedReadme}\nOur own notes.\n`);
-    assert.ok(second.unknown.includes('README.md'));
-    const after = JSON.parse(read(client, 'status/installed-files.json'));
-    assert.equal(after.files['AGENTS.md'].hash, receipt.files['AGENTS.md'].hash, 'the edited file keeps its migrated baseline');
-    assert.equal(after.files['status/guard.mjs'].hash, lfHash(readFileSync(join(client, 'status/guard.mjs'))));
   });
 }
 
 for (const tool of ['claude-code', 'codex']) {
-  test(`${tool} harness migrated to receipts, switched away and back, still restores with its migrated baselines`, t => {
-    const { release, client } = journey(t, tool, { installAt: BEFORE_RECEIPTS });
-    const installedReadme = read(client, 'README.md');
-    put(client, 'README.md', `${installedReadme}\nOur own notes.\n`);
-    put(client, `${skill(tool)}/personal/SKILL.md`, '# Personal skill\n');
-    const migrated = run(release, 'update/apply.mjs', 'update', '--root', client, '--commit', git(release, 'rev-parse', 'HEAD'));
-    ok(migrated);
-    const { backup } = JSON.parse(migrated.stdout);
-    const proved = JSON.parse(read(client, `${backup}/receipt/migrated.json`));
-
-    const { switchAi, targetReady } = switcher(client);
-    for (const to of [other(tool), tool]) {
-      targetReady(to);
-      ok(switchAi());
-      assert.equal(JSON.parse(read(client, 'status/installed-files.json')).ai_assistant, to);
-    }
-    assert.equal(read(client, `${backup}/receipt/migrated.json`), JSON.stringify(proved, null, 2) + '\n', 'the switches leave the update backup alone');
-
-    const restore = run(client, 'update/apply.mjs', 'restore', '--root', client, '--backup', backup);
-    ok(restore);
-    const restored = JSON.parse(restore.stdout).restored.filter(path => path !== 'registration');
-    assert.ok(restored.includes('switch_ai.mjs'), restore.stdout);
-    const receipt = JSON.parse(read(client, 'status/installed-files.json'));
-    assert.equal(receipt.ai_assistant, tool);
-    for (const path of restored.filter(path => path !== 'plugins/orion')) assert.deepEqual(receipt.files[path], proved.files[path], `${path} takes its migrated baseline`);
-    assert.equal(receipt.files['README.md'], undefined, 'unknown bytes are never adopted');
-    assert.equal(read(client, 'README.md'), `${installedReadme}\nOur own notes.\n`);
-    assert.equal(read(client, `${skill(tool)}/personal/SKILL.md`), '# Personal skill\n');
-  });
-}
-
-for (const tool of ['claude-code', 'codex']) {
-  test(`${tool} harness with a damaged receipt never falls back to the frozen fingerprints`, t => {
-    const { release, client } = journey(t, tool, { installAt: BEFORE_RECEIPTS });
-    // The files are all shipped bytes the registry recognises; only the damaged receipt stands in the way.
+  test(`${tool} harness with a damaged receipt stops the update before any change`, t => {
+    const { release, client } = journey(t, tool);
     put(client, 'status/installed-files.json', '{"schema":"orion-installed-files",');
-    const before = Object.fromEntries(['AGENTS.md', 'status/guard.mjs', `${pkg}/prospecting/SKILL.md`, 'status/status.json'].map(path => [path, read(client, path)]));
-    const result = run(release, 'update/apply.mjs', 'update', '--root', client, '--commit', git(release, 'rev-parse', 'HEAD'));
+    const before = tree(client);
+    const pinned = publish(release, { 'AGENTS.md': `${read(release, 'AGENTS.md')}\nA later release.\n` });
+    const result = run(release, 'update/apply.mjs', 'update', '--root', client, '--commit', pinned);
     assert.equal(result.status, 2, result.stdout + result.stderr);
     assert.match(result.stderr, /installed-file receipt[\s\S]*nothing was changed/);
-    for (const [path, text] of Object.entries(before)) assert.equal(read(client, path), text, path);
-    assert.equal(existsSync(join(client, 'update/receipt.mjs')), false);
-    assert.equal(existsSync(join(client, '.update-backup')), false);
+    assert.deepEqual(tree(client), before);
   });
 }

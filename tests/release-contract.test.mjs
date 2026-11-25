@@ -4,8 +4,8 @@ import { mkdtempSync, mkdirSync, copyFileSync, existsSync, readFileSync, readdir
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { fingerprint, planForTool, safePath } from '../update/destination-resolver.mjs';
+import { spawnSync } from 'node:child_process';
+import { planForTool, safePath } from '../update/destination-resolver.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -64,16 +64,12 @@ test('release contract plans one selected runtime from portable sources', (t) =>
   assert.match(duplicate.stderr, /plugins\/orion\/ exactly once/i);
 });
 
-test('release contract rejects an unsupported tool; the registry holds the last pre-receipt version of each file', () => {
+test('release contract rejects an unsupported tool', () => {
   const run = spawnSync(process.execPath, [join(repo, 'update/release-contract.mjs'), '--tool', 'chatgpt'], { encoding: 'utf8' });
   assert.notEqual(run.status, 0);
   assert.match(run.stderr, /AI assistant/i);
   const manifest = JSON.parse(readFileSync(join(repo, 'update/manifest.json'), 'utf8'));
   assert.deepEqual(manifest.deployment.tools, ['claude-code', 'codex']);
-  // 1.x harnesses are reinstalled, never updated: no aliases, and one version per file.
-  assert.equal(manifest.deployment.fingerprints.legacy_aliases, undefined);
-  const pristine = JSON.parse(readFileSync(join(repo, 'update/pristine.json'), 'utf8'));
-  for (const [key, prints] of Object.entries(pristine.files)) assert.equal(prints.length, 1, key);
 });
 
 test('release contract ships shared package files and only the selected manifest', () => {
@@ -117,68 +113,13 @@ test('relative links in the package resolve to package files, never escape to th
   }
 });
 
-test('release contract validates the frozen compatibility registry without any git history', (t) => {
+test('release contract needs no git history', (t) => {
   const { release } = candidate(t);
   assert.equal(existsSync(join(release, '.git')), false, 'the candidate has no repository at all');
-  for (const tool of ['codex', 'claude-code']) assert.equal(contract(release, '--tool', tool).status, 0, tool);
-
-  const registry = join(release, 'update/pristine.json');
-  const frozen = readFileSync(registry, 'utf8');
-  const refuses = (why, text, says) => {
-    writeFileSync(registry, text);
-    for (const tool of ['codex', 'claude-code']) {
-      const run = contract(release, '--tool', tool);
-      assert.notEqual(run.status, 0, `${tool}: ${why}`);
-      assert.match(run.stderr, /update\/pristine\.json/, `${tool}: ${why} names the registry`);
-      assert.match(run.stderr, says, `${tool}: ${why}`);
-    }
-    writeFileSync(registry, frozen);
-  };
-  // A merge that drops a comma between two entries.
-  refuses('malformed JSON', frozen.replace(/",\n(\s+")/, '"\n$1'), /JSON/i);
-  const data = JSON.parse(frozen);
-  const without = (key) => JSON.stringify({ ...data, files: Object.fromEntries(Object.entries(data.files).filter(([k]) => k !== key)) });
-  // A later release retires a file a pre-receipt harness carries: the registry must keep its fingerprint.
-  const manifestPath = join(release, 'update/manifest.json');
-  const manifest = readFileSync(manifestPath, 'utf8');
-  const withRetired = JSON.parse(manifest);
-  withRetired.deployment.retired = [{ source: 'agent/install.md', destinations: { 'claude-code': 'agent/install.md', codex: 'agent/install.md' }, fingerprint_key: 'agent/install.md' }];
-  writeFileSync(manifestPath, JSON.stringify(withRetired, null, 2));
-  for (const tool of ['codex', 'claude-code']) assert.equal(contract(release, '--tool', tool).status, 0, `${tool}: a listed retirement`);
-  refuses('a retired source lost', without('agent/install.md'), /agent\/install\.md/);
-  writeFileSync(manifestPath, manifest);
-  // The harness's own copy is bookkeeping, replaced whatever its bytes: the registry lists no versions of itself.
-  assert.equal(data.files['update/pristine.json'], undefined, 'the registry does not fingerprint itself');
-  refuses('a hash that is not a fingerprint', JSON.stringify({ ...data, files: { ...data.files, 'AGENTS.md': ['not-a-hash'] } }), /AGENTS\.md/);
-  refuses('no files map', JSON.stringify({ ...data, files: [] }), /files/);
-});
-
-test('history, merges and working-tree edits alone never require a registry rewrite', (t) => {
-  const { release } = candidate(t);
-  const registry = readFileSync(join(release, 'update/pristine.json'));
-  const git = (...args) => execFileSync('git', ['-c', 'commit.gpgsign=false', ...args], { cwd: release, stdio: 'ignore', env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' } });
-  const passes = (when) => {
-    for (const tool of ['codex', 'claude-code']) {
-      const run = contract(release, '--tool', tool);
-      assert.equal(run.status, 0, `${tool} ${when}: ${run.stderr}`);
-    }
-    assert.deepEqual(readFileSync(join(release, 'update/pristine.json')), registry, `${when}: registry untouched`);
-  };
-  // One squashed commit: none of the shipped history is reachable.
-  git('init', '-q', '-b', 'main'); git('add', '-A'); git('commit', '-q', '-m', 'squashed');
-  passes('after a squash');
-  // A side branch with a new deployed-file version, merged with a merge commit.
-  git('checkout', '-q', '-b', 'side');
-  writeFileSync(join(release, 'agent/install.md'), `${readFileSync(join(release, 'agent/install.md'), 'utf8')}\nA side-branch line.\n`);
-  git('commit', '-q', '-am', 'side edit');
-  git('checkout', '-q', 'main');
-  writeFileSync(join(release, 'README.md'), `${readFileSync(join(release, 'README.md'), 'utf8')}\nA main line.\n`);
-  git('commit', '-q', '-am', 'main edit');
-  git('merge', '-q', '--no-ff', '-m', 'merge side', 'side');
-  passes('after a merge');
-  // An uncommitted edit to a deployed file.
-  writeFileSync(join(release, 'CHANGELOG.md'), `${readFileSync(join(release, 'CHANGELOG.md'), 'utf8')}\n- uncommitted\n`);
-  passes('with an uncommitted edit');
+  for (const tool of ['codex', 'claude-code']) {
+    const run = contract(release, '--tool', tool);
+    assert.equal(run.status, 0, `${tool}: ${run.stderr}`);
+  }
 });
 
 

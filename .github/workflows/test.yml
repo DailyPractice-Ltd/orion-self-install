@@ -27,7 +27,7 @@ jobs:
       - run: git config --global core.autocrlf false
       - uses: actions/checkout@v5
         with:
-          # Journey tests replay files from historical release commits.
+          # tests/send-risk.test.mjs replays files from the v1.3.0 and v1.4.0 tags.
           fetch-depth: 0
       - uses: actions/setup-node@v5
         with:

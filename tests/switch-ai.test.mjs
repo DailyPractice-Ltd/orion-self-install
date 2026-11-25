@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, realpathSync, rmSync, symlinkSync, copyFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, realpathSync, rmSync, symlinkSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -19,6 +19,12 @@ const status = (root) => JSON.parse(get(root, 'status/status.json'));
 const skills = (tool) => tool === 'codex' ? '.agents/skills' : '.claude/skills';
 const other = (tool) => tool === 'codex' ? 'claude-code' : 'codex';
 
+/** The receipt every install writes; these folders' tests need none of its entries. */
+const installReceipt = (root, tool) => put(root, 'status/installed-files.json', receiptText({
+  schema: RECEIPT_SCHEMA, version: RECEIPT_VERSION, algorithm: RECEIPT_ALGORITHM, ai_assistant: tool,
+  template_version: '2.0.0', recorded_by: 'install', recorded_at: '2026-11-01T00:00:00.000Z', files: {},
+}));
+
 function folder(t, from) {
   const root = mkdtempSync(join(tmpdir(), 'orion-switch-ai-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -29,6 +35,7 @@ function folder(t, from) {
   put(root, `${skills(from)}/custom/references/notes.md`, 'my notes\n');
   put(root, `${skills(from)}/speckit-plan/SKILL.md`, 'maintainer only\n');
   put(root, 'status/shift-log.md', 'old log\n');
+  installReceipt(root, from);
   return root;
 }
 const run = (root, ...args) => spawnSync(process.execPath, [script, '--root', root, ...args], { encoding: 'utf8' });
@@ -165,6 +172,7 @@ function pluginWorld(t, { tool = 'claude-code', faults = {}, codexInstalled = tr
       native.codex.installed = [{ id: PLUGIN_ID, name: 'orion', marketplace: CATALOG, version: 'local', installed: true, enabled: true }];
     }
   }
+  installReceipt(client, tool);
   writeFileSync(statePath, JSON.stringify(native));
   const bin = join(base, 'bin'); mkdirSync(bin);
   const extra = { FAKE_NATIVE_STATE: statePath, HOME: home, CODEX_HOME: join(home, '.codex') };
@@ -506,8 +514,27 @@ test('a receipt that cannot be trusted stops the switch before anything changes'
   assert.equal(has(w.client, '.update-backup'), false);
 });
 
-test('a folder without a receipt gets none from a switch', (t) => {
-  const root = folder(t, 'codex');
-  assert.equal(run(root).status, 0);
-  assert.equal(has(root, RECEIPT), false);
+/** Every path under root with its bytes (folders marked), to show that nothing changed. */
+function tree(root, prefix = '') {
+  const found = {};
+  for (const item of readdirSync(join(root, prefix), { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${item.name}` : item.name;
+    if (item.isDirectory()) Object.assign(found, { [`${rel}/`]: 'folder' }, tree(root, rel));
+    else found[rel] = readFileSync(join(root, rel)).toString('base64');
+  }
+  return found;
+}
+
+for (const tool of ['codex', 'claude-code']) test(`a switch from ${tool} refuses a folder without a receipt and points at reinstalling, with nothing changed`, (t) => {
+  const w = pluginWorld(t, { tool });
+  rmSync(join(w.client, RECEIPT)); // a 2.0.0 folder installed before receipts
+  const before = tree(w.client), nativeBefore = w.native();
+  const result = w.switchTo(other(tool));
+  assert.equal(result.status, 2, out(result));
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /no installed-file receipt \(status\/installed-files\.json\)/);
+  assert.match(result.stderr, /agent\/reinstall-from-1\.x\.md/);
+  assert.match(result.stderr, /Nothing was changed/);
+  assert.deepEqual(tree(w.client), before, 'no skill, status, catalog, backup or lock was written');
+  assert.deepEqual(w.native(), nativeBefore, 'neither tool was touched');
 });

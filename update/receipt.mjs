@@ -6,7 +6,7 @@
  */
 import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PACKAGE_ROOT, REGISTRY_PATH, SHA256_HEX, TOOL_LAYOUT, fingerprint, safePath } from './destination-resolver.mjs';
+import { PACKAGE_ROOT, SHA256_HEX, TOOL_LAYOUT, fingerprint, safePath } from './destination-resolver.mjs';
 import { RECEIPT_PATH } from '../status/store.mjs';
 
 export { RECEIPT_PATH };
@@ -77,6 +77,19 @@ export function validateReceipt(value) {
   return value;
 }
 
+/**
+ * Why a folder without a receipt is refused: it was installed before receipts (or is 1.x),
+ * and only a fresh install gives it ownership evidence. Updates and switches say this
+ * before taking the status lock or changing anything.
+ */
+export const NO_RECEIPT = `This folder has no installed-file receipt (${RECEIPT_PATH}): it was installed before Orion recorded the files it installs, so Orion cannot tell your changes from its own files. Install Orion fresh in a new folder and bring your files across: follow agent/reinstall-from-1.x.md, which covers this folder too. Nothing was changed`;
+
+/** Whether the folder has a receipt at all (a damaged one counts: readReceipt reports it). */
+export function hasReceipt(root) {
+  const path = join(root, RECEIPT_PATH);
+  return existsSync(path) || isDanglingLink(path);
+}
+
 /** The harness's receipt: null when it has none, an error when one exists but cannot be trusted. */
 export function readReceipt(root) {
   const path = join(root, RECEIPT_PATH);
@@ -100,12 +113,9 @@ function isDanglingLink(path) {
  * Managed runtime: code the harness runs, and the data that code reads. A client edit
  * here that an update would replace stops the update, so the folder never runs a
  * mixture of releases. Plugin package files and the catalog are protected the same way
- * by the updater. The compatibility registry is not runtime: updates read the
- * incoming release's copy, never the harness's, so it is tracked like any other
- * non-runtime file (see legacyReceipt for how a migrating harness claims it).
+ * by the updater.
  */
 export function isRuntimeDestination(destination) {
-  if (destination === REGISTRY_PATH) return false;
   return destination.endsWith('.mjs') || destination.startsWith('update/') || destination === 'status/status.schema-template.json';
 }
 
@@ -132,28 +142,6 @@ export function receiptState(root, destination, receipt) {
   const current = fingerprint(readFileSync(target));
   const state = baseline === null ? 'unknown' : current === baseline ? 'installed' : 'modified';
   return { state, current, baseline };
-}
-
-/**
- * The receipt a harness from before receipts can prove, from the frozen compatibility
- * registry (update/pristine.json): one entry for each candidate `{destination, key}` whose
- * current bytes are the last version Orion shipped under that source identity before
- * receipts. Anything else gets no entry, so its bytes are never adopted as Orion's, with one
- * deliberate exception: the registry's own copy (update/pristine.json). Updates read the
- * incoming release's registry and never the harness's, so the harness copy is Orion's
- * bookkeeping, not client content; no client work lives in it and nothing runs from it.
- * It is seeded as owned whatever its bytes, so a malformed or stale shipped copy is
- * always replaced and the registry never has to list versions of itself.
- */
-export function legacyReceipt(root, candidates, { registry, ai_assistant, template_version }) {
-  const proved = { schema: RECEIPT_SCHEMA, version: RECEIPT_VERSION, algorithm: RECEIPT_ALGORITHM, ai_assistant, template_version, recorded_by: 'migration', recorded_at: new Date().toISOString(), files: {} };
-  const shipped = key => registry?.files?.[key] || [];
-  for (const { destination, key } of candidates) {
-    if (proved.files[destination]) continue;
-    const { state, current } = receiptState(root, destination, proved);
-    if (state === 'unknown' && (destination === REGISTRY_PATH || shipped(key).includes(current))) proved.files[destination] = receiptEntry(key, current);
-  }
-  return validateReceipt({ ...proved, files: sortedFiles(proved.files) });
 }
 
 /**

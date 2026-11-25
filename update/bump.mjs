@@ -6,18 +6,15 @@
  *
  * Checks first, writing nothing until every check passes: X.Y.Z format, greater
  * than the current template_version, a CHANGELOG.md that opens with exactly
- * one "## Unreleased — <title>" section, and valid frozen compatibility
- * fingerprints in update/pristine.json. Then, in order: renames that heading to
+ * one "## Unreleased — <title>" section. Then, in order: renames that heading to
  * "## X.Y.Z — <today> — <title>", sets template_version in update/manifest.json
- * and regenerates the plugin manifests. update/pristine.json is frozen data: the
- * bump validates it and never rewrites it, and needs no git history.
+ * and regenerates the plugin manifests. It needs no git history.
  * All or nothing: if any write fails, every file it may write is put back
  * byte for byte. It never commits, tags or pushes.
  */
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compatibilityErrors } from './destination-resolver.mjs';
 import { MANIFEST_PATHS, writePluginManifests } from './plugin-package.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -44,10 +41,8 @@ function plan(version) {
     throw new Error(`${version === undefined ? 'No version given' : `"${version}" is not an X.Y.Z version`}. Usage: node update/bump.mjs X.Y.Z`);
   }
   const manifestText = read(MANIFEST);
-  const { template_version: current, deployment } = JSON.parse(manifestText);
+  const { template_version: current } = JSON.parse(manifestText);
   if (!isNewer(version, current)) throw new Error(`${version} is not greater than the current template_version ${current}.`);
-  const compatibility = compatibilityErrors(root, deployment);
-  if (compatibility.length) throw new Error(compatibility.join('\n'));
 
   const lines = read(CHANGELOG).split('\n');
   const headings = lines.map((line, at) => ({ line: line.replace(/\r$/, ''), at })).filter(({ line }) => line.startsWith('## '));
@@ -100,6 +95,5 @@ console.log(`Bumped ${next.current} → ${version}:
   ${CHANGELOG}: ${next.heading}
   ${MANIFEST}: template_version ${version}
   ${manifests.join('\n  ')}: version ${version}
-  update/pristine.json: frozen compatibility data, validated and unchanged
 
 Next: review the diff (git diff), commit it, then tag v${version}. Nothing was committed, tagged or pushed.`);

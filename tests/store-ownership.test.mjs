@@ -177,6 +177,9 @@ test('a tool switch takes the lock: it waits, and changes nothing when the lock 
     mkdirSync(dirname(join(dir, path)), { recursive: true });
     copyFileSync(join(ROOT, path), join(dir, path));
   }
+  // The receipt its install wrote: a folder without one is refused before the lock.
+  writeFileSync(join(dir, 'status', 'installed-files.json'), JSON.stringify({ schema: 'orion-installed-files', version: 1, algorithm: 'sha256-utf8-lf',
+    ai_assistant: 'claude-code', template_version: '2.0.0', recorded_by: 'install', recorded_at: '2026-11-01T00:00:00.000Z', files: {} }));
   mkdirSync(join(dir, 'status', '.radio-lock'));
   const { code, out } = node(dir, [join(dir, 'switch_ai.mjs')], SHORT_WAIT);
   assert.equal(code, 2, out);

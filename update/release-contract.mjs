@@ -7,9 +7,8 @@
  * the plugin manifests are fresh from the candidate's template_version (and
  * equal `--version` when given), checks CHANGELOG.md exists and its newest
  * numbered section is that template_version (and, with `--version`, that it
- * opens with a section for that version), validates the frozen compatibility
- * fingerprints in update/pristine.json (structure only, never git history),
- * validates the package, then simulates a
+ * opens with a section for that version), validates the package, then
+ * simulates a
  * fresh deployment for the tool into a temporary folder: deployment plan plus
  * that tool's catalog under a synthetic catalog identity, validated against
  * the deployed package. Prints the deployment plan; exits 2 naming the tool on
@@ -20,7 +19,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PACKAGE_ROOT, TOOL_LAYOUT, compatibilityErrors, planForTool, safePath } from './destination-resolver.mjs';
+import { PACKAGE_ROOT, TOOL_LAYOUT, planForTool, safePath } from './destination-resolver.mjs';
 import { staleManifests, validateCatalog, validatePackage, writeCatalog } from './plugin-package.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -94,7 +93,6 @@ function check(ai_assistant, requested) {
     else if (requested !== version) errors.push(`release version ${requested} does not equal the candidate's template_version ${version}`);
   }
   errors.push(...changelogErrors(version, requested));
-  errors.push(...compatibilityErrors(root, manifest.deployment));
   errors.push(...staleManifests(root).map(path => `${path} is stale: regenerate it from template_version ${version} (node update/plugin-package.mjs --write)`));
   errors.push(...validatePackage(root, { version: requested ?? version }));
   if (!errors.length) errors.push(...simulateDeployment(ai_assistant, entries, requested ?? version));

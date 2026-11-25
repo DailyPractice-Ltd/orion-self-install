@@ -12,11 +12,9 @@
  * Ownership comes from the harness's installed-file receipt (update/receipt.mjs): files still
  * as installed are updated, edited and unknown ones are kept, and an edited or unknown
  * runtime or plugin file the update would replace stops it before any change (state
- * "conflict"). An unreadable or invalid receipt stops it too. A harness from before receipts
- * has none and migrates: its receipt starts as the files whose bytes match the frozen
- * fingerprints in update/pristine.json (the last 2.0.0 version of each file before
- * receipts), plus its registry copy as bookkeeping (receipt.mjs legacyReceipt), and the
- * same rules apply.
+ * "conflict"). An unreadable or invalid receipt stops it too. A folder without a receipt
+ * (installed before receipts) is refused before the lock, like a 1.x folder: it reinstalls.
+ * A retired file is removed only when the receipt shows it untouched.
  * The receipt is backed up, journaled, written last under the lock and rolled back with the files.
  *
  * The Orion plugin package (plugins/orion) is release-managed and replaced as a unit; the
@@ -37,13 +35,13 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, exis
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PACKAGE_ROOT, REGISTRY_PATH, TOOL_LAYOUT, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
+import { PACKAGE_ROOT, TOOL_LAYOUT, fingerprint, planForTool, resolveAiAssistant, safePath } from './destination-resolver.mjs';
 import { MANIFEST_PATHS, catalogName, catalogText, ensurePluginRegion } from './plugin-package.mjs';
 import { lowerFirst } from './plugin-native.mjs';
 import { captureRegistration, restoreRegistration, CODEX_PROJECT_CONFIG, CLAUDE_LOCAL_SETTINGS } from './plugin-registration.mjs';
 import { RESUME_COMMAND, VERIFY_COMMAND, runPluginSetup } from './plugin-setup.mjs';
 import { preflightDestinations } from './preflight.mjs';
-import { RECEIPT_PATH, isRuntimeDestination, legacyReceipt, readReceipt, receiptAction, receiptEntry, receiptState, receiptText, restoredReceipt, updatedReceipt } from './receipt.mjs';
+import { NO_RECEIPT, RECEIPT_PATH, hasReceipt, isRuntimeDestination, readReceipt, receiptAction, receiptEntry, receiptState, receiptText, restoredReceipt, updatedReceipt } from './receipt.mjs';
 import { withStatusLock } from '../status/store.mjs';
 
 const arg = name => { const i=process.argv.indexOf(name); return i<0 ? undefined : process.argv[i+1]; };
@@ -139,18 +137,14 @@ async function update(store,root,repo,commit) {
   const snapshot=sourceSnapshot(repo,commit);
   try {
     const manifest=json(join(snapshot,'update/manifest.json'));
-    // The registry is always the incoming release's copy, never the harness's.
-    const pristine=json(join(snapshot,manifest.deployment.fingerprints?.registry||REGISTRY_PATH));
     const statusPath=safe(root,'status/status.json'), status=await store.readStatus();
-    // 2.0.0 is a reinstall release: a 1.x folder is never updated in place.
-    const legacyMarker=['agent/agent-definition.md','agent/adapters/claude.md'].find(path=>existsSync(join(root,path)));
-    if (legacyMarker) throw new Error(`This folder is an Orion 1.x harness (it has ${legacyMarker}). Orion 2.0.0 is installed fresh, not updated in place: follow agent/reinstall-from-1.x.md. Nothing was changed`);
     const ai_assistant=resolveAiAssistant(status,manifest.deployment);
-    // The receipt is this harness's ownership evidence. None is a harness from before
-    // receipts, which migrates below; one that cannot be trusted stops the update before anything changes.
+    // The receipt is this harness's ownership evidence. One that cannot be trusted stops the
+    // update before anything changes; one gone since the check before the lock is refused like none.
     let receipt;
     try { receipt=readReceipt(root); }
     catch (error) { throw new Error(`${error.message}. Orion cannot tell your changes from its own files without it, so it stopped; nothing was changed. ${receiptAction('update')}`); }
+    if (!receipt) throw new Error(NO_RECEIPT);
     if (newer(status.template_version,manifest.template_version)) throw new Error('Refusing to roll back the harness version');
     if (status.plugin?.pending_switch) throw new Error(`A switch to ${product(status.plugin.pending_switch.to)} has started but is not finished, and an update now could leave the two tools on different releases. Finish the switch first (run "node switch_ai.mjs" again) or cancel it (run "node switch_ai.mjs --to ${ai_assistant}"), then update`);
     const withPlugin=hasPackage(manifest.deployment);
@@ -164,18 +158,9 @@ async function update(store,root,repo,commit) {
       rmSync(omitted, { force: true });
       pruneParents(snapshot, [MANIFEST_PATHS[otherTool]]);
     }
-    const retired=(manifest.deployment.retired||[]).map(e=>({source:e.source,destination:e.destinations?.[ai_assistant]||e.destination,ownership:'release',fingerprint_key:e.sources?.[ai_assistant]||e.fingerprint_key||e.source}));
-    const commonRetired=(manifest.remove||[]).map(path=>({source:path,destination:path,ownership:'release',fingerprint_key:path}));
-    // Migration: a harness without a receipt starts from the one it can prove, the files whose
-    // bytes the frozen registry recognises; from there it is updated like any receipt harness.
-    const migrating=receipt===null;
-    if (migrating) {
-      const packageFiles=withPlugin && existsSync(safe(root,PACKAGE_ROOT)) ? treeLines(safe(root,PACKAGE_ROOT)).map(line=>`${PACKAGE_ROOT}/${line.slice(0,line.lastIndexOf(' '))}`) : [];
-      const keyOf=new Map(plan.map(e=>[e.destination,e.fingerprint_key]));
-      const candidates=[...plan.filter(e=>e.ownership==='release'),...retired,...commonRetired].map(e=>({destination:e.destination,key:e.fingerprint_key}))
-        .concat(packageFiles.map(path=>({destination:path,key:keyOf.get(path)||path})));
-      receipt=legacyReceipt(root,candidates,{registry:pristine,ai_assistant,template_version:status.template_version||'unknown'});
-    }
+    // Retired destinations: removed only when the receipt shows them untouched (below).
+    const retired=(manifest.deployment.retired||[]).map(e=>({destination:e.destinations?.[ai_assistant]||e.destination}));
+    const commonRetired=(manifest.remove||[]).map(path=>({destination:path}));
     const actions=[], report={from:status.template_version,to:manifest.template_version,commit,ai_assistant,refreshed:[],added:[],retired:[],kept:[],unknown:[],collisions:[]};
     // Conflicts stop the update; `verified` files already hold the incoming
     // bytes and `forgotten` receipt entries name retired files that are gone.
@@ -237,9 +222,7 @@ async function update(store,root,repo,commit) {
       const path=TOOL_LAYOUT[ai_assistant].catalogPath, text=catalogText(ai_assistant,identity);
       const {state,current}=receiptState(root,path,receipt);
       // Plugin metadata: a catalog that is neither as generated (its receipt baseline) nor the
-      // incoming bytes is the client's change and stops the update, like a package edit. Every
-      // Orion release generated the same bytes for a tool and identity, so a migrating
-      // harness's catalog is either the incoming one or not Orion's.
+      // incoming bytes is the client's change and stops the update, like a package edit.
       if (state==='not-a-file' || ((state==='modified' || state==='unknown') && current!==fingerprint(text))) conflicts.push({path,reason:state});
       // Always backed up: the catalog is this harness's registration state for the tool.
       catalog={path,text,prior_hash:current,installed_hash:fingerprint(text),changed:current!==fingerprint(text)};
@@ -287,20 +270,16 @@ async function update(store,root,repo,commit) {
       pkg:pkg && Object.fromEntries(plan.filter(e=>isPackagePath(e.destination) && existsSync(safe(snapshot,e.source))).map(e=>[e.destination,receiptEntry(e.fingerprint_key,fileHash(safe(snapshot,e.source)))])),
       catalog:catalog && (catalog.changed || catalog.prior_hash===catalog.installed_hash) ? {path:catalog.path,entry:receiptEntry(catalog.path,catalog.installed_hash,'generated')} : null,
     },{ai_assistant,template_version:manifest.template_version}));
-    // Whenever this update writes a receipt, the journal says what to put back: the backed-up
-    // copy, or (`prior: null`) no receipt at all for a harness that had none.
-    // A migrating harness also keeps the receipt it proved (`migrated`): the baselines its
-    // restored files go back to if the receipt changes after this update.
+    // The journal says what to put back: the backed-up copy of the receipt.
     const priorReceiptHash = fileHash(safe(root,RECEIPT_PATH));
-    if (priorReceiptHash) copyTo(safe(root,RECEIPT_PATH),join(backup,'receipt',RECEIPT_PATH));
-    if (migrating) { mkdirSync(join(backup,'receipt'),{recursive:true}); writeFileSync(join(backup,'receipt','migrated.json'),receiptText(receipt)); }
+    copyTo(safe(root,RECEIPT_PATH),join(backup,'receipt',RECEIPT_PATH));
     const journal={kind:'update',state:'pending',from:status.template_version,to:manifest.template_version,commit,ai_assistant,
       actions:actions.map(a=>({kind:a.kind,destination:a.e.destination,installed_hash:a.kind==='retire'?null:fingerprint(readFileSync(a.src)),prior_hash:a.kind==='add'?null:fingerprint(readFileSync(a.dest))})),
       remove_status_checklist_keys:checklistKeys,
       package:pkg && {path:PACKAGE_ROOT,prior_hash:pkg.prior_hash,installed_hash:pkg.installed_hash},
       catalog:catalog && {path:catalog.path,prior_hash:catalog.prior_hash,installed_hash:catalog.installed_hash},
       registration:registration ? 'registration.json' : null,
-      receipt:{path:RECEIPT_PATH,prior:priorReceiptHash?`receipt/${RECEIPT_PATH}`:null,prior_hash:priorReceiptHash,installed_hash:fingerprint(installedReceipt),...(migrating && {migrated:'receipt/migrated.json'})}};
+      receipt:{path:RECEIPT_PATH,prior:`receipt/${RECEIPT_PATH}`,prior_hash:priorReceiptHash,installed_hash:fingerprint(installedReceipt)}};
     // The status fields this update owns, written under the lock once the files are in place.
     const commitStatus=current=>{
       for(const key of journal.remove_status_checklist_keys) delete current.checklist?.[key];
@@ -447,7 +426,8 @@ async function rollbackUpdate(store,root,backup,journal,adjust) {
     if (journal.package.prior_hash) copyTree(join(backup,'package',PACKAGE_ROOT),safe(root,PACKAGE_ROOT));
   }
   if (journal.registration) restoreRegistration(root,json(join(backup,journal.registration)));
-  // The receipt goes back with the files it describes; a harness that had none has none again.
+  // The receipt goes back with the files it describes. A journal from before every update
+  // had a receipt to back up (`prior: null`) leaves none, as before that update.
   if (journal.receipt && fileHash(safe(root,journal.receipt.path))!==journal.receipt.prior_hash) {
     if (journal.receipt.prior) await store.writeReceiptText(readFileSync(join(backup,journal.receipt.prior)));
     else await store.removeReceipt();
@@ -525,20 +505,17 @@ async function restore(store,root,backupRel) {
     }
   }
   if (journal.registration) { restoreRegistration(root,json(join(backup,journal.registration))); restored.push('registration'); }
-  // The receipt follows the files. Restored files take back their prior baselines (none when
-  // the harness had no receipt before the update); kept ones keep the update's, so a later
-  // edit to them is still recognised as the client's. Files the update added and the client
-  // deleted are no longer claimed.
+  // The receipt follows the files. Restored files take back their prior baselines; kept ones
+  // keep the update's, so a later edit to them is still recognised as the client's. Files the
+  // update added and the client deleted are no longer claimed. A backup from before every
+  // update had a receipt to back up (`prior: null`) records no baselines: when nothing changed
+  // the receipt since and every file went back, the folder has none again, as before.
   const prior=journal.receipt?.prior ? json(join(backup,journal.receipt.prior)) : null;
   if (!prior && receiptNow && journal.receipt && receiptHashNow===journal.receipt.installed_hash && !kept.length) {
-    // The update wrote the harness's first receipt, nothing changed it since and every file
-    // went back: none again loses nothing. A kept edit needs the receipt to stay the client's.
     await store.removeReceipt();
   } else if (prior || receiptNow) {
-    // A migrated harness had no receipt; its restored files take the baselines it proved then.
-    const migrated=!prior && journal.receipt?.migrated ? json(join(backup,journal.receipt.migrated)) : null;
     const files=restored.filter(path=>path!=='registration');
-    await store.writeReceiptText(receiptText(restoredReceipt(receiptNow||prior,{prior:(prior||migrated)?.files,restored:files,gone},{template_version:old.template_version})));
+    await store.writeReceiptText(receiptText(restoredReceipt(receiptNow||prior,{prior:prior?.files,restored:files,gone},{template_version:old.template_version})));
   }
   for(const key of journal.remove_status_checklist_keys) if(Object.hasOwn(old.checklist||{},key)) {status.checklist ||= {};status.checklist[key]=old.checklist[key];}
   status.template_version=old.template_version;
@@ -558,11 +535,23 @@ async function restore(store,root,backupRel) {
   return result;
 }
 
+/**
+ * Folders an update never touches, refused before the lock, a recovery, a backup or any
+ * change: a 1.x harness (2.0.0 is a reinstall release), and a folder without an
+ * installed-file receipt (installed before receipts), which reinstalls the same way.
+ */
+function refuseUnreceipted(root) {
+  const legacyMarker=['agent/agent-definition.md','agent/adapters/claude.md'].find(path=>existsSync(join(root,path)));
+  if (legacyMarker) throw new Error(`This folder is an Orion 1.x harness (it has ${legacyMarker}). Orion 2.0.0 is installed fresh, not updated in place: follow agent/reinstall-from-1.x.md. Nothing was changed`);
+  if (!hasReceipt(root)) throw new Error(NO_RECEIPT);
+}
+
 async function main() {
   const command=process.argv[2], root=arg('--root'); if(!root) throw new Error('--root is required');
   const repo=arg('--release-repo')||dirname(dirname(fileURLToPath(import.meta.url)));
   if (command==='switch') throw new Error('To switch AI assistants, run: node switch_ai.mjs');
   if (!['update','restore','recover'].includes(command)) throw new Error('Use update, restore or recover');
+  if (command==='update') refuseUnreceipted(root);
   return withStatusLock(root, store =>
     command==='update' ? update(store,root,repo,arg('--commit'))
       : command==='restore' ? restore(store,root,arg('--backup'))

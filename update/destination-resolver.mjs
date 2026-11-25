@@ -1,4 +1,4 @@
-/** Resolve a deployed harness's selected destinations and file ownership. */
+/** Resolve a deployed harness's selected destinations; file ownership is the receipt's (update/receipt.mjs). */
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -8,9 +8,6 @@ const RELEASE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** The shipped Orion plugin package: same path in the release and in every harness. */
 export const PACKAGE_ROOT = 'plugins/orion';
-
-/** The frozen compatibility registry's default path (see compatibilityErrors). */
-export const REGISTRY_PATH = 'update/pristine.json';
 
 /** A fingerprint: lowercase SHA-256 hex. */
 export const SHA256_HEX = /^[0-9a-f]{64}$/;
@@ -62,61 +59,6 @@ export function fingerprint(contents) {
   return createHash('sha256').update(Buffer.from(contents).toString('utf8').replace(/\r\n/g, '\n')).digest('hex');
 }
 
-export function destinationState(root, entry, pristine) {
-  const target = safePath(root, entry.destination);
-  // A symlink anywhere in a destination is a collision, even if its target
-  // happens to have the expected bytes. Never read through it for ownership.
-  let part = resolve(root);
-  for (const segment of entry.destination.split('/')) {
-    part = join(part, segment);
-    try { if (lstatSync(part).isSymbolicLink()) return 'preserve'; }
-    catch (error) { if (error.code !== 'ENOENT') throw error; }
-  }
-  if (!existsSync(target)) return 'absent';
-  if (!lstatSync(target).isFile()) return 'preserve';
-  if (entry.ownership === 'client-template') return 'client-owned';
-  // The registry's own copy is Orion bookkeeping: always replaceable, and never listed in
-  // itself. Updates use the receipt, or for a harness without one, receipt.mjs legacyReceipt.
-  if (entry.source === REGISTRY_PATH && entry.destination === entry.source) return 'owned';
-  const known = pristine.files?.[entry.fingerprint_key] || [];
-  return known.includes(fingerprint(readFileSync(target))) ? 'owned' : 'preserve';
-}
-
-/**
- * update/pristine.json is frozen compatibility data: one fingerprint per file, its
- * last 2.0.0 version before installed-file receipts, kept so a 2.0.0 harness
- * installed before receipts stays recognisable (1.x harnesses are reinstalled,
- * never updated). It is never rebuilt from git history, so its validity depends
- * only on its own content and the manifest: well-formed, every fingerprint a
- * lowercase SHA-256, and every retirement identity that deployed harnesses may
- * still carry present with at least one fingerprint. It
- * lists no versions of itself: a harness's copy is Orion bookkeeping, never read by
- * an update, and a migrating harness claims it whatever its bytes (receipt.mjs
- * legacyReceipt).
- * Returns the problems, empty when valid.
- */
-export function compatibilityErrors(releaseRoot, deployment) {
-  const name = deployment.fingerprints?.registry || REGISTRY_PATH;
-  let registry;
-  try { registry = JSON.parse(readFileSync(join(releaseRoot, name), 'utf8')); }
-  catch (error) { return [`${name} is not readable JSON: ${error.message}`]; }
-  const files = registry?.files;
-  if (!files || typeof files !== 'object' || Array.isArray(files)) return [`${name} has no "files" map of fingerprints`];
-  const errors = [];
-  for (const [key, prints] of Object.entries(files)) {
-    if (!Array.isArray(prints) || prints.some(print => typeof print !== 'string' || !SHA256_HEX.test(print))) {
-      errors.push(`${name}: ${key} must list lowercase SHA-256 fingerprints`);
-    }
-  }
-  const required = new Set(
-    (deployment.retired || []).flatMap(entry => [entry.fingerprint_key || entry.source, ...Object.values(entry.sources || {})]),
-  );
-  for (const key of [...required].sort()) {
-    if (!files[key]?.length) errors.push(`${name} lost the compatibility fingerprints for ${key}, which deployed harnesses may still carry`);
-  }
-  return errors;
-}
-
 /**
  * The tool mapping alone: each deployment entry's source, destination and identity for
  * one tool, without checking a release tree. planForTool adds those checks; a switch
@@ -158,11 +100,10 @@ export function planForTool(deployment, ai_assistant, { releaseRoot = RELEASE_RO
 export function resolveDestinations({ root, releaseRoot = RELEASE_ROOT, legacyTool } = {}) {
   if (!root) throw new Error('A deployed harness root is required');
   const manifest = readJson(join(releaseRoot, 'update/manifest.json'), 'release manifest');
-  const pristine = readJson(join(releaseRoot, manifest.deployment.fingerprints?.registry || REGISTRY_PATH), 'fingerprint registry');
   const status = readJson(join(root, 'status/status.json'), 'harness status');
   const ai_assistant = resolveAiAssistant(status, manifest.deployment, { legacyTool });
   const entries = planForTool(manifest.deployment, ai_assistant, { releaseRoot, root });
-  return { ai_assistant, legacy_migration: status.ai_assistant == null, entries: entries.map((entry) => ({ ...entry, state: destinationState(root, entry, pristine) })) };
+  return { ai_assistant, legacy_migration: status.ai_assistant == null, entries };
 }
 
 /** Paths used by a running client harness, from its recorded tool alone. */

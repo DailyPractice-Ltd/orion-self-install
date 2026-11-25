@@ -56,7 +56,6 @@ test('bump releases the Unreleased section at a new version the release contract
   const current = templateVersion(release);
   const next = nextPatch(current);
   changelog(release, `## Unreleased — tidy the release\n\n- a note\n\n## ${current} — 2026-11-12\n\n- older\n`);
-  const registry = readFileSync(join(release, 'update/pristine.json'));
 
   const run = bump(release, next);
   assert.equal(run.status, 0, run.stderr);
@@ -68,7 +67,6 @@ test('bump releases the Unreleased section at a new version the release contract
   }
   const headings = readFileSync(join(release, 'CHANGELOG.md'), 'utf8').split('\n').filter(line => line.startsWith('## '));
   assert.deepEqual(headings, [`## ${next} — ${today()} — tidy the release`, `## ${current} — 2026-11-12`]);
-  assert.deepEqual(readFileSync(join(release, 'update/pristine.json')), registry, 'compatibility fingerprints are frozen, never regenerated');
 });
 
 test('bump refuses before writing anything', (t) => {
@@ -86,12 +84,9 @@ test('bump refuses before writing anything', (t) => {
     { why: 'Unreleased not first', args: [next], changes: `## 9.9.9 — x\n\n## Unreleased — a\n\n${released}`, says: /must open with a "## Unreleased — <title>" section/ },
     { why: 'Unreleased without a title', args: [next], changes: `## Unreleased\n\n${released}`, says: /must open with a "## Unreleased — <title>" section/ },
     { why: 'two Unreleased sections', args: [next], changes: `## Unreleased — a\n\n## Unreleased — b\n\n${released}`, says: /2 "## Unreleased" sections\. Merge them into one/ },
-    { why: 'malformed compatibility registry', args: [next], changes: `## Unreleased — a\n\n${released}`, registry: '{"files": {', says: /Bump refused[\s\S]*update\/pristine\.json is not readable JSON/ },
   ];
-  const frozen = readFileSync(join(release, 'update/pristine.json'));
-  for (const { why, args, changes, registry, says } of cases) {
+  for (const { why, args, changes, says } of cases) {
     changelog(release, changes);
-    writeFileSync(join(release, 'update/pristine.json'), registry ?? frozen);
     const before = snapshot(release);
     const run = bump(release, ...args);
     assert.notEqual(run.status, 0, `${why}: should refuse`);

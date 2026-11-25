@@ -1,7 +1,7 @@
 {
-  "_read_first": "Follow agent/updating.md with this manifest pinned to main's commit, or to the full commit the request names (on main or not, tagged or not). The deployment map uses the tool recorded in status; the harness's installed-file receipt (status/installed-files.json) decides which files are Orion's, and update/pristine.json only migrates a harness without one. The request is consent: never stop to ask, and never replace a file the client has changed: a changed runtime or plugin file, or plugin catalog, stops the update instead.",
+  "_read_first": "Follow agent/updating.md with this manifest pinned to main's commit, or to the full commit the request names (on main or not, tagged or not). The deployment map uses the tool recorded in status; the harness's installed-file receipt (status/installed-files.json) decides which files are Orion's; a folder without one is refused and reinstalls (agent/reinstall-from-1.x.md). The request is consent: never stop to ask, and never replace a file the client has changed: a changed runtime or plugin file, or plugin catalog, stops the update instead.",
   "_what": "deployment is the source-to-destination and ownership contract for separate client repositories; select exactly one recorded tool. 2.0.0 is a reinstall release: this manifest updates 2.0.0 and later only (agent/reinstall-from-1.x.md). Contract: agent/updating.md and deployment._contract.",
-  "_regenerate": "Map every file under plugins/orion/ in deployment.entries, once each, with no per-tool destinations: the package ships at its own path for every tool. update/pristine.json is frozen compatibility data: never regenerate it; the release contract validates it.",
+  "_regenerate": "Map every file under plugins/orion/ in deployment.entries, once each, with no per-tool destinations: the package ships at its own path for every tool.",
   "template_version": "2.0.0",
   "never_touch": {
     "status/status.json": "The client's own record: preserve pairing, setup checkpoint, stages, packages and choices. An update edits template_version and appends one notes line. node status/send.mjs migrate may add the default send level. The shared guard updates sharing.pairing at runtime; it never resets a recorded clock. Setup may persist its own checkpoint. These runtime state changes do not authorize replacing the client's status file.",
@@ -72,7 +72,6 @@
       "update/manifest.json",
       "update/plugin-native.mjs",
       "update/plugin-registration.mjs",
-      "update/pristine.json",
       "update/receipt.mjs",
       "update/plugin-package.mjs",
       "update/plugin-setup.mjs",
@@ -330,14 +329,9 @@
       "img/"
     ],
     "ownership": {
-      "release": "Install only into an absent destination. On update replace only when the destination fingerprint is a known shipped copy for this fingerprint_key; preserve and report edits and collisions. Back up before replacement or retirement.",
+      "release": "Install only into an absent destination. On update replace or retire only when the installed-file receipt shows the destination untouched; preserve and report edits and collisions. Back up before replacement or retirement.",
       "client-template": "Install only into an absent destination. Thereafter the destination belongs to the client; never refresh or retire personalized roster rows or job sheets.",
       "unlisted": "Any destination absent from the deployment plan for this AI assistant belongs to the client. Never write or retire it."
-    },
-    "fingerprints": {
-      "algorithm": "sha256-utf8-lf",
-      "registry": "update/pristine.json",
-      "key": "source path (fingerprint_key), independent of destination"
     }
   }
 }

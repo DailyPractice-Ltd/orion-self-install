@@ -32,28 +32,25 @@ only those: a file you changed is kept, or the update stops before changing anyt
   catalog and the update would replace it, the update now stops before changing
   anything and names the files, instead of overwriting them. A damaged receipt also stops the update, with
   nothing changed.
-- **2.0.0 folders installed before receipts** update straight to the latest release,
-  with no intermediate release. Files matching the 2.0.0 version Orion shipped update
-  as before and enter the new receipt; any other bytes are kept, listed and never
-  claimed as Orion's. A changed script, plugin skill or catalog in such a folder
-  stops the update too. The folder's copy of `update/pristine.json` is Orion's own
-  bookkeeping (updates never read it), so it is always replaced, including the
-  malformed one 2.0.0 shipped.
+- **Folders without a receipt reinstall.** A 2.0.0 folder installed before receipts
+  cannot show which files are Orion's, so an update or a tool switch refuses it before
+  changing anything and names the reinstall guide
+  ([agent/reinstall-from-1.x.md](agent/reinstall-from-1.x.md)), the same route as a
+  1.x folder: install fresh, bring your business files and skills across, and pair
+  again.
 - **Recovery and restore keep the receipt in step with the files.** A failed update,
   an interrupted one recovered with `recover` (or by the next update), and a plugin
-  activation failure that rolls back (exit 3) all put the receipt back exactly, or
-  remove it again for a folder that had none. A restore keeps files you changed
-  after the update, and now also keeps a file you wrote where the update retired one
-  instead of overwriting it; restored files take back their earlier baselines and
-  your later edits stay recognised as yours, including after restoring the update
-  that first gave a folder its receipt. While plugin activation is pending, the
-  receipt describes the files already applied, and finishing activation (`resume`,
-  `verify --discovered`) never moves a baseline.
+  activation failure that rolls back (exit 3) all put the receipt back exactly. A
+  restore keeps files you changed after the update, and now also keeps a file you
+  wrote where the update retired one instead of overwriting it; restored files take
+  back their earlier baselines and your later edits stay recognised as yours. While
+  plugin activation is pending, the receipt describes the files already applied, and
+  finishing activation (`resume`, `verify --discovered`) never moves a baseline.
 - **Switching between Codex and Claude Code** keeps the receipt accurate. A finished
   switch records the new assistant's plugin manifest and catalog, and drops the old
   assistant's only once they are removed; your edits keep their baselines. A failed,
-  waiting or cancelled switch leaves the receipt unchanged, and a damaged receipt
-  stops the switch before anything changes.
+  waiting or cancelled switch leaves the receipt unchanged, and a damaged or missing
+  receipt stops the switch before anything changes.
 - **Updates still follow `main` by default.** An update can also be pinned to a
   full commit that is not on `main` or tagged (for example a candidate Daily
   Practice asks you to try); it installs exactly that commit's files under the same
@@ -61,23 +58,13 @@ only those: a file you changed is kept, or the update stops before changing anyt
 
 ### For maintainers
 
-- `update/pristine.json` is now frozen compatibility data, read only to migrate
-  folders installed before receipts. It is no longer regenerated from Git history,
-  so merges, squashes, shallow clones and working-tree edits never require a
-  registry rewrite. `tests/helpers/pristine.mjs` is gone.
-- The release contract and `node update/bump.mjs` validate the registry instead:
-  readable JSON, SHA-256 fingerprints, and every retirement identity present. The bump no longer touches `update/pristine.json`, and neither the
-  contract nor the updater needs full Git history.
-- The registry holds one fingerprint per file: its last 2.0.0 version before
-  receipts (commit `55d0e65`), 98 files (down from 150 keys and 645 hashes). 1.x
-  folders are reinstalled, never updated (`agent/reinstall-from-1.x.md`), so the
-  1.x-only data is gone: the 47 `deployment.retired` entries (`library/`, Spec Kit,
-  `.specify/`, `notion/` and the old `.claude` skills and roster) and
-  `fingerprints.legacy_aliases`, with the alias lookup in the migration. Retirement
-  itself still works for later releases. It no longer lists versions of itself: a
-  harness's copy is bookkeeping, tracked like any other non-runtime file and, when
-  migrating, claimed and replaced whatever its bytes.
-- The registry's malformed JSON from the 2.0.0 merge is gone with that rewrite.
+- The fingerprint registry is gone: ownership comes only from each folder's receipt,
+  so no fingerprint data is regenerated, frozen or validated in the release, and
+  merges, squashes, shallow clones and working-tree edits never need a data rewrite.
+  `node update/bump.mjs` and the release contract no longer check one.
+  `tests/helpers/pristine.mjs` is gone.
+- Retirement still works: a file listed in `deployment.retired` or `remove` is removed
+  only where the receipt shows it untouched.
 - A candidate can be tried on a deployed harness by pinning its full commit; no
   merge or tag is needed (`agent/maintaining.md`).
 

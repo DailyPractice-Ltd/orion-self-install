@@ -16,17 +16,18 @@ const run = (...args) => spawnSync(process.execPath,[script,...args],{encoding:'
 test('pinned selected update preserves collisions and restores additions and retirements', t => {
   const base=mkdtempSync(join(tmpdir(),'orion-update-cli-')); t.after(()=>rmSync(base,{recursive:true,force:true}));
   const source=join(base,'release'), client=join(base,'client'); mkdirSync(source); mkdirSync(client);
-  const manifest={template_version:'2.0.0', remove_status_checklist_keys:['n8n_wf01_imported'], deployment:{tools:['claude-code','codex'],common_sources:['AGENTS.md','status/a.mjs','status/b.mjs','update/manifest.json','update/pristine.json'],entries:[{source:'skills/foo/SKILL.md',destinations:{'claude-code':'.claude/skills/foo/SKILL.md',codex:'.agents/skills/foo/SKILL.md'},ownership:'release',fingerprint_key:'skills/foo/SKILL.md'},{source:'agents/README.md',destinations:{'claude-code':'.claude/agents/README.md',codex:'agents/README.md'},ownership:'client-template',fingerprint_key:'agents/README.md'}],retired:[{source:'skills/old/SKILL.md',destinations:{'claude-code':'.claude/skills/old/SKILL.md',codex:'.agents/skills/old/SKILL.md'},fingerprint_key:'skills/old/SKILL.md'}]}};
+  const manifest={template_version:'2.0.0', remove_status_checklist_keys:['n8n_wf01_imported'], deployment:{tools:['claude-code','codex'],common_sources:['AGENTS.md','status/a.mjs','status/b.mjs','update/manifest.json'],entries:[{source:'skills/foo/SKILL.md',destinations:{'claude-code':'.claude/skills/foo/SKILL.md',codex:'.agents/skills/foo/SKILL.md'},ownership:'release',fingerprint_key:'skills/foo/SKILL.md'},{source:'agents/README.md',destinations:{'claude-code':'.claude/agents/README.md',codex:'agents/README.md'},ownership:'client-template',fingerprint_key:'agents/README.md'}],retired:[{source:'skills/old/SKILL.md',destinations:{'claude-code':'.claude/skills/old/SKILL.md',codex:'.agents/skills/old/SKILL.md'},fingerprint_key:'skills/old/SKILL.md'}]}};
   put(source,'AGENTS.md','new instructions\n'); put(source,'status/a.mjs','console.log("new a")\n'); put(source,'status/b.mjs','console.log("new b")\n'); put(source,'skills/foo/SKILL.md','new skill\n'); put(source,'agents/README.md','roster template\n'); put(source,'update/manifest.json',JSON.stringify(manifest));
-  const hash=s=>requireHash(s); const pristine={files:{'AGENTS.md':[hash('old instructions\n')],'status/a.mjs':[hash('old a\n')],'status/b.mjs':[hash('old b\n')],'skills/foo/SKILL.md':[hash('old skill\n')],'skills/old/SKILL.md':[hash('old retired\n')]}};
-  put(source,'update/pristine.json',JSON.stringify(pristine));
   git(source,'init','-q'); git(source,'add','.'); git(source,'-c','user.email=test@example.com','-c','user.name=Test','commit','-qm','release'); const commit=git(source,'rev-parse','HEAD'); put(source,'AGENTS.md','uncommitted instructions\n');
   put(client,'status/status.json',JSON.stringify({template_version:'1.0.0',ai_assistant:'codex',notes:'before',sharing:{pairing:{version:2,state:'verified',verified_at:'2026-11-18T12:00:00.000Z',last_check:'unreachable',last_connected_at:'2026-11-18T12:00:00.000Z'}},checklist:{n8n_wf01_imported:true,connector_crm_live:true}}));
   put(client,'AGENTS.md','old instructions\r\n'); put(client,'status/a.mjs','client edited script\n'); put(client,'status/b.mjs','old b\n'); put(client,'.agents/skills/foo/SKILL.md','client edit\n'); put(client,'.agents/skills/old/SKILL.md','old retired\n'); put(client,'agents/README.md','personalized roster\n'); put(client,'.claude/skills/foo/SKILL.md','other tool content\n');
-  // Without a receipt, an edited runtime script is unknown to Orion and stops the update before any change.
+  // The receipt the install wrote: what Orion installed, before the client's edits above.
+  writeReceipt(client,{'AGENTS.md':'old instructions\n','status/a.mjs':'old a\n','status/b.mjs':'old b\n','.agents/skills/foo/SKILL.md':'old skill\n','.agents/skills/old/SKILL.md':'old retired\n'},{'.agents/skills/foo/SKILL.md':'skills/foo/SKILL.md','.agents/skills/old/SKILL.md':'skills/old/SKILL.md'});
+  const installedReceipt=get(client,'status/installed-files.json');
+  // An edited runtime script the update would replace stops it before any change.
   const blocked=run('update','--root',client,'--release-repo',source,'--commit',commit); assert.equal(blocked.status,2,blocked.stdout+blocked.stderr);
-  assert.deepEqual(JSON.parse(blocked.stdout).conflicts,[{path:'status/a.mjs',reason:'unknown'}]);
-  assert.equal(get(client,'AGENTS.md'),'old instructions\r\n'); assert.equal(existsSync(join(client,'status/installed-files.json')),false); assert.equal(existsSync(join(client,'.update-backup')),false);
+  assert.deepEqual(JSON.parse(blocked.stdout).conflicts,[{path:'status/a.mjs',reason:'modified'}]);
+  assert.equal(get(client,'AGENTS.md'),'old instructions\r\n'); assert.equal(get(client,'status/installed-files.json'),installedReceipt); assert.equal(existsSync(join(client,'.update-backup')),false);
   put(client,'status/a.mjs','old a\n');
   const updated=run('update','--root',client,'--release-repo',source,'--commit',commit); assert.equal(updated.status,0,updated.stderr); const report=JSON.parse(updated.stdout);
   assert.equal(report.ai_assistant, 'codex');
@@ -35,7 +36,7 @@ test('pinned selected update preserves collisions and restores additions and ret
   assert.deepEqual(updatedStatus.sharing.pairing,{version:2,state:'verified',verified_at:'2026-11-18T12:00:00.000Z',last_check:'unreachable',last_connected_at:'2026-11-18T12:00:00.000Z'});
   assert.deepEqual(updatedStatus.checklist, { connector_crm_live: true });
   put(client, 'status/status.json', JSON.stringify({ ...updatedStatus, agent_name: 'Orion' }));
-  assert.equal(get(client,'AGENTS.md'),'new instructions\n'); assert.equal(get(client,'status/a.mjs'),'console.log("new a")\n'); assert.equal(get(client,'status/b.mjs'),'console.log("new b")\n'); assert.equal(get(client,'.agents/skills/foo/SKILL.md'),'client edit\n'); assert.equal(get(client,'agents/README.md'),'personalized roster\n'); assert.equal(get(client,'.claude/skills/foo/SKILL.md'),'other tool content\n'); assert.equal(existsSync(join(client,'.agents/skills/old/SKILL.md')),false); assert.ok(report.unknown.includes('.agents/skills/foo/SKILL.md')); assert.ok(report.collisions.includes('agents/README.md'));
+  assert.equal(get(client,'AGENTS.md'),'new instructions\n'); assert.equal(get(client,'status/a.mjs'),'console.log("new a")\n'); assert.equal(get(client,'status/b.mjs'),'console.log("new b")\n'); assert.equal(get(client,'.agents/skills/foo/SKILL.md'),'client edit\n'); assert.equal(get(client,'agents/README.md'),'personalized roster\n'); assert.equal(get(client,'.claude/skills/foo/SKILL.md'),'other tool content\n'); assert.equal(existsSync(join(client,'.agents/skills/old/SKILL.md')),false); assert.ok(report.kept.includes('.agents/skills/foo/SKILL.md')); assert.ok(report.collisions.includes('agents/README.md'));
   const restored=run('restore','--root',client,'--backup',report.backup); assert.equal(restored.status,0,restored.stderr); assert.equal(get(client,'AGENTS.md'),'old instructions\r\n'); assert.equal(get(client,'status/a.mjs'),'old a\n'); assert.equal(get(client,'.agents/skills/old/SKILL.md'),'old retired\n'); assert.equal(existsSync(join(client,'update/manifest.json')),false); assert.equal(get(client,'.agents/skills/foo/SKILL.md'),'client edit\n'); assert.equal(JSON.parse(get(client,'status/status.json')).template_version,'1.0.0');
   const restoredStatus = JSON.parse(get(client, 'status/status.json'));
   assert.equal(restoredStatus.ai_assistant, 'codex');
@@ -44,19 +45,25 @@ test('pinned selected update preserves collisions and restores additions and ret
   assert.deepEqual(restoredStatus.checklist, { connector_crm_live: true, n8n_wf01_imported: true });
 });
 function requireHash(s) { return createHash('sha256').update(s).digest('hex'); }
+/** The receipt an install leaves: `installed` maps each destination to the text Orion installed there. */
+function writeReceipt(client, installed = {}, keys = {}) {
+  const files = Object.fromEntries(Object.entries(installed).map(([path, body]) => [path, { key:keys[path] || path, hash:requireHash(body), origin:'release' }]));
+  put(client,'status/installed-files.json',JSON.stringify({ schema:'orion-installed-files', version:1, algorithm:'sha256-utf8-lf', ai_assistant:JSON.parse(get(client,'status/status.json')).ai_assistant, template_version:'1.0.0', recorded_by:'install', recorded_at:'2026-11-01T00:00:00.000Z', files },null,2));
+}
 
 test('same-version Codex update reports up to date and preserves job sheets',t=>{
   const base=mkdtempSync(join(tmpdir(),'orion-update-team-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
   const source=join(base,'release'),client=join(base,'client');mkdirSync(source);mkdirSync(client);
   const manifest={template_version:'2.0.0',deployment:{tools:['claude-code','codex'],common_sources:[],entries:[]}};
-  put(source,'agents/README.md','release roster\n');put(source,'update/manifest.json',JSON.stringify(manifest));put(source,'update/pristine.json',JSON.stringify({files:{}}));
+  put(source,'agents/README.md','release roster\n');put(source,'update/manifest.json',JSON.stringify(manifest));
   git(source,'init','-q');git(source,'add','.');git(source,'-c','user.email=test@example.com','-c','user.name=Test','commit','-qm','release');
   const status=JSON.stringify({template_version:'2.0.0',ai_assistant:'codex'});
-  put(client,'status/status.json',status);
+  put(client,'status/status.json',status);writeReceipt(client);const receipt=get(client,'status/installed-files.json');
   put(client,'team/README.md','client roster\n');put(client,'team/writer.md','client job\n');
   const updated=run('update','--root',client,'--release-repo',source,'--commit',git(source,'rev-parse','HEAD'));assert.equal(updated.status,0,updated.stderr);
   assert.equal(JSON.parse(updated.stdout).up_to_date,true);
   assert.equal(get(client,'status/status.json'),status);
+  assert.equal(get(client,'status/installed-files.json'),receipt);
   assert.equal(existsSync(join(client,'.update-backup')),false);
   assert.equal(get(client,'team/README.md'),'client roster\n');
   assert.equal(get(client,'team/writer.md'),'client job\n');
@@ -68,15 +75,15 @@ test('failed update rolls back writes from the predeclared transaction',t=>{
   const source=join(base,'release'),client=join(base,'client');mkdirSync(source);mkdirSync(client);
   const manifest={template_version:'2.0.0',deployment:{tools:['claude-code','codex'],common_sources:['AGENTS.md','README.md'],entries:[]}};
   put(source,'AGENTS.md','new agents\n');put(source,'README.md','new readme\n');put(source,'update/manifest.json',JSON.stringify(manifest));
-  put(source,'update/pristine.json',JSON.stringify({files:{'AGENTS.md':[requireHash('old agents\n')],'README.md':[requireHash('old readme\n')]}}));
   git(source,'init','-q');git(source,'add','.');git(source,'-c','user.email=test@example.com','-c','user.name=Test','commit','-qm','release');
   put(client,'status/status.json',JSON.stringify({template_version:'1.0.0',ai_assistant:'codex'}));
   put(client,'AGENTS.md','old agents\n');put(client,'README.md','old readme\n');
+  writeReceipt(client,{'AGENTS.md':'old agents\n','README.md':'old readme\n'});const installedReceipt=get(client,'status/installed-files.json');
   const result=spawnSync(process.execPath,[script,'update','--root',client,'--release-repo',source,'--commit',git(source,'rev-parse','HEAD')],{encoding:'utf8',env:plainEnv({ORION_UPDATE_FAIL_AFTER:'1'})});
   assert.equal(result.status,2);assert.match(result.stderr,/Injected update interruption/);
   assert.equal(get(client,'AGENTS.md'),'old agents\n');assert.equal(get(client,'README.md'),'old readme\n');
   assert.equal(JSON.parse(get(client,'status/status.json')).template_version,'1.0.0');
-  assert.equal(existsSync(join(client,'status/installed-files.json')),false,'a receipt-free harness stays receipt-free');
+  assert.equal(get(client,'status/installed-files.json'),installedReceipt,'the receipt goes back with the files');
   const recovery=run('recover','--root',client);assert.equal(recovery.status,0,recovery.stderr);
 });
 
@@ -85,7 +92,6 @@ for (const marker of ['agent/agent-definition.md','agent/adapters/claude.md']) t
   const source=join(base,'release'),client=join(base,'client');mkdirSync(source);mkdirSync(client);
   const manifest={template_version:'2.0.0',deployment:{tools:['claude-code','codex'],common_sources:['AGENTS.md'],entries:[]}};
   put(source,'AGENTS.md','new agents\n');put(source,'update/manifest.json',JSON.stringify(manifest));
-  put(source,'update/pristine.json',JSON.stringify({files:{'AGENTS.md':[requireHash('old agents\n')]}}));
   git(source,'init','-q');git(source,'add','.');git(source,'-c','user.email=test@example.com','-c','user.name=Test','commit','-qm','release');
   const status=JSON.stringify({template_version:'1.9.0',ai_assistant:'claude-code'});
   put(client,'status/status.json',status);put(client,'AGENTS.md','old agents\n');put(client,marker,'old\n');
@@ -105,15 +111,15 @@ const lf = text => requireHash(text.replace(/\r\n/g, '\n'));
  * 1.0.0 with the receipt install wrote: `installed` maps each installed destination to its
  * text, `keys` gives a destination's source identity when it differs from its path.
  */
-function receiptWorld(t, { installed, keys = {}, retired = [], pristine = {} }) {
+function receiptWorld(t, { installed, keys = {}, retired = [] }) {
   const base=mkdtempSync(join(tmpdir(),'orion-receipt-update-')); t.after(()=>rmSync(base,{recursive:true,force:true}));
   const source=join(base,'release'), client=join(base,'client'); mkdirSync(source); mkdirSync(client);
   git(source,'init','-q');
   const publish = (version, files) => {
     for (const path of git(source,'ls-files').split('\n').filter(Boolean)) rmSync(join(source,path));
-    const manifest = { template_version:version, deployment:{ tools:['claude-code','codex'], common_sources:[...Object.keys(files),'update/manifest.json','update/pristine.json'], entries:[], retired } };
+    const manifest = { template_version:version, deployment:{ tools:['claude-code','codex'], common_sources:[...Object.keys(files),'update/manifest.json'], entries:[], retired } };
     for (const [path, body] of Object.entries(files)) put(source, path, body);
-    put(source,'update/manifest.json',JSON.stringify(manifest)); put(source,'update/pristine.json',JSON.stringify({files:pristine}));
+    put(source,'update/manifest.json',JSON.stringify(manifest));
     git(source,'add','-A'); git(source,'-c','user.email=test@example.com','-c','user.name=Test','commit','-qm',version);
     return git(source,'rev-parse','HEAD');
   };
@@ -133,11 +139,9 @@ test('a receipt harness updates untouched files and keeps edited and unknown one
     installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n', 'guide.md':'guide v1\n', 'status/a.mjs':'console.log("a v1")\n', '.agents/skills/old/SKILL.md':'old v1\n' },
     keys: { '.agents/skills/old/SKILL.md':'skills/old/SKILL.md' },
     retired: [{ source:'skills/old/SKILL.md', destinations:{'claude-code':'.claude/skills/old/SKILL.md',codex:'.agents/skills/old/SKILL.md'}, fingerprint_key:'skills/old/SKILL.md' }],
-    // The registry's pre-receipt README: matching it must not make a receipt-detected edit look untouched.
-    pristine: { 'README.md':[requireHash('readme v0\n')], 'guide.md':[requireHash('guide v1\n')] },
   });
   put(w.client,'AGENTS.md','agents v1\r\n');            // untouched; only the line endings differ
-  put(w.client,'README.md','readme v0\n');              // edited to the version the registry recognises
+  put(w.client,'README.md','readme v0\n');              // edited back to an earlier text
   put(w.client,'guide.md','client guide\n');            // edited
   put(w.client,'notes.md','client notes\n');            // unknown: not installed by Orion
   const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n', 'guide.md':'guide v2\n', 'status/a.mjs':'console.log("a v2")\n', 'notes.md':'notes v2\n', 'added.md':'added v2\n' });
@@ -208,21 +212,21 @@ const damagedReceipts = {
   'wrong-schema': text => JSON.stringify({ ...JSON.parse(text), schema: 'something-else' }),
 };
 for (const [name, damage] of Object.entries(damagedReceipts)) test(`a ${name} receipt stops the update before any change`, t => {
-  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n' }, pristine: { 'AGENTS.md':[requireHash('agents v1\n')] } }); // the registry would recognise it
+  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n' } });
   put(w.client, RECEIPT, damage(get(w.client, RECEIPT)));
   const before = get(w.client, RECEIPT);
   const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n' });
   const result = w.update(v2);
   assert.equal(result.status,2,result.stdout+result.stderr);
   assert.match(result.stderr,/installed-file receipt[\s\S]*nothing was changed/);
-  assert.equal(get(w.client,'AGENTS.md'),'agents v1\n','no fallback to the registry');
+  assert.equal(get(w.client,'AGENTS.md'),'agents v1\n','an untouched file is not replaced either');
   assert.equal(get(w.client,RECEIPT),before);
   assert.equal(JSON.parse(get(w.client,'status/status.json')).template_version,'1.0.0');
   assert.equal(existsSync(join(w.client,'.update-backup')),false);
 });
 
 test('an unreadable receipt stops the update before any change', t => {
-  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n' }, pristine: { 'AGENTS.md':[requireHash('agents v1\n')] } });
+  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n' } });
   rmSync(join(w.client, RECEIPT)); mkdirSync(join(w.client, RECEIPT));
   const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n' });
   const result = w.update(v2);
@@ -236,7 +240,7 @@ test('a failed receipt update puts back files and receipt together, and a held l
   const before = get(w.client, RECEIPT);
   const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n' });
   // Each file is one step and the receipt write is the next: interrupt right after the receipt lands.
-  const steps = 4; // AGENTS.md, README.md, update/manifest.json, update/pristine.json are added or replaced first
+  const steps = 3; // AGENTS.md, README.md and update/manifest.json are added or replaced first
   const failed = w.update(v2, { ORION_UPDATE_FAIL_AFTER:String(steps + 1) });
   assert.equal(failed.status,2,failed.stdout+failed.stderr); assert.match(failed.stderr,/Injected update interruption/);
   assert.equal(get(w.client,'AGENTS.md'),'agents v1\n'); assert.equal(get(w.client,'README.md'),'readme v1\n');
@@ -253,61 +257,35 @@ test('a failed receipt update puts back files and receipt together, and a held l
   assert.equal(receiptOf(w.client).files['README.md'].hash,requireHash('readme v2\n'));
 });
 
-// ── Harnesses from before receipts ─────────────────────────────────────────
-/** A receipt-free Codex client at 1.0.0: what every harness installed before receipts looks like. */
-function legacyWorld(t, options) {
-  const w = receiptWorld(t, options);
-  rmSync(join(w.client, RECEIPT));
-  return w;
+// ── Folders without a receipt ──────────────────────────────────────────────
+/** Every path under root with its bytes (folders marked), to show that nothing changed. */
+function tree(root, prefix = '') {
+  const found = {};
+  for (const item of readdirSync(join(root, prefix), { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${item.name}` : item.name;
+    if (item.isDirectory()) Object.assign(found, { [`${rel}/`]: 'folder' }, tree(root, rel));
+    else found[rel] = readFileSync(join(root, rel)).toString('base64');
+  }
+  return found;
 }
 
-test('a harness without a receipt migrates: shipped files update, unknown ones are kept and reported, and the new baselines hold on the next update', t => {
-  const w = legacyWorld(t, {
-    installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n', 'guide.md':'guide v1\n', 'status/a.mjs':'console.log("a v1")\n',
-      '.agents/skills/old/SKILL.md':'old v1\n', 'update/pristine.json':'{"files":{' },
-    // The incoming release retires a file the pre-receipt harness carries.
-    retired: [
-      { source:'skills/old/SKILL.md', destinations:{'claude-code':'.claude/skills/old/SKILL.md',codex:'.agents/skills/old/SKILL.md'}, fingerprint_key:'skills/old/SKILL.md' },
-    ],
-    // The frozen registry: the last pre-receipt version of each file, by source identity.
-    pristine: { 'AGENTS.md':[requireHash('agents v1\n')], 'README.md':[requireHash('readme v1\n')], 'guide.md':[requireHash('guide v1\n')],
-      'status/a.mjs':[requireHash('console.log("a v1")\n')], 'skills/old/SKILL.md':[requireHash('old v1\n')] },
-  });
-  put(w.client,'AGENTS.md','agents v1\r\n');            // shipped; only the line endings differ
-  put(w.client,'guide.md','client guide\n');            // edited: no shipped version matches
-  put(w.client,'notes.md','client notes\n');            // never shipped at all
-  const files = { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n', 'guide.md':'guide v2\n', 'status/a.mjs':'console.log("a v2")\n', 'notes.md':'notes v2\n', 'added.md':'added v2\n' };
-  const v2 = w.publish('2.0.0', files);
-  const first = w.update(v2); assert.equal(first.status,0,first.stdout+first.stderr); const report = JSON.parse(first.stdout);
-  for (const path of ['AGENTS.md','README.md','status/a.mjs','added.md']) assert.equal(get(w.client,path),files[path],path);
-  assert.equal(get(w.client,'guide.md'),'client guide\n');
-  assert.equal(get(w.client,'notes.md'),'client notes\n');
-  assert.equal(existsSync(join(w.client,'.agents/skills/old/SKILL.md')),false,'retired');
-  assert.deepEqual([...report.unknown].sort(),['guide.md','notes.md']);
-  let receipt = receiptOf(w.client);
-  assert.equal(receipt.template_version,'2.0.0');
-  for (const path of ['AGENTS.md','README.md','status/a.mjs','added.md']) assert.equal(receipt.files[path].hash,requireHash(files[path]),path);
-  for (const path of ['guide.md','notes.md','.agents/skills/old/SKILL.md']) assert.equal(receipt.files[path],undefined,`${path} is not claimed`);
-  assert.equal(receipt.files['update/pristine.json'].hash,lf(get(w.client,'update/pristine.json')));
-  assert.notEqual(get(w.client,'update/pristine.json'),'{"files":{','the registry copy is bookkeeping: replaced whatever its bytes');
-
-  // The migrated receipt is the baseline now: a later edit is the client's, and untouched files keep updating.
-  put(w.client,'AGENTS.md','client agents\n');
-  const v3 = w.publish('3.0.0', { ...files, 'AGENTS.md':'agents v3\n', 'README.md':'readme v3\n', 'guide.md':'guide v3\n' });
-  const second = w.update(v3); assert.equal(second.status,0,second.stdout+second.stderr); const next = JSON.parse(second.stdout);
-  assert.equal(get(w.client,'AGENTS.md'),'client agents\n');
-  assert.equal(get(w.client,'README.md'),'readme v3\n');
-  assert.equal(get(w.client,'guide.md'),'client guide\n');
-  assert.deepEqual(next.kept,['AGENTS.md']);
-  assert.deepEqual([...next.unknown].sort(),['guide.md','notes.md']);
-  receipt = receiptOf(w.client);
-  assert.equal(receipt.files['AGENTS.md'].hash,requireHash('agents v2\n'));
-  assert.equal(receipt.files['README.md'].hash,requireHash('readme v3\n'));
+test('an update refuses a folder without a receipt and points at reinstalling, with nothing changed', t => {
+  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'status/a.mjs':'console.log("a v1")\n' } });
+  rmSync(join(w.client, RECEIPT)); // a 2.0.0 folder installed before receipts
+  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'status/a.mjs':'console.log("a v2")\n', 'added.md':'added v2\n' });
+  const before = tree(w.client);
+  const result = w.update(v2);
+  assert.equal(result.status,2,result.stdout+result.stderr);
+  assert.equal(result.stdout,'');
+  assert.match(result.stderr,/no installed-file receipt \(status\/installed-files\.json\)/);
+  assert.match(result.stderr,/agent\/reinstall-from-1\.x\.md/);
+  assert.match(result.stderr,/Nothing was changed/);
+  assert.deepEqual(tree(w.client),before,'no file, backup, receipt or lock was written');
 });
 
 test('an update killed at any step is recovered with its receipt, and the next update trusts only what it installs', t => {
-  // Steps: AGENTS.md, README.md, added.md, update/manifest.json, update/pristine.json, then the receipt.
-  for (const [at, next] of [['1','recover'],['3','update'],['6','recover'],['6','update']]) {
+  // Steps: AGENTS.md, README.md, added.md, update/manifest.json, then the receipt.
+  for (const [at, next] of [['1','recover'],['3','update'],['5','recover'],['5','update']]) {
     const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n' } });
     const before = get(w.client, RECEIPT);
     const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n', 'added.md':'added v2\n' });
@@ -395,9 +373,9 @@ test('restore keeps later edits, restores the rest with their baselines, and the
 });
 
 /**
- * An update that wrote the harness's first receipt (a migration from before receipts) records
- * that there was none: its journal's receipt has `prior: null` and the backup holds no copy.
- * Made here from a completed update's backup, as a crash would leave it.
+ * A backup from before every update had a receipt to back up records that there was none:
+ * its journal's receipt has `prior: null` and the backup holds no copy. Made here from a
+ * completed update's backup, as a crash would leave it.
  */
 function firstReceiptUpdate(t, state) {
   const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n' } });
@@ -436,64 +414,4 @@ test('restoring an update that wrote the first receipt removes it, unless the re
   const after = receiptOf(later.client);
   assert.equal(after.files['README.md'].hash,requireHash('readme v2\n'),'the kept file keeps its baseline');
   for (const path of ['AGENTS.md','added.md']) assert.equal(after.files[path],undefined,path);
-});
-
-test('restoring a backup from before receipts leaves a harness without one as it is', t => {
-  const w = receiptWorld(t, { installed: { 'AGENTS.md':'agents v1\n' }, pristine: { 'AGENTS.md':[requireHash('agents v1\n')] } });
-  rmSync(join(w.client, RECEIPT));
-  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n' });
-  const updated = w.update(v2); assert.equal(updated.status,0,updated.stderr);
-  const { backup } = JSON.parse(updated.stdout);
-  const restored = w.restore(backup); assert.equal(restored.status,0,restored.stdout+restored.stderr);
-  assert.equal(get(w.client,'AGENTS.md'),'agents v1\n');
-  assert.equal(existsSync(join(w.client,RECEIPT)),false);
-});
-
-test('restoring a migration after its receipt changed gives restored files the baselines the migration proved', t => {
-  const w = legacyWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'status/a.mjs':'console.log("a v1")\n' },
-    pristine: { 'AGENTS.md':[requireHash('agents v1\n')], 'status/a.mjs':[requireHash('console.log("a v1")\n')] } });
-  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'status/a.mjs':'console.log("a v2")\n' });
-  const updated = w.update(v2); assert.equal(updated.status,0,updated.stderr);
-  // Another Orion command rewrote the receipt after the update (a tool switch does).
-  put(w.client, RECEIPT, JSON.stringify({ ...receiptOf(w.client), recorded_by:'switch' }, null, 2));
-  const restored = w.restore(JSON.parse(updated.stdout).backup); assert.equal(restored.status,0,restored.stdout+restored.stderr);
-  assert.equal(get(w.client,'status/a.mjs'),'console.log("a v1")\n');
-  assert.equal(receiptOf(w.client).files['status/a.mjs'].hash,requireHash('console.log("a v1")\n'));
-  // So the restored runtime file is Orion's again, and the next update replaces it.
-  const again = w.update(v2); assert.equal(again.status,0,again.stdout+again.stderr);
-  assert.equal(get(w.client,'status/a.mjs'),'console.log("a v2")\n');
-});
-
-test('restoring a migration that kept a later edit keeps a receipt, so the edit is never adopted from the registry', t => {
-  const w = legacyWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'README.md':'readme v1\n' },
-    pristine: { 'AGENTS.md':[requireHash('agents v1\n')], 'README.md':[requireHash('readme v1\n')] } });
-  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n', 'README.md':'readme v2\n' });
-  const updated = w.update(v2); assert.equal(updated.status,0,updated.stdout+updated.stderr);
-  // After the update the client writes README.md back to the text the registry recognises.
-  put(w.client,'README.md','readme v1\n');
-  const restored = w.restore(JSON.parse(updated.stdout).backup); assert.equal(restored.status,0,restored.stdout+restored.stderr);
-  assert.deepEqual(JSON.parse(restored.stdout).kept,['README.md']);
-  assert.equal(get(w.client,'AGENTS.md'),'agents v1\n');
-  const receipt = receiptOf(w.client);
-  assert.equal(receipt.template_version,'1.0.0');
-  assert.equal(receipt.files['AGENTS.md'].hash,requireHash('agents v1\n'),'the restored file takes the baseline the migration proved');
-  assert.equal(receipt.files['README.md'].hash,requireHash('readme v2\n'),'the kept edit keeps the update baseline');
-  // The next update keeps the client's README.md and still updates the rest.
-  const v3 = w.publish('3.0.0', { 'AGENTS.md':'agents v3\n', 'README.md':'readme v3\n' });
-  const next = w.update(v3); assert.equal(next.status,0,next.stdout+next.stderr);
-  assert.equal(get(w.client,'README.md'),'readme v1\n');
-  assert.deepEqual(JSON.parse(next.stdout).kept,['README.md']);
-  assert.equal(get(w.client,'AGENTS.md'),'agents v3\n');
-});
-
-test('a migrating harness always replaces its registry copy: it is Orion bookkeeping, whatever its bytes', t => {
-  const w = legacyWorld(t, { installed: { 'AGENTS.md':'agents v1\n', 'update/pristine.json':'{"files":{"mine":[]}}\n' },
-    pristine: { 'AGENTS.md':[requireHash('agents v1\n')] } });
-  const v2 = w.publish('2.0.0', { 'AGENTS.md':'agents v2\n' });
-  const updated = w.update(v2); assert.equal(updated.status,0,updated.stdout+updated.stderr);
-  const report = JSON.parse(updated.stdout);
-  assert.equal(get(w.client,'AGENTS.md'),'agents v2\n');
-  assert.equal(get(w.client,'update/pristine.json'),get(w.source,'update/pristine.json'));
-  assert.ok(!report.unknown.includes('update/pristine.json'));
-  assert.equal(receiptOf(w.client).files['update/pristine.json'].hash,lf(get(w.client,'update/pristine.json')));
 });
